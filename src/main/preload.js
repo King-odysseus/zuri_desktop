@@ -35,6 +35,7 @@ const CHANNELS = Object.freeze([
   'zuri:settings:save',
   'zuri:settings:setKey',
   'zuri:settings:clearKey',
+  'zuri:onboarding:complete',
   'zuri:settings:keyStatus',
   'zuri:settings:open-data-folder',
   'zuri:files:list',

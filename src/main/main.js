@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 import { CHAT_STREAM_CHANNEL, sendChatMessage, summarizeText } from './providers/chat.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
+import { runOnboardingSetup } from './onboarding.js';
 import { clearKey, keyStatus, setKey } from './secrets.js';
 import { appendMessage, createThread, getStoreRoot, listThreads, readSettings, saveSettings } from './store.js';
 import { ensureWorkspace, listWorkspaceFiles, resolveWorkspaceFile, runTool } from './tools/index.js';
@@ -71,6 +72,7 @@ const HANDLERS = new Map([
   ['zuri:settings:save', handleSettingsSave],
   ['zuri:settings:setKey', handleSettingsSetKey],
   ['zuri:settings:clearKey', handleSettingsClearKey],
+  ['zuri:onboarding:complete', handleOnboardingComplete],
   ['zuri:settings:keyStatus', handleSettingsKeyStatus],
   ['zuri:settings:open-data-folder', handleSettingsOpenDataFolder],
   ['zuri:files:list', handleFilesList],
@@ -207,6 +209,18 @@ function handleSettingsGet() {
  */
 function handleSettingsSave(payload) {
   return saveSettings(payload ?? {});
+}
+
+/**
+ * Finish first-run setup in one call: name, theme and provider key.
+ * One channel rather than three saves, because the card treats setup as a single
+ * step, and half of it (a name stored, no key) is a state it must report as an
+ * error rather than leave behind silently.
+ * @param {{ name?: string, theme?: string, provider?: string, key?: string, model?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+function handleOnboardingComplete(payload) {
+  return runOnboardingSetup(payload ?? {});
 }
 
 /**

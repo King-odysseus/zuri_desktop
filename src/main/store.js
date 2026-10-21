@@ -375,9 +375,16 @@ export async function createThread(input = {}, options = {}) {
 }
 
 /**
+ * The modes a turn can be sent in. Kept here as well as in the renderer because a
+ * stored turn keeps the mode it was sent in, and an unknown one is dropped rather
+ * than written into chats.json.
+ */
+const MESSAGE_MODES = Object.freeze(['ask', 'act', 'autopilot']);
+
+/**
  * Append one message to a thread, bump its `updatedAt`, and persist.
  * @param {string} threadId
- * @param {{ role?: 'user' | 'assistant', content?: string }} message
+ * @param {{ role?: 'user' | 'assistant', content?: string, mode?: string }} message
  * @param {{ root?: string }} [options]
  * @returns {Promise<{ ok: true, data: { thread: any, message: any } } | { ok: false, error: { code: string, message: string } }>}
  */
@@ -408,7 +415,8 @@ export async function appendMessage(threadId, message, options = {}) {
     if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
     if (!Array.isArray(thread.messages)) thread.messages = [];
 
-    const stored = { id: randomUUID(), role, content, createdAt: now };
+    const mode = MESSAGE_MODES.includes(message.mode) ? message.mode : null;
+    const stored = { id: randomUUID(), role, content, createdAt: now, ...(mode ? { mode } : {}) };
     thread.messages.push(stored);
     thread.updatedAt = now;
     // The first user message names the thread, so a chat called "New chat" in the
