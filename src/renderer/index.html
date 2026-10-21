@@ -11,6 +11,7 @@
     />
     <title>Zuri</title>
     <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/dropdown.css" />
     <link rel="stylesheet" href="styles/components.css" />
   </head>
   <body>
@@ -22,12 +23,51 @@
          data-collapsed; the sidebar's toggle lives in the top bar, where the
          design puts it. -->
     <div class="app-shell" id="app">
-      <!-- Top bar (node 0:132): sidebar toggle, the app name, the model trigger,
-           then search, notifications, theme and the account chip, right-aligned. -->
+      <!-- Top bar (design "App shell (main window)", node 0:132): one 56 px bar
+           across the whole window, so no bare strip is left above the sidebar at
+           wide sizes. The bar's own background and hairline span the window; its
+           controls keep their 16 px inset. The brand stays in the sidebar. -->
       <header class="top-bar">
         <div class="top-bar-leading">
+          <!-- Named after the section on show; ui/router.js keeps it in step with
+               the destination so the bar reads "Chats", "Tasks", "Settings"... -->
+          <span class="top-bar-title">Chats</span>
+          <!-- The model chip, search, notifications and theme are rendered by
+               ui/topbar.js from settings. The account lives in the sidebar's user
+               row, so the bar's trailing side ends at the theme toggle. -->
+        </div>
+
+        <div class="top-bar-trailing"></div>
+      </header>
+
+      <!-- Body: the sidebar, the 12 px rail, then the workspace column. -->
+      <div class="app-body">
+      <!--
+        Shell geometry from the App Shell frame (0:466, 1200x800): the sidebar runs
+        the body height at 260, a 12 px gutter follows it, and the workspace fills
+        the rest. The bar above is window wide, so the sidebar starts under it and
+        the brand stays in the sidebar rather than in the bar.
+      -->
+      <aside
+        class="shell-column shell-column-sidebar"
+        id="sidebar"
+        aria-label="Sidebar"
+        data-collapsed="false"
+      >
+        <!-- Brand row (node 0:469, 236x40 at 12,12): the 32 px mark, the name, then
+             the collapse toggle on the right edge of the panel. -->
+        <div class="sidebar-brand">
+          <!-- The mark: a speech bubble with two eye holes punched out of it by
+               fill-rule, so the tile's accent shows through instead of the eyes
+               being painted a second colour. -->
+          <span class="sidebar-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" focusable="false">
+              <path fill-rule="evenodd" d="M10.2 0H13.8C18.9 0 24 3.9 24 8.6V12.4C24 16.3 22 20.2 20.05 20.2V24L13.8 21.4H9.2C4.6 21.4 0 17.25 0 13.1V8.4C0 4.2 5.1 0 10.2 0ZM5.8 8.3A1.86 1.86 0 0 1 9.5 8.3V13.8A1.86 1.86 0 0 1 5.8 13.8ZM14.3 8.3A1.86 1.86 0 0 1 18.1 8.3V13.8A1.86 1.86 0 0 1 14.3 13.8Z" />
+            </svg>
+          </span>
+          <span class="sidebar-brand-name">Zuri</span>
           <button
-            class="shell-toggle top-bar-button top-bar-sidebar-toggle"
+            class="shell-toggle sidebar-brand-toggle"
             type="button"
             aria-controls="sidebar"
             aria-expanded="true"
@@ -37,8 +77,8 @@
             <svg
               class="shell-toggle-icon"
               viewBox="0 0 24 24"
-              width="16"
-              height="16"
+              width="15"
+              height="15"
               aria-hidden="true"
               focusable="false"
             >
@@ -51,24 +91,9 @@
               <path d="M9.5 4v16" fill="none" stroke="currentColor" stroke-width="1.5"></path>
             </svg>
           </button>
-          <span class="top-bar-title">Zuri</span>
-          <!-- Model chip, search, notifications, theme and the account chip are
-               rendered by ui/topbar.js from settings. The sidebar toggle and app
-               name above are shell layout and stay in the markup. -->
         </div>
 
-        <div class="top-bar-trailing"></div>
-      </header>
-
-      <div class="shell">
-        <aside
-          class="shell-column shell-column-sidebar"
-          id="sidebar"
-          aria-label="Sidebar"
-          data-collapsed="false"
-        >
-          <!-- New chat (node 0:165): the one filled row in the panel, with its
-               shortcut on the right so the keyboard route is discoverable. -->
+        <!-- Sidebar content: new chat, the destinations, then the thread list. -->
           <div class="sidebar-head">
             <!-- data-route: a new chat is still the Chats destination, so starting
                  one from any other view also brings the conversation back. -->
@@ -99,12 +124,13 @@
             </button>
           </div>
 
-          <!-- Navigation (nodes 0:63 / 0:67, "Nav / Sidebar Row"): the destinations
-               the central column can show, one row each. ui/router.js owns which row
-               carries aria-current="page", so the fill and the announced state are
-               the same attribute. New chat and Settings stay outside this list
-               because they are the two pinned rows above and below it. -->
-          <nav class="sidebar-nav" id="sidebar-nav" aria-label="Main">
+          <!-- Navigation (design "Primary Nav", 236x264: seven 36 px rows on a
+               2 px gap): the destinations the central column can show, one row each.
+               ui/router.js owns which row carries aria-current="page", so the fill and
+               the announced state are the same attribute. New chat stays outside this
+               list because it is the pinned action above it. -->
+          <p class="sidebar-group-label" id="sidebar-workspace-label">Workspace</p>
+          <nav class="sidebar-nav" id="sidebar-nav" aria-labelledby="sidebar-workspace-label">
             <button class="nav-sidebar-row" type="button" data-route="chats" aria-current="page">
               <svg
                 class="nav-sidebar-row-icon"
@@ -248,10 +274,36 @@
               </svg>
               <span class="nav-sidebar-row-label">Files</span>
             </button>
+
+            <button class="nav-sidebar-row" type="button" data-route="settings">
+              <svg
+                class="nav-sidebar-row-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                ></path>
+                <path
+                  d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 1.56V21a2 2 0 11-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.56-1H3a2 2 0 110-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.56V3a2 2 0 114 0v.09A1.7 1.7 0 0015 4.6a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9v.09a1.7 1.7 0 001.56 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  stroke-linejoin="round"
+                ></path>
+              </svg>
+              <span class="nav-sidebar-row-label">Settings</span>
+            </button>
           </nav>
 
           <div class="shell-column-body sidebar-body">
-            <p class="shell-section-label" id="thread-list-label">Conversations</p>
+            <p class="shell-section-label sidebar-group-label" id="thread-list-label">Recent</p>
 
             <!-- Thread rows: built by ui/chats.js from chats.json, newest first.
                  Built in JS because the list is data, not markup. -->
@@ -283,53 +335,41 @@
             </div>
           </div>
 
-          <!-- Foot: the Settings row and the Autopilot status card (node 0:204),
-               pinned under a hairline. Both are always in the same place, so the
-               panel does not jump when the thread list grows. -->
+          <!-- Foot: the account row (design "User Row", 236x52 on a 12 px radius),
+               pinned to the bottom so the panel does not jump when the thread list
+               grows. The Settings destination now sits in the nav list above, as the
+               design draws it. -->
           <div class="sidebar-foot">
-            <!-- Settings row: drawn here, routed by the sidebar-router card. It is
-                 a button rather than a link so it cannot strand the shell in a view
-                 that has no way back. -->
-            <button
-              class="sidebar-settings-row"
-              id="sidebar-settings-row"
-              type="button"
-              title="Settings"
-              data-route="settings"
-            >
+            <button class="sidebar-user-row" id="sidebar-user-row" type="button" data-route="account">
+              <span class="sidebar-user-avatar" aria-hidden="true" id="sidebar-user-avatar">You</span>
+              <span class="sidebar-user-text">
+                <span class="sidebar-user-name" id="sidebar-user-name">You</span>
+                <span class="sidebar-user-plan">Solo plan</span>
+              </span>
               <svg
-                class="sidebar-settings-icon"
+                class="sidebar-user-chevron"
                 viewBox="0 0 24 24"
-                width="20"
-                height="20"
+                width="14"
+                height="14"
                 aria-hidden="true"
                 focusable="false"
               >
                 <path
-                  d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"
+                  d="M8 9l4-4 4 4M8 15l4 4 4-4"
                   fill="none"
                   stroke="currentColor"
-                  stroke-width="1.5"
-                ></path>
-                <path
-                  d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 1.56V21a2 2 0 11-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.56-1H3a2 2 0 110-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.56V3a2 2 0 114 0v.09A1.7 1.7 0 0015 4.6a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9v.09a1.7 1.7 0 001.56 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.2"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
                   stroke-linejoin="round"
                 ></path>
               </svg>
-              <span class="sidebar-settings-label">Settings</span>
             </button>
-
-            <div class="autopilot-status">
-              <span class="autopilot-status-dot" aria-hidden="true"></span>
-              <span class="autopilot-status-label">Autopilot</span>
-              <span class="autopilot-status-meta">While Zuri is open</span>
-            </div>
           </div>
-        </aside>
+      </aside>
 
+      <!-- The workspace: the three-column content row under the window-wide bar. -->
+      <div class="workspace">
+        <div class="shell">
         <main
           class="shell-column shell-column-chat"
           id="chat"
@@ -382,23 +422,8 @@
                  Hidden rather than removed once a thread has messages. -->
             <div class="shell-empty-hero" id="chat-empty-hero" data-state="empty">
               <span class="transcript-empty-mark" aria-hidden="true">
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                >
-                  <path
-                    d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"
-                  ></path>
-                  <path d="M20 3v4"></path>
-                  <path d="M22 5h-4"></path>
-                  <path d="M4 17v2"></path>
-                  <path d="M5 18H3"></path>
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" focusable="false">
+                  <path fill-rule="evenodd" d="M10.2 0H13.8C18.9 0 24 3.9 24 8.6V12.4C24 16.3 22 20.2 20.05 20.2V24L13.8 21.4H9.2C4.6 21.4 0 17.25 0 13.1V8.4C0 4.2 5.1 0 10.2 0ZM5.8 8.3A1.86 1.86 0 0 1 9.5 8.3V13.8A1.86 1.86 0 0 1 5.8 13.8ZM14.3 8.3A1.86 1.86 0 0 1 18.1 8.3V13.8A1.86 1.86 0 0 1 14.3 13.8Z" />
                 </svg>
               </span>
               <h1 class="shell-empty-title" id="chat-empty-title">New chat with Zuri</h1>
@@ -594,7 +619,7 @@
                   title="Add an AI key in Settings to attach files"
                   disabled
                 >
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
                     <path
                       d="M9 12.5l5.2-5.2a3 3 0 114.2 4.2l-7.1 7.1a5 5 0 11-7.1-7.1l7.4-7.4"
                       fill="none"
@@ -622,7 +647,7 @@
                   title="Send message"
                   disabled
                 >
-                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
                     <path
                       d="M12 19V6M6 12l6-6 6 6"
                       fill="none"
@@ -649,9 +674,12 @@
           aria-label="Context panel"
           data-collapsed="false"
         >
-          <!-- Context header (node 0:271): the collapse control, the panel name and
-               its state, on the rail's own tone. -->
+          <!-- Context panel (design 0:634, 300 wide on the panel tone): a 28 px
+               header naming the panel, then four white cards 12 apart on the panel's
+               12 px gutter - detected files, the next Autopilot run, reminders and a
+               note on what Act does. -->
           <div class="context-header">
+            <span class="context-title">Context</span>
             <button
               class="shell-toggle context-toggle"
               type="button"
@@ -663,8 +691,8 @@
               <svg
                 class="shell-toggle-icon"
                 viewBox="0 0 24 24"
-                width="16"
-                height="16"
+                width="14"
+                height="14"
                 aria-hidden="true"
                 focusable="false"
               >
@@ -678,56 +706,59 @@
                 ></path>
               </svg>
             </button>
-            <span class="context-title">Autopilot</span>
-            <span class="context-status"><span class="context-status-dot" aria-hidden="true"></span>Idle</span>
           </div>
 
           <div class="shell-column-body context-body">
-            <p class="shell-section-label">Active work</p>
+            <!-- Card: detected files (design 0:642). The rows come from
+                 `zuri:files:list` in ui/contextPanel.js; without the desktop bridge
+                 the card says so rather than claiming there are no files. -->
+            <section class="context-card" aria-labelledby="context-files-label">
+              <p class="context-card-label" id="context-files-label">Detected files</p>
+              <ul class="context-file-list" id="context-file-list" data-state="loading">
+                <li class="context-file-row context-file-placeholder" aria-hidden="true">
+                  <span class="context-file-icon"></span>
+                  <span class="context-file-name">Reading your workspace…</span>
+                </li>
+              </ul>
+              <p class="context-card-empty" id="context-files-empty" hidden></p>
+            </section>
 
-            <!-- Loading state: the panel fills from the main process once the first
-                 state payload arrives, so it starts as a labelled skeleton rather
-                 than pretending there is nothing to show. -->
-            <div class="shell-loading" data-state="loading" role="status" aria-live="polite">
-              <p class="shell-loading-label">
-                <span class="shell-spinner" aria-hidden="true"></span>
-                Loading active work
+            <!-- Card: the next scheduled run (design 0:661). Automations are stored
+                 by main; until one is scheduled the card names the promise instead of
+                 inventing a run. -->
+            <section class="context-card" aria-labelledby="context-run-label">
+              <p class="context-card-label" id="context-run-label">Next Autopilot run</p>
+              <p class="context-card-title" id="context-run-title">Nothing scheduled</p>
+              <p class="context-card-text" id="context-run-text">
+                Automations run while Zuri is open. Schedule one from Automations.
               </p>
-              <span class="shell-skeleton-row" aria-hidden="true"></span>
-              <span class="shell-skeleton-row" aria-hidden="true"></span>
-              <span class="shell-skeleton-row shell-skeleton-row-short" aria-hidden="true"></span>
-            </div>
+            </section>
 
-            <p class="shell-section-label">Reminders</p>
-
-            <!-- Empty: the design's Block / Empty component (node 0:105) - mark,
-                 title, caption and one action. The mark is that node's own vector,
-                 drawn in currentColor so it follows the mark token. -->
-            <div class="empty-block" data-state="empty">
+            <!-- Card: reminders (design 0:670). Empty, it holds the design's empty
+                 state card (node 0:10866): icon badge, title, body and one action
+                 that starts a task with the composer ready to finish. The badge's
+                 glyph is that node's own two vectors (0:10869 and 0:10870), drawn as
+                 strokes in currentColor so it follows the text-subtle token the node
+                 binds them to. -->
+            <section class="context-card" aria-labelledby="context-reminders-label">
+              <p class="context-card-label" id="context-reminders-label">Reminders</p>
+              <div class="empty-block" data-state="empty">
               <span class="empty-block-mark" aria-hidden="true">
-                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 22 22"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.83"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <!-- Design node 0:10869: the tray line inside the box. -->
+                  <path d="M20.17 11H14.67L12.83 13.75H9.17L7.33 11H1.83"></path>
+                  <!-- Design node 0:10870: the rounded tray outline, corners included. -->
                   <path
-                    d="M4.87 11.72C2.96 9.09 3.35 5.45 5.76 3.28C8.17 1.11 11.83 1.11 14.24 3.28C16.65 5.45 17.04 9.09 15.13 11.72"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="1.47"
-                    stroke-linecap="round"
-                  ></path>
-                  <path
-                    d="M6.88 7.08C6.88 7.61 7.31 8.05 7.85 8.05C8.38 8.05 8.81 7.61 8.81 7.08C8.81 6.55 8.38 6.12 7.85 6.12C7.31 6.12 6.88 6.55 6.88 7.08"
-                    fill="currentColor"
-                  ></path>
-                  <path
-                    d="M11.19 7.08C11.19 7.61 11.62 8.05 12.16 8.05C12.69 8.05 13.12 7.61 13.12 7.08C13.12 6.55 12.69 6.12 12.16 6.12C11.62 6.12 11.19 6.55 11.19 7.08Z"
-                    fill="currentColor"
-                  ></path>
-                  <path
-                    d="M4.9 13.88C4.9 15.57 7.18 16.94 10 16.94C12.82 16.94 15.1 15.57 15.1 13.88C15.1 12.19 12.82 10.82 10 10.82C7.18 10.82 4.9 12.19 4.9 13.88Z"
-                    fill="currentColor"
-                  ></path>
-                  <path
-                    d="M7.51 14.33L12.49 14.33L9.55 19.09L7.51 14.33Z"
-                    fill="currentColor"
+                    d="M5 4.68L1.83 11V16.5C1.83 16.987 2.024 17.454 2.37 17.798C2.715 18.141 3.183 18.333 3.67 18.33H18.33C18.817 18.333 19.285 18.141 19.63 17.798C19.976 17.454 20.17 16.987 20.17 16.5V11L17 4.68C16.689 4.06 16.054 3.668 15.36 3.67H6.64C5.946 3.668 5.311 4.06 5 4.68Z"
                   ></path>
                 </svg>
               </span>
@@ -738,9 +769,44 @@
               <button class="empty-block-action" id="reminders-empty-action" type="button">
                 Create a task
               </button>
-            </div>
+              </div>
+            </section>
+
+            <!-- Card: what Act does (design 0:684). A description of the product's
+                 behaviour, which is true of this build: Act asks before it changes a
+                 file (the composer hint says the same). -->
+            <section class="context-card context-card-act">
+              <span class="context-act-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M12 3l7 3v6c0 4.2-2.9 7.4-7 9-4.1-1.6-7-4.8-7-9V6l7-3z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M8.5 12.2l2.4 2.4 4.6-5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ></path>
+                </svg>
+              </span>
+              <div class="context-act-text">
+                <p class="context-card-title">Act asks before it changes anything</p>
+                <p class="context-card-text">
+                  Zuri opens your files itself and says what it is about to do before it
+                  does it.
+                </p>
+              </div>
+            </section>
           </div>
         </aside>
+        </div>
+      </div>
       </div>
 
       <!-- Phone navigation: below 768 px the three columns cannot share the

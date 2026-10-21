@@ -35,9 +35,20 @@
      through border-strong). */
   --zuri-bg-canvas: #0b0b0f; /* heroUI default ramp, darkest canvas step */
   --zuri-bg-glass: rgba(20, 20, 26, 0.66); /* heroUI default ramp, 66% alpha glass */
+  /* Card / Glass (design node 0:105): the two colour variables the node binds,
+     glass-surface and glass-border, as the design's Dark collection holds them
+     (#18181BCC and #FFFFFF1F). Deliberately not --zuri-bg-glass above, which is
+     the style guide's HeroUI ramp value rather than this node's binding. */
+  --zuri-glass-card-surface: rgba(24, 24, 27, 0.8); /* design node 0:105 glass-surface, dark #18181BCC */
+  --zuri-glass-card-border: rgba(255, 255, 255, 0.1216); /* design node 0:105 glass-border, dark #FFFFFF1F */
   --zuri-surface: #16161c; /* heroUI default ramp, dark surface */
   --zuri-surface-raised: #1e1e26; /* heroUI default ramp, one step above surface */
   --zuri-surface-sunken: #101214; /* design node 0:113 color/sunken, the dark step below surface */
+  /* The two steps the current design's panels and controls are drawn on
+     (tokens.json Dark --color-surface-secondary / --color-surface-tertiary):
+     the sidebar and context panel, and the search field and bell button. */
+  --zuri-surface-secondary: #27272a; /* tokens.json Dark --color-surface-secondary: the sidebar and context panel tone */
+  --zuri-surface-tertiary: #3f3f46; /* tokens.json Dark --color-surface-tertiary: the search field and bell button tone */
   --zuri-surface-active: #262a2f; /* design node 0:67 color/active fill, read through the design's dark colour collection (the node is bound to the light twin) */
   /* The scrim behind a dialog, from the "Modal / Scrim" node 0:95 read through the
      design's dark colour collection: color/overlay is pure black at 56.08%. */
@@ -84,6 +95,7 @@
   --zuri-rail-danger-line: rgba(240, 106, 106, 0.32); /* danger, dark collection, at the node's 32% */
   --zuri-text-secondary: #a6a6b2; /* heroUI default ramp, secondary foreground */
   --zuri-text-muted: #71717c; /* heroUI default ramp, muted foreground */
+  --zuri-text-subtle: #a1a1aa; /* tokens.json Dark --color-text-subtle, design node 0:105 Body */
   --zuri-text-on-accent: #ffffff; /* heroUI primary ramp, contrast foreground */
   --zuri-text-mark: #c28a1d; /* design node 0:105 mark gold; the node gives one value, so both themes share it */
   --zuri-text-panel-header: #8e9196; /* design node 0:73 Label and Count fill; unbound to a mode, so both themes share it */
@@ -98,9 +110,9 @@
   --zuri-nav-top-bar-hairline: rgba(255, 255, 255, 0.08); /* design node 0:78 color/border, dark collection: white at 7.84% */
 
   /* Accent and semantic: HeroUI primary / success / warning / danger ramps. */
-  --zuri-accent: #7c7cec; /* heroUI primary ramp, dark interactive step */
-  --zuri-accent-hover: #8f8ff2; /* heroUI primary ramp, one step lighter for hover */
-  --zuri-accent-subtle: rgba(124, 124, 236, 0.16); /* heroUI primary ramp at 16% alpha */
+  --zuri-accent: #006fee; /* tokens.json Dark --color-primary, the design's blue */
+  --zuri-accent-hover: #338ef7; /* tokens.json Dark --color-primary-hover */
+  --zuri-accent-subtle: rgba(0, 111, 238, 0.16); /* tokens.json Dark --color-primary-soft (#001731) as a tint */
   --zuri-success: #3ddc84; /* heroUI success ramp, dark step */
   --zuri-success-subtle: rgba(61, 220, 132, 0.16); /* heroUI success ramp at 16% alpha */
   --zuri-warning: #f5a623; /* heroUI warning ramp, dark step */
@@ -146,6 +158,10 @@
   --zuri-radius-card: 10px; /* tokens.json radius-card */
   --zuri-radius-modal: 12px; /* tokens.json radius-modal */
   --zuri-radius-overlay: 12px; /* tokens.json radius-overlay */
+  /* The card's 20 px corners are the node's own binding, radius-xl. The HeroUI
+     scale above spells radius-xl as 16 px, so the card carries the design's
+     value rather than borrowing the ramp's. */
+  --zuri-glass-card-radius: 20px; /* design node 0:105 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
 
   /* Typography: HeroUI type scale, system UI stack with Segoe UI first on
      Windows (style guide text styles). */
@@ -189,6 +205,14 @@
   --zuri-sidebar-width-collapsed: 64px; /* style guide sidebar collapsed */
   --zuri-right-panel-width: 320px; /* style guide right panel */
   --zuri-topbar-height: 52px; /* design node 0:78: a 51 px row plus its 1 px hairline, and size/topbar-height is 52; the node overrides the style guide's 48 */
+  /* The shell's own geometry, from the App Shell frame 0:466. Kept apart from the
+     topbar/panel tokens above because the standalone view pages still draw the
+     older 52 px bar and 320 px panel. */
+  --zuri-shell-topbar-height: 56px; /* design "Top Bar" (0:541): 56 px, content row starts at 56 */
+  --zuri-context-panel-width: 300px; /* design "Context Panel" (0:634): 300 wide */
+  --zuri-shell-gutter: 12px; /* design "Rail Left" (0:538) / "Rail Right" (0:632): 12 px */
+  --zuri-radius-brand: 10px; /* design "Brand Mark" (0:470) and New chat (0:478): radius 10 */
+  --zuri-radius-search: 9px; /* design search field (0:543), bell (0:546) and theme (0:556): radius 9 */
   --zuri-chat-max-width: 732px; /* design node 0:1221: the transcript content column, 860 wide less its 64 px inset each side */
   --zuri-modal-width: 480px; /* design node 0:96 dialog width */
   --zuri-floating-assistant-width: 360px; /* style guide floating assistant */
@@ -211,9 +235,18 @@
      through border-strong). */
   --zuri-bg-canvas: #f5f5f7; /* heroUI default ramp, light canvas step */
   --zuri-bg-glass: rgba(255, 255, 255, 0.72); /* heroUI default ramp, 72% alpha glass */
+  /* Card / Glass (design node 0:105), the design's Light collection: the node's
+     fill is #FFFFFFB3 and its stroke #FFFFFF66. */
+  --zuri-glass-card-surface: rgba(255, 255, 255, 0.702); /* design node 0:105 glass-surface, light #FFFFFFB3 */
+  --zuri-glass-card-border: rgba(255, 255, 255, 0.4); /* design node 0:105 glass-border, light #FFFFFF66 */
   --zuri-surface: #ffffff; /* heroUI default ramp, light surface */
   --zuri-surface-raised: #ffffff; /* heroUI default ramp, raised light surface */
   --zuri-surface-sunken: #f0f1f3; /* design node 0:113 color/sunken, the light step below surface */
+  /* The two steps the current design's panels and controls are drawn on
+     (tokens.json Light --color-surface-secondary / --color-surface-tertiary):
+     the sidebar and context panel, and the search field and bell button. */
+  --zuri-surface-secondary: #f4f4f5; /* tokens.json Light --color-surface-secondary: the sidebar and context panel tone */
+  --zuri-surface-tertiary: #e4e4e7; /* tokens.json Light --color-surface-tertiary: the search field and bell button tone */
   --zuri-surface-active: #e6e8eb; /* design node 0:67 color/active fill, the design's light colour collection */
   /* The scrim behind a dialog, from the "Modal / Scrim" node 0:95 read through the
      design's light colour collection: the node's own fill is #1F232847, near-black
@@ -259,6 +292,7 @@
   --zuri-rail-danger-line: rgba(209, 67, 67, 0.32); /* node stroke #D1434352: due card and error card outline */
   --zuri-text-secondary: #5b5b66; /* heroUI default ramp, secondary foreground */
   --zuri-text-muted: #8a8a96; /* heroUI default ramp, muted foreground */
+  --zuri-text-subtle: #6b6b75; /* tokens.json Light --color-text-subtle, design node 0:105 Body */
   --zuri-text-on-accent: #ffffff; /* heroUI primary ramp, contrast foreground */
   --zuri-text-mark: #c28a1d; /* design node 0:105 mark gold; the node gives one value, so both themes share it */
   --zuri-text-panel-header: #8e9196; /* design node 0:73 Label and Count fill; unbound to a mode, so both themes share it */
@@ -272,9 +306,9 @@
   --zuri-nav-top-bar-hairline: #e8eaed; /* design node 0:78 color/border, light collection */
 
   /* Accent and semantic: HeroUI primary / success / warning / danger ramps. */
-  --zuri-accent: #5b5bd6; /* heroUI primary ramp, light interactive step */
-  --zuri-accent-hover: #4f4fc4; /* heroUI primary ramp, one step darker for hover */
-  --zuri-accent-subtle: rgba(91, 91, 214, 0.1); /* heroUI primary ramp at 10% alpha */
+  --zuri-accent: #006fee; /* tokens.json Light --color-primary, the design's blue */
+  --zuri-accent-hover: #005bc4; /* tokens.json Light --color-primary-hover */
+  --zuri-accent-subtle: rgba(0, 111, 238, 0.1); /* tokens.json Light --color-primary-soft (#E6F1FE) as a tint */
   --zuri-success: #17a34a; /* heroUI success ramp, light step */
   --zuri-success-subtle: rgba(23, 163, 74, 0.1); /* heroUI success ramp at 10% alpha */
   --zuri-warning: #d97706; /* heroUI warning ramp, light step */
@@ -320,6 +354,10 @@
   --zuri-radius-card: 10px; /* tokens.json radius-card */
   --zuri-radius-modal: 12px; /* tokens.json radius-modal */
   --zuri-radius-overlay: 12px; /* tokens.json radius-overlay */
+  /* The card's 20 px corners are the node's own binding, radius-xl. The HeroUI
+     scale above spells radius-xl as 16 px, so the card carries the design's
+     value rather than borrowing the ramp's. */
+  --zuri-glass-card-radius: 20px; /* design node 0:105 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
 
   /* Typography: HeroUI type scale, system UI stack with Segoe UI first on
      Windows (style guide text styles). */
@@ -363,6 +401,14 @@
   --zuri-sidebar-width-collapsed: 64px; /* style guide sidebar collapsed */
   --zuri-right-panel-width: 320px; /* style guide right panel */
   --zuri-topbar-height: 52px; /* design node 0:78: a 51 px row plus its 1 px hairline, and size/topbar-height is 52; the node overrides the style guide's 48 */
+  /* The shell's own geometry, from the App Shell frame 0:466. Kept apart from the
+     topbar/panel tokens above because the standalone view pages still draw the
+     older 52 px bar and 320 px panel. */
+  --zuri-shell-topbar-height: 56px; /* design "Top Bar" (0:541): 56 px, content row starts at 56 */
+  --zuri-context-panel-width: 300px; /* design "Context Panel" (0:634): 300 wide */
+  --zuri-shell-gutter: 12px; /* design "Rail Left" (0:538) / "Rail Right" (0:632): 12 px */
+  --zuri-radius-brand: 10px; /* design "Brand Mark" (0:470) and New chat (0:478): radius 10 */
+  --zuri-radius-search: 9px; /* design search field (0:543), bell (0:546) and theme (0:556): radius 9 */
   --zuri-chat-max-width: 732px; /* design node 0:1221: the transcript content column, 860 wide less its 64 px inset each side */
   --zuri-modal-width: 480px; /* design node 0:96 dialog width */
   --zuri-floating-assistant-width: 360px; /* style guide floating assistant */

@@ -86,6 +86,78 @@
   color: var(--zuri-onboarding-text-secondary);
 }
 
+/* The name and the theme are the design's first two setup steps (nodes 0:2329 and
+   0:2423). They are asked here in the title bar's empty band so the provider card
+   keeps the geometry node 0:1009 draws to the pixel: the title bar is a fixed 48 px
+   strip the card never measures against, so nothing below it moves. */
+.onboarding-details {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  min-width: 0;
+  margin-left: var(--zuri-space-6);
+}
+
+.onboarding-details-label {
+  flex: 0 0 auto;
+  color: var(--zuri-onboarding-text-secondary);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-field-label);
+  white-space: nowrap;
+}
+
+.onboarding-details-input,
+.onboarding-details-select {
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 var(--zuri-space-2);
+  color: var(--zuri-onboarding-text);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-field-label);
+  background: var(--zuri-onboarding-surface);
+  border: 1px solid var(--zuri-onboarding-border);
+  border-radius: var(--zuri-radius-row);
+}
+
+.onboarding-details-input {
+  width: 220px;
+}
+
+.onboarding-details-select {
+  width: 96px;
+}
+
+/* The drawn control (ui/select.js) replaces the select's own box, so the arrow that
+   said "this opens a list" is drawn beside it at the same 8 px inset the text starts
+   from. Two classes on the rule below so the room it needs outranks the shared
+   padding above. */
+.onboarding-details-field {
+  position: relative;
+  display: inline-flex;
+}
+
+.onboarding-details-field .onboarding-details-select {
+  padding-right: 26px;
+}
+
+.onboarding-details-chevron {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  width: 12px;
+  height: 12px;
+  color: var(--zuri-onboarding-text-muted);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.onboarding-details-input:focus-visible,
+.onboarding-details-select:focus-visible {
+  outline: 2px solid var(--zuri-onboarding-accent);
+  outline-offset: 1px;
+}
+
 .onboarding-window-glyph {
   display: grid;
   place-items: center;
@@ -254,6 +326,16 @@
   gap: var(--zuri-space-2);
 }
 
+/* The row under the key field. The node drew one wide model select here; setup also
+   asks for a name and a theme, so three compact fields share the row and the card
+   keeps the height it was drawn at. */
+.onboarding-field-row {
+  display: grid;
+  align-items: stretch;
+  grid-template-columns: 1.2fr 0.9fr 1.1fr;
+  gap: var(--zuri-space-3);
+}
+
 .field-head {
   display: flex;
   align-items: center;
@@ -387,6 +469,30 @@
   outline-offset: 0;
 }
 
+/* The name field: the select's box without the room its chevron needs. */
+.field-text-control {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  padding: 0 11px;
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  color: var(--zuri-onboarding-text);
+  background: var(--zuri-onboarding-surface);
+  border: 1px solid var(--zuri-onboarding-border);
+  border-radius: var(--zuri-radius-sm);
+}
+
+.field-text-control::placeholder {
+  color: var(--zuri-onboarding-text-muted);
+}
+
+.field-text-control:focus-visible {
+  outline: 2px solid var(--zuri-onboarding-accent);
+  outline-offset: 0;
+}
+
 .field-select-icon {
   position: absolute;
   top: 50%;
@@ -483,6 +589,15 @@
   opacity: 0.5;
 }
 
+/* Name and theme are answered once, so they lock with the model while the key is
+   on its way to main and when there is no bridge to save through at all. */
+.onboarding-card[data-state="loading"] .onboarding-field-name,
+.onboarding-card[data-state="loading"] .onboarding-field-theme,
+.onboarding-card[data-state="disabled"] .onboarding-field-name,
+.onboarding-card[data-state="disabled"] .onboarding-field-theme {
+  opacity: 0.5;
+}
+
 /* Disabled state: there is no preload bridge, so every control is inert. */
 .onboarding-card[data-state="disabled"] .onboarding-providers,
 .onboarding-card[data-state="disabled"] .onboarding-field-model {
@@ -508,6 +623,14 @@
 @keyframes onboarding-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  /* Three fields side by side stop fitting before the card stops shrinking, so the
+     row stacks under itself: same fields, full width, nothing clipped. */
+  .onboarding-field-row {
+    grid-template-columns: 1fr;
   }
 }
 

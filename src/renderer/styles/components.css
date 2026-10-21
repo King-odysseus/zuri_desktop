@@ -634,11 +634,11 @@ body {
   gap: var(--zuri-space-2);
   box-sizing: border-box;
   width: 100%;
-  height: 32px;
+  height: 36px; /* design "Nav / Chats" (0:484) is 236x36 */
   padding: 0 var(--zuri-space-2);
   border: 0;
   border-radius: var(--zuri-radius-row);
-  background: var(--zuri-surface);
+  background: transparent; /* unselected rows sit on the panel's own surface */
   font-family: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -655,7 +655,7 @@ body {
 
 /* The label is the node's color/text child at 13/18 regular. The node resizes the
    text to width and height, so it stays on one line rather than wrapping inside
-   the 32 px row. */
+   the 36 px row. */
 .nav-sidebar-row-label {
   color: var(--zuri-text-primary);
   font-family: inherit;
@@ -707,7 +707,32 @@ body {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--zuri-bg-canvas);
+  background: var(--zuri-surface);
+}
+
+/* The body under the bar: the sidebar, the 12 px gutter, then the workspace column.
+   The bar above is window wide, so this row is what the three columns share. The 12
+   px gutter is the design's "Rail Left" (0:538), a white strip on this surface tone;
+   painting the row means the gap belongs to the shell, not to either column. */
+.app-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+  gap: var(--zuri-shell-gutter);
+}
+
+/* The workspace column (design "Workspace", 0:540): the content row under the
+   window-wide top bar. The bar no longer lives in here, so the workspace is just the
+   row of columns; the sidebar's height is the body height. */
+.workspace {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--zuri-surface);
 }
 
 .shell {
@@ -717,17 +742,20 @@ body {
   overflow: hidden;
 }
 
-/* Top bar (node 0:132). One 52 px row: the sidebar toggle, the app name and the
-   model trigger on the left; search, notifications, theme and the account chip
-   on the right, 8 px apart, inset 20 px from the right edge. */
+/* Top bar (design "Top Bar", 0:541): a 56 px row across the whole window, named
+   after the current section, with search, notifications, the model chip and the theme
+   button on the right. The account is in the sidebar's user row, so it is not
+   repeated here. It spans the window (node 0:132) so no bare strip is left above the
+   sidebar at 1920; only the controls inside it are inset. */
 .top-bar {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: var(--zuri-space-2);
-  height: var(--zuri-topbar-height);
-  padding: 0 var(--zuri-space-5) 0 var(--zuri-space-4);
+  box-sizing: border-box;
+  height: var(--zuri-shell-topbar-height);
+  padding: 0 var(--zuri-space-4);
   border-bottom: 1px solid var(--zuri-border-hairline);
   background: var(--zuri-surface);
 }
@@ -739,26 +767,27 @@ body {
   gap: var(--zuri-space-2);
 }
 
-/* The design's top-bar controls are 28 px squares on radius/row: the same box as
-   .btn-icon, so they borrow it and only the hover surface differs. */
+/* Bell and theme buttons (design 0:546 / 0:556): 32 px on radius 9, filled with the
+   panel tone so they read as controls on the white bar. */
 .top-bar-button {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
-  border-radius: var(--zuri-radius-row);
-  background: transparent;
+  border-radius: var(--zuri-radius-search);
+  background: var(--zuri-surface-secondary);
   color: var(--zuri-text-secondary);
   cursor: pointer;
   transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
 }
 
 .top-bar-button:hover {
-  background: var(--zuri-surface-active);
+  background: var(--zuri-surface-tertiary);
   color: var(--zuri-text-primary);
 }
 
@@ -767,75 +796,67 @@ body {
   outline-offset: 2px;
 }
 
-/* Search, the first trailing control. The node draws a 28 px icon, so the control
-   rests at that box and the input grows leftwards into the bar's empty middle while
-   it has focus. Keeping the resting box at 28 px is what lets the trailing group
-   keep the node's measured 8/8/12 px gaps. */
+/* Search, the first trailing control (design 0:543, 220x32 on radius 9 on the
+   panel tone): the icon at its left and the placeholder showing, so the field is
+   recognisable at rest instead of hiding behind an icon. */
 .top-bar-search {
   position: relative;
+  display: flex;
   flex: 0 0 auto;
-  width: 28px;
-  height: 28px;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  box-sizing: border-box;
+  width: 220px;
+  height: 32px;
+  padding: 0 var(--zuri-space-2);
+  border-radius: var(--zuri-radius-search);
+  background: var(--zuri-surface-secondary);
 }
 
 .top-bar-search-icon {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  color: var(--zuri-text-secondary);
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
   pointer-events: none;
 }
 
 .top-bar-search-input {
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
   padding: 0;
   border: 0;
-  border-radius: var(--zuri-radius-row);
   background: transparent;
-  /* Transparent at rest so the collapsed control reads as the node's icon, not as
-     a 28 px box of placeholder text. */
-  color: transparent;
+  color: var(--zuri-text-primary);
   font-family: inherit;
   font-size: var(--zuri-font-size-caption);
-  line-height: 28px;
-  cursor: pointer;
-  transition: width var(--zuri-motion-fast) var(--zuri-ease-out);
+  line-height: var(--zuri-line-height-caption);
 }
 
 .top-bar-search-input::placeholder {
-  color: transparent;
-}
-
-.top-bar-search:hover .top-bar-search-input {
-  background: var(--zuri-surface-active);
-}
-
-/* Above its neighbours while open, so the grown field covers the bar's empty
-   middle rather than slipping under the bell. */
-.top-bar-search:focus-within {
-  z-index: 2;
-}
-
-.top-bar-search:focus-within .top-bar-search-icon {
-  display: none;
-}
-
-.top-bar-search:focus-within .top-bar-search-input {
-  width: 240px;
-  padding: 0 var(--zuri-space-3);
-  background: var(--zuri-surface-active);
-  color: var(--zuri-text-primary);
-  cursor: text;
-  outline: 2px solid var(--zuri-accent);
-  outline-offset: 2px;
-}
-
-.top-bar-search:focus-within .top-bar-search-input::placeholder {
   color: var(--zuri-text-muted);
+}
+
+/* The field itself draws the focus ring (.top-bar-search:focus-within below), so the
+   input inside it must not paint one of its own: Chromium's default ring is a white
+   rectangle in the dark colour scheme and it ignores the pill's radius, so it read as
+   a second border floating inside the field. The composer and connectors inputs are
+   handled the same way. */
+.top-bar-search-input:focus,
+.top-bar-search-input:focus-visible {
+  outline: none;
+}
+
+/* A system-drawn clear button would arrive in Windows' own styling next to the
+   design's magnifier. The field is 220 wide and the text is the control. */
+.top-bar-search-input::-webkit-search-cancel-button,
+.top-bar-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.top-bar-search:focus-within {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 1px;
 }
 
 /* The badge is in the DOM at zero so the count is part of the control's spoken
@@ -865,40 +886,41 @@ body {
 }
 
 /* "Zuri" is 20/28 medium in the node, and the model trigger sits 24 px after it. */
+/* The bar's leading side is only the section name now (design 0:542: 15/18
+   medium at x 16, y 19), so it does not stretch to push the trailing side. */
 .top-bar-title {
   color: var(--zuri-text-primary);
-  font-size: var(--zuri-font-size-heading-md);
+  font-size: 15px; /* design 0:542: 15/18 medium, between the two scale steps */
   font-weight: var(--zuri-font-weight-medium);
-  line-height: var(--zuri-line-height-heading-md);
+  line-height: 18px;
   white-space: nowrap;
 }
 
-/* Model selector trigger: a 124 x 28 ghost pill on color/muted with a 14 px
-   chevron 10 px in from its right edge. No fill and no outline in the node. */
+/* Model chip (design 0:550, 68x28 pill on the panel tone): a 6 px status dot then
+   the model's name at 11/14. It hugs its label rather than sitting on a fixed width,
+   so a longer model name lengthens the chip instead of truncating it. */
 .top-bar-model {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
-  gap: var(--zuri-space-3);
-  min-width: 124px;
+  gap: 6px;
   height: 28px;
-  margin-left: var(--zuri-space-4);
   padding: 0 10px;
   border: 0;
   border-radius: var(--zuri-radius-pill);
-  background: transparent;
-  color: var(--zuri-text-muted);
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-secondary);
   font-family: inherit;
-  font-size: var(--zuri-font-size-caption);
-  line-height: var(--zuri-line-height-caption);
-  text-align: left;
+  font-size: 11px;
+  line-height: 14px;
   white-space: nowrap;
   cursor: pointer;
   transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
 }
 
 .top-bar-model:hover {
-  background: var(--zuri-surface-active);
-  color: var(--zuri-text-secondary);
+  background: var(--zuri-surface-tertiary);
+  color: var(--zuri-text-primary);
 }
 
 .top-bar-model:focus-visible {
@@ -906,13 +928,15 @@ body {
   outline-offset: 2px;
 }
 
-.top-bar-model-name {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.top-bar-model-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-success);
 }
 
-.top-bar-model-chevron {
+.top-bar-model-name {
   flex: 0 0 auto;
 }
 
@@ -940,22 +964,8 @@ body {
   line-height: var(--zuri-line-height-caption);
 }
 
-/* Account chip: 28 px on radius/pill, initials on color/accent. */
-.top-bar-avatar {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  margin-left: var(--zuri-space-1);
-  border-radius: var(--zuri-radius-pill);
-  background: var(--zuri-accent);
-  color: var(--zuri-text-on-accent);
-  font-size: var(--zuri-font-size-caption);
-  font-weight: var(--zuri-font-weight-medium);
-  line-height: var(--zuri-line-height-caption);
-}
+/* The account chip (design 0:530 "User Row") lives in the sidebar now; the bar has
+   no avatar, so this rule is gone rather than left behind unused. */
 
 .shell-column {
   display: flex;
@@ -973,17 +983,34 @@ body {
 .shell-column-sidebar {
   flex: 0 0 auto;
   width: var(--zuri-sidebar-width);
-  background: var(--zuri-bg-canvas);
-  border-right: 1px solid var(--zuri-border-hairline);
+  /* Design "Sidebar Column" (0:467) sits on surface-secondary, against the white
+     rail beside it. The hairline that used to divide it is now the 12 px gutter. */
+  background: var(--zuri-surface-secondary);
+  overflow-y: auto;
 }
 
 .shell-column-sidebar[data-collapsed='true'] {
   width: var(--zuri-sidebar-width-collapsed);
 }
 
-/* The 64 px sidebar rail keeps New chat as an icon, so the strip still does the
-   one thing it is for; the label, the shortcut and the foot are dropped. */
+/* The 64 px sidebar rail keeps the brand mark, New chat and the six destination
+   icons, so the strip still does the two things it is for; the labels, the shortcut
+   and the thread list are dropped. */
 .shell-column-sidebar[data-collapsed='true'] .sidebar-foot {
+  display: none;
+}
+
+/* The brand row loses its name and keeps the mark, centred on the rail. */
+.shell-column-sidebar[data-collapsed='true'] .sidebar-brand {
+  flex-direction: column;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  /* The rail's own 12 px padding is the inset here, so the row drops the margin. */
+  margin-top: 0;
+  padding: var(--zuri-space-3) 0 0;
+}
+
+.shell-column-sidebar[data-collapsed='true'] .sidebar-brand-name {
   display: none;
 }
 
@@ -997,6 +1024,22 @@ body {
   display: none;
 }
 
+/* The group label and the row labels cannot read at 64 px, so the rows become a
+   column of icons, 44 px on the rail's own 10 px gutter. */
+.shell-column-sidebar[data-collapsed='true'] .sidebar-group-label,
+.shell-column-sidebar[data-collapsed='true'] .nav-sidebar-row-label {
+  display: none;
+}
+
+.shell-column-sidebar[data-collapsed='true'] .sidebar-nav {
+  padding: 0 10px;
+}
+
+.shell-column-sidebar[data-collapsed='true'] .nav-sidebar-row {
+  justify-content: center;
+  padding: 0;
+}
+
 /* The chat column takes whatever the two panels leave. */
 .shell-column-chat {
   flex: 1 1 auto;
@@ -1006,9 +1049,12 @@ body {
 
 .shell-column-context {
   flex: 0 0 auto;
-  width: var(--zuri-right-panel-width);
-  background: var(--zuri-bg-canvas);
-  border-left: 1px solid var(--zuri-border-hairline);
+  /* Design "Context Panel" (0:634) is 300 wide, on surface-secondary, and a 12 px
+     white rail (0:632) separates it from the main column. The rail is this
+     margin, so the panel itself keeps its full 300 px of content. */
+  width: var(--zuri-context-panel-width);
+  margin-left: var(--zuri-shell-gutter);
+  background: var(--zuri-surface-secondary);
 }
 
 /* Chat and the context panel collapse to a thin rail, not to nothing: the rail
@@ -1138,7 +1184,57 @@ body {
 
 .sidebar-head {
   flex: 0 0 auto;
-  padding: var(--zuri-space-3) var(--zuri-space-3) 0;
+  /* 8 px under the brand row, so New chat lands on the design's y=60 and the
+     WORKSPACE label and the nav follow at 108 and 128. */
+  padding: var(--zuri-space-2) var(--zuri-space-3) 0;
+}
+
+/* Brand row (design "Brand Row", 0:469: 236x40 at 12,12): the 32 px blue mark,
+   the name 8 px after it, and the collapse toggle on the row's right edge. */
+.sidebar-brand {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  min-height: 40px; /* the node's row, not the mark's 32 px, so the mark centres on y=16 */
+  /* The panel has no inset of its own, so the brand row carries the 12 px top and
+     the 12 px gutters; its 40 px row keeps the mark on y=16. */
+  margin-top: var(--zuri-space-3);
+  padding: 0 var(--zuri-space-3);
+}
+
+.sidebar-brand-mark {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--zuri-radius-brand);
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
+}
+
+.sidebar-brand-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  font-size: 15px;
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The collapse toggle in the brand row (design 0:474): 28 px on radius 8 with a
+   surface-tertiary fill, so it reads as a control rather than a bare glyph. */
+.sidebar-brand-toggle {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface-tertiary);
+  color: var(--zuri-text-primary);
 }
 
 .sidebar-new-chat {
@@ -1146,12 +1242,12 @@ body {
   align-items: center;
   gap: var(--zuri-space-2);
   width: 100%;
-  height: 32px;
+  height: 40px; /* design "New Chat Button" is 236x40 */
   padding: 0 var(--zuri-space-3) 0 10px;
-  border: 1px solid var(--zuri-border-hairline);
+  border: 0;
   border-radius: var(--zuri-radius-row);
-  background: var(--zuri-surface);
-  color: var(--zuri-text-primary);
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
   font-family: inherit;
   font-size: var(--zuri-font-size-body-sm);
   font-weight: var(--zuri-font-weight-medium);
@@ -1162,7 +1258,7 @@ body {
 }
 
 .sidebar-new-chat:hover {
-  background: var(--zuri-surface-active);
+  background: var(--zuri-accent-hover);
 }
 
 .sidebar-new-chat:focus-visible {
@@ -1172,7 +1268,7 @@ body {
 
 .sidebar-new-chat-icon {
   flex: 0 0 auto;
-  color: var(--zuri-text-muted);
+  color: var(--zuri-text-on-accent);
 }
 
 .sidebar-new-chat-label {
@@ -1184,27 +1280,47 @@ body {
 
 .sidebar-new-chat-shortcut {
   flex: 0 0 auto;
-  color: var(--zuri-text-muted);
+  color: var(--zuri-text-on-accent);
+  opacity: 0.72;
   font-size: var(--zuri-font-size-caption);
   font-weight: var(--zuri-font-weight-regular);
   line-height: var(--zuri-line-height-caption);
 }
 
-/* Navigation (nodes 0:63 / 0:67): the destinations the central column can show,
-   one row each. The rows keep the node's own 32 px box and fill; the gutter is the
-   sidebar's, so they line up with the New chat button above and Settings below. */
+/* The group label (design "WORKSPACE" / "RECENT": 10/12, 0.6 px tracking,
+   uppercase, muted) sits on the panel's own 12 px gutter, aligned with the rows. */
+.sidebar-group-label {
+  margin: 0;
+  padding: 0;
+  color: var(--zuri-text-muted);
+  font-size: 10px;
+  font-weight: var(--zuri-font-weight-regular);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  text-transform: uppercase;
+}
+
+/* WORKSPACE sits between the New chat button and the nav, 8 px clear of each and
+   on the panel's 12 px gutter (design puts it at x=12, y=108). */
+.shell-column-sidebar > .sidebar-group-label {
+  flex: 0 0 auto;
+  margin: var(--zuri-space-2) var(--zuri-space-3);
+}
+
+/* Navigation (design "Primary Nav", 236x264: seven 36 px rows on a 2 px gap):
+   the destinations the central column can show, one row each. The gutter is the
+   sidebar's, so the rows line up with the New chat button above them. */
 .sidebar-nav {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: var(--zuri-space-1);
-  padding: var(--zuri-space-2) var(--zuri-space-3) 0;
+  gap: 2px;
+  padding: 0 var(--zuri-space-3);
 }
 
-/* The section label sits one row inset further than the rows themselves (the
-   node puts it at x=24 while the rows start at x=12). */
+/* The section label sits on the panel's own gutter, aligned with the rows. */
 .sidebar-body .shell-section-label {
-  padding: 0 var(--zuri-space-3);
+  padding: 0;
 }
 
 .sidebar-foot {
@@ -1213,92 +1329,79 @@ body {
   flex-direction: column;
   gap: var(--zuri-space-1);
   padding: var(--zuri-space-2) var(--zuri-space-3) var(--zuri-space-3);
-  border-top: 1px solid var(--zuri-border-hairline);
 }
 
-/* Settings row: the design's nav row, 32 px on radius/row with a 20 px icon. */
-.sidebar-settings-row {
+/* Account row (design "User Row", 236x52 on a 12 px radius, white on the canvas
+   panel): avatar, name over plan, and the switcher chevron. */
+.sidebar-user-row {
   display: flex;
   align-items: center;
-  gap: var(--zuri-space-2);
+  gap: 8px;
   width: 100%;
-  height: 32px;
-  padding: 0 var(--zuri-space-3) 0 var(--zuri-space-2);
+  min-height: 52px;
+  padding: 0 10px 0 8px;
+  /* No outline: the row is surface on the panel tone, and the node draws it flat
+     (0:578), so the fill is the whole separation. */
   border: 0;
-  border-radius: var(--zuri-radius-row);
-  background: transparent;
-  color: var(--zuri-text-secondary);
-  font-family: inherit;
-  font-size: var(--zuri-font-size-body-sm);
-  line-height: var(--zuri-line-height-body-sm);
-  text-align: left;
-  cursor: pointer;
-  transition:
-    background var(--zuri-motion-fast) var(--zuri-ease-out),
-    color var(--zuri-motion-fast) var(--zuri-ease-out);
-}
-
-/* Current destination: the Settings row is a destination like a nav row, so the
-   selected fill is the nav row's own color/active value, not a new one. Declared
-   before :hover so the row still answers the pointer when it is the current one. */
-.sidebar-settings-row[aria-current='page'] {
-  background: var(--zuri-surface-active);
-  color: var(--zuri-text-primary);
-}
-
-.sidebar-settings-row:hover {
+  border-radius: var(--zuri-radius-card);
   background: var(--zuri-surface);
   color: var(--zuri-text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
 }
 
-.sidebar-settings-row:focus-visible {
+.sidebar-user-row:hover {
+  background: var(--zuri-surface-active);
+}
+
+.sidebar-user-row:focus-visible {
   outline: 2px solid var(--zuri-accent);
   outline-offset: 2px;
 }
 
-.sidebar-settings-icon {
+.sidebar-user-avatar {
+  display: inline-flex;
   flex: 0 0 auto;
-}
-
-.sidebar-settings-label {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Autopilot status card (node 0:204): an 8 px dot, a 12/16 label and the state
-   on the right, inside an outlined 36 px card. */
-.autopilot-status {
-  display: flex;
   align-items: center;
-  gap: var(--zuri-space-2);
-  height: 36px;
-  padding: 0 var(--zuri-space-3);
-  border: 1px solid var(--zuri-border-hairline);
-  border-radius: var(--zuri-radius-card);
-  background: var(--zuri-surface);
-  font-size: var(--zuri-font-size-caption);
-  line-height: var(--zuri-line-height-caption);
-}
-
-.autopilot-status-dot {
-  flex: 0 0 auto;
-  width: 8px;
-  height: 8px;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
   border-radius: var(--zuri-radius-pill);
-  background: var(--zuri-success);
+  background: var(--zuri-accent-subtle);
+  color: var(--zuri-accent);
+  font-size: 10px;
+  font-weight: var(--zuri-font-weight-bold);
+  line-height: 12px;
 }
 
-.autopilot-status-label {
+.sidebar-user-text {
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sidebar-user-name {
   overflow: hidden;
-  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.autopilot-status-meta {
+.sidebar-user-plan {
+  overflow: hidden;
+  color: var(--zuri-text-muted);
+  font-size: 11px;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-user-chevron {
   flex: 0 0 auto;
   color: var(--zuri-text-muted);
 }
@@ -1365,61 +1468,230 @@ body {
 
 /* -------------------------------------------------------------------------
    Context panel header (node 0:271)
-
-   Inset 6 px so the 20 px collapse button sits where the node draws it, with the
-   panel name 8 px after it and the panel's state on the far right.
    ------------------------------------------------------------------------- */
 
+/* Context header (design 0:636, 276x28): the panel's name at 13/16 medium on the
+   left, the 26 px collapse toggle on the right, on the panel's 12 px gutter. */
 .context-header {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: var(--zuri-space-2);
-  height: 60px;
-  padding: 0 var(--zuri-space-6) 0 6px;
+  height: 28px;
+  margin: var(--zuri-space-3) var(--zuri-space-3) 0;
 }
 
 .context-toggle {
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   padding: 0;
+  border: 0;
   border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface-tertiary);
+  color: var(--zuri-text-primary);
 }
 
 .context-title {
   flex: 1 1 auto;
   overflow: hidden;
   color: var(--zuri-text-primary);
-  font-size: var(--zuri-font-size-heading-sm);
+  font-size: 13px;
   font-weight: var(--zuri-font-weight-medium);
-  line-height: var(--zuri-line-height-heading-sm);
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.context-status {
-  display: inline-flex;
+/* The cards (design 0:642 / 0:661 / 0:670 / 0:684): white on the panel tone, 12 px
+   radius, 12 px padding, 12 px apart, on the panel's own 12 px gutter. */
+.context-body {
+  gap: var(--zuri-space-3);
+  padding: var(--zuri-space-3);
+}
+
+.context-card {
+  display: flex;
   flex: 0 0 auto;
-  align-items: center;
-  gap: var(--zuri-space-2);
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+  padding: var(--zuri-space-3);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+}
+
+/* "DETECTED FILES" (design 0:643): 10/12, 0.6 px tracking, uppercase, muted. */
+.context-card-label {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: 10px;
+  font-weight: var(--zuri-font-weight-regular);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  text-transform: uppercase;
+}
+
+.context-card-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: 13px;
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: 16px;
+}
+
+.context-card-text {
+  margin: 0;
   color: var(--zuri-text-muted);
   font-size: var(--zuri-font-size-caption);
   line-height: var(--zuri-line-height-caption);
 }
 
-/* Status dot before the panel state: green while a run is live, muted when the
-   scheduler has nothing to do, which is the state an empty automations file
-   means. */
-.context-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--zuri-radius-pill);
-  background: var(--zuri-text-muted);
+/* File rows (design 0:644, 252x26): a 14 px icon, the name at 12/15, and the state
+   on the right at 10/12. */
+.context-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: none;
 }
 
-.context-body {
-  padding: var(--zuri-space-4);
+.context-file-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 26px;
 }
+
+.context-file-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--zuri-accent);
+}
+
+.context-file-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  font-size: 12px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-file-state {
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.context-card-empty {
+  margin: 0;
+  padding: 4px 0 0;
+  color: var(--zuri-text-muted);
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.context-card-empty[hidden] {
+  display: none;
+}
+
+/* The Act card (design 0:684): the shield on the left, two lines of text after it. */
+.context-card-act {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--zuri-space-2);
+}
+
+.context-act-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--zuri-accent);
+}
+
+.context-act-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+/* The reminders card holds the empty block, so the block gives up its own card
+   surface: the card already draws the fill, the corners and the label above it. */
+.context-card .empty-block {
+  width: 100%;
+  max-width: none;
+  padding: var(--zuri-space-4) 0 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* Design "Empty State Card" (node 0:10866): the mark sits on a 48 px disc, so the
+   glyph reads as a badge instead of floating in the middle of the card. The node's
+   disc is color/surface over a surface-secondary card; this card is already the
+   surface, so the disc takes the raised step and keeps the node's one-step
+   contrast. Inside it the node puts a 22 px glyph. */
+.context-card .empty-block-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zuri-space-12);
+  height: var(--zuri-space-12);
+  margin-bottom: var(--zuri-space-4);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface-raised);
+  /* The node strokes both of its vectors in text-subtle, not in an accent: the
+     badge is one quiet step off the card, and the label above it already carries
+     the section name. */
+  color: var(--zuri-text-subtle);
+}
+
+/* The card under the disc is color/surface, which is nearly black in dark and
+   white in light. "Raised" is a step above it only in dark; in light it is the
+   same white, so the disc vanishes. Light therefore takes the step below instead,
+   which keeps the node's one-step contrast in both themes. */
+:root[data-theme='light'] .context-card .empty-block-mark {
+  background: var(--zuri-surface-secondary);
+}
+
+.context-card .empty-block-mark svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* The node's Empty Title is 16/24 semibold, not the display size the base rule
+   carries, which would run to two lines in a 276 px card. */
+.context-card .empty-block-title {
+  font-size: var(--zuri-font-size-heading-sm);
+  font-weight: var(--zuri-font-weight-semibold);
+  line-height: var(--zuri-line-height-heading-sm);
+}
+
+/* The node's Empty Body is 13/20 on color/text-subtle, 8 px under the title; the
+   base rule's caption step is a size and a colour below what the node draws. */
+.context-card .empty-block-text {
+  margin-top: var(--zuri-space-2);
+  color: var(--zuri-text-subtle);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+/* The node's Empty Action Primary: a 36 px box on radius/lg carrying a 13/20
+   label, standing 28 px under the body (the caption's own 8 plus 20). The base
+   rule already sets that label size, so only the box changes here. */
+.context-card .empty-block-action {
+  height: 36px;
+  margin-top: var(--zuri-space-5);
+  border-radius: var(--zuri-radius-lg);
+}
+
 
 /* A collapsed chat or context panel is a 12 px rail (pages.md), so the toggle in
    its header fills the strip instead of sitting as a square inside it, and the
@@ -1541,7 +1813,9 @@ body {
   align-items: flex-start;
   gap: var(--zuri-space-1);
   padding: var(--zuri-space-4);
-  border: 1px solid var(--zuri-border-hairline);
+  /* Flat like the thread rows it stands in for: surface on the panel tone already
+     separates it, and an outline there reads as a second edge. */
+  border: 0;
   border-radius: var(--zuri-radius-card);
   background: var(--zuri-surface);
 }
@@ -1621,6 +1895,9 @@ body {
   justify-content: center;
   height: 32px;
   padding: 0 var(--zuri-space-4);
+  /* Without this the UA's own 2 px outset bevel draws a white ring round the
+     accent, which no button in the design has. */
+  border: 0;
   border-radius: var(--zuri-radius-row);
   background: var(--zuri-accent);
   color: var(--zuri-text-on-accent);
@@ -1979,62 +2256,23 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Loading: skeleton rows plus a written label, so the state does not depend on
-   noticing an animation. */
-.shell-loading {
-  display: flex;
-  flex-direction: column;
-  gap: var(--zuri-space-2);
-}
-
-.shell-loading-label {
-  display: flex;
-  align-items: center;
-  gap: var(--zuri-space-2);
-  margin: 0;
-  font-size: var(--zuri-font-size-body-sm);
-  line-height: var(--zuri-line-height-body-sm);
-  color: var(--zuri-text-secondary);
-}
-
-.shell-spinner {
-  flex: 0 0 auto;
+/* Loading: the file rows reserve their space while the bridge answers, so the card
+   does not jump from one line to three when the list arrives. */
+.context-file-placeholder .context-file-icon {
   width: 14px;
   height: 14px;
-  border: 2px solid var(--zuri-border-strong);
-  border-top-color: var(--zuri-accent);
-  border-radius: var(--zuri-radius-pill);
-  animation: shell-spin 800ms linear infinite;
+  border-radius: 3px;
+  background: var(--zuri-surface-tertiary);
 }
 
+.context-file-placeholder .context-file-name {
+  color: var(--zuri-text-muted);
+}
+
+/* One turn per cycle, shared by the streaming status icon. */
 @keyframes shell-spin {
   to {
     transform: rotate(1turn);
-  }
-}
-
-.shell-skeleton-row {
-  display: block;
-  height: 12px;
-  border-radius: var(--zuri-radius-pill);
-  /* A translucent neutral, so the placeholder reads on both a light and a dark
-     surface instead of vanishing into the panel behind it. */
-  background: var(--zuri-border-strong);
-  animation: shell-pulse 1.4s var(--zuri-ease-out) infinite;
-}
-
-.shell-skeleton-row-short {
-  width: 62%;
-}
-
-@keyframes shell-pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-
-  50% {
-    opacity: 1;
   }
 }
 
@@ -2105,7 +2343,7 @@ body {
 }
 
 /* The mark: 24 px in both roles, the reader's circle carrying their initials on
-   color/primary, Zuri's carrying the sparkles glyph on the surface step. */
+   color/primary, Zuri's carrying the bubble mark on the surface step. */
 .message-avatar {
   display: grid;
   flex: 0 0 auto;
@@ -2442,15 +2680,21 @@ body {
   display: flex;
   align-items: flex-start;
   gap: var(--zuri-space-2);
+  /* The drawn bars are wider than a phone column, and a flex item's min-content
+     width would otherwise hold the group open and scroll the transcript sideways. */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .transcript-skeleton-turn[data-role='user'] {
   flex-direction: column;
   align-items: flex-end;
   /* The node draws the reader's group as the 420 px its widest bar needs, sitting
-     against the right edge, not as a full-width block with the bars pushed over. */
+     against the right edge, not as a full-width block with the bars pushed over.
+     max-width keeps that from becoming wider than the column on a phone. */
   align-self: flex-end;
   width: fit-content;
+  max-width: 100%;
   gap: var(--zuri-space-2);
 }
 
@@ -2467,6 +2711,7 @@ body {
   flex: 1 1 auto;
   flex-direction: column;
   gap: var(--zuri-space-2);
+  min-width: 0;
 }
 
 .transcript-skeleton-bar {
@@ -2500,9 +2745,12 @@ body {
   max-width: 100%;
 }
 
-/* The node's reply closes on a longer bar than the reader's (380 against 280). */
+/* The node's reply closes on a longer bar than the reader's (380 against 280).
+   max-width keeps it inside the column on a phone, where 380 is wider than the
+   column; the drawn 380 still wins wherever there is room. */
 .transcript-skeleton-turn[data-role='assistant'] .transcript-skeleton-bar[data-size='short'] {
   width: 380px;
+  max-width: 100%;
 }
 
 .transcript-skeleton-note {
@@ -2600,6 +2848,18 @@ body {
    32%, an alert mark beside a two-line message, then one action. The node binds
    color/danger, so both the tint and the border come from the theme's danger ramp;
    only their alphas (5.88% fill, 32% outline) are the node's own. */
+/* The error card centres itself on the column rather than sitting at its left edge:
+   the composer below it is inset evenly from both edges, so its centre line is the
+   column's centre, and auto margins put the card on that same axis. A width cap does
+   the gutter as well as the node's 360 px: the cap is wider than 360 on any desktop
+   column, so the node's width wins there, and in the narrow band it takes over and
+   keeps the composer's 16 px gutter while the card stays centred. The 8 px bottom
+   margin is the gap the composer area would otherwise give it.
+
+   This lives on the component, not on a `.view-chats > .error-block` child selector.
+   As a child selector it only applied while the block was a direct child; once that
+   stopped matching, the flex column pinned the width-capped card to its start and it
+   rendered flush with the composer's left edge instead of centred under it. */
 .error-block {
   display: flex;
   flex: 0 0 auto;
@@ -2607,11 +2867,18 @@ body {
   align-items: flex-start;
   gap: var(--zuri-space-2);
   width: 100%;
-  max-width: 360px;
+  max-width: min(360px, calc(100% - var(--zuri-space-8)));
+  margin: 0 auto var(--zuri-space-2);
   padding: var(--zuri-space-4);
   border: 1px solid var(--zuri-danger-line);
   border-radius: var(--zuri-radius-card);
   background: var(--zuri-danger-tint);
+}
+
+/* The block is display:flex, which beats the `hidden` attribute's UA rule. Without
+   this the card stayed on screen in every other state (loading, empty, disabled). */
+.error-block[hidden] {
+  display: none;
 }
 
 /* The node lays the mark out 20 px wide with the message 8 px to its right, and
@@ -2755,6 +3022,52 @@ body {
   border-radius: var(--zuri-radius-card);
   background: var(--zuri-surface-raised);
   box-shadow: var(--zuri-shadow-raised);
+}
+
+/* Card / Glass: the design's "Card / Glass" component (node 0:105). The surface for
+   floating panels and the compact overlay, so it is drawn over other content rather
+   than inside a page column: the node's 320 px width, 20 px inset (space-5) and
+   radius/xl corner, filled with the glass-surface token, outlined 1 px in
+   glass-border so the edge survives on busy content, and blurred with the style
+   guide's glass backdrop recipe. The node draws no shadow - the outline and the blur
+   are what lift it off the page.
+
+   The node is 140 px tall around a 24 px title, an 8 px gap and a two-line 14/22
+   body, which the 20 px insets leave 96 px for. That height is a floor, not a fixed
+   size: a longer body grows the card instead of being clipped, so it is stated as
+   min-height. Title and Body reuse the 16/24 semibold and 14/22 body roles the other
+   cards use, so the type steps stay in one place. */
+.card-glass {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: 320px;
+  min-height: 140px;
+  padding: var(--zuri-space-5);
+  border: 1px solid var(--zuri-glass-card-border);
+  border-radius: var(--zuri-glass-card-radius);
+  background: var(--zuri-glass-card-surface);
+  -webkit-backdrop-filter: var(--zuri-backdrop-glass);
+  backdrop-filter: var(--zuri-backdrop-glass);
+}
+
+.card-glass-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-heading-sm);
+  font-weight: var(--zuri-font-weight-semibold);
+  line-height: var(--zuri-line-height-heading-sm);
+}
+
+.card-glass-text {
+  width: 100%;
+  margin: 0;
+  color: var(--zuri-text-subtle);
+  font-size: var(--zuri-font-size-body-md);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-md);
 }
 
 /* Input / Text: the design's "Input / Text" component (node 0:23). A 320 px
@@ -3012,118 +3325,6 @@ body {
   cursor: not-allowed;
 }
 
-/* Select / Menu: the design's open list (node 0:43). It is the card surface - 260
-   px wide, color/background fill, a 1 px color/border edge on radius/card and the
-   same raised drop shadow Card / Raised carries - holding one group label and
-   three 28 px options. Every value here is a token the node binds: color/background
-   on the panel, color/border on the edge, radius/card on the corner, radius/row on
-   each option. Moving a binding in open-pencil moves this rule with it.
-
-   The height is the node's own arithmetic rather than a number: 8 px of padding,
-   the 16 px group label at 12/16, a 4 px rhythm, then 28 px options. That is
-   8 + 16 + 4 + 3x28 + 2x4 + 8 = 128, the node's height, so a fourth option grows
-   the menu the way the node's auto height would instead of clipping it.
-
-   The selected option changes exactly two things, its fill and the check mark: the
-   label stays color/text at 13/18 regular, because the node does not recolour it.
-
-   The mark is anchored to the row's right edge rather than to the x the node packs
-   it at. Node 0:45 holds an auto-width label, so its 16 px Icon / check lands
-   right after the text; a list whose rows have different label widths needs the
-   mark on the edge, or it wanders row to row. The Select / Default chevron is
-   anchored the same way for the same reason.
-
-   Markup: a host draws <div class="select-menu" role="listbox"> with a
-   .select-menu-label and one <button class="select-menu-option" role="option">
-   per choice. aria-selected carries the state, so the primary-soft fill and a
-   screen reader read the one attribute instead of a class that could drift. */
-.select-menu {
-  display: flex;
-  flex-direction: column;
-  gap: var(--zuri-space-1);
-  width: 100%;
-  max-width: 260px;
-  /* The node measures its 8 px inset from the frame edge and draws the 1 px stroke
-     inside that same 8, so the padding is the inset less the edge. Reading 8 px
-     literally would put 1 + 8 px between the edge and the first row, making the
-     menu 130 px tall and its rows 242 px wide; the node is 128 with 244 px rows. */
-  padding: calc(var(--zuri-space-2) - 1px);
-  border: 1px solid var(--zuri-border-hairline);
-  border-radius: var(--zuri-radius-card);
-  background: var(--zuri-surface);
-  box-shadow: var(--zuri-shadow-raised);
-}
-
-/* The node's "Chat models": 12/16 regular. It carries the unmatched #8E9196 that
-   every label in this family carries, which the token layer reads as the muted
-   foreground in both themes - the same reading the select's own Label gets. */
-.select-menu-label {
-  margin: 0;
-  color: var(--zuri-text-muted);
-  font-family: inherit;
-  font-size: var(--zuri-font-size-caption);
-  font-weight: var(--zuri-font-weight-regular);
-  line-height: var(--zuri-line-height-caption);
-  letter-spacing: normal; /* the node sets no tracking */
-}
-
-/* One 244 x 28 row inside the 8 px padding, on color/background, with the 13/18
-   label 8 px in from the row's edge. */
-.select-menu-option {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--zuri-space-2);
-  overflow: hidden;
-  width: 100%;
-  height: 28px;
-  padding: 0 var(--zuri-space-2);
-  border: 0;
-  border-radius: var(--zuri-radius-row);
-  background: var(--zuri-surface);
-  color: var(--zuri-text-primary);
-  font-family: inherit;
-  font-size: var(--zuri-font-size-body-sm);
-  font-weight: var(--zuri-font-weight-regular);
-  line-height: var(--zuri-line-height-select-option);
-  letter-spacing: normal;
-  text-align: left;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.select-menu-option[aria-selected='true'] {
-  background: var(--zuri-accent-subtle);
-}
-
-/* The node's Icon / check: a 16 px glyph whose path is a tick from (2.67, 8) to
-   (6, 11.33) to (13.33, 4), stroked at color/primary with weight 1.33 - two arms
-   of 4.7 and 10.4 on the node's grid. Two borders on a turned box draw the same
-   tick and take the accent straight from the token layer. The 3 px margin
-   centres the turned mark in the 16 px glyph, the width the node reserves for it. */
-.select-menu-option[aria-selected='true']::after {
-  content: '';
-  flex: 0 0 auto;
-  width: 5px;
-  height: 10px;
-  margin-right: 3px;
-  border-right: 1.33px solid var(--zuri-accent);
-  border-bottom: 1.33px solid var(--zuri-accent);
-  transform: rotate(45deg);
-}
-
-/* States the guide names for a control, drawn outside the node: hover is the
-   subtle surface darken and never touches the chosen row, whose fill already means
-   "this is the current choice"; the keyboard ring is the guide's accent ring. */
-.select-menu-option:hover:not([aria-selected='true']) {
-  background: var(--zuri-surface-active);
-}
-
-.select-menu-option:focus-visible {
-  outline: 2px solid var(--zuri-accent);
-  outline-offset: 2px;
-}
-
 /* The composer spans the whole inset width of the column (780 px at the node's
    860 px centre), so it is not held to the transcript's 720 px reading measure. */
 .composer-shell {
@@ -3134,20 +3335,21 @@ body {
   width: 100%;
 }
 
-/* Composer: the node's 60 px pill on radius/pill, 8 px padding, a 44 px attach
-   button, the draft on 14/22 and a 44 px accent send button. */
+/* Composer: the transcript node's 60 px field (0:1221) in the shell node's dress
+   (0:843): the panel tone, radius 14, no stroke, a 16 px paperclip 12 px in from the
+   left, the draft 36 px in, and a 34 px accent send 12 px from the right. The fill is
+   the separation; the soft shadow is the node's own drop shadow and stays. */
 .composer {
   display: flex;
   box-sizing: border-box;
-  align-items: flex-end;
-  gap: var(--zuri-space-2);
+  align-items: center;
   min-height: 60px;
-  /* 7 px padding plus the node's inside 1 px stroke is its 8 px inset, which is
-     what puts the 44 px controls 60 px tall overall as drawn. */
-  padding: 7px var(--zuri-space-2);
-  border: 1px solid var(--zuri-border-hairline);
-  border-radius: var(--zuri-radius-pill);
-  background: var(--zuri-surface);
+  /* 4 px plus the 32 px attach button puts the paperclip's left edge at 12 px,
+     and the draft starts at the button's right edge, 36 px in, as drawn. */
+  padding: 0 var(--zuri-space-3) 0 var(--zuri-space-1);
+  border: 0;
+  border-radius: 14px;
+  background: var(--zuri-surface-secondary);
   box-shadow: var(--zuri-shadow-soft);
 }
 
@@ -3157,8 +3359,8 @@ body {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
   border-radius: var(--zuri-radius-pill);
@@ -3169,16 +3371,14 @@ body {
     color var(--zuri-motion-fast) var(--zuri-ease-out);
 }
 
-.composer-button {
-  background: var(--zuri-bg-canvas);
-}
-
 .composer-button:hover:not(:disabled) {
-  background: var(--zuri-accent-subtle);
-  color: var(--zuri-accent);
+  background: var(--zuri-surface-tertiary);
+  color: var(--zuri-text-primary);
 }
 
 .composer-send {
+  width: 34px;
+  height: 34px;
   background: var(--zuri-accent);
   color: var(--zuri-text-on-accent);
 }
@@ -3197,7 +3397,11 @@ body {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 44px;
-  max-height: 176px;
+  /* The height belongs to ui/composer.js: it clamps scrollHeight to 8 lines and only
+     then lets the box scroll, which no stylesheet can measure. A max-height here would
+     cap the box below that clamp. */
+  max-height: none;
+  /* The attach button already ends at the design's 36 px, so the draft starts there. */
   padding: 11px 0;
   border: 0;
   background: transparent;
@@ -3214,6 +3418,82 @@ body {
 
 .composer-input:focus {
   outline: none;
+}
+
+/* Model selector and mode selector (brief: "attachment button, model selector,
+   Ask/Act/Autopilot mode selector, and send button, neatly integrated into the
+   input"). Both are 28 px so the 60 px pill keeps the drawn row height; the mode
+   group is a sunken track with the pressed mode on the pill tone, which is how the
+   design draws a segmented control elsewhere in the family. */
+.composer-model {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 28px;
+}
+
+.composer-model-select {
+  max-width: 132px;
+  height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--zuri-radius-pill);
+  background: transparent;
+  color: var(--zuri-text-secondary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  cursor: pointer;
+}
+
+.composer-model-select:hover {
+  background: var(--zuri-surface-tertiary);
+  color: var(--zuri-text-primary);
+}
+
+.composer-model-select:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.composer-modes {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 2px;
+  margin-right: var(--zuri-space-1);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface-sunken);
+}
+
+.composer-mode {
+  height: 24px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--zuri-radius-pill);
+  background: transparent;
+  color: var(--zuri-text-secondary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  cursor: pointer;
+}
+
+.composer-mode:hover {
+  color: var(--zuri-text-primary);
+}
+
+/* The mode in use, which is also the mode every send carries. */
+.composer-mode[aria-pressed='true'] {
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-weight: var(--zuri-font-weight-medium);
+  box-shadow: var(--zuri-shadow-soft);
+}
+
+.composer-mode:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
 }
 
 /* Disabled: a control the person cannot use has to look unusable, not just be
@@ -3448,21 +3728,15 @@ body {
   gap: var(--zuri-space-2);
 }
 
-/* Reduced motion: the skeleton still reads as a placeholder at a fixed tone, and
-   the scrim arrives without its fade. */
+/* Reduced motion: the stream icon still reads at a fixed tone, and the scrim
+   arrives without its fade. */
 @media (prefers-reduced-motion: reduce) {
-  .shell-spinner,
-  .shell-skeleton-row,
   .stream-status-icon svg {
     animation: none;
   }
 
   .modal-scrim {
     animation: none;
-  }
-
-  .shell-skeleton-row {
-    opacity: 0.7;
   }
 }
 
@@ -3471,34 +3745,17 @@ body {
    only a skeleton-sized column, so #chat always keeps real width. The collapse
    state itself still comes from ui/shell.js; this is layout only. */
 @media (max-width: 999px) {
-  .shell-column-sidebar {
-    width: var(--zuri-sidebar-width-collapsed);
-  }
-
-  /* The rail keeps New chat as an icon and drops the rest of the panel, which is
-     what the collapsed design does with the same 64 px strip. */
-  .shell-column-sidebar .shell-column-body,
-  .shell-column-sidebar .sidebar-nav,
-  .shell-column-sidebar .sidebar-foot {
-    display: none;
-  }
-
-  .shell-column-sidebar .sidebar-new-chat {
-    justify-content: center;
-    padding: 0;
-  }
-
-  .shell-column-sidebar .sidebar-new-chat-label,
-  .shell-column-sidebar .sidebar-new-chat-shortcut {
-    display: none;
-  }
-
+  /* Below 1000 the context panel starts collapsed (ui/shell.js), which is what keeps
+     the centre readable. The sidebar itself stays at its full 260 px here: the tab
+     bar only takes over below 768, so shrinking the panel to an icon rail in this
+     band would leave the window with no navigation at all. */
   .composer-area {
     padding: 0 var(--zuri-space-4) var(--zuri-space-3);
   }
 
   .shell-column-context {
-    width: clamp(96px, 30vw, var(--zuri-right-panel-width));
+    width: clamp(96px, 30vw, var(--zuri-context-panel-width));
+    margin-left: 0;
   }
 }
 
@@ -3508,12 +3765,47 @@ body {
    ui/shell.js already keeps decides whether a sheet is in or out, so this block
    is layout only. */
 @media (max-width: 767.98px) {
+  /* A phone stacks the body under the bar: the shell is a column, so the body takes
+     the window and the tab bar sits beneath it. The 12 px gutter is a desktop rail
+     and has no place here. */
   .app-shell {
+    flex-direction: column;
+    gap: 0;
     min-height: 100dvh;
+  }
+
+  .app-body {
+    flex-direction: column;
+    gap: 0;
+    min-height: 0;
+  }
+
+  .workspace {
+    flex: 1 1 auto;
+    min-height: 0;
   }
 
   .shell {
     position: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  /* The bar's own inset and the search field: 220 px plus four controls will not fit
+     in 390, so the field takes the room the title can spare. */
+  .top-bar {
+    gap: var(--zuri-space-1);
+    padding: 0 var(--zuri-space-3);
+  }
+
+  .top-bar-search {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+  }
+
+  .top-bar-title {
+    flex: 0 0 auto;
   }
 
   .shell-tabbar {
@@ -3591,7 +3883,8 @@ body {
     right: 0;
     bottom: 0;
     z-index: 2;
-    width: min(var(--zuri-right-panel-width), 88vw);
+    width: min(var(--zuri-context-panel-width), 88vw);
+    margin-left: 0;
     box-shadow: var(--zuri-shadow-raised);
     transform: translateX(100%);
     visibility: hidden;
@@ -3606,5 +3899,649 @@ body {
      still names the model. */
   .top-bar-model {
     display: none;
+  }
+
+  /* The bell and theme keep their 32 px boxes; the search field gives up its width
+     first, so the bar never spills sideways. */
+  .top-bar-button {
+    flex: 0 0 auto;
+  }
+
+  /* The node's skeleton bars are drawn at 420 and 380 px, which is wider than a phone
+     column. The group has to become definite (100%) before the bars' percentage cap
+     can bite, so the reader's group runs full width here and its bars stop at the
+     column's edge instead of scrolling the transcript sideways. */
+  .transcript-skeleton-turn[data-role='user'] {
+    width: 100%;
+  }
+
+  .transcript-skeleton-bar[data-size='wide'],
+  .transcript-skeleton-turn[data-role='assistant'] .transcript-skeleton-bar[data-size='short'] {
+    max-width: 100%;
+  }
+
+  /* The draft wraps and grows on a phone too (decision 18). The pill gives its
+     controls their own row here, so a long prompt has somewhere to go instead of
+     being clipped to the first line. */
+  .composer-input {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  /* One row cannot hold the draft and four controls on a phone: the draft keeps the
+     first row between the attachment and send buttons, and the model and mode
+     selectors take a second row under it. A grid rather than flex-wrap so the two
+     rows are the same at every phone width. Every control keeps a 44 px tap target. */
+  .composer {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'attach input send'
+      'model modes modes';
+    align-items: center;
+    gap: 2px 8px;
+    padding: 4px var(--zuri-space-3) 8px var(--zuri-space-1);
+    min-height: 0;
+  }
+
+  .composer-button {
+    grid-area: attach;
+    width: 44px;
+    height: 44px;
+  }
+
+  .composer-input {
+    grid-area: input;
+    min-height: 40px;
+  }
+
+  .composer-send {
+    grid-area: send;
+    width: 44px;
+    height: 44px;
+  }
+
+  .composer-model {
+    grid-area: model;
+    height: 44px;
+  }
+
+  .composer-model-select {
+    height: 44px;
+    max-width: 108px;
+  }
+
+  .composer-modes {
+    grid-area: modes;
+    justify-self: start;
+    height: 44px;
+    padding: 4px;
+    margin-right: 0;
+  }
+
+  .composer-mode {
+    height: 36px;
+    padding: 0 8px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Settings overview (design node 0:6194)
+
+   A 940-wide page on the canvas tone: title over a two-column body. The left
+   column is the six section rows, the right column two cards, 24 apart. The page
+   paints its own canvas behind the cards, because the shell's centre is the
+   reading surface and white cards need something to sit on.
+   --------------------------------------------------------------------------- */
+
+.settings-ov-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 28px 32px 32px; /* node 0:6265 sits 28 down and 32 in */
+  overflow-y: auto;
+  background: var(--zuri-bg-canvas);
+  /* The page measures itself, not the window: the centre column changes width when
+     the context panel opens or closes, and the columns should react to that. */
+  container-type: inline-size;
+}
+
+.settings-ov-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-5);
+  width: 100%;
+  max-width: 940px;
+  margin: 0 auto;
+}
+
+.settings-ov-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+}
+
+.settings-ov-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: 20px; /* node 0:6265: 240x28 */
+  font-weight: var(--zuri-font-weight-semibold);
+  line-height: 28px;
+}
+
+.settings-ov-lead {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-body-sm); /* node 0:6266: 470x20 */
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+/* The two columns keep the node's 520:332 proportion rather than a fixed 332, so a
+   narrower centre shrinks both instead of squeezing the row titles into ellipses.
+   The container query below stacks them when there is genuinely no room. */
+.settings-ov-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr);
+  gap: var(--zuri-space-5);
+  align-items: start;
+}
+
+.settings-ov-sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-3);
+  min-width: 0;
+}
+
+.settings-ov-group-label {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: 10px; /* node 0:6270: 240x16 */
+  font-weight: var(--zuri-font-weight-regular);
+  letter-spacing: 0.6px;
+  line-height: 16px;
+  text-transform: uppercase;
+}
+
+.settings-ov-row-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* rows are 72 tall, 12 apart */
+}
+
+.settings-ov-row {
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+  overflow: hidden;
+}
+
+/* The row itself is the disclosure: the whole 72 px band is the hit area. */
+.settings-ov-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 72px;
+  padding: 0 12px;
+  border: 0;
+  background: transparent;
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-ov-row-main:hover {
+  background: var(--zuri-surface-secondary);
+}
+
+.settings-ov-row-main:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: -2px;
+}
+
+.settings-ov-row-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px; /* 36 px mark on radius 10 */
+  height: 36px;
+  border-radius: var(--zuri-radius-brand);
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-secondary);
+}
+
+.settings-ov-row-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-ov-row-title {
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  font-size: 15px;
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-ov-row-desc {
+  overflow: hidden;
+  color: var(--zuri-text-muted);
+  font-size: 12px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The chip states what the section currently holds. Only a true claim gets the
+   success tone: a section with nothing recorded stays neutral. */
+.settings-ov-row-chip {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-muted);
+  font-size: 10px;
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+.settings-ov-row-chip[data-tone='success'] {
+  background: var(--zuri-success-soft);
+  color: var(--zuri-success-soft-foreground);
+}
+
+.settings-ov-row-chevron {
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
+  transition: transform var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.settings-ov-row[data-open='true'] .settings-ov-row-chevron {
+  transform: rotate(90deg);
+}
+
+.settings-ov-row-panel {
+  padding: 0 12px 14px 60px; /* aligns with the row's copy, past the 36 px mark */
+}
+
+.settings-ov-row-panel[hidden] {
+  display: none;
+}
+
+.settings-ov-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-3);
+}
+
+.settings-ov-row-text {
+  margin: 0;
+  color: var(--zuri-text-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.settings-ov-row-text-quiet {
+  color: var(--zuri-text-muted);
+}
+
+/* Right column cards: white, radius 12, 12 padding, 12 apart. */
+.settings-ov-aside {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-3);
+  min-width: 0;
+}
+
+.settings-ov-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  padding: 12px;
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+}
+
+.settings-ov-card-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: 15px;
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: 20px;
+}
+
+.settings-ov-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-2);
+  min-height: 40px;
+}
+
+/* The hairline divides the two rows (design 0:6341), it does not ring the card. */
+.settings-ov-card-row + .settings-ov-card-row {
+  padding-top: 12px;
+  border-top: 1px solid var(--zuri-border-hairline);
+}
+
+.settings-ov-card-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.settings-ov-card-label {
+  color: var(--zuri-text-primary);
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.settings-ov-card-hint {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.settings-ov-card-value {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-secondary);
+  font-size: 11px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+
+/* The allow-list: one 26 px row per entry, the glyph 14, the label 12/15, and the
+   remove control at the right edge. */
+.settings-ov-allow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: none;
+}
+
+.settings-ov-allow-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  min-height: 26px;
+}
+
+.settings-ov-allow-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  color: var(--zuri-text-secondary);
+}
+
+.settings-ov-allow-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  font-size: 12px;
+  line-height: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-ov-allow-remove {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: transparent;
+  color: var(--zuri-text-muted);
+  cursor: pointer;
+}
+
+.settings-ov-allow-remove:hover {
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-primary);
+}
+
+.settings-ov-allow-empty {
+  color: var(--zuri-text-muted);
+  font-size: 12px;
+  line-height: 15px;
+}
+
+.settings-ov-allow-add {
+  display: flex;
+  gap: var(--zuri-space-2);
+  margin-top: var(--zuri-space-2);
+}
+
+.settings-ov-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.settings-ov-field:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 1px;
+}
+
+/* The drawn control (ui/select.js) replaces the select's own box, so the arrow that
+   said "this opens a list" is drawn beside it: the same .select-icon the standalone
+   page uses, anchored to this field instead. */
+.settings-ov-select {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-ov-select .settings-ov-field {
+  padding-right: 30px;
+}
+
+.settings-ov-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+}
+
+.settings-ov-field-label {
+  color: var(--zuri-text-muted);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.settings-ov-choices {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-self: flex-start; /* inside a column, a segmented control must not stretch */
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface-secondary);
+}
+
+.settings-ov-choice {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--zuri-text-muted);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 14px;
+  cursor: pointer;
+}
+
+.settings-ov-choice[aria-pressed='true'] {
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+}
+
+.settings-ov-choice:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 1px;
+}
+
+.settings-ov-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+.settings-ov-save,
+.settings-ov-add {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.settings-ov-save:hover,
+.settings-ov-add:hover {
+  background: var(--zuri-accent-hover);
+}
+
+.settings-ov-remove {
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: transparent;
+  color: var(--zuri-text-secondary);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+
+.settings-ov-remove:hover {
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-primary);
+}
+
+.settings-ov-key-status {
+  color: var(--zuri-text-muted);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.settings-ov-key-error {
+  margin: 0;
+  color: var(--zuri-danger);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+.settings-ov-key-error[hidden] {
+  display: none;
+}
+
+.settings-ov-key-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+}
+
+/* The page's own status line, under the columns. */
+.settings-ov-status {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.settings-ov-status[data-tone='error'] {
+  color: var(--zuri-danger);
+}
+
+.settings-ov-status[hidden] {
+  display: none;
+}
+
+.settings-ov-foot {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: 11px;
+  line-height: 14px;
+}
+
+/* Screen-reader-only text, for the allow-list input's label. */
+.settings-ov-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 999px) {
+  .settings-ov-page {
+    padding: var(--zuri-space-5) var(--zuri-space-4) var(--zuri-space-4);
+  }
+}
+
+/* One column once the page itself is narrower than the two columns need. */
+@container (max-width: 620px) {
+  .settings-ov-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 767.98px) {
+  /* The row keeps its mark and its title on a phone; the description is the first
+     thing it can afford to lose, and the chip stays because it carries the state. */
+  .settings-ov-page {
+    padding: var(--zuri-space-4) var(--zuri-space-3);
+  }
+
+  .settings-ov-row-desc {
+    display: none;
+  }
+
+  .settings-ov-row-main {
+    min-height: 60px;
+  }
+
+  .settings-ov-row-panel {
+    padding: 0 12px 14px;
   }
 }

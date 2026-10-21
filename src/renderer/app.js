@@ -5,8 +5,9 @@
  */
 
 import { initChats } from './ui/chats.js';
+import { initContextPanel } from './ui/contextPanel.js';
 import { initRouter } from './ui/router.js';
-import { initShell } from './ui/shell.js';
+import { fillSidebarUser, initShell } from './ui/shell.js';
 import { initTopbar, readSettings } from './ui/topbar.js';
 
 const LIGHT_THEME = 'light';
@@ -33,10 +34,16 @@ applyTheme(settings.theme);
 
 initTopbar({ settings });
 initShell();
+// The sidebar's account row shows the same saved name as the top bar's avatar.
+fillSidebarUser(settings.name);
 // Awaited so the sidebar and transcript are painted before the page reports ready:
 // the thread list is the first thing the user sees, and a check that reads the page
 // must not catch it half drawn.
 await initChats();
+// The Context panel's detected-files card, filled from main once the thread list is
+// up. Not awaited: the panel is a summary beside the conversation, and a slow disk
+// read must not hold the page's ready mark.
+void initContextPanel();
 // The central column's router, started after the chats so the Chat view it points
 // at already has its thread list. Every sidebar destination now opens a view.
 initRouter();

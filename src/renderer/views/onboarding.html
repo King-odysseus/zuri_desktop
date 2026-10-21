@@ -10,6 +10,7 @@
     />
     <title>Welcome - Zuri</title>
     <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/dropdown.css" />
     <link rel="stylesheet" href="onboarding.css" />
   </head>
   <body class="onboarding-page">
@@ -21,26 +22,40 @@
 
     <header class="onboarding-titlebar">
       <span class="onboarding-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="14" height="14" focusable="false">
-          <path
-            d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.961L8.5 9.937A2 2 0 0 0 9.937 8.5l1.581-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .963L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.581 6.135a.5.5 0 0 1-.963 0z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          ></path>
-          <path
-            d="M20 3v4M22 5h-4M4 17v2M5 18H3"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          ></path>
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" focusable="false">
+          <path fill-rule="evenodd" d="M10.2 0H13.8C18.9 0 24 3.9 24 8.6V12.4C24 16.3 22 20.2 20.05 20.2V24L13.8 21.4H9.2C4.6 21.4 0 17.25 0 13.1V8.4C0 4.2 5.1 0 10.2 0ZM5.8 8.3A1.86 1.86 0 0 1 9.5 8.3V13.8A1.86 1.86 0 0 1 5.8 13.8ZM14.3 8.3A1.86 1.86 0 0 1 18.1 8.3V13.8A1.86 1.86 0 0 1 14.3 13.8Z" />
         </svg>
       </span>
       <span class="onboarding-app-name">Zuri Desktop</span>
+      <!-- The design asks for the name and the theme on their own steps (nodes 0:2329
+           and 0:2423) before this provider step. They are asked here, in the title
+           bar's empty band, because the drawn card is fixed geometry (node 0:1009
+           draws 620 x 756 at 410, 84) and a field added inside it moves every row
+           below. maxlength matches SETUP_NAME_MAX_LENGTH in src/main/onboarding.js. -->
+      <div class="onboarding-details">
+        <label class="onboarding-details-label" for="onboarding-name">Your name</label>
+        <input
+          class="onboarding-details-input"
+          id="onboarding-name"
+          name="name"
+          type="text"
+          autocomplete="name"
+          maxlength="60"
+          placeholder="What should Zuri call you?"
+        />
+        <label class="onboarding-details-label" for="onboarding-theme">Theme</label>
+        <!-- The drawn control (ui/select.js) replaces the select's own box, so the
+             arrow that said "this opens a list" is drawn beside it instead. -->
+        <span class="onboarding-details-field">
+          <select class="onboarding-details-select" id="onboarding-theme" name="theme">
+            <option value="light" selected>Light</option>
+            <option value="dark">Dark</option>
+          </select>
+          <svg class="onboarding-details-chevron" viewBox="0 0 24 24" width="12" height="12" fill="none" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
+      </div>
       <!-- Window glyphs as the node draws them. The desktop window keeps its own
            native title bar controls, so these are decoration, not buttons. -->
       <span class="onboarding-window-glyphs" aria-hidden="true">

@@ -379,11 +379,18 @@ async function callThrough(call) {
 
 /**
  * Build the Files destination.
+ *
+ * The second argument is the shell the router hands every view (navigation), not
+ * the bridge, so the bridge is read from `window.zuri` here - the same place
+ * Settings reads it. Taking the second argument as the bridge made this page say
+ * "only inside Zuri" while it was running inside Zuri.
+ *
  * @param {Document} [doc]
- * @param {any} [api] The `window.zuri` bridge.
+ * @param {{ zuri?: any }} [shell]
  * @returns {HTMLElement}
  */
-export function createView(doc = document, api = window.zuri) {
+export function createView(doc = document, shell = {}) {
+  const api = shell.zuri ?? window.zuri ?? null;
   const status = element('p', 'view-card-text', 'Reading your workspace...');
   const list = element('div', 'view-file-list');
   const refresh = button('Refresh', () => load());

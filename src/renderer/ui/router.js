@@ -42,11 +42,20 @@ export const ROUTES = Object.freeze([
 export const DEFAULT_ROUTE = 'chats';
 
 /**
+ * Sidebar rows that open another route. The sidebar foot holds the account row,
+ * which is a destination but has no view of its own: everything it stands for
+ * (name, theme, data folder, reset) is edited in Settings, so it opens Settings
+ * rather than falling back to Chats and looking like a broken row.
+ */
+const ROUTE_ALIASES = Object.freeze({ account: 'settings' });
+
+/**
  * @param {string} name
  * @returns {{ name: string, label: string, create: Function } | undefined}
  */
 function routeNamed(name) {
-  return ROUTES.find((route) => route.name === name);
+  const wanted = ROUTE_ALIASES[name] ?? name;
+  return ROUTES.find((route) => route.name === wanted);
 }
 
 /**
@@ -130,6 +139,9 @@ export function initRouter({ doc = document, viewport = window } = {}) {
     outlet.dataset.view = route.name;
     outlet.setAttribute('aria-label', route.label);
     markSidebar(route.name);
+    window.document.title = `${route.label} - Zuri`;
+    const barTitle = document.querySelector('.top-bar-title');
+    if (barTitle) barTitle.textContent = route.label;
     active = route.name;
 
     // On a phone the sidebar is a drawer over the conversation; picking a

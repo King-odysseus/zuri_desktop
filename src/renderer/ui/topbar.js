@@ -1,14 +1,16 @@
 /**
  * topbar.js - the top bar's stateful controls.
  *
- * index.html carries only what never changes: the sidebar toggle and the app name.
- * The model chip, the search field, the notification bell and the theme toggle all
- * depend on settings, which the renderer can only learn after the bridge answers,
- * so they are built here rather than sitting in the markup as placeholders.
+ * index.html carries only what never changes: the brand row in the sidebar and the
+ * bar's section title. The model chip, the search field, the notification bell and
+ * the theme toggle all depend on settings, which the renderer can only learn after
+ * the bridge answers, so they are built here rather than sitting in the markup.
  *
- * Geometry is node 0:131's, which smoke measures: the 124 x 28 model pill after the
- * app name, then four 28 px controls in .top-bar-trailing - search, bell, theme and
- * the account chip - 8 px apart, with 12 px before the account chip.
+ * Geometry is the current design's "Top Bar" (node 0:541, 928x56): a 16 px inset
+ * each side, the title on the left, then search (220x32), the bell (32), the model
+ * chip (68x28, pill) and the theme button (32), 8 px apart. The account moved to
+ * the sidebar's user row (node 0:530), so the bar's trailing side ends at the theme
+ * button and this module no longer builds an avatar.
  */
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -141,7 +143,8 @@ async function saveSettings(patch) {
 }
 
 /**
- * The model trigger: a 124 x 28 ghost pill naming the model from settings.
+ * The model chip (design 0:550, 68x28 pill on the panel tone): a status dot and the
+ * model's name, so the bar names the model in use without opening a menu.
  * @param {unknown} model
  * @returns {HTMLButtonElement}
  */
@@ -151,22 +154,23 @@ function createModelChip(model) {
   chip.className = 'top-bar-model';
   chip.title = 'Provider and model are chosen in Settings';
 
+  const dot = document.createElement('span');
+  dot.className = 'top-bar-model-dot';
+  dot.setAttribute('aria-hidden', 'true');
+
   const name = document.createElement('span');
   name.className = 'top-bar-model-name';
   const label = typeof model === 'string' ? model.trim() : '';
   name.textContent = label === '' ? UNCHOSEN_MODEL : label;
 
-  chip.append(name);
-  const chevron = createIcon(ICONS.chevron, 14);
-  chevron.classList.add('top-bar-model-chevron');
-  chip.append(chevron);
+  chip.append(dot, name);
   return chip;
 }
 
 /**
- * The search control: a real input that rests at the node's 28 px icon box and
- * expands over the empty middle of the bar while focused. Keeping the resting box
- * at 28 px is what lets the trailing group keep the node's measured gaps.
+ * The search field (design 0:543, 220x32 on radius 9): a real input with the icon at
+ * its left, always visible rather than collapsing to an icon, because the design
+ * draws it with its placeholder showing.
  * @returns {{ element: HTMLElement, focus: () => void, destroy: () => void }}
  */
 function createSearch() {
@@ -174,7 +178,7 @@ function createSearch() {
   wrap.className = 'top-bar-search';
   wrap.setAttribute('role', 'search');
 
-  const icon = createIcon(ICONS.search);
+  const icon = createIcon(ICONS.search, 14);
   icon.classList.add('top-bar-search-icon');
 
   const input = document.createElement('input');
@@ -315,30 +319,6 @@ function createThemeToggle() {
 }
 
 /**
- * The account chip: 28 px on radius/pill, initials from the stored name.
- * @param {unknown} name
- * @returns {HTMLSpanElement}
- */
-function createAccountChip(name) {
-  const chip = document.createElement('span');
-  chip.className = 'top-bar-avatar';
-  chip.setAttribute('aria-hidden', 'true');
-
-  const words = String(typeof name === 'string' ? name : '')
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  chip.textContent =
-    words.length === 0
-      ? 'You'
-      : words
-          .slice(0, 2)
-          .map((word) => word[0].toUpperCase())
-          .join('');
-  return chip;
-}
-
-/**
  * Build and wire the top bar's controls.
  * @param {{ settings?: object, unreadCount?: number }} [options] Settings already
  *   read by the caller; without them the bar reads them through the bridge.
@@ -346,9 +326,8 @@ function createAccountChip(name) {
  *   is not on this page.
  */
 export function initTopbar(options = {}) {
-  const leading = document.querySelector('.top-bar-leading');
   const trailing = document.querySelector('.top-bar-trailing');
-  if (!leading || !trailing) return null;
+  if (!trailing) return null;
 
   const settings = options.settings ?? {};
   const search = createSearch();
@@ -357,12 +336,14 @@ export function initTopbar(options = {}) {
   // The Settings destination changes the theme through this same control.
   themeControl = themeToggle;
 
-  // The chip is rebuilt rather than edited so the name and the element that shows
-  // it are always in step; nothing else in the leading group moves.
-  leading.querySelector('.top-bar-model')?.remove();
-  leading.append(createModelChip(settings.model));
-
-  trailing.replaceChildren(search.element, bell.element, themeToggle.element, createAccountChip(settings.name));
+  // The design's order, left to right: search, bell, model, theme. The account is
+  // the sidebar's user row now, so it is deliberately not part of this group.
+  trailing.replaceChildren(
+    search.element,
+    bell.element,
+    createModelChip(settings.model),
+    themeToggle.element,
+  );
   themeToggle.sync();
 
   return { setUnreadCount: bell.setUnread };

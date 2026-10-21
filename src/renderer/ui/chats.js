@@ -9,7 +9,7 @@
  * store.js returns, so a reload restores exactly what was saved.
  */
 
-import { createComposer, createMessageElement } from './composer.js';
+import { createComposer, createMessageElement, renderComposerControls, setComposerModel } from './composer.js';
 import { createLoadingSkeleton } from './skeleton.js';
 
 /** Placeholder title a thread carries until its first message names it. */
@@ -106,6 +106,7 @@ const IDS = Object.freeze({
   send: 'composer-send',
   hint: 'composer-hint',
   emptyAction: 'reminders-empty-action',
+  errorBlock: 'chat-error-block',
   errorRetry: 'chat-error-retry',
 });
 
@@ -173,9 +174,10 @@ function formatWhen(iso) {
  * @param {Record<string, HTMLElement>} elements
  * @param {Record<string, Function>} api The `window.zuri.chats` namespace.
  * @param {Record<string, Function>} [chatApi] The `window.zuri.chat` namespace.
+ * @param {Record<string, Function>} [settingsApi] The `window.zuri.settings` namespace.
  * @returns {{ selectThread: Function, createNewChat: Function, send: Function, reload: Function }}
  */
-function createWorkspace(elements, api, chatApi) {
+function createWorkspace(elements, api, chatApi, settingsApi = null) {
   /** @type {{ threads: any[], activeId: string | null }} */
   const state = { threads: [], activeId: null };
 
@@ -473,6 +475,30 @@ function createWorkspace(elements, api, chatApi) {
     lastReplyFailed,
   });
 
+  // The model chip is the composer's to draw, but the choice belongs in settings, and
+  // this is where a failed write can be reported under the pill like every other one.
+  elements.composer.addEventListener('composer-model', async (event) => {
+    if (typeof settingsApi?.save !== 'function') return;
+    const model = event.detail?.value ?? '';
+    const saved = await call(() => settingsApi.save({ model }));
+    if (!saved?.ok) {
+      report(saved?.error?.message ?? 'That model choice was not saved.');
+      return;
+    }
+    // The bar names the model in use, so it has to move with the pill or the two
+    // would disagree about what the next send is going to ask.
+    const chip = document.querySelector('.top-bar-model-name');
+    if (chip && model !== '') chip.textContent = model;
+  });
+
+  // The pill starts on the saved model. A failed read leaves the adapter's default
+  // showing, which is what a send would use anyway.
+  if (typeof settingsApi?.get === 'function') {
+    call(() => settingsApi.get()).then((settings) => {
+      if (settings?.ok) setComposerModel(elements, settings.data?.model);
+    });
+  }
+
   elements.newChat.addEventListener('click', () => {
     createNewChat();
   });
@@ -566,6 +592,75 @@ function markComposerUnavailable(elements) {
 }
 
 /**
+ * The states the chat page draws (pages.md: empty, loading, streaming, error,
+ * disabled). Streaming is the reply in flight, drawn inside the transcript, so the
+ * four a reviewer can hold still are named here.
+ */
+export const CHAT_STATES = Object.freeze(['empty', 'loading', 'error', 'disabled']);
+
+/**
+ * Hold one of the page's states on screen, for ?state= in the query string.
+ *
+ * Loading is a real state of the page, but it lasts only as long as the disk read
+ * that fills it in, so a reviewer opening the page after boot would never see it.
+ * Naming it here keeps the skeleton up until the next navigation. The states are
+ * painted from the markup nodes, so this works with or without the preload bridge.
+ * @param {Record<string, HTMLElement>} elements
+ * @param {string} name
+ * @returns {boolean} whether the name is one of this page's states
+ */
+export function showState(elements, name) {
+  if (!CHAT_STATES.includes(name)) return false;
+
+  if (name === 'loading') {
+    // One state on screen at a time: the always-on error card would read as a failed
+    // load rather than a load in progress.
+    if (elements.errorBlock) elements.errorBlock.hidden = true;
+    elements.list.dataset.state = 'loading';
+    elements.listEmpty.hidden = true;
+    elements.list.replaceChildren(createLoadingSkeleton('Loading conversations'));
+    elements.hero.hidden = true;
+    elements.transcript.dataset.state = 'loading';
+    elements.transcript.querySelector('.transcript-skeleton')?.remove();
+    elements.transcript.append(createTranscriptSkeleton());
+    return true;
+  }
+
+  if (name === 'empty') {
+    if (elements.errorBlock) elements.errorBlock.hidden = true;
+    elements.list.replaceChildren();
+    elements.list.dataset.state = 'empty';
+    elements.listEmpty.hidden = false;
+    elements.hero.hidden = false;
+    elements.transcript.dataset.state = 'empty';
+    for (const node of elements.transcript.querySelectorAll('.message')) node.remove();
+    elements.transcript.querySelector('.transcript-skeleton')?.remove();
+    return true;
+  }
+
+  if (name === 'error') {
+    // The block above the composer is the drawn error state; the hero has to step
+    // back so two invitations are not talking over each other.
+    if (elements.errorBlock) elements.errorBlock.hidden = false;
+    elements.hero.hidden = true;
+    elements.transcript.dataset.state = 'filled';
+    return true;
+  }
+
+  // disabled: the design's inert composer and status row while a reply is in flight.
+  if (elements.errorBlock) elements.errorBlock.hidden = true;
+  elements.composer.dataset.state = 'disabled';
+  elements.input.disabled = true;
+  elements.input.setAttribute('aria-disabled', 'true');
+  elements.send.disabled = true;
+  elements.send.setAttribute('aria-disabled', 'true');
+  elements.hint.textContent = 'Zuri is working, wait for it to finish…';
+  elements.stream.hidden = false;
+  elements.transcript.append(elements.stream);
+  return true;
+}
+
+/**
  * Start the chat workspace. Safe to call in a plain browser preview, where the
  * preload bridge does not exist: the markup keeps its empty states, the composer
  * shows its disabled state, and nothing is wired.
@@ -574,13 +669,25 @@ function markComposerUnavailable(elements) {
  */
 export async function initChats(bridge = window.zuri) {
   const elements = collectElements();
+  // The pill's model and mode selectors are markup-level, so they are mounted even
+  // with no bridge: the preview then shows the composer the app actually uses.
+  renderComposerControls(elements);
+
   const api = bridge?.chats;
+  let workspace = null;
+
   if (!api) {
     markComposerUnavailable(elements);
-    return null;
+  } else {
+    workspace = createWorkspace(elements, api, bridge?.chat, bridge?.settings);
+    await workspace.reload();
   }
 
-  const workspace = createWorkspace(elements, api, bridge?.chat);
-  await workspace.reload();
+  // KAI reads this to know which states the page draws; ?state= then holds one on
+  // screen, so the loading skeleton is there to be reviewed instead of gone.
+  window.__KAI_STATES__ = [...CHAT_STATES];
+  const wanted = new URLSearchParams(window.location.search).get('state');
+  if (wanted !== null) showState(elements, wanted);
+
   return workspace;
 }

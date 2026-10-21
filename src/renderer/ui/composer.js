@@ -12,6 +12,8 @@
  * builds it here, so a streamed reply, a saved reply and a stored one look the same.
  */
 
+import { enhanceSelect } from './select.js';
+
 /** The reply token channel's time label, when the stored time is unreadable. */
 const UNKNOWN_TIME = '';
 
@@ -49,12 +51,39 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
 const MODE_LABELS = Object.freeze({ ask: 'Ask', act: 'Act', autopilot: 'Autopilot' });
 
 /**
+ * The modes the selector offers, in the order the design lists them. Each carries a
+ * one-line hint, because "Act" alone does not tell someone that Zuri announces a
+ * change before making it.
+ */
+const MODES = Object.freeze([
+  { id: 'ask', label: 'Ask', hint: 'Answers, changes nothing' },
+  { id: 'act', label: 'Act', hint: 'Changes things, telling you first' },
+  { id: 'autopilot', label: 'Autopilot', hint: 'Runs the job on its schedule' },
+]);
+
+/**
+ * The draft grows a line at a time up to this many, then scrolls (decision 18). Kept
+ * here rather than in CSS so the clamp and the line count come from one number: CSS
+ * cannot measure a textarea's content height.
+ */
+const MAX_INPUT_LINES = 8;
+
+/** Models the selector offers; the saved one is added if it is not already listed. */
+const MODEL_OPTIONS = Object.freeze([
+  'gpt-4o',
+  'gpt-4o-mini',
+  'claude-3-5-sonnet-latest',
+  'claude-3-5-haiku-latest',
+]);
+
+/** The store's default model, used until settings answer. */
+const DEFAULT_MODEL = 'gpt-4o';
+
+/**
  * Glyphs from the design's icon set, as lucide path data. Only these constants
  * ever reach an innerHTML call, never message content.
  */
 const GLYPH = Object.freeze({
-  sparkles:
-    '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
   person:
     '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
   alert:
@@ -62,6 +91,9 @@ const GLYPH = Object.freeze({
   file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/>',
   retry:
     '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  attach:
+    '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  send: '<path d="m5 12 7-7 7 7"/><path d="M12 19V5"/>',
 });
 
 /**
@@ -83,6 +115,35 @@ function createGlyph(name, size) {
   svg.setAttribute('aria-hidden', 'true');
   // Inert path constants: no message text is ever interpolated here.
   svg.innerHTML = GLYPH[name] ?? '';
+  return svg;
+}
+
+/**
+ * Zuri's mark, traced from the supplied logo: one filled speech bubble whose two
+ * eyes are holes cut by fill-rule, so the tile colour behind shows through them.
+ * The viewBox is the bubble plus its tail; the same path is inlined in the shell
+ * and the account pages, where no module can build it.
+ */
+const ZURI_MARK_PATH =
+  'M10.2 0H13.8C18.9 0 24 3.9 24 8.6V12.4C24 16.3 22 20.2 20.05 20.2V24L13.8 21.4H9.2C4.6 21.4 0 17.25 0 13.1V8.4C0 4.2 5.1 0 10.2 0ZM5.8 8.3A1.86 1.86 0 0 1 9.5 8.3V13.8A1.86 1.86 0 0 1 5.8 13.8ZM14.3 8.3A1.86 1.86 0 0 1 18.1 8.3V13.8A1.86 1.86 0 0 1 14.3 13.8Z';
+
+/**
+ * Zuri's mark as inline SVG in the current text colour.
+ * @param {number} size
+ * @returns {SVGSVGElement}
+ */
+function createZuriMark(size) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('fill', 'currentColor');
+  svg.setAttribute('aria-hidden', 'true');
+
+  const path = document.createElementNS(SVG_NS, 'path');
+  path.setAttribute('fill-rule', 'evenodd');
+  path.setAttribute('d', ZURI_MARK_PATH);
+  svg.append(path);
   return svg;
 }
 
@@ -140,7 +201,7 @@ function createMetaRow(role, message, initials) {
 }
 
 /**
- * Zuri's 24 px mark: the sparkles glyph, or the alert glyph on a failed turn.
+ * Zuri's 24 px mark: the bubble, or the alert glyph on a failed turn.
  * @param {boolean} failed
  * @returns {HTMLElement}
  */
@@ -149,7 +210,7 @@ function createAssistantAvatar(failed) {
   avatar.className = 'message-avatar';
   avatar.dataset.role = 'assistant';
   if (failed) avatar.dataset.state = 'failed';
-  avatar.append(createGlyph(failed ? 'alert' : 'sparkles', 12));
+  avatar.append(failed ? createGlyph('alert', 12) : createZuriMark(14));
   return avatar;
 }
 
@@ -441,6 +502,268 @@ export function createErrorBubble(message) {
 }
 
 /**
+ * Grow the draft by whole lines, up to MAX_INPUT_LINES, then scroll it.
+ *
+ * A textarea cannot be sized by CSS alone: `rows="1"` fixes it and a fixed height
+ * clips a long prompt. scrollHeight is the content height, so the height is reset to
+ * 'auto' first (otherwise the current height is the floor) and then clamped to the
+ * cap; past the cap the box scrolls instead of hiding text under the pill edge.
+ * @param {HTMLTextAreaElement | null | undefined} input
+ * @returns {void}
+ */
+export function fitComposerInput(input) {
+  if (!input) return;
+
+  const style = getComputedStyle(input);
+  const lineHeight = Number.parseFloat(style.lineHeight) || 20;
+  const padding = (Number.parseFloat(style.paddingTop) || 0) + (Number.parseFloat(style.paddingBottom) || 0);
+  const oneLine = Math.round(lineHeight + padding);
+  const cap = Math.round(lineHeight * MAX_INPUT_LINES + padding);
+
+  // 'auto' first: scrollHeight can never report less than the box already is.
+  input.style.height = 'auto';
+  // An empty draft is one line, except where the placeholder itself wraps: a phone
+  // needs two or three lines to show the whole invitation, and a clipped one is worse
+  // than a pill a line taller. The cap keeps an empty box from standing very tall.
+  const wanted =
+    input.value === ''
+      ? Math.min(Math.max(input.scrollHeight, oneLine), oneLine * 3)
+      : Math.max(input.scrollHeight, oneLine);
+  const height = Math.min(wanted, cap);
+  input.style.height = `${height}px`;
+  // Only a draft longer than the cap scrolls; otherwise the scrollbar would show as
+  // a stray grey bar beside a one-line prompt.
+  input.style.overflowY = wanted > cap ? 'auto' : 'hidden';
+  input.dataset.lines = String(Math.max(1, Math.round((height - padding) / lineHeight)));
+}
+
+/** Controls already mounted per pill, so a second call never adds a second set. */
+const MOUNTED = new WeakMap();
+
+/**
+ * The pill's round glyph buttons: the attachment button and the send button.
+ * @param {string} className
+ * @param {string} id
+ * @param {string} label
+ * @param {'attach' | 'send'} glyph
+ * @returns {HTMLButtonElement}
+ */
+function createIconButton(className, id, label, glyph) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = className;
+  button.id = id;
+  button.setAttribute('aria-label', label);
+  button.title = label;
+  button.append(createGlyph(glyph, 16));
+  return button;
+}
+
+/**
+ * The draft: one row tall to start with, grown by fitComposerInput.
+ * @returns {HTMLTextAreaElement}
+ */
+function createDraft() {
+  const input = document.createElement('textarea');
+  input.className = 'composer-input';
+  input.id = 'composer-input';
+  input.rows = 1;
+  input.placeholder = 'Ask Zuri anything, or describe a task for it to do…';
+  input.setAttribute('aria-label', 'Message Zuri');
+  return input;
+}
+
+/**
+ * The model selector: a chip-shaped native select, so the choice is reachable by
+ * keyboard and screen reader without a popup to trap and dismiss.
+ * @param {string} model
+ * @returns {{ element: HTMLElement, select: HTMLSelectElement, setModel: (name: string) => void }}
+ */
+function createModelSelector(model) {
+  const wrap = document.createElement('div');
+  wrap.className = 'composer-model';
+
+  const select = document.createElement('select');
+  select.className = 'composer-model-select';
+  select.id = 'composer-model';
+  select.setAttribute('aria-label', 'Model');
+  select.title = 'Model for the next message';
+  wrap.append(select);
+
+  // The chip is the drawn control from ui/select.js: a native select's list is painted
+  // by Windows and cannot wear the design. The select stays the value the change
+  // handler below reads, so the saved model still leaves as the same event.
+  enhanceSelect(select, { doc: select.ownerDocument });
+
+  /** @param {string} name */
+  function setModel(name) {
+    const label = typeof name === 'string' ? name.trim() : '';
+    if (label === '') return;
+    // A model saved for a provider the list does not name still has to be shown, or
+    // the selector would claim a model the next send is not using.
+    if (!Array.from(select.options).some((option) => option.value === label)) {
+      const option = document.createElement('option');
+      option.value = label;
+      option.textContent = label;
+      select.append(option);
+    }
+    select.value = label;
+  }
+
+  for (const name of MODEL_OPTIONS) {
+    const option = document.createElement('option');
+    option.value = name;
+    option.textContent = name;
+    select.append(option);
+  }
+  setModel(model);
+
+  // The choice belongs in settings, which only the page can write; it leaves as an
+  // event so the composer keeps working when it is mounted on its own.
+  select.addEventListener('change', () => {
+    wrap.dispatchEvent(
+      new CustomEvent('composer-model', { bubbles: true, detail: { value: select.value } }),
+    );
+  });
+
+  return { element: wrap, select, setModel };
+}
+
+/**
+ * The Ask / Act / Autopilot selector: three pressed-state buttons on the pill. The
+ * pressed one is the mode every send carries.
+ * @param {string} mode
+ * @returns {{ element: HTMLElement, buttons: Map<string, HTMLButtonElement>, sync: (next: string) => void }}
+ */
+function createModeSelector(mode) {
+  const group = document.createElement('div');
+  group.className = 'composer-modes';
+  group.id = 'composer-modes';
+  group.setAttribute('role', 'group');
+  group.setAttribute('aria-label', 'Mode');
+
+  /** @type {Map<string, HTMLButtonElement>} */
+  const buttons = new Map();
+  for (const item of MODES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'composer-mode';
+    button.dataset.mode = item.id;
+    button.title = item.hint;
+    button.textContent = item.label;
+    buttons.set(item.id, button);
+    group.append(button);
+  }
+
+  /** @param {string} next */
+  function sync(next) {
+    for (const [id, button] of buttons) {
+      button.setAttribute('aria-pressed', String(id === next));
+    }
+  }
+  sync(mode);
+
+  return { element: group, buttons, sync };
+}
+
+/**
+ * Render the composer's controls into the pill: the attachment button, the draft, the
+ * model selector, the Ask / Act / Autopilot selector and the send button, and wire the
+ * draft's auto-grow.
+ *
+ * The page ships the three plain controls, so the pill paints before any module runs;
+ * this adds the two that carry state and fills in anything a bare pill is missing. Safe
+ * to call twice: the second call returns what is mounted.
+ * @param {Record<string, HTMLElement>} elements The chat column's nodes.
+ * @returns {{ pill: HTMLElement, model: ReturnType<typeof createModelSelector>, modes: ReturnType<typeof createModeSelector> } | null}
+ */
+export function renderComposerControls(elements) {
+  const shell = elements?.composer;
+  if (!shell) return null;
+
+  // Only a shell that carries the pill gets the selectors: the pill is what clips them
+  // to one row. A bare root (a test stand-in, or a page without the pill) is left
+  // alone rather than grown by two controls it cannot lay out.
+  const pill = shell.classList?.contains('composer') ? shell : shell.querySelector('.composer');
+  if (!pill) return null;
+
+  const existing = MOUNTED.get(pill);
+  if (existing) return existing;
+
+  const mode = Object.hasOwn(MODE_LABELS, pill.dataset.mode) ? pill.dataset.mode : MODES[0].id;
+  pill.dataset.mode = mode;
+
+  // The page ships the attachment button, the draft and the send button so the pill
+  // paints before any module runs; a bare pill gets them here. Either way this is the
+  // module that renders the composer: five controls and the draft that carries them.
+  let attach = pill.querySelector('.composer-button');
+  if (!attach) {
+    attach = createIconButton('composer-button', 'composer-attach', 'Attach a file', 'attach');
+    pill.append(attach);
+  }
+  let input = elements.input ?? pill.querySelector('.composer-input');
+  if (!input) {
+    input = createDraft();
+    attach.after(input);
+  }
+  let send = elements.send ?? pill.querySelector('.composer-send');
+  if (!send) {
+    send = createIconButton('composer-send', 'composer-send', 'Send', 'send');
+    pill.append(send);
+  }
+  elements.attach = attach;
+  elements.input = input;
+  elements.send = send;
+
+  const model = createModelSelector(DEFAULT_MODEL);
+  const modes = createModeSelector(mode);
+
+  for (const [id, button] of modes.buttons) {
+    button.addEventListener('click', () => {
+      pill.dataset.mode = id;
+      modes.sync(id);
+      // The pressed button moved under the pointer, so the caret goes back to the
+      // draft: the choice was about the next message, not this button.
+      elements.input?.focus();
+    });
+  }
+
+  send.before(model.element, modes.element);
+
+  // The draft grows on every edit, whoever else is listening for input.
+  if (input.dataset.autogrow !== 'true') {
+    input.dataset.autogrow = 'true';
+    input.addEventListener('input', () => fitComposerInput(input));
+    fitComposerInput(input);
+  }
+
+  const controls = { pill, model, modes };
+  MOUNTED.set(pill, controls);
+  return controls;
+}
+
+/**
+ * Show a model the page read from settings in the pill's selector.
+ * @param {Record<string, HTMLElement>} elements
+ * @param {string} name
+ * @returns {void}
+ */
+export function setComposerModel(elements, name) {
+  renderComposerControls(elements)?.model.setModel(name);
+}
+
+/**
+ * The mode the selector is showing, which is what every send carries.
+ * @param {Record<string, HTMLElement>} elements
+ * @returns {string}
+ */
+export function composerMode(elements) {
+  const pill = elements?.composer?.querySelector('.composer');
+  const mode = pill?.dataset.mode ?? '';
+  return Object.hasOwn(MODE_LABELS, mode) ? mode : MODES[0].id;
+}
+
+/**
  * Wire the composer over the markup in index.html.
  *
  * @param {object} options
@@ -470,6 +793,10 @@ export function createComposer({
 }) {
   let sending = false;
 
+  // The model and mode selectors belong to the pill: mounting here means createComposer
+  // works on the page's markup and on a bare pill alike, and never adds a second set.
+  renderComposerControls(elements);
+
   /** The thread whose reply is in flight, so Stop addresses the right request. */
   let streamingThreadId = null;
 
@@ -484,6 +811,9 @@ export function createComposer({
     elements.input.disabled = sending;
     elements.input.setAttribute('aria-disabled', String(sending));
     elements.composer.dataset.state = sending ? 'disabled' : 'ready';
+    // The clamp is re-run on every state change too: emptying the draft after a send
+    // has to bring the pill back down to one line.
+    fitComposerInput(elements.input);
     // The line follows the state: waiting, retryable, or a plain invitation.
     elements.input.placeholder = sending
       ? PLACEHOLDER.working
@@ -565,9 +895,10 @@ export function createComposer({
   /**
    * Stream one reply into a bubble and settle it from the saved message.
    * @param {string} threadId
+   * @param {string} [mode] The mode this request was made in; main only answers in Ask.
    * @returns {Promise<void>}
    */
-  async function requestReply(threadId) {
+  async function requestReply(threadId, mode = composerMode(elements)) {
     if (typeof chat?.send !== 'function' || typeof chat?.onStream !== 'function') {
       appendBubble(createErrorBubble(NO_REPLY_PATH));
       return;
@@ -602,7 +933,7 @@ export function createComposer({
 
     let result;
     try {
-      result = await call(() => chat.send({ threadId }));
+      result = await call(() => chat.send({ threadId, mode }));
     } finally {
       // Detach before anything else can throw, or a failed send leaves a listener
       // behind that outlives the bubble.
@@ -656,6 +987,10 @@ export function createComposer({
     const content = elements.input.value.trim();
     if (content === '' || sending) return;
 
+    // Read once, before anything is awaited: the selector must not change under a
+    // message that was already being sent, or the badge would lie about the turn.
+    const sentMode = composerMode(elements);
+
     const thread = await ensureThread();
     if (!thread) return;
 
@@ -664,12 +999,19 @@ export function createComposer({
     sync();
 
     try {
-      const bubble = createMessageElement({ role: 'user', content, createdAt: new Date().toISOString() });
+      const bubble = createMessageElement({
+        role: 'user',
+        content,
+        mode: sentMode,
+        createdAt: new Date().toISOString(),
+      });
       bubble.dataset.state = 'pending';
       appendBubble(bubble);
 
+      // The mode rides on the stored message as well as the request, so a reopened
+      // chat still shows which mode a turn was made in.
       const saved = await call(() =>
-        chats.appendMessage({ threadId: thread.id, message: { role: 'user', content } }),
+        chats.appendMessage({ threadId: thread.id, message: { role: 'user', content, mode: sentMode } }),
       );
 
       if (!saved?.ok) {
@@ -688,7 +1030,7 @@ export function createComposer({
       applyThread(saved.data.thread);
       clearReport();
 
-      await requestReply(thread.id);
+      await requestReply(thread.id, sentMode);
     } finally {
       sending = false;
       sync();
@@ -719,7 +1061,7 @@ export function createComposer({
     sync();
     try {
       clearReport();
-      await requestReply(thread.id);
+      await requestReply(thread.id, composerMode(elements));
     } finally {
       sending = false;
       sync();
@@ -727,5 +1069,18 @@ export function createComposer({
     }
   }
 
-  return { send, retry, sync, stop };
+  /**
+   * Hold the drawn "reply in flight" state, or leave it.
+   *
+   * The screen review opens the page with ?state=disabled to see the state the design
+   * calls the disabled composer; a real reply does the same thing when one arrives.
+   * @param {boolean} next
+   * @returns {void}
+   */
+  function setSending(next) {
+    sending = Boolean(next);
+    sync();
+  }
+
+  return { send, retry, sync, stop, setSending };
 }

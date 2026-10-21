@@ -1,0 +1,169 @@
+/**
+ * Dropdown: the one select control, shared by every screen.
+ *
+ * Every dropdown in Zuri is a native <select>, so the keyboard, the form value and
+ * the `change` event each page already reads stay native. What a native select
+ * cannot do is draw its own list: Windows paints that popup, so in the dark shell
+ * it arrives as a pale system menu that no CSS can reach. `ui/select.js` therefore
+ * keeps the <select> as the value holder and draws the closed control and the open
+ * list from here.
+ *
+ * This file is its own sheet on purpose. tokens.css is the only sheet every
+ * document loads, and components.css carries the shell's global `body` and
+ * `box-sizing` rules, so linking it into the audit and onboarding pages to reach a
+ * dropdown would restyle those whole pages. The dropdown is a shared component, so
+ * it lives in its own sheet and every document that draws one links it.
+ *
+ * Every value is a token: no literal colour, radius or shadow belongs here. The
+ * open list is the design's Select / Menu (node 0:43). The closed control keeps
+ * whatever field class its own page draws, so each screen still matches its node.
+ */
+
+/* The native control stays in the document, because it holds the value, the options
+   and the events the page reads; it only stops taking pixels. A class rather than
+   the `hidden` attribute, which any `display` on the page's own select rule would
+   outrank. */
+.select-native {
+  display: none;
+}
+
+/* The closed control. It wears the classes the page already gave its <select>
+   (`audit-select`, `field-select-control`, `select-control`, the composer chip), so
+   the box, padding, border and type all come from that page's own design. A
+   <button> only has to be told the three things a select already does: a label
+   reads from the left, a long value truncates instead of widening the box, and it
+   takes the pointer. */
+.select-trigger {
+  overflow: hidden;
+  text-align: left;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The open list is anchored to the viewport rather than to the control, so no
+   scrolling panel or card can clip it: a select inside the sidebar drawer or the
+   context panel opens over them instead of being cut in half. 100 is the layer the
+   dialogs use, so a dropdown clears every page surface; no screen yet puts one
+   inside a dialog, which would need a layer above this. */
+.select-popup {
+  position: fixed;
+  z-index: 100;
+  /* The node grows with its options; a long list scrolls inside the menu rather
+     than running off a short window. 320 is five 28 px rows plus the padding and
+     gaps, past the four the node draws. */
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+/* Select / Menu: the design's open list (node 0:43). It is the card surface - 260
+   px wide, color/background fill, a 1 px color/border edge on radius/card and the
+   same raised drop shadow Card / Raised carries - holding one group label and
+   three 28 px options. Every value here is a token the node binds: color/background
+   on the panel, color/border on the edge, radius/card on the corner, radius/row on
+   each option. Moving a binding in open-pencil moves this rule with it.
+
+   The height is the node's own arithmetic rather than a number: 8 px of padding,
+   the 16 px group label at 12/16, a 4 px rhythm, then 28 px options. That is
+   8 + 16 + 4 + 3x28 + 2x4 + 8 = 128, the node's height, so a fourth option grows
+   the menu the way the node's auto height would instead of clipping it.
+
+   The selected option changes exactly two things, its fill and the check mark: the
+   label stays color/text at 13/18 regular, because the node does not recolour it.
+
+   The mark is anchored to the row's right edge rather than to the x the node packs
+   it at. Node 0:45 holds an auto-width label, so its 16 px Icon / check lands
+   right after the text; a list whose rows have different label widths needs the
+   mark on the edge, or it wanders row to row. The Select / Default chevron is
+   anchored the same way for the same reason.
+
+   Markup: ui/select.js builds this list, one <button class="select-menu-option"
+   role="option"> per choice inside <div class="select-menu" role="listbox">, and
+   .select-menu-label is available for a grouped list that names its choices.
+   aria-selected carries the state, so the primary-soft fill and a screen reader
+   read the one attribute instead of a class that could drift. */
+.select-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+  width: 100%;
+  max-width: 260px;
+  /* The node measures its 8 px inset from the frame edge and draws the 1 px stroke
+     inside that same 8, so the padding is the inset less the edge. Reading 8 px
+     literally would put 1 + 8 px between the edge and the first row, making the
+     menu 130 px tall and its rows 242 px wide; the node is 128 with 244 px rows. */
+  padding: calc(var(--zuri-space-2) - 1px);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+  box-shadow: var(--zuri-shadow-raised);
+}
+
+/* The node's "Chat models": 12/16 regular. It carries the unmatched #8E9196 that
+   every label in this family carries, which the token layer reads as the muted
+   foreground in both themes - the same reading the select's own Label gets. */
+.select-menu-label {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-caption);
+  letter-spacing: normal; /* the node sets no tracking */
+}
+
+/* One 244 x 28 row inside the 8 px padding, on color/background, with the 13/18
+   label 8 px in from the row's edge. */
+.select-menu-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-2);
+  overflow: hidden;
+  width: 100%;
+  height: 28px;
+  padding: 0 var(--zuri-space-2);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-select-option);
+  letter-spacing: normal;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.select-menu-option[aria-selected='true'] {
+  background: var(--zuri-accent-subtle);
+}
+
+/* The node's Icon / check: a 16 px glyph whose path is a tick from (2.67, 8) to
+   (6, 11.33) to (13.33, 4), stroked at color/primary with weight 1.33 - two arms
+   of 4.7 and 10.4 on the node's grid. Two borders on a turned box draw the same
+   tick and take the accent straight from the token layer. The 3 px margin
+   centres the turned mark in the 16 px glyph, the width the node reserves for it. */
+.select-menu-option[aria-selected='true']::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 5px;
+  height: 10px;
+  margin-right: 3px;
+  border-right: 1.33px solid var(--zuri-accent);
+  border-bottom: 1.33px solid var(--zuri-accent);
+  transform: rotate(45deg);
+}
+
+/* States the guide names for a control, drawn outside the node: hover is the
+   subtle surface darken and never touches the chosen row, whose fill already means
+   "this is the current choice"; the keyboard ring is the guide's accent ring. */
+.select-menu-option:hover:not([aria-selected='true']) {
+  background: var(--zuri-surface-active);
+}
+
+.select-menu-option:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}

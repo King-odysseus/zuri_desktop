@@ -144,6 +144,31 @@ export function getCollapsedColumns() {
 }
 
 /**
+ * Fill the sidebar account row (design "User Row") with the saved name: the row
+ * shows initials in the avatar, the name, and the plan underneath. A blank or
+ * missing name keeps the neutral "You" the markup ships with, so the row is never
+ * empty and nothing here has to guess at an account.
+ * @param {string} [name]
+ */
+export function fillSidebarUser(name) {
+  const initials = document.getElementById('sidebar-user-avatar');
+  const label = document.getElementById('sidebar-user-name');
+  if (!initials || !label) return;
+
+  const words = String(typeof name === 'string' ? name : '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  const short = words
+    .slice(0, 2)
+    .map((word) => word[0].toUpperCase())
+    .join('');
+
+  initials.textContent = short || 'You';
+  label.textContent = words.length > 0 ? words.join(' ') : 'You';
+}
+
+/**
  * Wire the collapse toggles and apply the starting state.
  * The breakpoints are read once, at start: a later resize must not undo a choice
  * the user made by hand, so nothing here listens for resize.

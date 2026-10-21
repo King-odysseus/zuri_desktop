@@ -18,6 +18,8 @@
  * pretending to read a file that does not exist.
  */
 
+import { enhanceSelects } from '../ui/select.js';
+
 // The node's six frames first, then the two standard states a screen check
 // also opens. A frame missing from this list is a name a screen check can open
 // and land on nothing.
@@ -625,3 +627,8 @@ el.retry.addEventListener('click', () => applyState('default'));
 el.export.addEventListener('click', startExport);
 
 applyState(stateFromSearch('state'));
+
+// Every filter is the drawn dropdown (ui/select.js). The native selects keep the
+// values the filter and the Clear button read, and the list they open is the
+// design's Select / Menu instead of the system's.
+enhanceSelects(document);

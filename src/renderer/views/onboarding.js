@@ -1,18 +1,21 @@
 /**
- * First-run welcome / provider setup (design node 0:1008).
+ * First-run welcome / setup (design node 0:1008).
  *
- * The page's whole job is one hand-over: the typed key goes to the main process
- * over `zuri:settings:setKey`, which answers with a boolean and never the key, and
- * the page then moves to the chat workspace. Nothing here stores the key: the only
- * copy is the characters the person is typing, which the browser clears as the
- * page unloads.
+ * The page asks for the three things setup needs - a name, a theme and a provider
+ * key - and hands them to the main process in one call over
+ * `zuri:onboarding:complete`, which answers with a boolean for the key and never
+ * the key itself. The page then moves to the chat workspace. Nothing here stores
+ * the key: the only copy is the characters the person is typing, which the browser
+ * clears as the page unloads.
  *
  * Four states, named as the design node names them:
- *   empty    - Save stays disabled until something is typed (node 0:1009)
- *   loading  - the field and model lock, the button reads "Saving..." (node 0:1079)
+ *   empty    - Save stays disabled until a name and a key are typed (node 0:1009)
+ *   loading  - the fields lock, the button reads "Saving..." (node 0:1079)
  *   error    - the field outline and help line turn red with main's reason (node 0:1151)
  *   disabled - there is no preload bridge, so nothing typed here could be saved
  */
+
+import { enhanceSelect } from '../ui/select.js';
 
 /**
  * The states this card can show. KAI's page check reads this list from the page,
@@ -64,6 +67,8 @@ function collectElements(doc) {
     help: doc.getElementById('onboarding-key-help'),
     reveal: doc.getElementById('onboarding-reveal'),
     docs: doc.getElementById('onboarding-docs'),
+    name: doc.getElementById('onboarding-name'),
+    theme: doc.getElementById('onboarding-theme'),
     model: doc.getElementById('onboarding-model'),
     save: doc.getElementById('onboarding-save'),
     saveLabel: doc.getElementById('onboarding-save-label'),
@@ -79,11 +84,17 @@ function collectElements(doc) {
 /**
  * Wire the setup card.
  * @param {Document} [doc]
- * @param {{ settings?: { setKey?: Function } }} [api] The preload bridge.
+ * @param {{ onboarding?: { complete?: Function } }} [api] The preload bridge.
  * @returns {{ getState: () => OnboardingState }}
  */
 export function initOnboardingView(doc = document, api = window.zuri) {
   const elements = collectElements(doc);
+
+  // Both dropdowns are the drawn control from ui/select.js. The native selects keep
+  // the values this page saves and the options it rebuilds whenever the provider
+  // changes, so setup reads and writes them exactly as it did before.
+  enhanceSelect(elements.theme, { doc });
+  enhanceSelect(elements.model, { doc });
 
   /** @type {OnboardingState} */
   const state = { provider: DEFAULT_PROVIDER, state: 'empty' };
@@ -105,6 +116,8 @@ export function initOnboardingView(doc = document, api = window.zuri) {
     elements.card.dataset.state = state.state;
 
     elements.key.disabled = loading || inert;
+    elements.name.disabled = loading || inert;
+    elements.theme.disabled = loading || inert;
     elements.model.disabled = loading || inert;
     for (const input of elements.providers.querySelectorAll('input[name="provider"]')) {
       // Disabled rows stay disabled: main cannot store those providers yet.
@@ -114,7 +127,8 @@ export function initOnboardingView(doc = document, api = window.zuri) {
     elements.saveLabel.textContent = loading ? 'Saving\u2026' : 'Save key';
     // Save is live again on error, because the field still holds the rejected key.
     const typed = elements.key.value.trim();
-    elements.save.disabled = loading || inert || typed === '';
+    const named = elements.name.value.trim();
+    elements.save.disabled = loading || inert || typed === '' || named === '';
 
     if (state.state === 'empty') {
       elements.help.textContent = ENTRY_HELP;
@@ -157,6 +171,11 @@ export function initOnboardingView(doc = document, api = window.zuri) {
     render();
   });
 
+  elements.name.addEventListener('input', () => {
+    if (state.state === 'error') state.state = 'empty';
+    render();
+  });
+
   elements.providers.addEventListener('change', (event) => {
     const input = event.target;
     if (!(input instanceof doc.defaultView.HTMLInputElement)) return;
@@ -193,8 +212,10 @@ export function initOnboardingView(doc = document, api = window.zuri) {
   }
 
   /**
-   * Hand the key to main. The field is not cleared on failure: the drawn error state
-   * keeps the key so a typo can be corrected, and it was never stored anywhere.
+   * Hand the three answers to main. The field is not cleared on failure: the drawn
+   * error state keeps the key so a typo can be corrected, and it was never stored
+   * anywhere. The name and theme are written before the key, so a rejected key
+   * leaves the person's other two answers saved.
    * @param {Event} event
    * @returns {Promise<void>}
    */
@@ -202,18 +223,24 @@ export function initOnboardingView(doc = document, api = window.zuri) {
     event.preventDefault();
     if (state.state === 'loading' || state.state === 'disabled') return;
 
+    const name = elements.name.value.trim();
+    if (name === '') {
+      fail('Add your name so Zuri knows what to call you.');
+      return;
+    }
+
     const typed = elements.key.value.trim();
     if (typed === '') {
       fail('Paste a key to continue.');
       return;
     }
 
-    if (typeof api?.settings?.setKey !== 'function') {
+    if (typeof api?.onboarding?.complete !== 'function') {
       // A window without the preload bridge cannot reach main at all, so the form is
-      // made inert rather than told to retry: no key typed here could ever be saved.
+      // made inert rather than told to retry: nothing typed here could ever be saved.
       state.state = 'disabled';
       render();
-      elements.help.textContent = 'Keys can only be saved inside Zuri. Open the app to finish setup.';
+      elements.help.textContent = 'Setup can only be finished inside Zuri. Open the app to continue.';
       return;
     }
 
@@ -221,13 +248,19 @@ export function initOnboardingView(doc = document, api = window.zuri) {
     render();
 
     try {
-      const result = await api.settings.setKey({ provider: state.provider, key: typed });
-      if (result?.ok !== true) throw new Error(result?.error?.message ?? 'the key was not saved');
-      // Main answered with the boolean only; the page is done with the key.
+      const result = await api.onboarding.complete({
+        name,
+        theme: elements.theme.value,
+        provider: state.provider,
+        model: elements.model.value,
+        key: typed,
+      });
+      if (result?.ok !== true) throw new Error(result?.error?.message ?? 'setup was not saved');
+      // Main answered with booleans only; the page is done with the key.
       elements.key.value = '';
       doc.defaultView.location.assign(NEXT_PAGE);
     } catch (error) {
-      fail(`Could not save the key: ${error.message}`);
+      fail(`Could not finish setup: ${error.message}`);
     }
   }
 
