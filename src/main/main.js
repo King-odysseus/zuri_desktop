@@ -14,6 +14,10 @@ import { ensureWorkspace, listWorkspaceFiles, resolveWorkspaceFile, runTool } fr
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 const RENDERER_ENTRY = path.join(moduleDir, '..', 'renderer', 'index.html');
 const PRELOAD_ENTRY = path.join(moduleDir, 'preload.js');
+// The window and taskbar icon. Electron cannot read an SVG here, so this is the PNG
+// rasterised from renderer/assets/zuri-logo.svg by scripts/make-icon.js, which keeps
+// the icon and the logo in the app one drawing rather than two that can drift.
+export const ICON_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.png');
 const CANVAS_DARK = '#0B0B0F'; // matches --zuri-bg-canvas dark, so the window does not flash white before first paint
 
 /**
@@ -41,6 +45,8 @@ function createMainWindow() {
     minWidth: 940,
     minHeight: 600,
     title: 'Zuri',
+    // Without this the window and the taskbar show Electron's own logo.
+    icon: ICON_ENTRY,
     backgroundColor: CANVAS_DARK,
     webPreferences: {
       preload: PRELOAD_ENTRY,

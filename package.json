@@ -12,6 +12,7 @@
     "smoke": "electron scripts/smoke.js",
     "selftest": "node scripts/selftest.js",
     "firstrun": "electron scripts/firstrun.js",
+    "icon": "electron scripts/make-icon.js",
     "test": "npm run smoke && npm run selftest && npm run firstrun"
   },
   "devDependencies": {
