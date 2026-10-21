@@ -254,21 +254,35 @@ export function enhanceSelect(select, options = {}) {
 
   /**
    * Anchor the list to the control. Fixed to the viewport, so a scrolling panel
-   * cannot clip it; flipped above the control when it would leave the window.
+   * cannot clip it; opened upward when there is no room below.
+   *
+   * A list with no room below ends on the control's bottom edge rather than on its
+   * top. That one decision does two things: the list is drawn over the control that
+   * opened it, so the two read as one piece (a list floating a gap above the chip it
+   * came from looks detached), and its bottom edge lines up with the control's, so
+   * the panel does not stop short and leave a sliver of the chip showing under it.
+   * The clamp keeps a list taller than the space above the control inside the window.
    * @returns {void}
    */
   function place() {
     if (menu === null) return;
     const rect = trigger.getBoundingClientRect();
     const room = win.innerWidth - MENU_GAP * 2;
-    const width = Math.min(Math.max(Math.round(rect.width), MENU_MIN_WIDTH), room);
+
+    // Width: the control's own width, stretched to the widest option so a model
+    // name is not cut to "claude-3-5-sonn" just because the chip that opened it is
+    // 48 px wide. Measuring at max-content resolves the rows' own labels, and the
+    // stylesheet's 260 px max-width caps a long one at the design's list width.
+    menu.style.width = 'max-content';
+    const natural = menu.offsetWidth;
+    const width = Math.min(Math.max(Math.round(rect.width), natural, MENU_MIN_WIDTH), room);
     menu.style.width = `${width}px`;
 
     const height = menu.offsetHeight;
     const below = rect.bottom + MENU_GAP;
-    const above = rect.top - MENU_GAP - height;
+    const above = Math.max(MENU_GAP, rect.bottom - height);
     const fitsBelow = below + height <= win.innerHeight - MENU_GAP;
-    const top = !fitsBelow && above >= MENU_GAP ? above : below;
+    const top = fitsBelow ? below : above;
     const left = Math.min(Math.round(rect.left), Math.max(MENU_GAP, win.innerWidth - width - MENU_GAP));
 
     menu.style.left = `${Math.max(MENU_GAP, left)}px`;

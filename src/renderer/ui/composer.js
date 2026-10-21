@@ -293,9 +293,9 @@ function createToolBlock(tool) {
 }
 
 /**
- * The still-arriving row at the end of a reply: the node's 2 x 16 caret, three
+ * The still-arriving row at the end of a reply: the design's 2 x 16 caret, three
  * 4 px dots on their 8 px pitch and the label. The row's dots are its own, not
- * the Loading Dots block, so the block keeps its one job (node 0:117).
+ * the Loading Dots block, so the block keeps its one job.
  * @returns {HTMLElement}
  */
 function createStreamingRow() {
@@ -465,9 +465,10 @@ export function createMessageElement(message, options = {}) {
 }
 
 /**
- * Build the design's "Block / Loading Dots" (node 0:117): three 4 px dots on an
- * 8 px pitch inside a 20 x 22 box. It holds the reply's place until the first
- * token lands, so a slow provider still looks like an answer on its way.
+ * Build the design's Loading Dots block: three 6 px round dots on a 12 px pitch,
+ * centred on the reply's 20 px line and drawn in color/text-subtle. It holds the
+ * reply's place until the first token lands, so a slow provider still looks like
+ * an answer on its way.
  * @returns {HTMLElement}
  */
 export function createLoadingDots() {
@@ -908,8 +909,8 @@ export function createComposer({
     bubble.dataset.state = 'streaming';
 
     // While the first token is awaited the Loading Dots block stands in the text
-    // slot (node 0:117). With the first token it gives way to the reply, and the
-    // node's own streaming row takes over underneath (node 0:1221).
+    // slot, as the design draws a waiting reply. With the first token it gives way
+    // to the reply, and the design's streaming row takes over underneath.
     const dots = createLoadingDots();
     bubble.querySelector('.message-text').append(dots);
     appendBubble(bubble);

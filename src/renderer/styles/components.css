@@ -2801,48 +2801,84 @@ body {
   opacity: 1;
 }
 
-/* Loading Skeleton block: the design's "Block / Loading Skeleton" component
-   (node 0:113). A 320 x 84 card on the node's 16 px padding and 8 px rhythm,
-   filled color/surface and outlined color/border, holding three 12 px bars at
-   the node's 200 / 160 / 120 widths on radius/row. The node draws no animation,
-   so the block is still: it is a placeholder the content replaces, not a loop.
-   Fluid below the node's width the way the error block is, so the sidebar can
-   hold it; the bars keep their widths and shrink rather than overflow. */
+/* Loading Skeleton block: the design's skeleton block (open-pencil "State /
+   Skeleton Row", node 0:296). A 320 x 159 card on the node's 20 px padding and
+   12 px rhythm, filled color/surface-secondary and rounded the node's 20 px
+   radius-xl, over a 13 px caption and two rows of a 40 px disc beside two 12 px
+   pills on radius-pill. The node draws no animation, so the block is still: it
+   is a placeholder the content replaces, not a loop. Fluid below the node's
+   width the way the error block is, so the sidebar can hold it; the wide pill
+   takes whatever is left beside the disc and the narrow one keeps the node's
+   140 and 120, so nothing overflows. */
 .loading-skeleton {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: var(--zuri-space-2);
+  gap: var(--zuri-space-3);
   width: 100%;
   max-width: 320px;
-  padding: var(--zuri-space-4);
-  border: 1px solid var(--zuri-border-hairline);
-  border-radius: var(--zuri-radius-card);
-  background: var(--zuri-surface);
+  padding: var(--zuri-space-5);
+  /* The node's radius-xl is 20 in tokens.json; the guide's generic token is 16,
+     so the node's value is kept here rather than the token. */
+  border-radius: 20px;
+  background: var(--zuri-surface-secondary);
+}
+
+/* The node sets 13 px type in a 20 px line height and its text box measures
+   15 px, so the line box is pinned to the node's 15 to keep the card's 159. */
+.loading-skeleton-caption {
+  margin: 0;
+  color: var(--zuri-text-subtle);
+  font-size: 13px;
+  line-height: 15px;
+}
+
+.loading-skeleton-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-3);
+}
+
+.loading-skeleton-disc {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface-tertiary);
+}
+
+.loading-skeleton-lines {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  min-width: 0;
 }
 
 .loading-skeleton-bar {
-  flex: 0 0 auto;
+  display: block;
   height: 12px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface-tertiary);
+}
+
+/* The node's wide pill fills the lines frame; the narrow one is 140 in the first
+   row and 120 in the second. */
+.loading-skeleton-bar--wide {
+  width: 100%;
+}
+
+.loading-skeleton-bar--narrow {
   max-width: 100%;
-  border-radius: var(--zuri-radius-row);
-  background: var(--zuri-surface-sunken);
 }
 
-/* The node stacks the bars longest to shortest, each one a step shorter than the
-   one above it. */
-.loading-skeleton-bar:nth-child(1) {
-  width: 200px;
+.loading-skeleton-row[data-narrow='140'] .loading-skeleton-bar--narrow {
+  width: 140px;
 }
 
-.loading-skeleton-bar:nth-child(2) {
-  width: 160px;
-}
-
-.loading-skeleton-bar:nth-child(3) {
+.loading-skeleton-row[data-narrow='120'] .loading-skeleton-bar--narrow {
   width: 120px;
 }
-
 /* Error block: the design's "Block / Error" component (node 0:121). A 360 px card
    on the node's 16 px padding and 8 px rhythm: danger tint and a danger border at
    32%, an alert mark beside a two-line message, then one action. The node binds

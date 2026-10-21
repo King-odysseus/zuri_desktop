@@ -159,7 +159,7 @@ check('ui/shell.js owns the collapse state and the 1000px breakpoint', () => {
   }
 });
 
-check('the Loading Dots block is drawn from node 0:117 and fills the reply slot', () => {
+check('the Loading Dots block is drawn as the design draws a waiting reply', () => {
   const css = read('src/renderer/styles/components.css');
   const source = read('src/renderer/ui/composer.js');
 
@@ -169,13 +169,16 @@ check('the Loading Dots block is drawn from node 0:117 and fills the reply slot'
     return css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
   };
 
-  // The node is a 20 x 22 box on color/surface, three 4 px dots on an 8 px pitch.
+  // Node 0:117 draws a 20 x 22 box on the surface fill holding three 4 px dots on
+  // the node's 8 px pitch: a 4 px dot plus the 4 px step between them, centred in
+  // the box so the row lands on the node's 9 px top offset.
   const block = ruleBody('.loading-dots');
   const blockChecks = [
-    ['the 20 px node width', /width:\s*20px/],
-    ['the 22 px node height', /height:\s*22px/],
-    ['the 4 px pitch as the spacing token', /gap:\s*var\(--zuri-space-1\)/],
-    ['the color/surface fill', /background:\s*var\(--zuri-surface\)/],
+    ['the 22 px box height', /height:\s*22px/],
+    ['the 20 px box width', /width:\s*20px/],
+    ["the 4 px step that makes the node's 8 px pitch", /gap:\s*var\(--zuri-space-1\)/],
+    ['the centring of the dots in that box', /align-items:\s*center/],
+    ['the color/surface fill the node draws behind them', /background:\s*var\(--zuri-surface\)/],
   ];
   const blockMissing = blockChecks.filter(([, pattern]) => !pattern.test(block)).map(([label]) => label);
   if (blockMissing.length > 0) throw new Error(`the block is missing ${blockMissing.join(', ')}`);
@@ -205,10 +208,10 @@ check('the Loading Dots block is drawn from node 0:117 and fills the reply slot'
     throw new Error('nothing removes the block, so it would outlive the reply');
   }
 
-  return '20x22 block, 4 px dots on an 8 px pitch, shown until the first token';
+  return '20x22 block, 4 px dots on an 8 px pitch in text-muted, shown until the first token';
 });
 
-check('the Loading Skeleton block is drawn from node 0:113 and holds the thread list', () => {
+check('the Loading Skeleton block is drawn from node 0:296 and holds the thread list', () => {
   const css = read('src/renderer/styles/components.css');
   const tokens = read('src/renderer/styles/tokens.css');
   const source = read('src/renderer/ui/skeleton.js');
@@ -220,47 +223,81 @@ check('the Loading Skeleton block is drawn from node 0:113 and holds the thread 
     return css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
   };
 
-  // The node is a 320 x 84 card on 16 px padding and an 8 px rhythm, filled
-  // color/surface and outlined color/border on radius/card.
+  // The node is a 320 x 159 card on 20 px padding and a 12 px rhythm, filled
+  // color/surface-secondary on its 20 px radius-xl.
   const block = ruleBody('.loading-skeleton');
   const blockChecks = [
     ['the 320 px node width', /max-width:\s*320px/],
-    ['the 16 px node padding', /padding:\s*var\(--zuri-space-4\)/],
-    ['the 8 px rhythm as the spacing token', /gap:\s*var\(--zuri-space-2\)/],
-    ['the color/surface fill', /background:\s*var\(--zuri-surface\)/],
-    ['the color/border outline', /border:\s*1px solid var\(--zuri-border-hairline\)/],
-    ['the radius/card corner', /border-radius:\s*var\(--zuri-radius-card\)/],
+    ['the 20 px node padding', /padding:\s*var\(--zuri-space-5\)/],
+    ['the 12 px rhythm as the spacing token', /gap:\s*var\(--zuri-space-3\)/],
+    ['the color/surface-secondary fill', /background:\s*var\(--zuri-surface-secondary\)/],
+    ['the node radius-xl corner', /border-radius:\s*20px/],
   ];
   const blockMissing = blockChecks.filter(([, pattern]) => !pattern.test(block)).map(([label]) => label);
   if (blockMissing.length > 0) throw new Error(`the block is missing ${blockMissing.join(', ')}`);
 
-  // Each bar is 12 px tall on radius/row in color/sunken, and the three are the
-  // node's 200 / 160 / 120 widths, longest first.
+  // The caption is the node's 13 px type in color/text-subtle.
+  const caption = ruleBody('.loading-skeleton-caption');
+  const captionChecks = [
+    ['the 13 px caption type', /font-size:\s*13px/],
+    ['the color/text-subtle ink', /color:\s*var\(--zuri-text-subtle\)/],
+    ['the caption line box the node measures', /line-height:\s*15px/],
+  ];
+  const captionMissing = captionChecks.filter(([, pattern]) => !pattern.test(caption)).map(([label]) => label);
+  if (captionMissing.length > 0) throw new Error(`the caption is missing ${captionMissing.join(', ')}`);
+
+  // A row is the node's 40 px disc and two pills, 12 px apart.
+  const row = ruleBody('.loading-skeleton-row');
+  if (!/gap:\s*var\(--zuri-space-3\)/.test(row)) throw new Error('a row is not on the node\'s 12 px gap');
+  const disc = ruleBody('.loading-skeleton-disc');
+  const discChecks = [
+    ['the 40 px disc', /width:\s*40px[\s\S]*height:\s*40px/],
+    ['the radius-full disc', /border-radius:\s*var\(--zuri-radius-pill\)/],
+    ['the color/surface-tertiary fill', /background:\s*var\(--zuri-surface-tertiary\)/],
+  ];
+  const discMissing = discChecks.filter(([, pattern]) => !pattern.test(disc)).map(([label]) => label);
+  if (discMissing.length > 0) throw new Error(`the disc is missing ${discMissing.join(', ')}`);
+
+  // Each pill is 12 px tall on radius-full in color/surface-tertiary, the wide one
+  // filling the lines frame and the narrow ones the node's 140 and 120.
   const bar = ruleBody('.loading-skeleton-bar');
   const barChecks = [
-    ['the 12 px bar height', /height:\s*12px/],
-    ['the radius/row corner', /border-radius:\s*var\(--zuri-radius-row\)/],
-    ['the color/sunken fill', /background:\s*var\(--zuri-surface-sunken\)/],
+    ['the 12 px pill height', /height:\s*12px/],
+    ['the radius-full corner', /border-radius:\s*var\(--zuri-radius-pill\)/],
+    ['the color/surface-tertiary fill', /background:\s*var\(--zuri-surface-tertiary\)/],
   ];
   const barMissing = barChecks.filter(([, pattern]) => !pattern.test(bar)).map(([label]) => label);
-  if (barMissing.length > 0) throw new Error(`a bar is missing ${barMissing.join(', ')}`);
+  if (barMissing.length > 0) throw new Error(`a pill is missing ${barMissing.join(', ')}`);
 
-  [200, 160, 120].forEach((width, index) => {
-    const rule = ruleBody(`.loading-skeleton-bar:nth-child(${index + 1})`);
-    if (!new RegExp(`width:\\s*${width}px`).test(rule)) {
-      throw new Error(`bar ${index + 1} is not the node's ${width}px wide`);
+  const lines = ruleBody('.loading-skeleton-lines');
+  if (!/gap:\s*var\(--zuri-space-2\)/.test(lines)) throw new Error('the two pills are not on the node\'s 8 px gap');
+  if (!/width:\s*100%/.test(ruleBody('.loading-skeleton-bar--wide'))) {
+    throw new Error('the wide pill does not fill the lines frame');
+  }
+  [140, 120].forEach((width) => {
+    const rule = ruleBody(`.loading-skeleton-row[data-narrow='${width}'] .loading-skeleton-bar--narrow`);
+    if (!new RegExp('width: *' + width + 'px').test(rule)) {
+      throw new Error(`the ${width} px row is not drawn at the node's ${width} px`);
     }
   });
 
-  // color/sunken is the one colour the node names that the token layer did not
-  // already have, and a one-theme token would leave the bars unstyled on a swap.
-  const sunken = tokens.match(/--zuri-surface-sunken\s*:/g) ?? [];
-  if (sunken.length !== 2) {
-    throw new Error(`tokens.css declares --zuri-surface-sunken ${sunken.length} times, not once per theme`);
+  // Both surface tones the node binds have to exist in each theme, or a theme
+  // swap would leave the block half-styled.
+  for (const token of ['--zuri-surface-secondary', '--zuri-surface-tertiary']) {
+    const declared = tokens.match(new RegExp(`${token}\s*:`, 'g')) ?? [];
+    if (declared.length !== 2) {
+      throw new Error(`tokens.css declares ${token} ${declared.length} times, not once per theme`);
+    }
   }
 
   if (!/export function createLoadingSkeleton/.test(source)) {
     throw new Error('skeleton.js does not export createLoadingSkeleton');
+  }
+  if (!/const ROW_NARROW_WIDTHS = \[140, 120\]/.test(source)) {
+    throw new Error('the block does not draw the node\'s two rows, 140 and 120 wide');
+  }
+  if (!/textContent = 'Loading list'/.test(source)) {
+    throw new Error('the block does not draw the node\'s caption');
   }
   if (!/replaceChildren\(createLoadingSkeleton\(/.test(chats)) {
     throw new Error('the thread list never shows the block');
@@ -273,7 +310,7 @@ check('the Loading Skeleton block is drawn from node 0:113 and holds the thread 
     throw new Error('the thread list does not show the block while the read is in flight');
   }
 
-  return '320x84 card, bars at 200/160/120 on an 8 px pitch, shown while chats load';
+  return '320x159 card, caption and two 40 px rows, pills 228/140 then 228/120, shown while chats load';
 });
 
 check('the Card / Default is drawn from node 0:54', () => {

@@ -4,13 +4,14 @@
  * (electron scripts/smoke.js), because it needs Electron's APIs.
  */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, nativeImage } from 'electron';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import '../src/main/main.js';
+import { ICON_ENTRY } from '../src/main/main.js';
 import { setStoreRoot } from '../src/main/store.js';
 import { setWorkspaceRoot } from '../src/main/tools/index.js';
 import {
@@ -36,10 +37,13 @@ const report = createReporter();
 // Registered before the app is ready, so load-time messages are captured.
 const consoleCapture = captureConsoleErrors();
 
+// A guard against a hung run, not a speed budget: the suite opens and measures two
+// dozen pages, and on a machine running other agents it has taken over a minute.
+// The number is high enough that only a real hang reaches it.
 const hardStop = setTimeout(() => {
-  console.log('FAIL smoke: app did not settle within 60 s');
+  console.log('FAIL smoke: app did not settle within 180 s');
   app.exit(1);
-}, 60000);
+}, 180000);
 
 /** @param {number} ms */
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -89,7 +93,16 @@ async function resizeAndSettle(window, width, height) {
  */
 async function measureDropdowns(window, selector = 'select') {
   return window.webContents.executeJavaScript(`(async () => {
-    const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Two frames let the menu paint before it is measured. Chromium throttles
+    // animation frames when the window is occluded, and this run leaves other
+    // windows open, so the wait falls back to a timer rather than hanging: the
+    // checks below read geometry, and a throttled frame never arrives.
+    const frame = () => new Promise((resolve) => {
+      let settled = false;
+      const done = () => { if (!settled) { settled = true; resolve(); } };
+      requestAnimationFrame(() => requestAnimationFrame(done));
+      setTimeout(done, 250);
+    });
     const text = (element) => (element?.textContent ?? '').replace(/\\s+/g, ' ').trim();
     const selects = Array.from(document.querySelectorAll(${JSON.stringify(selector)}));
 
@@ -139,10 +152,16 @@ async function measureDropdowns(window, selector = 'select') {
           : false,
         // A control near the bottom of the window opens its list above itself, so
         // anchoring has to hold on either side of the control, not only below it.
+        // ui/select.js ends such a list on the control's bottom edge rather than on
+        // its top, so the chip is covered instead of left showing under the panel;
+        // that is the third case, and it still counts as anchored to this control.
         anchored: box
           ? box.left < controlBox.right && box.right > controlBox.left &&
             ((box.top >= controlBox.bottom - 12 && box.top <= controlBox.bottom + 12) ||
-              (box.bottom <= controlBox.top + 12 && box.bottom >= controlBox.top - 12))
+              (box.bottom <= controlBox.top + 12 && box.bottom >= controlBox.top - 12) ||
+              (box.top < controlBox.top &&
+                box.bottom >= controlBox.bottom - 12 &&
+                box.bottom <= controlBox.bottom + 12))
           : false,
         box: box ? [box.left, box.top, box.right, box.bottom].map(Math.round) : [],
         controlBox: [controlBox.left, controlBox.top, controlBox.right, controlBox.bottom].map(Math.round),
@@ -331,6 +350,70 @@ app.whenReady().then(async () => {
   report.check('design tokens are applied', () => {
     if (pageState.tokensLoaded === '') throw new Error('--zuri-bg-canvas is empty');
     return `theme=${pageState.theme} canvas=${pageState.tokensLoaded}`;
+  });
+
+  // The logo, in both places it shows: the window/taskbar icon Electron paints, and
+  // the favicon every page declares. Without them the app carries Electron's default
+  // logo, which is what a missing or unreadable file looks like from the outside.
+  const faviconRun = await window.webContents.executeJavaScript(`(async () => {
+    const link = document.querySelector('link[rel="icon"]');
+    const href = link?.getAttribute('href') ?? '';
+    if (href === '') return { href: '', resolved: '', image: null };
+
+    const resolved = new URL(href, location.href).href;
+    // Ask the browser to paint it: a malformed SVG parses as a file but still fails here.
+    const image = await new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve({ ok: true, width: probe.naturalWidth, height: probe.naturalHeight });
+      probe.onerror = () => resolve({ ok: false, width: 0, height: 0 });
+      probe.src = resolved;
+    });
+    return { href, resolved, image };
+  })()`);
+
+  report.check('the window icon is an image Electron can load', () => {
+    const icon = nativeImage.createFromPath(ICON_ENTRY);
+    if (icon.isEmpty()) throw new Error(`no readable window icon at ${ICON_ENTRY}`);
+    const { width, height } = icon.getSize();
+    // Windows asks for 16 to 256 px out of this file; a small source would blur the taskbar.
+    if (width < 256 || height < 256) {
+      throw new Error(`the window icon is ${width}x${height}, too small for the taskbar`);
+    }
+    return `${path.basename(ICON_ENTRY)} at ${width}x${height}`;
+  });
+
+  report.check('the shell page draws the Zuri mark as its favicon', () => {
+    if (faviconRun.href === '') throw new Error('the page has no <link rel="icon">');
+    if (faviconRun.image?.ok !== true) {
+      throw new Error(`the browser could not draw ${faviconRun.resolved}`);
+    }
+    return `${faviconRun.href} at ${faviconRun.image.width}x${faviconRun.image.height}`;
+  });
+
+  // Every page, not only the one under test: a view with a broken href would fall back
+  // to a blank tab icon, and nothing else in the suite opens all of them.
+  report.check('every page points its favicon at the same mark', () => {
+    const pages = [path.join(root, 'src', 'renderer', 'index.html')];
+    const viewsDir = path.join(root, 'src', 'renderer', 'views');
+    for (const name of fs.readdirSync(viewsDir)) {
+      if (name.endsWith('.html')) pages.push(path.join(viewsDir, name));
+    }
+
+    const wrong = [];
+    for (const page of pages) {
+      const html = fs.readFileSync(page, 'utf8');
+      const match = /<link rel="icon"[^>]*href="([^"]+)"/.exec(html);
+      if (!match) {
+        wrong.push(`${path.basename(page)} declares none`);
+        continue;
+      }
+      // path.resolve reads the forward slashes an href uses on every platform.
+      if (!fs.existsSync(path.resolve(path.dirname(page), match[1]))) {
+        wrong.push(`${path.basename(page)} points at ${match[1]}, which is missing`);
+      }
+    }
+    if (wrong.length > 0) throw new Error(wrong.join('; '));
+    return `${pages.length} page(s) share one mark`;
   });
 
   report.check('renderer has no Node globals', () => {
@@ -2321,9 +2404,10 @@ app.whenReady().then(async () => {
     return 'chat.stop called once for t1';
   });
 
-  // Loading Skeleton block (design node 0:113). Built through the renderer's own
-  // factory on the live page, so the geometry and the colours are read back from
-  // the stylesheet in force rather than copied into this file.
+  // Loading Skeleton block (design node 0:296, "State / Skeleton Row"). Built
+  // through the renderer's own factory on the live page, so the geometry and the
+  // colours are read back from the stylesheet in force rather than copied into
+  // this file.
   const skeletonRun = await window.webContents.executeJavaScript(`(async () => {
     const { createLoadingSkeleton } = await import('./ui/skeleton.js');
 
@@ -2332,23 +2416,49 @@ app.whenReady().then(async () => {
 
     const box = block.getBoundingClientRect();
     const style = getComputedStyle(block);
+    // Computed colours arrive as rgb() or rgba(); the numbers in them are all
+    // this needs, so they are read positionally rather than by syntax.
     const toRgba = (value) => {
-      const match = String(value).match(/rgba?\\(([^)]+)\\)/);
-      if (!match) return null;
-      const parts = match[1].split(',').map((part) => Number(part.trim()));
-      return { r: parts[0] ?? -1, g: parts[1] ?? -1, b: parts[2] ?? -1, a: parts[3] ?? 1 };
+      const text = String(value);
+      const open = text.indexOf('(');
+      if (open === -1) return null;
+      const parts = text.slice(open + 1, text.lastIndexOf(')')).split(',').map((part) => Number.parseFloat(part.trim()));
+      if (parts.length < 3) return null;
+      return { r: parts[0], g: parts[1], b: parts[2], a: parts[3] ?? 1 };
     };
-
-    const bars = Array.from(block.querySelectorAll('.loading-skeleton-bar')).map((bar) => {
-      const rect = bar.getBoundingClientRect();
-      const barStyle = getComputedStyle(bar);
+    const offsets = (element) => {
+      const rect = element.getBoundingClientRect();
       return {
-        x: rect.left - box.left,
-        y: rect.top - box.top,
+        x: Math.round(rect.left - box.left),
+        y: Math.round(rect.top - box.top),
         width: Math.round(rect.width),
         height: Math.round(rect.height),
-        radius: Number.parseFloat(barStyle.borderTopLeftRadius),
-        fill: toRgba(barStyle.backgroundColor),
+      };
+    };
+
+    const caption = block.querySelector('.loading-skeleton-caption');
+    const captionStyle = getComputedStyle(caption);
+    const captionBox = offsets(caption);
+
+    const rows = Array.from(block.querySelectorAll('.loading-skeleton-row')).map((row) => {
+      const disc = row.querySelector('.loading-skeleton-disc');
+      const wide = row.querySelector('.loading-skeleton-bar--wide');
+      const narrow = row.querySelector('.loading-skeleton-bar--narrow');
+      return {
+        ...offsets(row),
+        disc: {
+          ...offsets(disc),
+          radius: Number.parseFloat(getComputedStyle(disc).borderTopLeftRadius),
+          fill: toRgba(getComputedStyle(disc).backgroundColor),
+        },
+        wide: offsets(wide),
+        narrow: {
+          ...offsets(narrow),
+          radius: Number.parseFloat(getComputedStyle(narrow).borderTopLeftRadius),
+          fill: toRgba(getComputedStyle(narrow).backgroundColor),
+        },
+        // The node puts the short pill 12 px below the long one.
+        pitch: Math.round(narrow.getBoundingClientRect().top - wide.getBoundingClientRect().top),
       };
     });
 
@@ -2357,12 +2467,13 @@ app.whenReady().then(async () => {
     document.body.append(probe);
     const tokenColor = (name) => {
       probe.style.color = 'var(' + name + ')';
-      return toRgba(getComputedStyle(probe).color);
+      return getComputedStyle(probe).color;
     };
+    const surfaceToken = tokenColor('--zuri-surface-secondary');
     const tokens = {
-      surface: tokenColor('--zuri-surface'),
-      sunken: tokenColor('--zuri-surface-sunken'),
-      border: tokenColor('--zuri-border-hairline'),
+      surface: toRgba(surfaceToken),
+      sunken: toRgba(tokenColor('--zuri-surface-tertiary')),
+      subtle: toRgba(tokenColor('--zuri-text-subtle')),
     };
     probe.remove();
 
@@ -2370,68 +2481,82 @@ app.whenReady().then(async () => {
       width: box.width,
       height: box.height,
       radius: Number.parseFloat(style.borderTopLeftRadius),
-      borderWidth: Number.parseFloat(style.borderTopWidth),
       padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join(' '),
       fill: toRgba(style.backgroundColor),
-      line: toRgba(style.borderTopColor),
-      bars,
+      caption: {
+        text: caption.textContent.trim(),
+        size: captionStyle.fontSize,
+        colour: toRgba(captionStyle.color),
+        top: captionBox.y,
+        height: captionBox.height,
+      },
+      rows,
       tokens,
       role: block.getAttribute('role'),
       label: block.getAttribute('aria-label'),
-      text: block.textContent.trim(),
     };
 
     block.remove();
     return result;
   })()`);
 
-  report.check('the Loading Skeleton block matches node 0:113', () => {
+  report.check('the Loading Skeleton block matches node 0:296', () => {
     const run = skeletonRun;
     const near = (value, expected) => Math.abs(value - expected) <= 0.01;
     const sameColour = (left, right) =>
       left && right && near(left.r, right.r) && near(left.g, right.g) && near(left.b, right.b) && near(left.a, right.a);
 
     if (Math.abs(run.width - 320) > 0.6) throw new Error(`the card is ${run.width}px wide, not the node's 320`);
-    // The node draws its 1px stroke inside the 84 px box; a CSS border sits outside
-    // the padding, so the card measures the node's 84 plus one hairline top and
-    // bottom, read back rather than assumed.
-    if (run.borderWidth <= 0 || run.borderWidth > 1) {
-      throw new Error(`the card border is ${run.borderWidth}px, not the node's hairline`);
-    }
-    if (Math.abs(run.height - (84 + run.borderWidth * 2)) > 0.6) {
-      throw new Error(`the card is ${run.height}px tall, not the node's 84 plus its border`);
-    }
-    if (run.radius !== 10) throw new Error(`the card radius is ${run.radius}px, not radius/card`);
-    if (run.padding !== '16px 16px 16px 16px') throw new Error(`the card padding is ${run.padding}, not the node's 16`);
-
-    if (run.bars.length !== 3) throw new Error(`the block holds ${run.bars.length} bars, the node has 3`);
-    const inset = Math.round(run.borderWidth) + 16;
-    const placed = run.bars.map((bar) => `${Math.round(bar.x)},${Math.round(bar.y)} ${bar.width}x${bar.height}`);
-    // Bars start at the node's 16 px padding and sit on its 20 px pitch: 12 px bar
-    // plus the 8 px gap, longest first.
-    const wanted = [[200, 0], [160, 20], [120, 40]].map(([width, offset]) => `${inset},${inset + offset} ${width}x12`);
-    if (placed.join(' | ') !== wanted.join(' | ')) {
-      throw new Error(`the bars sit at ${placed.join(' | ')}, the node has ${wanted.join(' | ')}`);
-    }
-
-    const squared = run.bars.find((bar) => bar.radius !== 8);
-    if (squared) throw new Error(`a bar has a ${squared.radius}px radius, not radius/row`);
-
+    if (Math.abs(run.height - 159) > 0.6) throw new Error(`the card is ${run.height}px tall, not the node's 159`);
+    if (run.radius !== 20) throw new Error(`the card radius is ${run.radius}px, not the node's radius-xl 20`);
+    if (run.padding !== '20px 20px 20px 20px') throw new Error(`the card padding is ${run.padding}, not the node's 20`);
     if (!sameColour(run.fill, run.tokens.surface)) {
-      throw new Error('the card is not filled with the theme colour/surface');
+      throw new Error('the card is not filled with the theme colour/surface-secondary');
     }
-    if (!sameColour(run.line, run.tokens.border)) {
-      throw new Error('the card outline is not the theme colour/border');
+
+    if (run.caption.text !== 'Loading list') {
+      throw new Error(`the caption reads "${run.caption.text}", not the node's "Loading list"`);
     }
-    const miscoloured = run.bars.find((bar) => !sameColour(bar.fill, run.tokens.sunken));
-    if (miscoloured) throw new Error('a bar is not filled with the theme colour/sunken');
+    if (run.caption.size !== '13px') throw new Error(`the caption is ${run.caption.size}, not the node's 13`);
+    if (run.caption.top !== 20) throw new Error(`the caption starts at ${run.caption.top}px, not the node's 20`);
+    if (run.caption.height !== 15) throw new Error(`the caption is ${run.caption.height}px tall, not the node's 15`);
+    if (!sameColour(run.caption.colour, run.tokens.subtle)) {
+      throw new Error('the caption is not the theme colour/text-subtle');
+    }
+
+    if (run.rows.length !== 2) throw new Error(`the block holds ${run.rows.length} rows, the node has 2`);
+    const [first, second] = run.rows;
+    // Padding 20 plus the caption's 15 and the 12 px rhythm: the node's 47, then
+    // that plus the 40 px row and the same 12 px rhythm.
+    if (first.y !== 47) throw new Error(`the first row starts at ${first.y}px, not the node's 47`);
+    if (second.y !== 99) throw new Error(`the second row starts at ${second.y}px, not the node's 99`);
+
+    const pills = run.rows.map((row) => `${row.wide.width}x${row.wide.height} / ${row.narrow.width}x${row.narrow.height}`);
+    const wanted = ['228x12 / 140x12', '228x12 / 120x12'];
+    if (pills.join(' | ') !== wanted.join(' | ')) {
+      throw new Error(`the pills measure ${pills.join(' | ')}, the node has ${wanted.join(' | ')}`);
+    }
+
+    const oddRow = run.rows.filter((row) => row.height !== 40 || row.disc.width !== 40 || row.disc.height !== 40);
+    if (oddRow.length) {
+      throw new Error(`a row is not the node's 40 px with a 40 px disc (${oddRow.map((row) => `${row.height} / ${row.disc.width}x${row.disc.height}`).join(', ')})`);
+    }
+    const offPitch = run.rows.filter((row) => row.pitch !== 20);
+    if (offPitch.length) {
+      throw new Error(`a short pill sits ${offPitch[0].pitch}px below the long one, not the node's 20`);
+    }
+    const squared = run.rows.filter((row) => row.disc.radius < 999 || row.narrow.radius < 999);
+    if (squared.length) throw new Error("a disc or pill is not on the node's radius-full");
+    const miscoloured = run.rows.filter(
+      (row) => !sameColour(row.disc.fill, run.tokens.sunken) || !sameColour(row.narrow.fill, run.tokens.sunken),
+    );
+    if (miscoloured.length) throw new Error('a shape is not filled with the theme colour/surface-tertiary');
 
     if (!run.role || !run.label) {
       throw new Error(`the block carries no spoken label (role ${run.role}, label "${run.label}")`);
     }
-    if (run.text !== '') throw new Error(`the node has no text, the block draws "${run.text}"`);
 
-    return `320x84 card, bars at ${placed.join(', ')}, colours from the theme`;
+    return `320x159 card, caption and two 40 px rows, pills ${pills.join(', ')}`;
   });
 
   // The shell's acceptance is "it matches the design node it was drawn from", so
