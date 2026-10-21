@@ -69,6 +69,140 @@ async function resizeAndSettle(window, width, height) {
   // checks below then report the real numbers rather than a timeout.
 }
 
+/**
+ * Measure the dropdowns in one page.
+ *
+ * A native <select> hands its open list to Windows, and that popup is painted
+ * outside the page: no stylesheet reaches it and no query can see it. The failure
+ * worth measuring is therefore a select still drawing its own box. Each one must
+ * be hidden behind a drawn `.select-trigger` (a button reading the chosen option
+ * and reporting itself as one combobox), and a press on that control must open a
+ * `.select-menu` element inside the page, laid over the control.
+ *
+ * The selector narrows the sweep to the view on screen. The shell keeps every view
+ * it has visited in the document and hides the inactive ones, and a hidden view's
+ * controls measure 0 wide, so a sweep of the whole document would report the Chat
+ * view's composer chip as broken while Settings is open.
+ * @param {Electron.BrowserWindow} window
+ * @param {string} [selector] Scope for the sweep; every select in the page by default.
+ * @returns {Promise<object>}
+ */
+async function measureDropdowns(window, selector = 'select') {
+  return window.webContents.executeJavaScript(`(async () => {
+    const frame = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const text = (element) => (element?.textContent ?? '').replace(/\\s+/g, ' ').trim();
+    const selects = Array.from(document.querySelectorAll(${JSON.stringify(selector)}));
+
+    const controls = selects.map((select) => {
+      const trigger = select.previousElementSibling;
+      const chosen = select.options[select.selectedIndex] ?? null;
+      const triggerBox = trigger?.getBoundingClientRect() ?? null;
+      return {
+        id: select.id,
+        options: select.options.length,
+        selectDisplay: getComputedStyle(select).display,
+        hasTrigger: trigger?.classList.contains('select-trigger') === true,
+        triggerTag: trigger?.tagName ?? '',
+        triggerWidth: Math.round(triggerBox?.width ?? 0),
+        // A view that the router is not showing still leaves its markup in the
+        // document. A dropdown with no pixels cannot open anything, so it is not
+        // measured: only the ones the page paints can hand a list to Windows.
+        painted: triggerBox !== null && triggerBox.width > 0 && triggerBox.height > 0,
+        triggerText: text(trigger),
+        chosenText: text(chosen),
+        role: trigger?.getAttribute('role') ?? '',
+      };
+    });
+    const painted = controls.filter((control) => control.painted);
+
+    // Read the list the first painted dropdown draws. elementFromPoint proves the
+    // page paints it: a system popup is not in the document, so nothing would answer.
+    const trigger = painted.length > 0 ? selects[controls.indexOf(painted[0])].previousElementSibling : null;
+    let opened = { drawn: false, rows: 0 };
+    if (trigger) {
+      trigger.click();
+      await frame();
+      const menu = document.querySelector('.select-menu');
+      const box = menu?.getBoundingClientRect() ?? null;
+      const controlBox = trigger.getBoundingClientRect();
+      opened = {
+        drawn: menu !== null,
+        rows: menu ? menu.querySelectorAll('.select-menu-option').length : 0,
+        position: menu ? getComputedStyle(menu).position : '',
+        inDocument: menu ? document.body.contains(menu) : false,
+        overlapsControl: box
+          ? box.left < controlBox.right && box.right > controlBox.left &&
+            box.top < controlBox.bottom + 8 && box.bottom > controlBox.top
+          : false,
+        hitTest: box
+          ? menu.contains(document.elementFromPoint(box.left + Math.min(box.width / 2, 20), box.top + 8))
+          : false,
+        // A control near the bottom of the window opens its list above itself, so
+        // anchoring has to hold on either side of the control, not only below it.
+        anchored: box
+          ? box.left < controlBox.right && box.right > controlBox.left &&
+            ((box.top >= controlBox.bottom - 12 && box.top <= controlBox.bottom + 12) ||
+              (box.bottom <= controlBox.top + 12 && box.bottom >= controlBox.top - 12))
+          : false,
+        box: box ? [box.left, box.top, box.right, box.bottom].map(Math.round) : [],
+        controlBox: [controlBox.left, controlBox.top, controlBox.right, controlBox.bottom].map(Math.round),
+        expanded: trigger.getAttribute('aria-expanded'),
+      };
+      trigger.click();
+      await frame();
+      opened.leftOpen = document.querySelectorAll('.select-menu').length;
+    }
+
+    return {
+      page: location.pathname.split('/').pop(),
+      count: painted.length,
+      controls: painted,
+      opened,
+      // A select with pixels of its own would still open the OS popup.
+      undrawn: painted.filter((control) => control.selectDisplay !== 'none' || !control.hasTrigger).map((control) => control.id),
+    };
+  })()`);
+}
+
+/**
+ * @param {string} label
+ * @param {object} run
+ */
+function checkDropdowns(label, run) {
+  report.check(`${label}: every dropdown is drawn, none opens a system popup`, () => {
+    if (run.count === 0) throw new Error('the page has no <select> to measure');
+    if (run.undrawn.length > 0) {
+      throw new Error(`these selects still draw their own box: ${run.undrawn.join(', ')}`);
+    }
+    const wrong = run.controls.filter(
+      (control) =>
+        control.triggerTag !== 'BUTTON' ||
+        control.triggerWidth === 0 ||
+        control.role !== 'combobox' ||
+        control.triggerText !== control.chosenText,
+    );
+    if (wrong.length > 0) {
+      throw new Error(`${wrong.map((control) => control.id).join(', ')} do not read as one combobox holding the chosen option`);
+    }
+    if (!run.opened.drawn) throw new Error('the control opened no .select-menu');
+    if (run.opened.rows !== run.controls[0].options) {
+      throw new Error(`the menu drew ${run.opened.rows} rows for ${run.controls[0].options} options`);
+    }
+    if (run.opened.position !== 'fixed') throw new Error(`the menu is ${run.opened.position}, so a panel can clip it`);
+    if (!run.opened.inDocument || !run.opened.anchored || !run.opened.hitTest) {
+      throw new Error(
+        `the open list is not the element the page paints over the control ` +
+          `(inDocument ${run.opened.inDocument}, anchored ${run.opened.anchored}, ` +
+          `hitTest ${run.opened.hitTest}, list ${JSON.stringify(run.opened.box)}, ` +
+          `control ${JSON.stringify(run.opened.controlBox)})`,
+      );
+    }
+    if (run.opened.expanded !== 'true') throw new Error('aria-expanded did not follow the open list');
+    if (run.opened.leftOpen !== 0) throw new Error('the list stayed open after a second press');
+    return `${run.count} select(s) ${run.controls.map((control) => control.id).join(', ')}, ${run.opened.rows}-row list at position ${run.opened.position}`;
+  });
+}
+
 app.whenReady().then(async () => {
   const window = await waitForFirstWindow();
   await waitForLoad(window);
@@ -204,6 +338,25 @@ app.whenReady().then(async () => {
       throw new Error('require or process is visible to the renderer');
     }
   });
+
+  // The composer's model chip is the dropdown every screen with a composer gets, so
+  // it is the one measured here: a native select would open the pale Windows menu.
+  checkDropdowns('the composer', await measureDropdowns(window));
+
+  // The providers key form is the one dropdown a view builds instead of markup, so it
+  // is the easiest to leave native and hand its list to Windows. Open Settings, open
+  // that panel, measure it, then put the shell back on Chats for the checks below.
+  await window.webContents.executeJavaScript(`(async () => {
+    document.querySelector('.nav-sidebar-row[data-route="settings"]').click();
+    document.getElementById('settings-ov-row-providers').click();
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    return true;
+  })()`);
+  checkDropdowns('the Settings providers panel', await measureDropdowns(window, '#view-settings select'));
+  await window.webContents.executeJavaScript(`(() => {
+    document.querySelector('.nav-sidebar-row[data-route="chats"]').click();
+    return true;
+  })()`);
 
   // The bridge is the only route to main, so check it from inside the page:
   // a declared channel must round-trip, an undeclared one must never leave.
@@ -595,6 +748,7 @@ app.whenReady().then(async () => {
     const titleStyle = getComputedStyle(block.querySelector('.error-block-title'));
     const textStyle = getComputedStyle(block.querySelector('.error-block-text'));
     const actionStyle = getComputedStyle(action);
+    const composerBox = composer.getBoundingClientRect();
     const before = failedCount();
     action.click();
     for (let tick = 0; tick < 120 && failedCount() <= before; tick += 1) {
@@ -608,6 +762,8 @@ app.whenReady().then(async () => {
       paths: icon ? icon.querySelectorAll('path').length : 0,
       mark: icon ? parse(getComputedStyle(icon).color) : null,
       width: Math.round(box.width),
+      blockCenter: Math.round(box.left + box.width / 2),
+      composerCenter: Math.round(composerBox.left + composerBox.width / 2),
       radius: Math.round(Number.parseFloat(style.borderTopLeftRadius)),
       padding: [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft].join(' '),
       fill: parse(style.backgroundColor),
@@ -641,6 +797,12 @@ app.whenReady().then(async () => {
     if (run.paths !== 2) throw new Error(`the mark draws ${run.paths} paths, not the node's 2`);
     if (!onDangerRamp(run.mark)) throw new Error('the mark is not in the danger colour');
     if (run.width !== 360) throw new Error(`the block is ${run.width}px wide, not the node's 360`);
+    // The card sits on the same centre line as the composer below it. Without the
+    // component's own auto margins a flex column pins a width-capped item to its
+    // start, so the card reads as left-aligned under a full-width field.
+    if (Math.abs(run.blockCenter - run.composerCenter) > 1) {
+      throw new Error(`the card is ${run.blockCenter - run.composerCenter}px off the composer's centre line`);
+    }
     // The node draws its 1px stroke inside its 110 px box; a CSS border sits outside
     // the padding, so the card measures the node's 110 plus one hairline top and
     // bottom. Chromium snaps a hairline to the display's device pixels, so the width
@@ -669,12 +831,12 @@ app.whenReady().then(async () => {
     if (run.actionRadius !== 8) throw new Error(`the action radius is ${run.actionRadius}px, not radius/row`);
     if (run.failedAfter <= run.failedBefore) throw new Error('Retry did not ask for the reply again');
     if (run.composerState !== 'ready') throw new Error('Retry left the composer locked');
-    return `${run.width}px wide, node geometry intact at ${run.radius}px radius, Retry re-asked for the reply`;
+    return `${run.width}px wide on the composer's centre line, node geometry intact at ${run.radius}px radius, Retry re-asked for the reply`;
   });
 
-  // The context panel's empty block is the design's "Block / Empty" component
-  // (node 0:105): mark, title, caption and one action. The action has to be a real
-  // control, so clicking it opens a chat with the request begun.
+  // The context panel's empty block is the design's "Empty State Card"
+  // (node 0:10866): a 48 px icon badge, title, body and one action. The action has
+  // to be a real control, so clicking it opens a chat with the request begun.
   const emptyBlockRun = await window.webContents.executeJavaScript(`(async () => {
     const block = document.querySelector('.empty-block');
     const action = document.getElementById('reminders-empty-action');
@@ -693,6 +855,7 @@ app.whenReady().then(async () => {
       text: block?.querySelector('.empty-block-text')?.textContent?.trim() ?? '',
       actionLabel: action?.textContent?.trim() ?? '',
       markPaths: block?.querySelectorAll('.empty-block-mark svg path').length ?? 0,
+      markStroke: block?.querySelector('.empty-block-mark') ? getComputedStyle(block.querySelector('.empty-block-mark')).color : '',
       width: Math.round(rect?.width ?? 0),
       composerValue: input.value,
       focused: document.activeElement === input,
@@ -701,7 +864,7 @@ app.whenReady().then(async () => {
     };
   })()`);
 
-  report.check('the context panel shows the Block / Empty component and its action starts a chat', () => {
+  report.check('the context panel shows the Empty State Card and its action starts a chat', () => {
     if (emptyBlockRun.title !== 'No reminders yet') throw new Error(`the title reads "${emptyBlockRun.title}"`);
     if (!emptyBlockRun.text.startsWith('Scheduled tasks and their reminders')) {
       throw new Error(`the caption reads "${emptyBlockRun.text}"`);
@@ -709,7 +872,13 @@ app.whenReady().then(async () => {
     if (emptyBlockRun.actionLabel !== 'Create a task') {
       throw new Error(`the action reads "${emptyBlockRun.actionLabel}"`);
     }
-    if (emptyBlockRun.markPaths !== 5) throw new Error(`the mark has ${emptyBlockRun.markPaths} paths`);
+    // The badge draws the node's own two vectors (0:10869 and 0:10870) as strokes
+    // in text-subtle. Counting them keeps a redrawn or filled glyph from passing:
+    // the node's mark is line art, and it is quiet, not accented.
+    if (emptyBlockRun.markPaths !== 2) throw new Error(`the mark has ${emptyBlockRun.markPaths} paths, not the node's 2`);
+    if (emptyBlockRun.markStroke !== 'rgb(161, 161, 170)') {
+      throw new Error(`the mark is drawn in ${emptyBlockRun.markStroke}, not text-subtle`);
+    }
     if (emptyBlockRun.width < 200) throw new Error(`the block is only ${emptyBlockRun.width}px wide`);
     if (emptyBlockRun.composerValue !== 'Create a task: ') {
       throw new Error(`the action left "${emptyBlockRun.composerValue}" in the composer`);
@@ -720,6 +889,8 @@ app.whenReady().then(async () => {
     }
     return `${emptyBlockRun.width}px block, chat opened with the request begun`;
   });
+
+  checkDropdowns('the Settings provider field', await measureDropdowns(settingsWindow));
 
   settingsWindow.destroy();
   fs.rmSync(storeRoot, { recursive: true, force: true });
@@ -1728,6 +1899,165 @@ app.whenReady().then(async () => {
     return `${box.width} px card, ${box.padding} padding on an 8 px rhythm over a ${box.measure} px measure, radius ${box.radius}, raised fill, 1 px hairline outline and the node's drop shadow in both themes`;
   });
 
+  // Card / Glass (design node 0:105). The same probe shape as the two cards above,
+  // reading the five values this node binds: a 20 px inset, the radius its radius-xl
+  // binding resolves to, the translucent glass-surface fill, the 1 px glass-border
+  // and a body on color/text-subtle. The two glass colours carry alpha, so they are
+  // compared against the tokens rather than against a copy of 0.702 and 0.4 here.
+  const glassRun = await window.webContents.executeJavaScript(`(async () => {
+    const card = document.createElement('article');
+    card.className = 'card-glass';
+    const title = document.createElement('h2');
+    title.className = 'card-glass-title';
+    title.textContent = 'Pinned to Autopilot';
+    const text = document.createElement('p');
+    text.className = 'card-glass-text';
+    text.textContent = 'Floating panels and the compact overlay use the glass-surface token over app content.';
+    card.append(title, text);
+    // A theme swap can animate a surface; pin the card to its resting state so the
+    // reading is not caught mid-fade.
+    card.style.transition = 'none';
+    document.body.append(card);
+
+    const probe = document.createElement('span');
+    probe.style.transition = 'none';
+    document.body.append(probe);
+    const colourToken = (name) => {
+      probe.style.color = 'var(' + name + ')';
+      return getComputedStyle(probe).color;
+    };
+    const borderToken = (name) => {
+      probe.style.borderTopColor = 'var(' + name + ')';
+      probe.style.borderTopStyle = 'solid';
+      return getComputedStyle(probe).borderTopColor;
+    };
+    const radiusToken = (name) => {
+      probe.style.borderTopLeftRadius = 'var(' + name + ')';
+      return getComputedStyle(probe).borderTopLeftRadius;
+    };
+    const onePixelBorder = () => {
+      probe.style.borderWidth = '1px';
+      probe.style.borderStyle = 'solid';
+      return getComputedStyle(probe).borderTopWidth;
+    };
+
+    // The node is 140 px tall because its sample copy is: a 24 px title, an 8 px gap
+    // and a two-line 44 px body between 20 px insets. The card states that height as
+    // a minimum, so the check reads the width, the height the sample copy produces
+    // and the rhythm, then the copy's own steps, rather than trusting a fixed frame.
+    const readBox = () => {
+      const style = getComputedStyle(card);
+      const box = card.getBoundingClientRect();
+      const titleBox = title.getBoundingClientRect();
+      const textBox = text.getBoundingClientRect();
+      const titleStyle = getComputedStyle(title);
+      const textStyle = getComputedStyle(text);
+      return {
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+        padding: style.paddingTop + ' ' + style.paddingRight + ' ' + style.paddingBottom + ' ' + style.paddingLeft,
+        radius: style.borderTopLeftRadius,
+        background: style.backgroundColor,
+        borderWidth: style.borderTopWidth,
+        borderColour: style.borderTopColor,
+        shadow: style.boxShadow,
+        titleInset: Math.round(titleBox.top - box.top),
+        titleGap: Math.round(textBox.top - titleBox.bottom),
+        measure: Math.round(textBox.width),
+        title: {
+          fontSize: titleStyle.fontSize,
+          lineHeight: titleStyle.lineHeight,
+          fontWeight: titleStyle.fontWeight,
+          color: titleStyle.color,
+        },
+        text: {
+          fontSize: textStyle.fontSize,
+          lineHeight: textStyle.lineHeight,
+          fontWeight: textStyle.fontWeight,
+          color: textStyle.color,
+        },
+      };
+    };
+    const readTokens = () => ({
+      text: colourToken('--zuri-text-primary'),
+      subtle: colourToken('--zuri-text-subtle'),
+      glassSurface: colourToken('--zuri-glass-card-surface'),
+      glassBorder: borderToken('--zuri-glass-card-border'),
+      glassRadius: radiusToken('--zuri-glass-card-radius'),
+      onePx: onePixelBorder(),
+    });
+
+    const previousTheme = document.documentElement.dataset.theme;
+    const dark = { box: readBox(), tokens: readTokens() };
+    document.documentElement.dataset.theme = 'light';
+    const light = { box: readBox(), tokens: readTokens() };
+    document.documentElement.dataset.theme = previousTheme;
+
+    card.remove();
+    probe.remove();
+    return { dark, light };
+  })()`);
+
+  report.check('the Card / Glass matches node 0:105', () => {
+    const problems = [];
+
+    for (const [theme, run] of [['dark', glassRun.dark], ['light', glassRun.light]]) {
+      const { box, tokens } = run;
+      const outline = parseFloat(tokens.onePx);
+      const inset = Math.round(20 + outline);
+      const measure = Math.round(320 - 40 - 2 * outline);
+      if (box.width !== 320) {
+        problems.push(`${theme}: the glass card is ${box.width} px wide, the node is 320`);
+      }
+      if (box.height !== 140) {
+        problems.push(`${theme}: the glass card is ${box.height} px tall, the node is 140 on its sample copy`);
+      }
+      if (box.padding !== '20px 20px 20px 20px') {
+        problems.push(`${theme}: the padding is ${box.padding}, the node keeps 20 px on every side`);
+      }
+      if (box.titleInset !== inset) {
+        problems.push(`${theme}: the title sits ${box.titleInset} px from the top, the node pads 20 px inside a ${outline} px outline`);
+      }
+      if (box.titleGap !== 8) {
+        problems.push(`${theme}: the gap under the title is ${box.titleGap} px, the node uses 8 px`);
+      }
+      if (box.measure !== measure) {
+        problems.push(`${theme}: the body wraps in ${box.measure} px, the node's 20 px padding inside its outline leaves ${measure}`);
+      }
+      if (box.radius !== tokens.glassRadius) {
+        problems.push(`${theme}: the corner is ${box.radius}, the node binds radius-xl (${tokens.glassRadius})`);
+      }
+      // The card's whole reason to exist is the translucent fill, so a card that
+      // read back opaque would have lost it.
+      if (box.background !== tokens.glassSurface) {
+        problems.push(`${theme}: the fill is ${box.background}, the node binds glass-surface (${tokens.glassSurface})`);
+      }
+      if (box.borderWidth !== tokens.onePx || box.borderColour !== tokens.glassBorder) {
+        problems.push(`${theme}: the outline is ${box.borderWidth} ${box.borderColour}, the node draws 1 px glass-border (${tokens.glassBorder})`);
+      }
+      if (box.shadow !== 'none') {
+        problems.push(`${theme}: the card draws ${box.shadow}, the node has no shadow`);
+      }
+      if (box.title.fontSize !== '16px' || box.title.lineHeight !== '24px' || box.title.fontWeight !== '600') {
+        problems.push(`${theme}: the title is ${box.title.fontSize} on ${box.title.lineHeight} at weight ${box.title.fontWeight}, the node sets 16/24 semibold`);
+      }
+      if (box.title.color !== tokens.text) {
+        problems.push(`${theme}: the title is ${box.title.color}, the node binds color/text (${tokens.text})`);
+      }
+      if (box.text.fontSize !== '14px' || box.text.lineHeight !== '22px' || box.text.fontWeight !== '400') {
+        problems.push(`${theme}: the body is ${box.text.fontSize} on ${box.text.lineHeight} at weight ${box.text.fontWeight}, the node sets 14/22 regular`);
+      }
+      if (box.text.color !== tokens.subtle) {
+        problems.push(`${theme}: the body is ${box.text.color}, the node binds color/text-subtle (${tokens.subtle})`);
+      }
+    }
+
+    if (problems.length > 0) throw new Error(problems.join('; '));
+
+    const { box } = glassRun.dark;
+    return `${box.width}x${box.height} glass card, ${box.padding} padding on an 8 px rhythm over a ${box.measure} px measure, radius ${box.radius}, translucent glass-surface fill, 1 px glass-border, 16/24 semibold title and 14/22 subtle body in both themes`;
+  });
+
   // Loading Dots block (design node 0:117). Built through the renderer's own
   // factory on the live page, so the numbers come from the stylesheet in force
   // rather than from a copy of them in this file.
@@ -2155,81 +2485,115 @@ app.whenReady().then(async () => {
         const column = document.getElementById(id);
         return { id, ...box(column), fill: style(column).backgroundColor };
       }),
-      toggle: box(document.querySelector('.top-bar .shell-toggle')),
+      toggle: box(document.querySelector('.top-bar .shell-toggle') ?? document.querySelector('.sidebar-brand-toggle')),
       title: { ...box(title), fontSize: parseFloat(style(title).fontSize) },
       model: { ...box(model), radius: style(model).borderRadius },
       trailing: trailing.map(box),
-      tones: { canvas: toneOf('--zuri-bg-canvas'), surface: toneOf('--zuri-surface') },
+      tones: { canvas: toneOf('--zuri-bg-canvas'), panel: toneOf('--zuri-surface-secondary'), surface: toneOf('--zuri-surface') },
       pillRadius,
     };
   })()`);
 
-  report.check('the App shell is drawn from node 0:131', () => {
+  report.check('the App shell is drawn from node 0:466', () => {
     const near = (left, right, label) => {
       if (Math.abs(left - right) > 0.6) throw new Error(`${label} is ${left}, the node draws ${right}`);
     };
     const column = (id) => shellMatch.columns.find((entry) => entry.id === id);
 
-    // 0:131 itself, and the 52 px bar that leaves the Body its 848.
+    // 0:466 is 1200x800: a window-wide 56 px bar (0:132) over a 744 px body, then a
+    // 260 px sidebar, a 12 px gutter and a 928 px workspace. At 1440 the workspace is
+    // 1168 wide and the centre 1168 - 12 - 300 = 856.
     near(shellMatch.viewport.width, 1440, 'the measured viewport');
     near(shellMatch.viewport.height, 900, 'the measured viewport height');
-    near(shellMatch.topBar.height, 52, 'the top bar height');
+    near(shellMatch.topBar.height, 56, 'the top bar height');
     near(shellMatch.topBar.width, 1440, 'the top bar width');
+    near(shellMatch.topBar.x, 0, 'the top bar left edge');
     near(shellMatch.topBar.borderBottom, 1, 'the top bar hairline');
-    near(shellMatch.body.height, 848, 'the body height');
+    near(shellMatch.body.height, 844, 'the content row height');
 
-    // Body: Sidebar 260 at 0, Centre 860 at 260, Rail 320 at 1120.
-    const expected = { sidebar: { x: 0, width: 260 }, chat: { x: 260, width: 860 }, 'context-panel': { x: 1120, width: 320 } };
+    // Sidebar 260 at 0 (full height), Centre 856 at 272, Context 300 at 1140.
+    const expected = { sidebar: { x: 0, width: 260 }, chat: { x: 272, width: 856 }, 'context-panel': { x: 1140, width: 300 } };
     for (const [id, want] of Object.entries(expected)) {
       const measured = column(id);
       near(measured.x, want.x, `#${id} left edge`);
       near(measured.width, want.width, `#${id} width`);
-      near(measured.height, 848, `#${id} height`);
     }
+    // The bar spans the window, so the sidebar and the content row start under it.
+    near(column('sidebar').height, 844, 'the sidebar height');
+    near(column('chat').height, 844, 'the centre height');
+    near(column('context-panel').height, 844, 'the context panel height');
 
-    // The node's tone separation: Sidebar and Rail on the panel tone, Centre on the
-    // reading surface. Getting these the wrong way round inverts the whole shell.
-    if (column('sidebar').fill !== shellMatch.tones.canvas) throw new Error('the sidebar is not on the canvas/panel tone');
-    if (column('context-panel').fill !== shellMatch.tones.canvas) throw new Error('the rail is not on the canvas/panel tone');
+    // The frame's tone separation: the sidebar and the context panel sit on the panel
+    // tone, the centre on the reading surface. Getting these the wrong way round
+    // inverts the whole shell.
+    if (column('sidebar').fill !== shellMatch.tones.panel) throw new Error('the sidebar is not on the panel tone');
+    if (column('context-panel').fill !== shellMatch.tones.panel) throw new Error('the context panel is not on the panel tone');
     if (column('chat').fill !== shellMatch.tones.surface) throw new Error('the centre is not on the surface tone');
 
-    // Top bar leading: 28 px toggle inset 16, the title 8 after it, the 124 x 28
-    // model pill 16 after that, all on the node's y=12 line.
-    near(shellMatch.toggle.x, 16, 'the sidebar toggle inset');
-    near(shellMatch.toggle.width, 28, 'the sidebar toggle width');
-    near(shellMatch.toggle.y, 12, 'the sidebar toggle top');
-    near(shellMatch.title.x, 52, 'the app title left edge');
-    near(shellMatch.title.fontSize, 20, 'the app title size');
-    near(shellMatch.title.height, 28, 'the app title line height');
-    // 0:138's 37 px title box ends at x=89 and 0:139 starts at 112, so the node
-    // leaves 23 px between them; the tolerance covers the text box's rounding to
-    // whole pixels, not a layout difference.
-    const titleGap = shellMatch.model.x - (shellMatch.title.x + shellMatch.title.width);
-    if (Math.abs(titleGap - 23) > 2) {
-      throw new Error(`the gap before the model trigger is ${titleGap}, the node leaves 23`);
-    }
-    near(shellMatch.model.width, 124, 'the model trigger width');
-    near(shellMatch.model.height, 28, 'the model trigger height');
-    near(shellMatch.model.y, 12, 'the model trigger top');
+    // Top bar: the section title inset 16 from the window edge, then search (220x32),
+    // the bell (32), the model chip (28 high, pill) and the theme button (32), 8 px
+    // apart, ending 16 from the bar's right edge. The account is the sidebar's user
+    // row now.
+    near(shellMatch.title.x, 16, 'the section title left edge');
+    near(shellMatch.title.fontSize, 15, 'the section title size');
+    near(shellMatch.title.height, 18, 'the section title line height');
+
+    if (shellMatch.trailing.length !== 4) throw new Error(`the top bar trailing side has ${shellMatch.trailing.length} controls, the node has 4`);
+    const [search, bell, chip, theme] = shellMatch.trailing;
+    near(search.width, 220, 'the search field width');
+    near(search.height, 32, 'the search field height');
+    near(bell.width, 32, 'the bell width');
+    near(bell.height, 32, 'the bell height');
+    near(chip.height, 28, 'the model chip height');
+    near(theme.width, 32, 'the theme button width');
+    near(theme.height, 32, 'the theme button height');
+    near(1440 - theme.right, 16, 'the right edge inset');
+    const gaps = shellMatch.trailing.slice(1).map((control, index) => control.x - shellMatch.trailing[index].right);
+    if (gaps.join(',') !== '8,8,8') throw new Error(`the trailing controls sit ${gaps.join(',')} apart, the node has 8,8,8`);
+
     // tokens.json's radius/pill is 999 and HeroUI's full radius is 9999px; both
     // clamp to half the 28 px height, so the pill is the token, whichever it reads.
     if (shellMatch.model.radius !== shellMatch.pillRadius) {
-      throw new Error(`the model trigger radius is ${shellMatch.model.radius}, not radius/pill (${shellMatch.pillRadius})`);
+      throw new Error(`the model chip radius is ${shellMatch.model.radius}, not radius/pill (${shellMatch.pillRadius})`);
     }
 
-    // Top bar trailing: four 28 px controls ending 20 from the right edge, 8 apart
-    // with the account chip 12 after the theme button.
-    if (shellMatch.trailing.length !== 4) throw new Error(`the top bar trailing side has ${shellMatch.trailing.length} controls, the node has 4`);
-    for (const control of shellMatch.trailing) {
-      near(control.width, 28, 'a top bar control width');
-      near(control.height, 28, 'a top bar control height');
-      near(control.y, 12, 'a top bar control top');
-    }
-    near(1440 - shellMatch.trailing[shellMatch.trailing.length - 1].right, 20, 'the right edge inset');
-    const gaps = shellMatch.trailing.slice(1).map((control, index) => control.x - shellMatch.trailing[index].right);
-    if (gaps.join(',') !== '8,8,12') throw new Error(`the trailing controls sit ${gaps.join(',')} apart, the node has 8,8,12`);
+    return `1440x900: 56 px bar over ${shellMatch.columns.map((entry) => `${entry.id} ${entry.width}`).join(' / ')}, trailing 220/32/28/32 at 8 px gaps`;
+  });
 
-    return `1440x900: 52 px bar over ${shellMatch.columns.map((entry) => `${entry.id} ${entry.width}`).join(' / ')}, controls 28 px at 8/12 px gaps`;
+  // The field draws the focus ring for the input inside it, so the input must not
+  // paint one of its own. Chromium's default ring is a white rectangle that ignores
+  // the pill radius, which read as a second border floating inside the search field.
+  const searchRing = await window.webContents.executeJavaScript(`(() => {
+    const input = document.querySelector('.top-bar-search-input');
+    const field = document.querySelector('.top-bar-search');
+    input.focus();
+    const inner = getComputedStyle(input);
+    const outer = getComputedStyle(field);
+    const measured = {
+      innerOutline: inner.outlineStyle,
+      innerBorder: inner.borderTopStyle,
+      outerOutline: outer.outlineStyle,
+      outerWidth: parseFloat(outer.outlineWidth),
+      outerRadius: parseFloat(outer.borderRadius),
+    };
+    input.blur();
+    return measured;
+  })()`);
+
+  report.check('the search field draws one focus ring, not two', () => {
+    if (searchRing.innerOutline !== 'none') {
+      throw new Error(`the input draws its own ${searchRing.innerOutline} outline inside the field`);
+    }
+    if (searchRing.innerBorder !== 'none') {
+      throw new Error(`the input draws its own ${searchRing.innerBorder} border inside the field`);
+    }
+    if (searchRing.outerOutline === 'none' || searchRing.outerWidth <= 0) {
+      throw new Error('the field draws no ring, so nothing marks where the caret is');
+    }
+    if (searchRing.outerRadius <= 0) {
+      throw new Error('the field ring has no radius, so it will not follow the pill');
+    }
+    return `one ${searchRing.outerWidth}px ring on the ${searchRing.outerRadius}px field, none on the input`;
   });
 
   // The conversation transcript page's acceptance is the same sentence as the
@@ -2480,25 +2844,32 @@ app.whenReady().then(async () => {
       if (!String(value).startsWith(expected)) throw new Error(`${label} is ${value}, the node draws ${expected}`);
     };
 
-    // The column: 860 wide between the 260 sidebar and the 320 rail, a 48 px header
-    // over a transcript inset 20 from the top and 64 at the sides.
-    near(transcriptMatch.column.width, 860, 'the chat column width');
-    near(transcriptMatch.transcript.width, 860, 'the transcript width');
+    // The column is the shell's centre, so it takes whatever the current App Shell
+    // frame leaves: 1440 - 260 sidebar - 12 rail - 300 context - 12 rail = 856. The
+    // transcript node (0:1221) was drawn in the older 860 column, so its inner
+    // numbers below are expressed against the measured width rather than pinned to
+    // that frame's arithmetic.
+    const centre = 1440 - 260 - 12 - 300 - 12;
+    near(transcriptMatch.column.width, centre, 'the chat column width');
+    near(transcriptMatch.transcript.width, centre, 'the transcript width');
     near(transcriptMatch.header.height, 48, 'the transcript header height');
     near(transcriptMatch.title.x, 24, 'the thread title inset');
     near(transcriptMatch.inset.side, 64, 'the transcript side inset');
     near(transcriptMatch.inset.top, 20, 'the transcript top inset');
+    // The turns span the column inside its 64 px insets.
+    const turnWidth = centre - 2 * 64;
 
-    // The composer under it: the node's 780 x 60 pill, and the hint 40 in.
-    near(transcriptMatch.composer.width, 780, 'the composer width');
+    // The composer under it: the node's 60 px pill inset 40 each side, and the hint
+    // on the same inset.
+    near(transcriptMatch.composer.width, centre - 2 * 40, 'the composer width');
     near(transcriptMatch.composer.height, 60, 'the composer height');
     near(transcriptMatch.hint.x - transcriptMatch.column.x, 40, 'the composer hint inset');
 
-    // 0:1222: four turns on the node's 732 px column, 24 apart, the first 20 down.
+    // 0:1222: four turns on the column, 24 apart, the first 20 down.
     same(transcriptMatch.turns.length, 4, 'the number of turns');
     const [ask, reply, act, streaming] = transcriptMatch.turns;
     for (const turn of transcriptMatch.turns) {
-      near(turn.box.width, 732, 'a turn width');
+      near(turn.box.width, turnWidth, 'a turn width');
       near(turn.box.x, 64, 'a turn inset');
     }
     near(ask.box.y, 20, 'the first turn top');
@@ -2516,14 +2887,14 @@ app.whenReady().then(async () => {
     same(ask.mode, 'ask', 'turn 1 mode');
     near(ask.stack.cap, 460, 'the reader stack cap');
     if (ask.stack.width > 460) throw new Error(`the reader stack is ${ask.stack.width} wide, the node draws it within 460`);
-    near(ask.stack.right, 732, 'the reader stack right edge');
+    near(ask.stack.right, turnWidth, 'the reader stack right edge');
     near(ask.meta.height, 24, 'the reader meta row height');
-    near(ask.meta.right, 732, 'the reader meta row right edge');
+    near(ask.meta.right, turnWidth, 'the reader meta row right edge');
     near(ask.meta.gap, 8, 'the reader meta row gap');
     same(ask.texts.length, 1, 'the reader bubble count');
     near(ask.texts[0].cap, 460, 'the reader bubble cap');
     if (ask.texts[0].width > 460) throw new Error(`the reader bubble is ${ask.texts[0].width} wide, the node draws it within 460`);
-    near(ask.texts[0].right, 732, 'the reader bubble right edge');
+    near(ask.texts[0].right, turnWidth, 'the reader bubble right edge');
     near(ask.texts[0].corner, 10, 'the reader bubble radius');
     near(ask.texts[0].inset, 12, 'the reader bubble inset');
     reads(ask.texts[0].font, '14/22', 'the reader bubble type');
@@ -2537,7 +2908,7 @@ app.whenReady().then(async () => {
     near(halfPill(reply.avatar.corner, reply.avatar.height), 12, 'the Zuri mark radius');
     paintIs(reply.avatar.paint, transcriptMatch.fills.readerBubble, 'the Zuri mark fill');
     near(reply.stack.x, 32, 'the Zuri stack inset');
-    near(reply.stack.width, 700, 'the Zuri stack width');
+    near(reply.stack.width, turnWidth - 32, 'the Zuri stack width');
     near(reply.meta.height, 20, 'the Zuri meta row height');
     same(reply.texts.length, 2, 'the paragraph count');
     for (const paragraph of reply.texts) {
@@ -2550,12 +2921,12 @@ app.whenReady().then(async () => {
     same(act.role, 'user', 'turn 3 role');
     same(act.mode, 'act', 'turn 3 mode');
     near(act.stack.cap, 460, 'the Act stack cap');
-    near(act.stack.right, 732, 'the Act stack right edge');
-    near(act.texts[0].right, 732, 'the Act bubble right edge');
+    near(act.stack.right, turnWidth, 'the Act stack right edge');
+    near(act.texts[0].right, turnWidth, 'the Act bubble right edge');
     near(act.chip.height, 28, 'the attachment chip height');
     near(halfPill(act.chip.corner, act.chip.height), 14, 'the attachment chip radius');
     near(act.chip.stroke, 1, 'the attachment chip stroke');
-    near(act.chip.right, 732, 'the attachment chip right edge');
+    near(act.chip.right, turnWidth, 'the attachment chip right edge');
 
     // The streaming reply: the tool card, then the 16 px row under it.
     same(streaming.role, 'assistant', 'turn 4 role');
@@ -2579,7 +2950,7 @@ app.whenReady().then(async () => {
     near(transcriptMatch.empty.mark.width, 56, 'the empty mark width');
     near(transcriptMatch.empty.mark.height, 56, 'the empty mark height');
     near(transcriptMatch.empty.markCorner, 16, 'the empty mark radius');
-    near(transcriptMatch.empty.markCentre, transcriptMatch.column.x + 430, 'the empty mark centre');
+    near(transcriptMatch.empty.markCentre, transcriptMatch.column.x + centre / 2, 'the empty mark centre');
     near(transcriptMatch.empty.title.y - transcriptMatch.empty.mark.bottom, 16, 'the gap under the mark');
     reads(transcriptMatch.empty.title.font, '22/30', 'the empty title type');
     if (transcriptMatch.empty.lead.width > 420) throw new Error(`the empty lead is ${transcriptMatch.empty.lead.width} wide, the node caps it at 420`);
@@ -2611,18 +2982,18 @@ app.whenReady().then(async () => {
 
     // 0:1776: the loading state is the shape of the same two turns, 24 apart, its
     // bars on the node's 12/14 heights and 4 px radius.
-    near(transcriptMatch.loading.box.width, 732, 'the loading column width');
+    near(transcriptMatch.loading.box.width, turnWidth, 'the loading column width');
     near(transcriptMatch.loading.gap, 24, 'the loading group gap');
     near(transcriptMatch.loading.userGroup.width, 420, 'the loading reader group width');
     near(transcriptMatch.loading.userGroup.gap, 8, 'the loading reader group gap');
     near(transcriptMatch.loading.replyGroup.x, 0, 'the loading reply alignment');
-    near(transcriptMatch.loading.userGroup.x, 312, 'the loading reader alignment');
+    near(transcriptMatch.loading.userGroup.x, turnWidth - 420, 'the loading reader alignment');
     near(transcriptMatch.loading.userBars[0].width, 72, 'the reader meta bar width');
     near(transcriptMatch.loading.userBars[1].width, 420, 'the reader bar width');
     near(transcriptMatch.loading.userBars[2].width, 280, 'the reader short bar width');
     near(transcriptMatch.loading.replyBars[0].width, 64, 'the first reply bar width');
     for (const bar of transcriptMatch.loading.replyBars.slice(1, 3)) {
-      near(bar.width, 700, 'a reply bar width');
+      near(bar.width, turnWidth - 32, 'a reply bar width');
     }
     near(transcriptMatch.loading.replyBars[3].width, 380, 'the last reply bar width');
     for (const bar of transcriptMatch.loading.userBars) {
@@ -2861,6 +3232,8 @@ app.whenReady().then(async () => {
 
     return `1440x900: 620x756 card at 410,84, four 52 px rows on a 60 px pitch, 48/42 px fields, empty, saving and rejected states as drawn`;
   });
+
+  checkDropdowns('the setup theme and model fields', await measureDropdowns(onboardingWindow));
 
   onboardingWindow.destroy();
 

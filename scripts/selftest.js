@@ -12,6 +12,7 @@ import * as store from '../src/main/store.js';
 import * as secrets from '../src/main/secrets.js';
 import * as chat from '../src/main/providers/chat.js';
 import * as tools from '../src/main/tools/index.js';
+import * as scheduler from '../src/main/scheduler.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 let failures = 0;
@@ -102,6 +103,47 @@ check('index.html renders the three-column shell', () => {
   if (withoutToggle.length > 0) throw new Error(`no collapse toggle for ${withoutToggle.join(', ')}`);
 
   return required.map(([label]) => label).join(', ');
+});
+
+check('every page that draws a dropdown links the sheet and enhances the control', () => {
+  // A native <select> opens the Windows popup, which no stylesheet reaches. Any page
+  // holding one therefore has to link styles/dropdown.css and hand the select to
+  // ui/select.js; this walks every page so a new screen cannot quietly miss it.
+  const pages = [];
+  const walk = (directory) => {
+    for (const entry of fs.readdirSync(path.join(root, directory), { withFileTypes: true })) {
+      const relative = path.posix.join(directory, entry.name);
+      if (entry.isDirectory()) walk(relative);
+      else if (entry.name.endsWith('.html')) pages.push(relative);
+    }
+  };
+  walk('src/renderer');
+
+  const withSelect = pages.filter((page) => /<select\b/i.test(read(page)));
+  if (withSelect.length === 0) throw new Error('no page holds a <select>, so this check measures nothing');
+
+  const problems = [];
+  for (const page of withSelect) {
+    const html = read(page);
+    if (!html.includes('styles/dropdown.css')) problems.push(`${page} does not link styles/dropdown.css`);
+
+    const script = html.match(/<script[^>]*type="module"[^>]*src="([^"]+)"/i);
+    if (!script) {
+      problems.push(`${page} has no module script, so nothing enhances its select`);
+      continue;
+    }
+    const module_ = path.posix.join(path.posix.dirname(page), script[1]);
+    if (!exists(module_)) {
+      problems.push(`${page} loads ${script[1]}, which does not exist`);
+      continue;
+    }
+    const source = read(module_);
+    if (!/from '\.\.\/ui\/select\.js'/.test(source)) problems.push(`${module_} does not import ui/select.js`);
+    if (!/enhanceSelects?\(/.test(source)) problems.push(`${module_} never calls enhanceSelect`);
+  }
+
+  if (problems.length > 0) throw new Error(problems.join('; '));
+  return `${withSelect.length} pages: ${withSelect.join(', ')}`;
 });
 
 check('ui/shell.js owns the collapse state and the 1000px breakpoint', () => {
@@ -972,9 +1014,12 @@ check('the Input / Textarea is drawn from node 0:27', () => {
   }
 
   // The chat prompt only looks like this: it is the composer's own borderless pill
-  // that grows upward (decision 18), so the two must not be merged.
+  // that grows upward (decision 18), so the two must not be merged. The pill draws
+  // its own controls now (ui/composer.js mounts them into index.html's #composer), so
+  // the class is looked for in the module that renders it as well as in the page.
   const index = read('src/renderer/index.html');
-  if (!/class="composer-input"/.test(index)) {
+  const composerModule = read('src/renderer/ui/composer.js');
+  if (!/class="composer-input"/.test(index) && !/className = 'composer-input'/.test(composerModule)) {
     throw new Error('the composer prompt is no longer its own control (decision 18)');
   }
 
@@ -1083,11 +1128,13 @@ check('the Select / Default is drawn from node 0:37', () => {
 });
 
 check('the Select / Menu is drawn from node 0:43', () => {
-  const css = read('src/renderer/styles/components.css');
+  // The dropdown moved to its own sheet so the audit and onboarding pages can link it
+  // without pulling in the shell's global body and box-sizing rules.
+  const css = read('src/renderer/styles/dropdown.css');
 
   const ruleBody = (selector) => {
     const at = css.indexOf(`${selector} {`);
-    if (at === -1) throw new Error(`components.css has no ${selector} rule`);
+    if (at === -1) throw new Error(`dropdown.css has no ${selector} rule`);
     return css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
   };
 
@@ -1517,15 +1564,18 @@ check('the Nav / Sidebar Row is drawn from node 0:63', () => {
       match[1].replace(/\s+/g, ' ').trim(),
     );
 
-  // Node 0:63 is a 236 x 32 box on radius/row filled with color/background. Its
-  // 20 px icon sits at x 8 / y 6 and its label at x 36 / y 8, which is centring
-  // plus one 8 px step, not padding of its own.
+  // The current design row is "Nav / Chats" (node 0:484): a 236 x 36 box on
+  // radius/row. Its 20 px icon sits at x 8 and its label 8 px after it, which is
+  // centring plus one 8 px step, not padding of its own. Unselected rows carry no
+  // fill of their own - they sit on the panel's surface - and only the selected
+  // twin paints color/active. The earlier 32 px / color/background row this check
+  // was written against no longer exists in the document.
   const row = ruleBody('.nav-sidebar-row');
   const box = [
     ['the two children on one line', /display:\s*flex/],
-    ['the 32 px row height', /height:\s*32px/],
+    ['the 36 px row height', /height:\s*36px/],
     ['the radius/row corner', /border-radius:\s*var\(--zuri-radius-row\)/],
-    ['the color/background fill', /background:\s*var\(--zuri-surface\)/],
+    ['no fill on the unselected row', /background:\s*transparent/],
     ["the node's 8 px icon inset and gap", /padding:\s*0 var\(--zuri-space-2\)/],
     ["the node's 8 px step between icon and label", /gap:\s*var\(--zuri-space-2\)/],
     ['vertical centring of both children', /align-items:\s*center/],
@@ -1707,24 +1757,27 @@ check('the App shell holds node 0:131 as one set of tokens', () => {
     return match[1].replace(/\s+/g, ' ').trim();
   };
 
-  // Node 0:131 is a 1440 x 900 frame: a 52 px top bar (0:132) over an 848 px Body
-  // (0:163) split into Sidebar 260 (0:164), Centre 860 (0:209) and Rail 320 (0:269).
-  // One node change, one edit: the frame's numbers live in the token layer, so the
-  // CSS and the markup follow open-pencil instead of holding their own copies.
+  // The current shell frame is "01 App Shell Light" (0:466, 1200x800): a full-height
+  // 260 px Sidebar (0:467), a 12 px Rail Left (0:538), then a Workspace (0:540) whose
+  // own 56 px Top Bar (0:541) sits over a Content Row (0:564) of Main Column 616,
+  // Rail Right 12 and Context Panel 300. The earlier 1440-wide 52 px bar with a
+  // 320 px rail no longer exists in the document, so those numbers are replaced
+  // here rather than kept beside the new ones.
   const frame = [
-    ['--zuri-topbar-height', '52px'],
     ['--zuri-sidebar-width', '260px'],
-    ['--zuri-right-panel-width', '320px'],
+    ['--zuri-shell-topbar-height', '56px'],
+    ['--zuri-context-panel-width', '300px'],
+    ['--zuri-shell-gutter', '12px'],
   ];
   for (const theme of ['dark', 'light']) {
     for (const [name, value] of frame) {
       const actual = tokenValue(theme, name);
-      if (actual !== value) throw new Error(`${name} in ${theme} is ${actual}, node 0:131 draws ${value}`);
+      if (actual !== value) throw new Error(`${name} in ${theme} is ${actual}, node 0:466 draws ${value}`);
     }
   }
-  // The centre is the remainder of the node's frame, not a fourth number to keep:
-  // 1440 - 260 - 320 = 860.
-  if (260 + 320 >= 1440) throw new Error('the two panels leave no centre in the node frame');
+  // The centre is the remainder of the frame, not a fourth number to keep:
+  // 1200 - 260 - 12 - 300 - 12 = 616.
+  if (260 + 12 + 300 + 12 >= 1200) throw new Error('the two panels leave no centre in the frame');
 
   const bar = ruleBody('.top-bar');
   const sidebar = ruleBody('.shell-column-sidebar');
@@ -1735,25 +1788,24 @@ check('the App shell holds node 0:131 as one set of tokens', () => {
   const model = ruleBody('.top-bar-model');
 
   const drawn = [
-    ["the node's 52 px bar", bar, /height:\s*var\(--zuri-topbar-height\)/],
-    ["the node's 1 px hairline under the bar", bar, /border-bottom:\s*1px solid var\(--zuri-border-hairline\)/],
-    ["the node's 16 px left and 20 px right insets", bar, /padding:\s*0 var\(--zuri-space-5\) 0 var\(--zuri-space-4\)/],
+    ["the frame's 56 px bar", bar, /height:\s*var\(--zuri-shell-topbar-height\)/],
+    ["the frame's 1 px hairline under the bar", bar, /border-bottom:\s*1px solid var\(--zuri-border-hairline\)/],
+    ["the frame's 16 px insets", bar, /padding:\s*0 var\(--zuri-space-4\)/],
     ["the reading surface behind the bar", bar, /background:\s*var\(--zuri-surface\)/],
     ["the 260 px sidebar", sidebar, /width:\s*var\(--zuri-sidebar-width\)/],
-    ['the sidebar hairline', sidebar, /border-right:\s*1px solid var\(--zuri-border-hairline\)/],
-    ['the panel tone on the sidebar', sidebar, /background:\s*var\(--zuri-bg-canvas\)/],
+    ['the panel tone on the sidebar', sidebar, /background:\s*var\(--zuri-surface-secondary\)/],
     ['a centre that takes what the panels leave', chat, /flex:\s*1 1 auto/],
     ['the reading surface on the centre', chat, /background:\s*var\(--zuri-surface\)/],
-    ['the 320 px rail', rail, /width:\s*var\(--zuri-right-panel-width\)/],
-    ['the rail hairline', rail, /border-left:\s*1px solid var\(--zuri-border-hairline\)/],
-    ['the panel tone on the rail', rail, /background:\s*var\(--zuri-bg-canvas\)/],
-    ["the node's 28 px controls", button, /width:\s*28px/],
-    ["the node's 28 px control height", button, /height:\s*28px/],
-    ['radius/row on the controls', button, /border-radius:\s*var\(--zuri-radius-row\)/],
-    ["the node's 20 px app name", title, /font-size:\s*var\(--zuri-font-size-heading-md\)/],
-    ["the node's 28 px app name line", title, /line-height:\s*var\(--zuri-line-height-heading-md\)/],
-    ['the 124 px model trigger', model, /min-width:\s*124px/],
-    ['radius/pill on the model trigger', model, /border-radius:\s*var\(--zuri-radius-pill\)/],
+    ['the 300 px context panel', rail, /width:\s*var\(--zuri-context-panel-width\)/],
+    ['the 12 px rail before the context panel', rail, /margin-left:\s*var\(--zuri-shell-gutter\)/],
+    ['the panel tone on the context panel', rail, /background:\s*var\(--zuri-surface-secondary\)/],
+    ["the frame's 32 px controls", button, /width:\s*32px/],
+    ["the frame's 32 px control height", button, /height:\s*32px/],
+    ['radius 9 on the controls', button, /border-radius:\s*var\(--zuri-radius-search\)/],
+    ["the frame's 15/18 section title", title, /font-size:\s*15px/],
+    ["the frame's 18 px title line", title, /line-height:\s*18px/],
+    ['radius/pill on the model chip', model, /border-radius:\s*var\(--zuri-radius-pill\)/],
+    ['the panel tone on the model chip', model, /background:\s*var\(--zuri-surface-secondary\)/],
   ];
   const missing = drawn.filter(([, source, pattern]) => !pattern.test(source)).map(([name]) => name);
   if (missing.length > 0) throw new Error(`the shell is missing ${missing.join(', ')}`);
@@ -1764,11 +1816,13 @@ check('the App shell holds node 0:131 as one set of tokens', () => {
   if (literals.length > 0) throw new Error('a shell rule holds a literal colour instead of a token');
 
   // The markup is the node's parts in the node's order, and it names the node so
-  // the next reader can see where the numbers came from.
-  const regions = ['class="top-bar"', 'id="sidebar"', 'id="chat"', 'id="context-panel"'].map((needle) => markup.indexOf(needle));
+  // the next reader can see where the numbers came from. The bar is the window-wide
+  // row (0:132) and comes first, then the body holds the sidebar and the workspace
+  // with the centre and the rail.
+  const regions = ['class="top-bar"', 'id="sidebar"', 'class="workspace"', 'id="chat"', 'id="context-panel"'].map((needle) => markup.indexOf(needle));
   if (regions.includes(-1)) throw new Error('index.html is missing one of the shell regions the node draws');
   if (regions.join(',') !== [...regions].sort((left, right) => left - right).join(',')) {
-    throw new Error('the shell regions are not in the node order: bar, sidebar, centre, rail');
+    throw new Error('the shell regions are not in the node order: bar, then sidebar and workspace (centre and rail)');
   }
   if (!markup.includes('design node 0:131')) throw new Error('index.html does not name node 0:131 as its source');
 
@@ -3980,8 +4034,6 @@ check('the theme is dark until settings are read', () => {
   }
 });
 
-skip('scheduler tick selection', 'scheduler.js arrives with the scheduler card');
-
 check('views/files.js lists workspace files with Open and Reveal through the bridge', () => {
   const source = read('src/renderer/views/files.js');
   for (const call of ['api.files.list(', 'api.files.open(', 'api.files.reveal(']) {
@@ -4472,6 +4524,83 @@ await checkAsync('tools/index.js creates the workspace folder and lists what is 
   }
 
   return 'folder created, 2 files listed newest first, escapes refused';
+});
+
+/* ---------------------------------------------------------------------------
+   Scheduler tick selection
+
+   The 30-second tick belongs to the scheduler card; what is checked here is the
+   choice it makes, driven by a fixed clock so no check waits on real time.
+   ------------------------------------------------------------------------- */
+
+/** @param {string} id @param {unknown} nextRunAt @param {object} [extra] */
+const scheduleOf = (id, nextRunAt, extra = {}) => ({ id, prompt: `Run ${id}`, nextRunAt, ...extra });
+
+check('scheduler.js selects the automations whose nextRunAt has passed', () => {
+  const now = Date.parse('2025-03-04T12:00:00.000Z');
+  const schedules = [
+    scheduleOf('late', '2025-03-04T11:55:00.000Z'),
+    scheduleOf('future', '2025-03-04T12:05:00.000Z'),
+    scheduleOf('dueNow', '2025-03-04T12:00:00.000Z'),
+  ];
+
+  const due = scheduler.dueSchedules(schedules, now).map((entry) => entry.id);
+  if (due.join(',') !== 'late,dueNow') throw new Error(`selected ${due.join(', ') || 'nothing'}`);
+  // The boundary counts as due, so a tick that lands exactly on nextRunAt fires it.
+  if (!scheduler.hasDueSchedule(schedules, now)) throw new Error('hasDueSchedule said nothing is due');
+  if (scheduler.hasDueSchedule(schedules, Date.parse('2025-03-04T11:54:00.000Z'))) {
+    throw new Error('hasDueSchedule saw work due a minute early');
+  }
+  return 'late and dueNow fire, future waits';
+});
+
+check('a run missed while Zuri was closed is replayed once, not once per interval', () => {
+  // Nine hourly runs were missed overnight. The sweep must fire the automation once
+  // and let the run advance nextRunAt, or reopening Zuri would flood the run log.
+  const now = Date.parse('2025-03-04T12:00:00.000Z');
+  const missed = scheduleOf('hourly', '2025-03-04T03:00:00.000Z', { cadence: 'interval:60' });
+  const due = scheduler.dueSchedules([missed], now);
+
+  if (due.length !== 1) throw new Error(`${due.length} replays for one missed automation`);
+  // The stored object comes back, so the caller's advance of nextRunAt is kept.
+  if (due[0] !== missed) throw new Error('the selector returned a copy');
+  return '9 missed intervals, one replay';
+});
+
+check('scheduler.js skips a paused automation and one with no readable next run', () => {
+  const now = Date.parse('2025-03-04T12:00:00.000Z');
+  const due = scheduler
+    .dueSchedules(
+      [
+        scheduleOf('paused', '2025-03-04T11:00:00.000Z', { enabled: false }),
+        scheduleOf('draft', undefined),
+        scheduleOf('garbage', 'next tuesday-ish'),
+        scheduleOf('live', '2025-03-04T11:30:00.000Z'),
+      ],
+      now,
+    )
+    .map((entry) => entry.id);
+
+  if (due.join(',') !== 'live') throw new Error(`selected ${due.join(', ') || 'nothing'}`);
+  return 'live only';
+});
+
+check('scheduler.js refuses a schedule list or clock it cannot read', () => {
+  const problems = [];
+  const attempts = [
+    ['a missing list', () => scheduler.dueSchedules(undefined, Date.now())],
+    ['an unreadable clock', () => scheduler.dueSchedules([], Number.NaN)],
+  ];
+  for (const [label, run] of attempts) {
+    try {
+      run();
+      problems.push(`${label} was accepted`);
+    } catch (error) {
+      if (!(error instanceof TypeError)) problems.push(`${label} gave ${error.name}`);
+    }
+  }
+  if (problems.length > 0) throw new Error(problems.join('; '));
+  return 'TypeError for both';
 });
 
 /* ---------------------------------------------------------------------------
