@@ -288,6 +288,272 @@ export async function saveSettings(patch, options = {}) {
 }
 
 /* ---------------------------------------------------------------------------
+   Tasks
+
+   tasks.json is one array, and every action is one read plus one write of that
+   array: the list is small, and the whole file is the unit the person sees, so
+   a create, an edit and a delete all leave the file in the state the Tasks view
+   is showing. A task is
+   `{ id, title, notes, due, priority, done, createdAt, updatedAt, completedAt }`.
+   `due` is an ISO 8601 string or null (a task may have no date), `done` is the
+   boolean the view filters on, and `priority` is 'low' | 'medium' | 'high'.
+   ------------------------------------------------------------------------- */
+
+/** Priorities, low to high. Anything else is refused rather than guessed at. */
+export const TASK_PRIORITIES = Object.freeze(['low', 'medium', 'high']);
+export const TASK_TITLE_MAX_LENGTH = 200;
+export const TASK_NOTES_MAX_LENGTH = 500;
+
+/** Serialises task writes so two quick actions cannot read the same old array. */
+let tasksChain = Promise.resolve();
+
+/**
+ * @param {() => Promise<T>} task
+ * @returns {Promise<T>}
+ * @template T
+ */
+function withTasksLock(task) {
+  const result = tasksChain.then(task, task);
+  tasksChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+/**
+ * Trimmed, length-capped title, or '' when the caller sent nothing usable.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normaliseTaskTitle(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, TASK_TITLE_MAX_LENGTH);
+}
+
+/**
+ * Notes are optional: '' and null both mean "no note".
+ * @param {unknown} value
+ * @returns {string|undefined} undefined when the value is not text at all.
+ */
+function normaliseTaskNotes(value) {
+  if (value === undefined || value === null) return '';
+  if (typeof value !== 'string') return undefined;
+  return value.trim().slice(0, TASK_NOTES_MAX_LENGTH);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string|null|undefined} null means "no due date", undefined means "not a date".
+ */
+function normaliseTaskDue(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string|undefined} undefined when the value is not one of TASK_PRIORITIES.
+ */
+function normaliseTaskPriority(value) {
+  if (value === undefined || value === null || value === '') return 'medium';
+  const candidate = String(value).toLowerCase();
+  return TASK_PRIORITIES.includes(candidate) ? candidate : undefined;
+}
+
+/**
+ * A stored entry is only a task if it has the two fields the view needs to draw
+ * a row. Anything else in the file (a hand edit, an older shape) is skipped
+ * rather than crashing the list.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isTaskEntry(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.id === 'string' &&
+    typeof value.title === 'string'
+  );
+}
+
+/**
+ * Open tasks first, then the soonest due date, then the oldest task. Undated open
+ * tasks sink below dated ones: they are the ones the person has not scheduled yet.
+ * @param {object} a
+ * @param {object} b
+ * @returns {number}
+ */
+function compareTasks(a, b) {
+  if (a.done !== b.done) return a.done ? 1 : -1;
+  const aDue = typeof a.due === 'string' && a.due !== '' ? Date.parse(a.due) : Number.POSITIVE_INFINITY;
+  const bDue = typeof b.due === 'string' && b.due !== '' ? Date.parse(b.due) : Number.POSITIVE_INFINITY;
+  if (aDue !== bDue) return aDue - bDue;
+  return String(a.createdAt ?? '').localeCompare(String(b.createdAt ?? ''));
+}
+
+/**
+ * Every task in tasks.json, ordered the way the Tasks view draws them.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object[] } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function listTasks(options = {}) {
+  const read = await readStore('tasks', options);
+  if (!read.ok) return read;
+  return { ok: true, data: read.data.filter(isTaskEntry).sort(compareTasks) };
+}
+
+/**
+ * Add one task and return it. The id, timestamps and `done: false` are set here,
+ * so a renderer cannot invent a task that the view would then be unable to edit.
+ * @param {{ title?: unknown, notes?: unknown, due?: unknown, priority?: unknown }} input
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function createTask(input, options = {}) {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return failure('TASK_INVALID_INPUT', 'Saving a task expects the fields to save.');
+  }
+
+  const title = normaliseTaskTitle(input.title);
+  if (title === '') {
+    return failure('TASK_TITLE_REQUIRED', 'A task needs a title before it can be saved.');
+  }
+  const notes = normaliseTaskNotes(input.notes);
+  if (notes === undefined) return failure('TASK_INVALID_NOTES', 'The note must be text.');
+  const due = 'due' in input ? normaliseTaskDue(input.due) : null;
+  if (due === undefined) return failure('TASK_INVALID_DUE', 'The due date must be a date, or left empty.');
+  const priority = normaliseTaskPriority(input.priority);
+  if (priority === undefined) {
+    return failure('TASK_INVALID_PRIORITY', `The priority must be one of ${TASK_PRIORITIES.join(', ')}.`);
+  }
+
+  const now = new Date().toISOString();
+
+  return withTasksLock(async () => {
+    const read = await readStore('tasks', options);
+    if (!read.ok) return read;
+
+    const task = {
+      id: randomUUID(),
+      title,
+      notes,
+      due,
+      priority,
+      done: false,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+    };
+    const next = [...read.data.filter(isTaskEntry), task].sort(compareTasks);
+    const written = await writeStore('tasks', next, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: task };
+  });
+}
+
+/**
+ * Change the fields the caller names on one task. Completing a task is an update
+ * with `{ done: true }`, which is why there is no separate complete function.
+ * @param {string} taskId
+ * @param {object} patch Fields to change: title, notes, due, priority, done.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function updateTask(taskId, patch, options = {}) {
+  if (typeof taskId !== 'string' || taskId === '') {
+    return failure('TASK_INVALID_ID', 'Which task to save was not given.');
+  }
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    return failure('TASK_INVALID_PATCH', 'Saving a task expects an object of the fields to change.');
+  }
+
+  return withTasksLock(async () => {
+    const read = await readStore('tasks', options);
+    if (!read.ok) return read;
+
+    const tasks = read.data.filter(isTaskEntry);
+    const index = tasks.findIndex((task) => task.id === taskId);
+    if (index === -1) {
+      return failure('TASK_NOT_FOUND', 'That task is no longer in tasks.json. Reload the list.');
+    }
+
+    const next = { ...tasks[index] };
+
+    if (Object.hasOwn(patch, 'title')) {
+      const title = normaliseTaskTitle(patch.title);
+      if (title === '') return failure('TASK_TITLE_REQUIRED', 'A task needs a title before it can be saved.');
+      next.title = title;
+    }
+    if (Object.hasOwn(patch, 'notes')) {
+      const notes = normaliseTaskNotes(patch.notes);
+      if (notes === undefined) return failure('TASK_INVALID_NOTES', 'The note must be text.');
+      next.notes = notes;
+    }
+    if (Object.hasOwn(patch, 'due')) {
+      const due = normaliseTaskDue(patch.due);
+      if (due === undefined) return failure('TASK_INVALID_DUE', 'The due date must be a date, or left empty.');
+      next.due = due;
+    }
+    if (Object.hasOwn(patch, 'priority')) {
+      const priority = normaliseTaskPriority(patch.priority);
+      if (priority === undefined) {
+        return failure('TASK_INVALID_PRIORITY', `The priority must be one of ${TASK_PRIORITIES.join(', ')}.`);
+      }
+      next.priority = priority;
+    }
+    if (Object.hasOwn(patch, 'done')) {
+      if (typeof patch.done !== 'boolean') return failure('TASK_INVALID_DONE', 'done must be true or false.');
+      next.done = patch.done;
+      // completedAt is what the Done filter sorts on, so it is cleared on reopen.
+      next.completedAt = patch.done ? new Date().toISOString() : null;
+    }
+
+    next.updatedAt = new Date().toISOString();
+    tasks[index] = next;
+
+    const written = await writeStore('tasks', [...tasks].sort(compareTasks), options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: next };
+  });
+}
+
+/**
+ * Remove one task from tasks.json and return what was removed, so the view can
+ * say which task it deleted.
+ * @param {string} taskId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function deleteTask(taskId, options = {}) {
+  if (typeof taskId !== 'string' || taskId === '') {
+    return failure('TASK_INVALID_ID', 'Which task to delete was not given.');
+  }
+
+  return withTasksLock(async () => {
+    const read = await readStore('tasks', options);
+    if (!read.ok) return read;
+
+    const tasks = read.data.filter(isTaskEntry);
+    const index = tasks.findIndex((task) => task.id === taskId);
+    if (index === -1) {
+      return failure('TASK_NOT_FOUND', 'That task is no longer in tasks.json. Reload the list.');
+    }
+
+    const [removed] = tasks.splice(index, 1);
+    const written = await writeStore('tasks', tasks, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: removed };
+  });
+}
+
+/* ---------------------------------------------------------------------------
    Chat threads
 
    chats.json holds every thread with its messages inline. One file makes

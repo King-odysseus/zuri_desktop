@@ -1,0 +1,202 @@
+/**
+ * Tasks page chrome (design node 0:9586).
+ *
+ * Only the page's own frame lives here: the top bar, the column the surface
+ * sits in, and the phone tab bar. The list, the filters, the sheet and the
+ * confirm dialog come from components.css, because the shell's Tasks
+ * destination draws the same ones.
+ */
+
+.tasks-page {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  background: var(--zuri-bg-canvas);
+}
+
+/* -- top bar -------------------------------------------------------------- */
+
+/* Full width, hairline to the window edges: the design's bar is the window's,
+   and any measure belongs to the content inside it. */
+.tasks-topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-3);
+  width: 100%;
+  min-height: 56px;
+  padding: 0 var(--zuri-space-5);
+  border-bottom: 1px solid var(--zuri-border-hairline);
+  background: var(--zuri-surface);
+}
+
+.tasks-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border-radius: var(--zuri-radius-sm);
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
+}
+
+.tasks-app-title {
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-semibold);
+  line-height: var(--zuri-line-height-body-sm);
+  white-space: nowrap;
+}
+
+.tasks-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-1);
+  min-width: 0;
+  margin-left: var(--zuri-space-3);
+}
+
+.tasks-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  min-height: 32px;
+  padding: 0 var(--zuri-space-3);
+  border-radius: var(--zuri-radius-row);
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-caption);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tasks-nav-tab:hover {
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-primary);
+}
+
+.tasks-nav-tab[aria-current='page'] {
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-primary);
+  font-weight: var(--zuri-font-weight-semibold);
+}
+
+.tasks-nav-tab:focus-visible,
+.tasks-theme-button:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.tasks-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  margin-left: auto;
+}
+
+.tasks-theme-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-secondary);
+  cursor: pointer;
+}
+
+.tasks-theme-button:hover {
+  background: var(--zuri-surface-secondary);
+  color: var(--zuri-text-primary);
+}
+
+.tasks-avatar {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface-tertiary);
+  color: var(--zuri-text-secondary);
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-semibold);
+}
+
+/* -- the page ------------------------------------------------------------- */
+
+/* The page scrolls, the bar does not. The bottom padding clears the phone tab
+   bar so the last row is never covered. */
+.tasks-page-main {
+  flex: 1 1 auto;
+  width: 100%;
+  padding: var(--zuri-space-6) var(--zuri-space-5) var(--zuri-space-10);
+  padding-bottom: calc(var(--zuri-space-10) + env(safe-area-inset-bottom, 0px));
+}
+
+/* Centred at a comfortable measure: at 1920 px the margins are equal, and the
+   content never sits against the left edge with a dead strip on the right. */
+#tasks-surface {
+  width: 100%;
+  max-width: 1160px;
+  margin: 0 auto;
+}
+
+.tasks-boot {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+/* -- phone ---------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .tasks-topbar {
+    flex-wrap: wrap;
+    padding: 0 var(--zuri-space-4);
+    min-height: 56px;
+  }
+
+  .tasks-app-title {
+    font-size: var(--zuri-font-size-caption);
+  }
+
+  /* Two or more destinations keep their navigation on screen: the tabs become
+     the fixed bar along the bottom, and the page scrolls behind it. */
+  .tasks-nav {
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 40;
+    display: flex;
+    gap: 0;
+    margin: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--zuri-border-hairline);
+    background: var(--zuri-surface);
+  }
+
+  .tasks-nav-tab {
+    flex: 1 1 0;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: var(--zuri-space-1) var(--zuri-space-2);
+    border-radius: 0;
+    font-size: 11px;
+  }
+
+  .tasks-nav-tab[aria-current='page'] {
+    background: transparent;
+    color: var(--zuri-accent);
+  }
+
+  .tasks-page-main {
+    padding: var(--zuri-space-4) var(--zuri-space-4) var(--zuri-space-8);
+    padding-bottom: calc(72px + var(--zuri-space-6) + env(safe-area-inset-bottom, 0px));
+  }
+}

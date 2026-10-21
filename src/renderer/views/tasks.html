@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <!-- No inline script or style: the token layer and modules are the only sources. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    />
+    <title>Tasks - Zuri</title>
+    <!-- Zuri mark: the same drawing the window and taskbar icon use. -->
+    <link rel="icon" type="image/svg+xml" href="../assets/zuri-logo.svg" />
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <!-- The surface (rows, filters, sheet, confirm) is styled in components.css so the
+         shell's Tasks destination and this page share one implementation. -->
+    <link rel="stylesheet" href="../styles/components.css" />
+    <link rel="stylesheet" href="tasks.css" />
+  </head>
+  <!-- Design node 0:9586. The list, its states and the two dialogs are drawn by
+       tasks.js from tasks.json through window.zuri.tasks; nothing here is sample
+       data. Outside Electron the surface says it cannot reach tasks.json. -->
+  <body class="tasks-page">
+    <header class="tasks-topbar">
+      <span class="tasks-mark" aria-hidden="true">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path
+            d="M7 1.6l1.35 3.15L11.5 6.1 8.35 7.45 7 10.6 5.65 7.45 2.5 6.1l3.15-1.35z"
+            stroke="currentColor"
+            stroke-width="1.17"
+            stroke-linejoin="round"
+          />
+          <path d="M11 9.6l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z" fill="currentColor" />
+        </svg>
+      </span>
+      <span class="tasks-app-title">Zuri Desktop</span>
+      <nav class="tasks-nav" aria-label="Sections">
+        <a class="tasks-nav-tab" href="../index.html">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path
+              d="M12.3 6.7a4.9 4.9 0 0 1-5.25 4.9 5.2 5.2 0 0 1-1.7-.3L1.7 12.3l1.3-2.75A4.9 4.9 0 0 1 2.1 6.7a4.9 4.9 0 0 1 4.9-4.9h.35a4.9 4.9 0 0 1 4.95 4.9z"
+              stroke="currentColor"
+              stroke-width="1.17"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Chat
+        </a>
+        <a class="tasks-nav-tab" href="tasks.html" aria-current="page">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M5.2 3.5h7M5.2 7h7M5.2 10.5h7" stroke="currentColor" stroke-width="1.17" stroke-linecap="round" />
+            <path
+              d="M1.8 3.5l1.05 1.05L4.6 2.8M1.8 7l1.05 1.05L4.6 6.3M1.8 10.5l1.05 1.05L4.6 9.8"
+              stroke="currentColor"
+              stroke-width="1.17"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Tasks
+        </a>
+        <a class="tasks-nav-tab" href="settings.html">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <circle cx="7" cy="7" r="1.9" stroke="currentColor" stroke-width="1.17" />
+            <path
+              d="M7 1.7v1.6M7 10.7v1.6M1.7 7h1.6M10.7 7h1.6M3.4 3.4l1.1 1.1M9.5 9.5l1.1 1.1M10.6 3.4L9.5 4.5M4.5 9.5L3.4 10.6"
+              stroke="currentColor"
+              stroke-width="1.17"
+              stroke-linecap="round"
+            />
+          </svg>
+          Settings
+        </a>
+      </nav>
+      <div class="tasks-topbar-right">
+        <button
+          class="tasks-theme-button"
+          id="tasks-theme"
+          type="button"
+          aria-label="Switch to the dark theme"
+          aria-pressed="false"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M14 9.6A6.7 6.7 0 1 1 6.4 2a5.4 5.4 0 0 0 7.6 7.6z"
+              stroke="currentColor"
+              stroke-width="1.17"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <span class="tasks-avatar" aria-hidden="true">AR</span>
+      </div>
+    </header>
+
+    <main class="tasks-page-main">
+      <!-- tasks.js replaces this with the surface; the line below is only what a
+           reader sees before the module has run. -->
+      <div id="tasks-surface">
+        <p class="tasks-boot">Reading tasks.json…</p>
+      </div>
+    </main>
+
+    <script type="module" src="tasks.js"></script>
+  </body>
+</html>

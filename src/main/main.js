@@ -7,7 +7,18 @@ import { CHAT_STREAM_CHANNEL, sendChatMessage, summarizeText } from './providers
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
 import { runOnboardingSetup } from './onboarding.js';
 import { clearKey, keyStatus, setKey } from './secrets.js';
-import { appendMessage, createThread, getStoreRoot, listThreads, readSettings, saveSettings } from './store.js';
+import {
+  appendMessage,
+  createTask,
+  createThread,
+  deleteTask,
+  getStoreRoot,
+  listTasks,
+  listThreads,
+  readSettings,
+  saveSettings,
+  updateTask,
+} from './store.js';
 import { ensureWorkspace, listWorkspaceFiles, resolveWorkspaceFile, runTool } from './tools/index.js';
 
 // ESM main process (package.json sets "type": "module"), so __dirname is built here.
@@ -81,6 +92,10 @@ const HANDLERS = new Map([
   ['zuri:onboarding:complete', handleOnboardingComplete],
   ['zuri:settings:keyStatus', handleSettingsKeyStatus],
   ['zuri:settings:open-data-folder', handleSettingsOpenDataFolder],
+  ['zuri:tasks:list', handleTasksList],
+  ['zuri:tasks:create', handleTasksCreate],
+  ['zuri:tasks:update', handleTasksUpdate],
+  ['zuri:tasks:delete', handleTasksDelete],
   ['zuri:files:list', handleFilesList],
   ['zuri:files:open', handleFilesOpen],
   ['zuri:files:reveal', handleFilesReveal],
@@ -142,6 +157,45 @@ function handleChatCreate(payload) {
  */
 function handleChatAppendMessage(payload) {
   return appendMessage(payload?.threadId, payload?.message);
+}
+
+/**
+ * Every task in tasks.json, in the order the Tasks view draws them.
+ * @returns {Promise<object>}
+ */
+function handleTasksList() {
+  return listTasks();
+}
+
+/**
+ * Save one task. The store sets the id, timestamps and done: false itself, so
+ * the renderer only sends what the person typed.
+ * @param {{ title?: string, notes?: string, due?: string|null, priority?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+function handleTasksCreate(payload) {
+  return createTask(payload ?? {});
+}
+
+/**
+ * Change the fields the view names on one task, done included: ticking a task
+ * off is an update, not a separate action. The id rides in the same object the
+ * view already builds and is split off here so it cannot land in the patch.
+ * @param {{ id?: string, title?: string, notes?: string, due?: string|null, priority?: string, done?: boolean }} [payload]
+ * @returns {Promise<object>}
+ */
+function handleTasksUpdate(payload) {
+  const { id, ...patch } = payload ?? {};
+  return updateTask(id, patch);
+}
+
+/**
+ * Remove one task and return what was removed, so the view can name it.
+ * @param {{ id?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+function handleTasksDelete(payload) {
+  return deleteTask(payload?.id);
 }
 
 /**
