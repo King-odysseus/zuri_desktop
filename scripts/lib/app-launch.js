@@ -4,13 +4,56 @@
  */
 
 import { app, BrowserWindow } from 'electron';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+/**
+ * Point this run at a scratch Electron profile.
+ *
+ * src/main/main.js pins the app name to "Zuri", so without this every run on a
+ * machine resolves userData to the same AppData/Roaming/Zuri folder and shares one
+ * disk cache, one GPU cache and one set of Chromium profile locks. When two runs
+ * overlap they fight over those files: Chromium logs "Unable to move the cache:
+ * Access is denied" and a window can stall before its first paint for far longer
+ * than a healthy one takes, which the load timeouts below then report as a broken
+ * renderer. A run that owns its profile cannot be slowed by another run, the same
+ * way the checks already give themselves a scratch store root for their JSON.
+ *
+ * Call it once, from the top of the script, before the app is ready.
+ * @returns {string} the directory this run owns
+ */
+export function useScratchProfile() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-profile-'));
+  app.setPath('userData', directory);
+  // Session data (cache, cookies, Local Storage) lives inside userData by default;
+  // it is set explicitly so a future default cannot put it back in the shared place.
+  app.setPath('sessionData', directory);
+
+  app.on('quit', () => {
+    try {
+      fs.rmSync(directory, { recursive: true, force: true });
+    } catch (error) {
+      // Windows can hold a handle on the profile for a moment after quit. Leaving
+      // the folder behind only costs a temp directory, so it is not worth a failure.
+      console.log('note: could not remove ' + directory + ': ' + error.message);
+    }
+  });
+
+  return directory;
+}
 
 /**
  * Resolve with the first BrowserWindow, or reject if none appears in time.
+ *
+ * The budget is generous on purpose: this machine runs several Electron instances
+ * at once, and a cold start that takes about 3 s idle takes longer while they all
+ * compile. A renderer that never loads still fails, because the timeout is the only
+ * way out of the wait.
  * @param {number} [timeoutMs]
  * @returns {Promise<BrowserWindow>}
  */
-export function waitForFirstWindow(timeoutMs = 15000) {
+export function waitForFirstWindow(timeoutMs = 45000) {
   const existing = BrowserWindow.getAllWindows()[0];
   if (existing) return Promise.resolve(existing);
 
@@ -35,14 +78,18 @@ export function waitForFirstWindow(timeoutMs = 15000) {
  * @param {number} [timeoutMs]
  * @returns {Promise<void>}
  */
-export function waitForLoad(window, timeoutMs = 15000) {
+export function waitForLoad(window, timeoutMs = 45000) {
   const contents = window.webContents;
   if (!contents.isLoadingMainFrame()) return Promise.resolve();
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
       cleanup();
-      reject(new Error(`renderer did not finish loading within ${timeoutMs} ms`));
+      // Say what was still in flight, so a slow machine reads differently from a
+      // renderer that died: a crash leaves nothing loading, and says so.
+      const url = contents.getURL() || "(no url yet)";
+      const state = contents.isCrashed() ? "the renderer crashed" : "the main frame is still loading";
+      reject(new Error(`renderer did not finish loading ${url} within ${timeoutMs} ms (${state})`));
     }, timeoutMs);
 
     function cleanup() {
@@ -74,7 +121,7 @@ export function waitForLoad(window, timeoutMs = 15000) {
  * @param {number} [timeoutMs]
  * @returns {Promise<void>}
  */
-export function reloadAndWait(window, timeoutMs = 15000) {
+export function reloadAndWait(window, timeoutMs = 45000) {
   const contents = window.webContents;
 
   return new Promise((resolve, reject) => {
