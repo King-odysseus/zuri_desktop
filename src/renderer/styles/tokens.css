@@ -1,0 +1,1771 @@
+/**
+ * Zuri design tokens. The only file allowed to hold a literal colour, radius,
+ * shadow, spacing or type value; component rules in components.css use these
+ * variables and nothing else.
+ *
+ * Provenance: every value is hard-coded from HeroUI's published preset (its
+ * primary, default, success, warning and danger ramps, radius scale, 4px spacing
+ * scale and type scale), as fixed by the design style guide
+ * (.kai/spec/design/style-guide.md) and the design tool's token export
+ * (.kai/spec/design/tokens.json). Each line names the ramp or source it came
+ * from. HeroUI ships React components, which a plain renderer cannot use, so no
+ * component library, Tailwind preset or @import is involved: only its published
+ * values are copied in by hand. Do not add @heroui/* to package.json.
+ *
+ * Theming: one variable layer, two themes. <html data-theme="dark"> is the
+ * default and index.html sets it in markup, so the first paint is already dark
+ * before settings are read; light is an override on
+ * <html data-theme="light">.
+ *
+ * Both theme blocks are complete on purpose, including the theme-invariant
+ * spacing, radius, layout and type scales. A block that omitted a scale would
+ * leave those variables undefined while the other theme is active, and the
+ * parity check in scripts/selftest.js requires both blocks to declare exactly
+ * the same names. Edit both blocks together.
+ */
+
+/* ------------------------------------------------------------------------ */
+/* Dark (default)                                                           */
+/* ------------------------------------------------------------------------ */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  /* Surfaces: HeroUI default ramp, dark steps (style guide rows bg-canvas
+     through border-strong). */
+  --zuri-bg-canvas: #0b0b0f; /* heroUI default ramp, darkest canvas step */
+  --zuri-bg-glass: rgba(20, 20, 26, 0.66); /* heroUI default ramp, 66% alpha glass */
+  --zuri-surface: #16161c; /* heroUI default ramp, dark surface */
+  --zuri-surface-raised: #1e1e26; /* heroUI default ramp, one step above surface */
+  --zuri-surface-sunken: #101214; /* design node 0:113 color/sunken, the dark step below surface */
+  --zuri-surface-active: #262a2f; /* design node 0:67 color/active fill, read through the design's dark colour collection (the node is bound to the light twin) */
+  /* The scrim behind a dialog, from the "Modal / Scrim" node 0:95 read through the
+     design's dark colour collection: color/overlay is pure black at 56.08%. */
+  --zuri-overlay: rgba(0, 0, 0, 0.56); /* design node 0:95 color/overlay, dark collection */
+  --zuri-border-hairline: rgba(255, 255, 255, 0.1); /* heroUI default contrast, 10% white */
+  --zuri-border-strong: rgba(255, 255, 255, 0.18); /* heroUI default contrast, 18% white */
+  --zuri-backdrop-glass: blur(20px) saturate(140%); /* style guide glass recipe */
+
+  /* Text: HeroUI default ramp foreground steps. */
+  --zuri-text-primary: #f4f4f6; /* heroUI default ramp, primary foreground */
+
+  /* Conversation transcript (design node 0:1221). The node is drawn in the light
+     collection; these are the same hues lifted for the dark canvas, so a mode
+     badge or the reader's avatar keeps its meaning in either theme. */
+  --zuri-transcript-accent: #7d9dff; /* Act/Autopilot badge, Zuri mark, streaming caret */
+  --zuri-transcript-accent-soft: rgba(47, 107, 255, 0.22); /* accent badge and mark tile fill */
+  --zuri-transcript-avatar: #7a63ff; /* the reader's avatar fill */
+  --zuri-transcript-card: #191920; /* tool call, error card and suggestion fill: one hair above the dark canvas */
+  --zuri-transcript-fill: #1e1e26; /* reader bubble, Ask badge and Zuri mark: a visible step up from the canvas */
+  --zuri-transcript-file: #3ecf8e; /* the file glyph on an attachment chip */
+  --zuri-transcript-border: rgba(255, 255, 255, 0.12); /* attachment chip outline */
+  --zuri-transcript-text-secondary: #a3a3ad; /* card detail, suggestion labels, tool diff */
+  --zuri-transcript-text-muted: #8f8f9a; /* Ask badge, attachment state, streaming label */
+  --zuri-transcript-danger: #f05252; /* Failed badge and error glyph */
+  --zuri-transcript-failed-soft: rgba(240, 82, 82, 0.22); /* Failed badge and error avatar fill */
+  --zuri-transcript-skeleton: rgba(255, 255, 255, 0.14); /* loading bars */
+
+  /* Autopilot right rail (design node 0:6978). The node is drawn in the light
+     collection; each value below is the same collection variable's dark twin, so
+     the rail keeps the node's roles in either theme instead of staying light. */
+  --zuri-rail-canvas: #16181b; /* color/surface, dark collection */
+  --zuri-rail-page: #0e1012; /* color/background, dark collection */
+  --zuri-rail-surface: #1d2024; /* color/raised, dark collection: the card sits one step above the rail */
+  --zuri-rail-inverse: #0e1012; /* color/inverse, dark collection: a dark label on the light red badge */
+  --zuri-rail-border: rgba(255, 255, 255, 0.08); /* color/border, dark collection: white at 7.84% */
+  --zuri-rail-border-strong: rgba(255, 255, 255, 0.16); /* color/border-strong, dark collection: white at 16.08% */
+  --zuri-rail-fill: #262a2f; /* color/active, dark collection: the collapse button stays a visible square */
+  --zuri-rail-text: #edeff2; /* color/text, dark collection */
+  --zuri-rail-text-secondary: #8a9099; /* color/subtle, dark collection */
+  --zuri-rail-text-muted: #9aa0a6; /* color/muted, dark collection */
+  --zuri-rail-accent: #5b8cff; /* color/primary, dark collection */
+  --zuri-rail-success: #34c38f; /* color/success, dark collection */
+  --zuri-rail-danger: #f06a6a; /* color/danger, dark collection */
+  --zuri-rail-danger-line: rgba(240, 106, 106, 0.32); /* danger, dark collection, at the node's 32% */
+  --zuri-text-secondary: #a6a6b2; /* heroUI default ramp, secondary foreground */
+  --zuri-text-muted: #71717c; /* heroUI default ramp, muted foreground */
+  --zuri-text-on-accent: #ffffff; /* heroUI primary ramp, contrast foreground */
+  --zuri-text-mark: #c28a1d; /* design node 0:105 mark gold; the node gives one value, so both themes share it */
+  --zuri-text-panel-header: #8e9196; /* design node 0:73 Label and Count fill; unbound to a mode, so both themes share it */
+
+  /* Nav / Top Bar (design node 0:78). The node binds its surface and its hairline
+     to color/background and color/border, and paints its title, model and glyphs
+     with the light collection's color/text and color/muted, so each value below
+     is that variable's dark collection twin rather than a derived colour. */
+  --zuri-nav-top-bar-surface: #0e1012; /* design node 0:78 color/background, dark collection */
+  --zuri-nav-top-bar-title: #edeff2; /* design node 0:78 title fill: #1f2328 is color/text, so this is color/text, dark collection */
+  --zuri-nav-top-bar-muted: #9aa0a6; /* design node 0:78 model and glyph fill: #8e9196 is color/muted, so this is color/muted, dark collection */
+  --zuri-nav-top-bar-hairline: rgba(255, 255, 255, 0.08); /* design node 0:78 color/border, dark collection: white at 7.84% */
+
+  /* Accent and semantic: HeroUI primary / success / warning / danger ramps. */
+  --zuri-accent: #7c7cec; /* heroUI primary ramp, dark interactive step */
+  --zuri-accent-hover: #8f8ff2; /* heroUI primary ramp, one step lighter for hover */
+  --zuri-accent-subtle: rgba(124, 124, 236, 0.16); /* heroUI primary ramp at 16% alpha */
+  --zuri-success: #3ddc84; /* heroUI success ramp, dark step */
+  --zuri-success-subtle: rgba(61, 220, 132, 0.16); /* heroUI success ramp at 16% alpha */
+  --zuri-warning: #f5a623; /* heroUI warning ramp, dark step */
+  --zuri-warning-subtle: rgba(245, 166, 35, 0.16); /* heroUI warning ramp at 16% alpha */
+  --zuri-danger: #f05252; /* heroUI danger ramp, dark step */
+  --zuri-danger-subtle: rgba(240, 82, 82, 0.16); /* heroUI danger ramp at 16% alpha */
+  --zuri-danger-tint: rgba(240, 82, 82, 0.0588); /* design node 0:121 card fill: danger ramp at the node's 5.88% alpha */
+  --zuri-danger-line: rgba(240, 82, 82, 0.32); /* design node 0:121 card border: danger ramp at the node's 32% alpha */
+
+  /* Shadows: HeroUI shadow scale, dark values (style guide shadow rows). */
+  /* heroUI soft shadow, dark */
+  --zuri-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
+  /* heroUI layered glass shadow, dark */
+  --zuri-shadow-glass: 0 1px 1px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.45);
+  /* design node 0:58 card drop shadow: 0/8, 24 blur, 0 spread at 10%. The node
+     carries one value in a single colour collection, so both themes share it, the
+     way color/text-mark does. */
+  --zuri-shadow-raised: 0 8px 24px rgba(17, 20, 24, 0.1);
+
+  /* Spacing: HeroUI 4px base scale (style guide spacing list). */
+  --zuri-space-1: 4px; /* heroUI spacing 1 */
+  --zuri-space-2: 8px; /* heroUI spacing 2 */
+  --zuri-space-3: 12px; /* heroUI spacing 3 */
+  --zuri-space-4: 16px; /* heroUI spacing 4 */
+  --zuri-space-5: 20px; /* heroUI spacing 5 */
+  --zuri-space-6: 24px; /* heroUI spacing 6 */
+  --zuri-space-8: 32px; /* heroUI spacing 8 */
+  --zuri-space-10: 40px; /* heroUI spacing 10 */
+  --zuri-space-12: 48px; /* heroUI spacing 12 */
+  --zuri-space-16: 64px; /* heroUI spacing 16 */
+
+  /* Radius: HeroUI radius scale (style guide radius list). */
+  --zuri-radius-sm: 8px; /* heroUI radius small */
+  --zuri-radius-md: 10px; /* heroUI radius medium, guide's 10px control value */
+  --zuri-radius-lg: 12px; /* heroUI radius large */
+  --zuri-radius-xl: 16px; /* heroUI radius extra large, guide's card value */
+  --zuri-radius-2xl: 24px; /* heroUI radius 2x large, guide's modal and pill input */
+  --zuri-radius-pill: 9999px; /* heroUI radius full (tokens.json pill is 999) */
+
+  /* Role names from the design tool's export (tokens.json "Mode 1"), so the
+     design file and the CSS speak the same language. Same values, same theme. */
+  --zuri-radius-row: 8px; /* tokens.json radius-row */
+  --zuri-radius-card: 10px; /* tokens.json radius-card */
+  --zuri-radius-modal: 12px; /* tokens.json radius-modal */
+  --zuri-radius-overlay: 12px; /* tokens.json radius-overlay */
+
+  /* Typography: HeroUI type scale, system UI stack with Segoe UI first on
+     Windows (style guide text styles). */
+  --zuri-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif; /* heroUI preset sans stack */
+  --zuri-font-family-mono: "Cascadia Mono", Consolas, ui-monospace, monospace; /* heroUI preset mono stack */
+  --zuri-font-weight-regular: 400; /* heroUI weight regular */
+  --zuri-font-weight-medium: 500; /* heroUI weight medium */
+  --zuri-font-weight-semibold: 600; /* heroUI weight semibold */
+
+  --zuri-font-size-display-lg: 28px; /* style guide display-lg size */
+  --zuri-line-height-display-lg: 36px; /* style guide display-lg line height */
+  --zuri-tracking-display-lg: -0.02em; /* style guide display-lg tracking */
+  --zuri-font-size-heading-md: 20px; /* style guide heading-md size */
+  --zuri-line-height-heading-md: 28px; /* style guide heading-md line height */
+  --zuri-tracking-heading-md: -0.01em; /* style guide heading-md tracking */
+  --zuri-font-size-heading-sm: 16px; /* style guide heading-sm size */
+  --zuri-line-height-heading-sm: 24px; /* style guide heading-sm line height */
+  --zuri-font-size-body-lg: 15px; /* style guide body-lg size */
+  --zuri-line-height-body-lg: 24px; /* style guide body-lg line height */
+  --zuri-font-size-body-md: 14px; /* style guide body-md size */
+  --zuri-line-height-body-md: 22px; /* style guide body-md line height */
+  --zuri-font-size-body-sm: 13px; /* style guide body-sm size */
+  --zuri-line-height-body-sm: 20px; /* style guide body-sm line height */
+  --zuri-font-size-label-md: 14px; /* style guide label-md size */
+  --zuri-line-height-label-md: 20px; /* style guide label-md line height */
+  --zuri-font-size-label-caps: 11px; /* style guide label-caps size */
+  --zuri-line-height-label-caps: 16px; /* style guide label-caps line height */
+  --zuri-tracking-label-caps: 0.06em; /* style guide label-caps tracking */
+  --zuri-font-size-mono-sm: 12px; /* style guide mono-sm size */
+  --zuri-line-height-mono-sm: 18px; /* style guide mono-sm line height */
+  --zuri-font-size-caption: 12px; /* design node 0:105 Description text size */
+  --zuri-line-height-caption: 16px; /* design node 0:105 Description line height */
+  --zuri-line-height-field-label: 18px; /* design node 0:24 Label line height */
+  --zuri-line-height-panel-header: 18px; /* design node 0:73 Label line height */
+  --zuri-line-height-nav-row: 18px; /* design node 0:63 Label line height */
+  --zuri-line-height-select-option: 18px; /* design node 0:46 Option label line height */
+
+  /* Layout: style guide layout variables. */
+  --zuri-sidebar-width: 260px; /* style guide sidebar expanded */
+  --zuri-sidebar-width-collapsed: 64px; /* style guide sidebar collapsed */
+  --zuri-right-panel-width: 320px; /* style guide right panel */
+  --zuri-topbar-height: 52px; /* design node 0:78: a 51 px row plus its 1 px hairline, and size/topbar-height is 52; the node overrides the style guide's 48 */
+  --zuri-chat-max-width: 732px; /* design node 0:1221: the transcript content column, 860 wide less its 64 px inset each side */
+  --zuri-modal-width: 480px; /* design node 0:96 dialog width */
+  --zuri-floating-assistant-width: 360px; /* style guide floating assistant */
+  --zuri-rail-width: 12px; /* pages.md "12 px rails": a collapsed chat or context panel */
+
+  /* Motion: style guide durations; reduced motion is handled at the end. */
+  --zuri-motion-fast: 150ms; /* style guide hover and press */
+  --zuri-motion-base: 200ms; /* style guide panel open and close */
+  --zuri-motion-slow: 250ms; /* style guide floating assistant */
+  --zuri-ease-out: ease-out; /* style guide easing */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Light                                                                    */
+/* ------------------------------------------------------------------------ */
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surfaces: HeroUI default ramp, light steps (style guide rows bg-canvas
+     through border-strong). */
+  --zuri-bg-canvas: #f5f5f7; /* heroUI default ramp, light canvas step */
+  --zuri-bg-glass: rgba(255, 255, 255, 0.72); /* heroUI default ramp, 72% alpha glass */
+  --zuri-surface: #ffffff; /* heroUI default ramp, light surface */
+  --zuri-surface-raised: #ffffff; /* heroUI default ramp, raised light surface */
+  --zuri-surface-sunken: #f0f1f3; /* design node 0:113 color/sunken, the light step below surface */
+  --zuri-surface-active: #e6e8eb; /* design node 0:67 color/active fill, the design's light colour collection */
+  /* The scrim behind a dialog, from the "Modal / Scrim" node 0:95 read through the
+     design's light colour collection: the node's own fill is #1F232847, near-black
+     at 27.84%, which is color/overlay here. */
+  --zuri-overlay: rgba(31, 35, 40, 0.28); /* design node 0:95 fill #1F232847, light collection */
+  --zuri-border-hairline: rgba(17, 17, 17, 0.08); /* heroUI default contrast, 8% black */
+  --zuri-border-strong: rgba(17, 17, 17, 0.16); /* heroUI default contrast, 16% black */
+  --zuri-backdrop-glass: blur(20px) saturate(140%); /* style guide glass recipe */
+
+  /* Text: HeroUI default ramp foreground steps. */
+  --zuri-text-primary: #111114; /* heroUI default ramp, primary foreground */
+
+  /* Conversation transcript (design node 0:1221): the node's own values. */
+  --zuri-transcript-accent: #2f6bff; /* Act/Autopilot badge, Zuri mark, streaming caret */
+  --zuri-transcript-accent-soft: #eaf0ff; /* accent badge and mark tile fill */
+  --zuri-transcript-avatar: #6b4eff; /* the reader's avatar fill */
+  --zuri-transcript-card: #f7f8f9; /* tool call, error card and suggestion fill */
+  --zuri-transcript-fill: #f0f1f3; /* reader bubble, Ask badge and Zuri mark */
+  --zuri-transcript-file: #1f9d6b; /* the file glyph on an attachment chip */
+  --zuri-transcript-border: #e8eaed; /* attachment chip outline */
+  --zuri-transcript-text-secondary: #6b7280; /* card detail, suggestion labels, tool diff */
+  --zuri-transcript-text-muted: #8e9196; /* Ask badge, attachment state, streaming label */
+  --zuri-transcript-danger: #d14343; /* Failed badge and error glyph */
+  --zuri-transcript-failed-soft: rgba(209, 67, 67, 0.18); /* Failed badge and error avatar fill */
+  --zuri-transcript-skeleton: #e8eaed; /* loading bars */
+
+  /* Autopilot right rail (design node 0:6978). The node's colours are the light
+     collection's own values, so each token names the collection variable it came
+     from and the dark block below holds that variable's dark twin. */
+  --zuri-rail-canvas: #f7f8f9; /* color/surface: rail fill, task checkbox fill, reload button fill */
+  --zuri-rail-page: #ffffff; /* color/background: the rail's page behind the cards */
+  --zuri-rail-surface: #ffffff; /* color/raised: reminder, task and automation card, outlined button */
+  --zuri-rail-inverse: #ffffff; /* color/inverse: the Due badge and the collapsed count label */
+  --zuri-rail-border: #e8eaed; /* color/border: hairline, divider, card and button stroke, progress track, skeleton */
+  --zuri-rail-border-strong: #cbd2da; /* the node's own stroke: task checkbox outline, queued progress fill */
+  --zuri-rail-fill: #f0f1f3; /* color/sunken: collapse button fill */
+  --zuri-rail-text: #1f2328; /* color/text: panel title, card titles, reload button label */
+  --zuri-rail-text-secondary: #6b7280; /* color/subtle: collapse glyph, snooze label, error body */
+  --zuri-rail-text-muted: #8e9196; /* color/muted: section labels, counts, quiet rows, meta lines, hints */
+  --zuri-rail-accent: #2f6bff; /* color/primary: running progress, running count, "2 more open" */
+  --zuri-rail-success: #1f9d6b; /* color/success: running status dot */
+  --zuri-rail-danger: #d14343; /* color/danger: due badge, due lines, bell-ring, error dot, alert glyph */
+  --zuri-rail-danger-line: rgba(209, 67, 67, 0.32); /* node stroke #D1434352: due card and error card outline */
+  --zuri-text-secondary: #5b5b66; /* heroUI default ramp, secondary foreground */
+  --zuri-text-muted: #8a8a96; /* heroUI default ramp, muted foreground */
+  --zuri-text-on-accent: #ffffff; /* heroUI primary ramp, contrast foreground */
+  --zuri-text-mark: #c28a1d; /* design node 0:105 mark gold; the node gives one value, so both themes share it */
+  --zuri-text-panel-header: #8e9196; /* design node 0:73 Label and Count fill; unbound to a mode, so both themes share it */
+
+  /* Nav / Top Bar (design node 0:78): the values the node itself holds, bound to
+     color/background and color/border and drawn as the light collection's
+     color/text and color/muted. */
+  --zuri-nav-top-bar-surface: #ffffff; /* design node 0:78 color/background, light collection */
+  --zuri-nav-top-bar-title: #1f2328; /* design node 0:78 title fill, color/text in the light collection */
+  --zuri-nav-top-bar-muted: #8e9196; /* design node 0:78 model and glyph fill, color/muted in the light collection */
+  --zuri-nav-top-bar-hairline: #e8eaed; /* design node 0:78 color/border, light collection */
+
+  /* Accent and semantic: HeroUI primary / success / warning / danger ramps. */
+  --zuri-accent: #5b5bd6; /* heroUI primary ramp, light interactive step */
+  --zuri-accent-hover: #4f4fc4; /* heroUI primary ramp, one step darker for hover */
+  --zuri-accent-subtle: rgba(91, 91, 214, 0.1); /* heroUI primary ramp at 10% alpha */
+  --zuri-success: #17a34a; /* heroUI success ramp, light step */
+  --zuri-success-subtle: rgba(23, 163, 74, 0.1); /* heroUI success ramp at 10% alpha */
+  --zuri-warning: #d97706; /* heroUI warning ramp, light step */
+  --zuri-warning-subtle: rgba(217, 119, 6, 0.12); /* heroUI warning ramp at 12% alpha */
+  --zuri-danger: #dc2626; /* heroUI danger ramp, light step */
+  --zuri-danger-subtle: rgba(220, 38, 38, 0.1); /* heroUI danger ramp at 10% alpha */
+  --zuri-danger-tint: rgba(220, 38, 38, 0.0588); /* design node 0:121 card fill: danger ramp at the node's 5.88% alpha */
+  --zuri-danger-line: rgba(220, 38, 38, 0.32); /* design node 0:121 card border: danger ramp at the node's 32% alpha */
+
+  /* Shadows: HeroUI shadow scale, light values (style guide shadow rows). */
+  /* heroUI soft shadow, light */
+  --zuri-shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
+  /* heroUI layered glass shadow, light */
+  --zuri-shadow-glass: 0 1px 1px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
+  /* design node 0:58 card drop shadow: 0/8, 24 blur, 0 spread at 10%. The node
+     carries one value in a single colour collection, so both themes share it, the
+     way color/text-mark does. */
+  --zuri-shadow-raised: 0 8px 24px rgba(17, 20, 24, 0.1);
+
+  /* Spacing: HeroUI 4px base scale (style guide spacing list). */
+  --zuri-space-1: 4px; /* heroUI spacing 1 */
+  --zuri-space-2: 8px; /* heroUI spacing 2 */
+  --zuri-space-3: 12px; /* heroUI spacing 3 */
+  --zuri-space-4: 16px; /* heroUI spacing 4 */
+  --zuri-space-5: 20px; /* heroUI spacing 5 */
+  --zuri-space-6: 24px; /* heroUI spacing 6 */
+  --zuri-space-8: 32px; /* heroUI spacing 8 */
+  --zuri-space-10: 40px; /* heroUI spacing 10 */
+  --zuri-space-12: 48px; /* heroUI spacing 12 */
+  --zuri-space-16: 64px; /* heroUI spacing 16 */
+
+  /* Radius: HeroUI radius scale (style guide radius list). */
+  --zuri-radius-sm: 8px; /* heroUI radius small */
+  --zuri-radius-md: 10px; /* heroUI radius medium, guide's 10px control value */
+  --zuri-radius-lg: 12px; /* heroUI radius large */
+  --zuri-radius-xl: 16px; /* heroUI radius extra large, guide's card value */
+  --zuri-radius-2xl: 24px; /* heroUI radius 2x large, guide's modal and pill input */
+  --zuri-radius-pill: 9999px; /* heroUI radius full (tokens.json pill is 999) */
+
+  /* Role names from the design tool's export (tokens.json "Mode 1"), so the
+     design file and the CSS speak the same language. Same values, same theme. */
+  --zuri-radius-row: 8px; /* tokens.json radius-row */
+  --zuri-radius-card: 10px; /* tokens.json radius-card */
+  --zuri-radius-modal: 12px; /* tokens.json radius-modal */
+  --zuri-radius-overlay: 12px; /* tokens.json radius-overlay */
+
+  /* Typography: HeroUI type scale, system UI stack with Segoe UI first on
+     Windows (style guide text styles). */
+  --zuri-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif; /* heroUI preset sans stack */
+  --zuri-font-family-mono: "Cascadia Mono", Consolas, ui-monospace, monospace; /* heroUI preset mono stack */
+  --zuri-font-weight-regular: 400; /* heroUI weight regular */
+  --zuri-font-weight-medium: 500; /* heroUI weight medium */
+  --zuri-font-weight-semibold: 600; /* heroUI weight semibold */
+
+  --zuri-font-size-display-lg: 28px; /* style guide display-lg size */
+  --zuri-line-height-display-lg: 36px; /* style guide display-lg line height */
+  --zuri-tracking-display-lg: -0.02em; /* style guide display-lg tracking */
+  --zuri-font-size-heading-md: 20px; /* style guide heading-md size */
+  --zuri-line-height-heading-md: 28px; /* style guide heading-md line height */
+  --zuri-tracking-heading-md: -0.01em; /* style guide heading-md tracking */
+  --zuri-font-size-heading-sm: 16px; /* style guide heading-sm size */
+  --zuri-line-height-heading-sm: 24px; /* style guide heading-sm line height */
+  --zuri-font-size-body-lg: 15px; /* style guide body-lg size */
+  --zuri-line-height-body-lg: 24px; /* style guide body-lg line height */
+  --zuri-font-size-body-md: 14px; /* style guide body-md size */
+  --zuri-line-height-body-md: 22px; /* style guide body-md line height */
+  --zuri-font-size-body-sm: 13px; /* style guide body-sm size */
+  --zuri-line-height-body-sm: 20px; /* style guide body-sm line height */
+  --zuri-font-size-label-md: 14px; /* style guide label-md size */
+  --zuri-line-height-label-md: 20px; /* style guide label-md line height */
+  --zuri-font-size-label-caps: 11px; /* style guide label-caps size */
+  --zuri-line-height-label-caps: 16px; /* style guide label-caps line height */
+  --zuri-tracking-label-caps: 0.06em; /* style guide label-caps tracking */
+  --zuri-font-size-mono-sm: 12px; /* style guide mono-sm size */
+  --zuri-line-height-mono-sm: 18px; /* style guide mono-sm line height */
+  --zuri-font-size-caption: 12px; /* design node 0:105 Description text size */
+  --zuri-line-height-caption: 16px; /* design node 0:105 Description line height */
+  --zuri-line-height-field-label: 18px; /* design node 0:24 Label line height */
+  --zuri-line-height-panel-header: 18px; /* design node 0:73 Label line height */
+  --zuri-line-height-nav-row: 18px; /* design node 0:63 Label line height */
+  --zuri-line-height-select-option: 18px; /* design node 0:46 Option label line height */
+
+  /* Layout: style guide layout variables. */
+  --zuri-sidebar-width: 260px; /* style guide sidebar expanded */
+  --zuri-sidebar-width-collapsed: 64px; /* style guide sidebar collapsed */
+  --zuri-right-panel-width: 320px; /* style guide right panel */
+  --zuri-topbar-height: 52px; /* design node 0:78: a 51 px row plus its 1 px hairline, and size/topbar-height is 52; the node overrides the style guide's 48 */
+  --zuri-chat-max-width: 732px; /* design node 0:1221: the transcript content column, 860 wide less its 64 px inset each side */
+  --zuri-modal-width: 480px; /* design node 0:96 dialog width */
+  --zuri-floating-assistant-width: 360px; /* style guide floating assistant */
+  --zuri-rail-width: 12px; /* pages.md "12 px rails": a collapsed chat or context panel */
+
+  /* Motion: style guide durations; reduced motion is handled at the end. */
+  --zuri-motion-fast: 150ms; /* style guide hover and press */
+  --zuri-motion-base: 200ms; /* style guide panel open and close */
+  --zuri-motion-slow: 250ms; /* style guide floating assistant */
+  --zuri-ease-out: ease-out; /* style guide easing */
+}
+
+/* Honour the OS setting: no motion at all rather than a shorter animation.
+   Both theme selectors are repeated so the override outranks the theme blocks,
+   which are more specific than a bare :root. */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  :root[data-theme="dark"],
+  :root[data-theme="light"] {
+    --zuri-motion-fast: 0ms; /* reduced motion: no hover or press transition */
+    --zuri-motion-base: 0ms; /* reduced motion: no panel transition */
+    --zuri-motion-slow: 0ms; /* reduced motion: no floating assistant transition */
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Design-mode tokens (tokens.json "Mode 1")                                */
+/* ------------------------------------------------------------------------ */
+/* The design tool exports its radius tokens under these names, with a bare
+   number and no unit. They sit once, outside the two theme blocks, because a
+   radius is the same in both themes; the dark/light blocks keep the lengths the
+   components use (--zuri-radius-row is 8px, the same 8). A screen check reads
+   these five names back off the root element and compares them with tokens.json,
+   so they stay numbers: a unit here would no longer match the design file. */
+:root {
+  --radius-radius-row: 8; /* tokens.json radius-row */
+  --radius-radius-card: 10; /* tokens.json radius-card */
+  --radius-radius-modal: 12; /* tokens.json radius-modal */
+  --radius-radius-overlay: 12; /* tokens.json radius-overlay */
+  --radius-radius-pill: 999; /* tokens.json radius-pill */
+}
+
+/* ------------------------------------------------------------------------ */
+/* First-run setup page (design node 0:1008)                                */
+/* ------------------------------------------------------------------------ */
+/* The node is drawn once, in the light colour collection, so its values sit in a
+   page-scoped block instead of the two theme blocks above: the screen keeps the
+   node's colours whichever app theme is active, and the theme blocks stay
+   name-for-name identical for the parity check in scripts/selftest.js. */
+.onboarding-page {
+  --zuri-onboarding-canvas: #f7f8f9; /* node 0:1009 canvas fill */
+  --zuri-onboarding-surface: #ffffff; /* card, provider row, field, top bar */
+  --zuri-onboarding-border: #e8eaed; /* card rows, fields and top bar hairline */
+  --zuri-onboarding-border-strong: #cbd2da; /* unselected radio outline */
+  --zuri-onboarding-text: #1f2328; /* title, provider name, field value */
+  --zuri-onboarding-text-secondary: #6b7280; /* subtitle, privacy note, window glyphs */
+  --zuri-onboarding-text-muted: #8e9196; /* labels, hints, help line, skip note */
+  --zuri-onboarding-accent: #2f6bff; /* mark, selected row, link, enabled button */
+  --zuri-onboarding-accent-tint: #f5f8ff; /* selected provider row fill */
+  --zuri-onboarding-fill: #f0f1f3; /* disabled save button fill */
+  --zuri-onboarding-fill-sunken: #f7f8f9; /* privacy note and reveal button fill */
+  --zuri-onboarding-danger: #d14343; /* rejected-key field outline and help line */
+  --zuri-onboarding-success: #1f9d6b; /* shield-check glyph */
+  --zuri-onboarding-glow-accent: #2f6bff; /* top-left glow, painted at 6% */
+  --zuri-onboarding-glow-secondary: #6b4eff; /* bottom-right glow, painted at 5% */
+  --zuri-onboarding-radius-control: 6px; /* reveal key button radius */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Autopilot right rail (design node 0:6978)                                */
+/* ------------------------------------------------------------------------ */
+/* The node draws the rail five times (live, empty, loading, error, collapsed).
+   Its colours live in the two theme blocks above, each naming the collection
+   variable it came from; only the frame-independent metrics stay here, so a
+   node edit is one token edit and both themes keep the same names. */
+.reminders-page {
+  --zuri-rail-radius-control: 6px; /* snooze, dismiss and reload button radius */
+  --zuri-rail-radius-box: 4px; /* task checkbox and skeleton block radius */
+  --zuri-rail-label-size: 11px; /* section label, count, button label, meta line */
+  --zuri-rail-label-line: 14px; /* the node's 14 px line on every 11 px label */
+  --zuri-rail-label-tracking: 0.4px; /* the node's letterSpacing on the upper-case section label */
+  --zuri-rail-meta-size: 12px; /* panel status, reminder meta, quiet row, error body */
+  --zuri-rail-meta-line: 16px; /* the node's 16 px line on every 12 px line of text */
+  --zuri-rail-title-size: 13px; /* reminder title */
+  --zuri-rail-title-line: 18px; /* the node's 18 px reminder title line */
+  --zuri-rail-row-title-size: 12px; /* task and automation title */
+  --zuri-rail-row-title-line: 16px; /* the node's 16 px task and automation title line */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Automations list page (design node 0:7686)                               */
+/* ------------------------------------------------------------------------ */
+/* The node draws the list six times (main, empty, loading, error, running and
+   caught-up), all in the light colour collection. Its colours therefore sit in
+   this page-scoped block, named after the collection variables they came from,
+   so the screen keeps the node's palette whichever app theme is active and the
+   two theme blocks above stay name-for-name identical for the parity check in
+   scripts/selftest.js. */
+.automations-page {
+  --zuri-automations-canvas: #f7f8f9; /* color/surface: page and table header fill */
+  --zuri-automations-surface: #ffffff; /* color/inverse: top bar, card, switch knob */
+  --zuri-automations-sunken: #f0f1f3; /* color/sunken: schedule chip, footer, skeleton bar */
+  --zuri-automations-hover: #edeef0; /* color/hover: row hairline */
+  --zuri-automations-active: #e6e8eb; /* color/active: skeleton name bar, rail fill */
+  --zuri-automations-border: #e8eaed; /* color/border: active filter outline */
+  --zuri-automations-border-strong: #d5d8dc; /* color/border-strong: switch off track */
+  --zuri-automations-text: #1f2328; /* color/text: title, name, value, button label */
+  --zuri-automations-text-secondary: #6b7280; /* color/subtle: subtitle, description, meta */
+  --zuri-automations-text-muted: #8e9196; /* color/muted: column label, hint, secondary line */
+  --zuri-automations-primary: #2f6bff; /* color/primary: mark, new automation, links, switch on */
+  --zuri-automations-primary-soft: #eaf0ff; /* color/primary-soft: empty icon disc, lock banner */
+  --zuri-automations-accent: #6b4eff; /* color/accent: avatar chip */
+  --zuri-automations-success: #1f9d6b; /* color/success: caught-up badge and banner glyph */
+  --zuri-automations-success-wash: #e9f6f0; /* caught-up banner fill */
+  --zuri-automations-success-tint: rgba(31, 157, 107, 0.2); /* caught-up badge fill, success at 20% */
+  --zuri-automations-success-text: #166534; /* caught-up badge label */
+  --zuri-automations-caught-row: #f4fbf7; /* the caught-up row's highlight fill */
+  --zuri-automations-danger: #d14343; /* color/danger: error glyph */
+  --zuri-automations-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card drop shadow */
+  --zuri-automations-row-height: 72px; /* row / locked row / caught-up row */
+  --zuri-automations-head-height: 38px; /* table header */
+  --zuri-automations-topbar-height: 52px; /* top bar */
+  --zuri-automations-body-sm-line: 18px; /* the node's 18 px line on 13 px row text */
+  --zuri-automations-label-line: 14px; /* the node's 14 px line on 11 px column labels */
+  --zuri-automations-label-tracking: 0.4px; /* letterSpacing on the upper-case column label */
+  --zuri-automations-grid: 516fr 250fr 236fr 186fr 96fr 44px; /* column tracks, from the node's x positions */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Automation run result / history page (design node 0:8574)                */
+/* ------------------------------------------------------------------------ */
+/* Six frames (main, empty, loading, error, blocked, accepted), all drawn in
+   the light colour collection. As on the automations page the colours sit in a
+   page-scoped block so the node's palette survives either app theme, and the
+   radii reuse the project radius tokens the node's numbers match:
+   card 12 = radius-lg/modal, panel 10 = radius-md/card, row 8 = radius-row,
+   pill 999 = radius-pill. */
+.runs-page {
+  --zuri-runs-canvas: #f7f8f9; /* color/surface: page canvas, note block, quiet button */
+  --zuri-runs-surface: #ffffff; /* color/inverse: top bar, card, tag, secondary button */
+  --zuri-runs-sunken: #f0f1f3; /* color/sunken: nav track, inline code, alert panel, skeleton */
+  --zuri-runs-hairline: #edeef0; /* color/hover: card and rail hairline */
+  --zuri-runs-border: #e8eaed; /* color/border: button outline, timeline rail line */
+  --zuri-runs-text: #1f2328; /* color/text: title, heading, entry time, button label */
+  --zuri-runs-text-secondary: #6b7280; /* color/subtle: meta line, reason, body copy */
+  --zuri-runs-text-muted: #8e9196; /* color/muted: section label, range, output line */
+  --zuri-runs-primary: #2f6bff; /* color/primary: primary button, live dot, links */
+  --zuri-runs-primary-strong: #245be0; /* primary at hover; the node draws no hover state */
+  --zuri-runs-primary-soft: #eaf0ff; /* color/primary-soft: selected entry, icon disc, streaming chip */
+  --zuri-runs-accent: #6b4eff; /* color/accent: mark and avatar chip */
+  --zuri-runs-success: #1f9d6b; /* color/success: completed dot, confirmation glyph */
+  --zuri-runs-success-soft: #e9f6f0; /* confirmation icon disc */
+  --zuri-runs-success-wash: rgba(31, 157, 107, 0.2); /* completed badge fill, success at 20% */
+  --zuri-runs-success-text: #166534; /* completed badge label */
+  --zuri-runs-warning: #c7861f; /* color/warning: blocked dot, tag and glyph */
+  --zuri-runs-danger: #d14343; /* color/danger: failed dot, alert glyph, note rule */
+  --zuri-runs-skeleton: #f0f1f3; /* skeleton bar on the streaming card */
+  --zuri-runs-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card drop shadow, node's 0 4 16 #0F172A14 */
+  --zuri-runs-topbar-height: 52px; /* top bar */
+  --zuri-runs-gutter: 40px; /* page gutter left and right */
+  --zuri-runs-gutter-top: 24px; /* breadcrumb row top */
+  --zuri-runs-grid-gap: 32px; /* column gutter between the result column and the rail */
+  --zuri-runs-grid-top: 24px; /* run header bottom (y172) to the first card top (y196) */
+  --zuri-runs-card-gap: 16px; /* stack gap between cards in the left column */
+  --zuri-runs-column-min: 676px; /* the node's left column body, level with the rail */
+  --zuri-runs-column-blocked-min: 694px; /* left column with the blocked strip, y196 to y890 */
+  --zuri-runs-result-min: 430px; /* the node's result card body in the completed, loading and accepted states */
+  --zuri-runs-failed-min: 380px; /* the node's failed result card */
+  --zuri-runs-blocked-min: 470px; /* the node's blocked result card */
+  --zuri-runs-header-gap: 12px; /* breadcrumb row to run header */
+  --zuri-runs-crumb-gap: 8px; /* breadcrumb text to chevron */
+  --zuri-runs-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-runs-tab-size: 12px; /* nav tab and breadcrumb text */
+  --zuri-runs-tab-padding: 14px; /* nav tab side padding */
+  --zuri-runs-title-size: 28px; /* run title */
+  --zuri-runs-title-leading: 36px; /* the node's 36 px title line */
+  --zuri-runs-meta-size: 13px; /* meta line, entry time, button label */
+  --zuri-runs-meta-leading: 20px; /* the node's 20 px meta line */
+  --zuri-runs-body-size: 13px; /* paragraph, bullet, note copy */
+  --zuri-runs-result-size: 14px; /* the node's 14 px markdown result paragraph and bullets */
+  --zuri-runs-body-leading: 22px; /* the node's 22 px result paragraph line */
+  --zuri-runs-body-sm-leading: 18px; /* the node's 18 px copy line inside cards */
+  --zuri-runs-tight-leading: 16px; /* the node's 16 px small lines: entry status, rail range, blocked attempt, output meta */
+  --zuri-runs-body-top: 20px; /* card body top padding */
+  --zuri-runs-body-bottom: 22px; /* card body bottom padding */
+  --zuri-runs-badge-size: 12px; /* status badge, button and avatar label */
+  --zuri-runs-tag-size: 10px; /* Now, Live and Blocked pills */
+  --zuri-runs-label-size: 11px; /* upper-case section label, output line, attempt time */
+  --zuri-runs-label-leading: 14px; /* the node's 14 px section label line */
+  --zuri-runs-label-tracking: 0.4px; /* letterSpacing on the upper-case label */
+  --zuri-runs-h2-size: 20px; /* result heading */
+  --zuri-runs-h2-leading: 28px; /* the node's 28 px result heading line */
+  --zuri-runs-h3-size: 15px; /* sub-heading, offer and alert title */
+  --zuri-runs-h3-leading: 20px; /* the node's 20 px sub-heading line */
+  --zuri-runs-code-size: 12px; /* inline code chip */
+  --zuri-runs-note-gap: 20px; /* bullets to note block, footer to output line */
+  --zuri-runs-btn-height: 30px; /* offer and confirmation buttons */
+  --zuri-runs-btn-wide-height: 38px; /* run header button and empty-state CTA */
+  --zuri-runs-btn-leading: 18px; /* the node's 18 px button label line */
+  --zuri-runs-radius-card: var(--zuri-radius-lg); /* node's 12, the project's radius-lg */
+  --zuri-runs-radius-panel: var(--zuri-radius-md); /* node's 10, the project's radius-md */
+  --zuri-runs-radius-row: var(--zuri-radius-row); /* node's 8 */
+  --zuri-runs-radius-chip: 6px; /* node's 6: nav active tab and app mark */
+  --zuri-runs-radius-pill: var(--zuri-radius-pill); /* node's 999 */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Quick assistant overlay (design node 0:9961)                             */
+/* ------------------------------------------------------------------------ */
+/* The node draws the floating window four times - empty, loading, error and
+   closed - over the same 1440x900 desktop, and every frame is drawn in the dark
+   colour collection only. So this page-scoped block carries the node's own
+   values (as the onboarding page does for its single-collection node) and the
+   scene keeps the node's palette whichever app theme is active. The two theme
+   blocks above stay name-for-name identical, which is what the parity check in
+   scripts/selftest.js requires.
+
+   The desktop behind the window is scenery, not chrome: it is drawn so the
+   overlay reads as an always-on-top window over another app, exactly as the
+   node draws it. */
+.overlay-page {
+  /* Surfaces */
+  --zuri-overlay-scene: #0e1012; /* color/background: the desktop behind the window and under the taskbar */
+  --zuri-overlay-taskbar: #0f1319; /* the Windows taskbar strip */
+  --zuri-overlay-window: #16181b; /* color/surface: the Excel window body */
+  --zuri-overlay-card: rgba(22, 24, 27, 0.9); /* the quick window: color/surface at the node's 90% */
+  --zuri-overlay-titlebar: #1d2024; /* color/raised: Excel title bar, prompt field, focus pill */
+  --zuri-overlay-raised: #1f2226; /* color/raised: mode chip, answer avatar, error card, stop control */
+  --zuri-overlay-close: #1f2224; /* the empty-state close control */
+
+  /* Borders and shadow */
+  --zuri-overlay-hairline: #262a2f; /* color/active: title-row hairline, Excel divider */
+  --zuri-overlay-card-border: #ffffff; /* the quick window's 1 px outline */
+  --zuri-overlay-field-border: rgba(255, 255, 255, 0.2); /* prompt field outline once a prompt is running */
+  --zuri-overlay-shadow: 0 12px 32px rgba(0, 0, 0, 0.3); /* the node's window drop shadow */
+
+  /* Text, from the node's dark collection steps */
+  --zuri-overlay-text: #edeff2; /* color/text: window title, answer copy, clock */
+  --zuri-overlay-text-secondary: #c7ccd1; /* Excel window title, chip labels, focus pill label */
+  --zuri-overlay-text-muted: #adb4bb; /* Excel body copy, placeholder, footer hint, closed message */
+  --zuri-overlay-text-subtle: #8a9099; /* color/subtle: prompt glyph and idle send glyph */
+  --zuri-overlay-glyph: #9aa0a6; /* color/muted: empty-state close glyph, background taskbar icons */
+
+  /* Accent and semantic */
+  --zuri-overlay-primary: #5b8cff; /* color/primary: mark tile, send control, streaming chip, caret */
+  --zuri-overlay-primary-soft: #7aa2ff; /* streaming chip glyph, error link, taskbar focus glyph */
+  --zuri-overlay-danger: #f06a6a; /* color/danger: the error glyph */
+
+  /* Desktop glows, painted at the node's alphas */
+  --zuri-overlay-glow-accent: #5b8cff; /* glow/left: color/primary painted at 18% */
+  --zuri-overlay-glow-secondary: #7e63ff; /* glow/right: the violet accent painted at 14% */
+  --zuri-overlay-glow-blur: 70px; /* the node's Gaussian blur, stdDeviation 70 */
+
+  /* The closed frame ghosts the window instead of removing it */
+  --zuri-overlay-ghost: 0.35; /* the ghosted window and its title, the node's group opacity */
+  --zuri-overlay-ghost-mark: 0.5; /* the mark inside that group, halved again as the node draws it */
+
+  /* Radii: the node's numbers match the project scale */
+  --zuri-overlay-radius-window: var(--zuri-radius-overlay); /* node's 12 */
+  --zuri-overlay-radius-field: var(--zuri-radius-card); /* node's 10 */
+  --zuri-overlay-radius-control: var(--zuri-radius-row); /* node's 8 */
+  --zuri-overlay-radius-key: 6px; /* node's 6: mark tile, start button, focus pill */
+  --zuri-overlay-radius-chip: 4px; /* node's 4: the Excel row chip */
+  --zuri-overlay-radius-pill: var(--zuri-radius-pill); /* node's 999 */
+
+  /* Type: the node's own sizes and leading */
+  --zuri-overlay-title-size: 13px; /* the window title */
+  --zuri-overlay-title-leading: 18px; /* the node's 18 px title line */
+  --zuri-overlay-body-size: 14px; /* the prompt placeholder */
+  --zuri-overlay-body-leading: 22px; /* the node's 22 px prompt line */
+  --zuri-overlay-label-size: 11px; /* mode chip, streaming chip, footer hint, error body and link */
+  --zuri-overlay-label-leading: 16px; /* the node's 16 px label line */
+  --zuri-overlay-answer-size: 12px; /* streaming answer copy and the error title */
+  --zuri-overlay-answer-leading: 18px; /* the node's 18 px answer line */
+  --zuri-overlay-meta-leading: 14px; /* the taskbar clock line */
+}
+
+/* Error / not-found view (design node 0:11074) */
+/*
+ * The node draws the window in the light collection only, so 404.html pins
+ * data-theme="light" and every value below is the binding the node holds.
+ * A colour changed in open-pencil is a single edit here, not a sweep of the page.
+ */
+.error-page {
+  /* Surfaces */
+  --zuri-error-window: #ffffff; /* color/inverse: title bar, top bar, conversation column */
+  --zuri-error-panel: #ffffff; /* color/inverse: the fallback panel */
+  --zuri-error-hairline: #e8eaed; /* color/border: the panel outline and every 1 px rule */
+  --zuri-error-panel-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* the node's 0 4 16 #0F172A14 */
+  --zuri-error-sunken: #f0f1f3; /* color/sunken: icon disc, quiet button, nav track, toggle track */
+  --zuri-error-surface: #f7f8f9; /* color/surface: restart hint strip, sidebar, rail */
+
+  /* Text and accent */
+  --zuri-error-text: #1f2328; /* color/text */
+  --zuri-error-text-subtle: #6b7280; /* color/subtle: message, hint, window title */
+  --zuri-error-text-muted: #8e9196; /* color/muted: the whole chrome, drawn faded behind the panel */
+  --zuri-error-primary: #2f6bff; /* color/primary */
+  --zuri-error-on-primary: #ffffff; /* the label and glyph on the primary button */
+  --zuri-error-alert: #d14343; /* the circle-alert glyph in the error and not-found frames */
+  --zuri-error-avatar: #6b4eff; /* color/accent: the avatar chip */
+
+  /* Window chrome: the node's own measurements */
+  --zuri-error-titlebar-height: 32px; /* the node's 32 px title bar */
+  --zuri-error-topbar-height: 52px; /* the node's 52 px top bar */
+  --zuri-error-sidebar-width: 260px; /* the node's recent-chat column */
+  --zuri-error-rail-width: 320px; /* the node's task rail */
+  --zuri-error-chrome-fade: 0.5; /* the node halves the theme toggle and the avatar */
+  --zuri-error-card-fade: 0.6; /* the node draws the rail's task card at 60% */
+
+  /* The panel: 600 x 340, a 44 px disc, 40 px actions, a 48 px hint strip */
+  --zuri-error-panel-width: 600px; /* the node's panel width */
+  --zuri-error-panel-min-height: 340px; /* the node's panel height */
+  --zuri-error-panel-padding: 32px 28px 28px; /* the node's top and side insets */
+  --zuri-error-disc: 44px; /* the node's icon disc */
+  --zuri-error-control-height: 40px; /* the node's primary and quiet buttons */
+  --zuri-error-hint-height: 48px; /* the node's restart strip */
+  --zuri-error-main-top: 150px; /* the panel's top edge, 70 + 80 inside the node's body */
+
+  /* Type: the node's own sizes and leading */
+  --zuri-error-title-size: 20px; /* the panel title */
+  --zuri-error-title-leading: 28px; /* the node's 28 px title line */
+  --zuri-error-body-size: 14px; /* the panel message */
+  --zuri-error-body-leading: 22px; /* the node's 22 px message line */
+  --zuri-error-label-size: 13px; /* button labels, sidebar rows, app title */
+  --zuri-error-label-leading: 18px; /* the node's 18 px label line */
+  --zuri-error-hint-size: 12px; /* the restart hint and the tab labels */
+  --zuri-error-hint-leading: 16px; /* the node's 16 px hint line */
+  --zuri-error-section-size: 11px; /* the Today and Tasks section labels */
+  --zuri-error-section-leading: 14px; /* the node's 14 px section line */
+}
+
+/* Sign-in page (design node 0:11371) */
+/*
+ * The node draws the page five times: empty (default), loading, error,
+ * signed-in, and the same page at 390 px. It is drawn in the light collection
+ * only, so sign-in.html pins data-theme="light" and every value below is the
+ * binding the node holds. A colour changed in open-pencil is one edit here,
+ * not a sweep of the page.
+ */
+.signin-page {
+  /* Surfaces */
+  --zuri-signin-window: #f7f8f9; /* color/surface: the form column, the quiet button, the phone's inputs */
+  --zuri-signin-card: #ffffff; /* color/inverse: the card, the desktop inputs, the phone page */
+  --zuri-signin-brand-panel: #101214; /* color/sunken: the brand column behind the headline */
+  --zuri-signin-sunken: #f0f1f3; /* color/sunken: error banner, submitting inputs, progress track */
+  --zuri-signin-hairline: #e8eaed; /* color/border: card, input and button outlines, divider rules */
+  --zuri-signin-card-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* the node's 0 4 16 #0F172A14 */
+  --zuri-signin-glow: #5b8cff; /* the brand column's glow disc, drawn under the headline */
+  --zuri-signin-glow-opacity: 0.16; /* the node's 16% on that disc */
+  --zuri-signin-glow-blur: 140px; /* the node's foreground blur radius */
+
+  /* Text */
+  --zuri-signin-text: #1f2328; /* color/text: titles, labels, field values, button labels */
+  --zuri-signin-text-subtle: #6b7280; /* color/subtle: the line under the title */
+  --zuri-signin-text-muted: #8e9196; /* color/muted: placeholders, field glyphs, divider label, fine print */
+  --zuri-signin-on-dark: #edeff2; /* color/text read on the brand column */
+  --zuri-signin-on-dark-subtle: #adb4bb; /* color/subtle on the brand column */
+
+  /* Accent */
+  --zuri-signin-primary: #2f6bff; /* color/primary: submit, mark tile, links, checked box */
+  --zuri-signin-primary-soft: #eaf0ff; /* the submitting button's fill */
+  --zuri-signin-on-primary: #ffffff; /* label and glyph on the primary fill */
+  --zuri-signin-icon-accent: #5b8cff; /* the three feature glyphs on the brand column */
+  --zuri-signin-danger: #d14343; /* the alert glyph and the rejected password outline */
+  --zuri-signin-success: #1f9d6b; /* the signed-in disc glyph and progress fill */
+  --zuri-signin-success-soft: #e9f6f0; /* the signed-in disc fill */
+
+  /* Radii: the node's numbers, through the project's scale */
+  --zuri-signin-radius-card: var(--zuri-radius-modal); /* node's 12: the card */
+  --zuri-signin-radius-control: var(--zuri-radius-row); /* node's 8: inputs, buttons, error banner */
+  --zuri-signin-radius-mark: var(--zuri-radius-row); /* node's 8: the mark tile */
+  --zuri-signin-radius-done: var(--zuri-radius-card); /* node's 10: the signed-in disc */
+  --zuri-signin-radius-check: 5px; /* node's 5: the remember box */
+  --zuri-signin-radius-pill: var(--zuri-radius-pill); /* node's 999: the progress track */
+
+  /* The page's box: 1440 x 900, a 640 brand column, a 560 card 150 from the top */
+  --zuri-signin-brand-width: 640px; /* the node's brand column */
+  --zuri-signin-brand-inset: 48px; /* mark, headline, body and feature rows' left edge */
+  --zuri-signin-brand-name-inset: 92px; /* the wordmark, 12 to the right of the mark */
+  --zuri-signin-brand-name-top: 54px; /* centred on the 32 px mark */
+  --zuri-signin-glow-size: 640px; /* the glow disc, 640 across */
+  --zuri-signin-glow-left: -160px; /* the disc starts outside the column */
+  --zuri-signin-glow-top: 180px;
+  --zuri-signin-headline-top: 300px; /* the headline's top edge in the 900 px column */
+  --zuri-signin-headline-width: 480px; /* the headline and feature rows' measure */
+  --zuri-signin-body-top: 392px; /* the supporting line, 56 below the headline */
+  --zuri-signin-body-width: 460px; /* the supporting line's measure */
+  --zuri-signin-features-top: 488px; /* the first feature row, 52 under the supporting line */
+  --zuri-signin-feature-height: 32px; /* each feature row */
+  --zuri-signin-card-width: 560px;
+  --zuri-signin-card-height: 600px; /* the empty and loading frames */
+  --zuri-signin-card-height-error: 660px; /* one banner taller */
+  --zuri-signin-card-height-done: 340px; /* the signed-in card */
+  --zuri-signin-card-pad: 40px; /* the card's top, left and right insets */
+  --zuri-signin-card-top: 150px; /* the card's top edge in the node's 900 px column */
+  --zuri-signin-control-height: 44px; /* inputs, submit and quiet button on desktop */
+  --zuri-signin-control-height-phone: 48px;
+  --zuri-signin-status-height: 28px; /* the phone frame's status bar */
+  --zuri-signin-print-bottom: 48px; /* the phone fine print sits 48 from the bottom edge */
+  --zuri-signin-progress-width: 72.5%; /* the node's 348 of 480 progress fill */
+
+  /* Type: the node's own sizes and leading */
+  --zuri-signin-title-size: 28px; /* card title, brand headline */
+  --zuri-signin-title-leading: 36px; /* the node's 36 px title line */
+  --zuri-signin-body-size: 14px; /* the line under the title, placeholders */
+  --zuri-signin-body-leading: 22px; /* the node's 22 px body line */
+  --zuri-signin-label-size: 13px; /* field labels, remember row, feature labels */
+  --zuri-signin-label-leading: 18px; /* the node's 18 px label line */
+  --zuri-signin-button-size: 14px; /* the submit and quiet button labels */
+  --zuri-signin-button-leading: 20px; /* the node's 20 px button line */
+  --zuri-signin-button-size-phone: 15px; /* the phone frame sets 15 */
+  --zuri-signin-field-size-phone: 15px; /* the phone frame's field value size */
+  --zuri-signin-note-size: 12px; /* the error banner message */
+  --zuri-signin-note-leading: 18px;
+  --zuri-signin-small-size: 11px; /* divider label, fine print, redirect note */
+  --zuri-signin-small-leading: 16px; /* the node's 16 px small line */
+  --zuri-signin-brand-name-size: 15px; /* the wordmark */
+  --zuri-signin-brand-name-leading: 20px;
+}
+
+/* Sign-up page (design node 0:11637) */
+/*
+ * The node draws the page six times: empty (default), submitting, rejected
+ * email, form out of reach, account created, and the same page at 390 px. It is
+ * drawn in the light collection only, so sign-up.html pins data-theme="light"
+ * and every value below is the binding the node holds. A colour changed in
+ * open-pencil is one edit here, not a sweep of the page.
+ */
+.signup-page {
+  /* Surfaces */
+  --zuri-signup-window: #f7f8f9; /* color/surface: the form column and the created frame's summary row */
+  --zuri-signup-card: #ffffff; /* color/inverse: the card, the desktop inputs, the phone page */
+  --zuri-signup-brand-panel: #101214; /* color/sunken: the brand column behind the headline */
+  --zuri-signup-sunken: #f0f1f3; /* color/sunken: submitting inputs, disabled button, progress track */
+  --zuri-signup-hairline: #e8eaed; /* color/border: card outline, field outlines, divider, empty strength bars */
+  --zuri-signup-card-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* the node's 0 4 16 #0F172A14 */
+  --zuri-signup-glow: #5b8cff; /* the brand column's glow disc, drawn behind the headline */
+  --zuri-signup-glow-opacity: 0.16; /* the node's 16% on that disc */
+  --zuri-signup-glow-blur: 140px; /* the node's foreground blur radius */
+
+  /* Text */
+  --zuri-signup-text: #1f2328; /* color/text: titles, labels, field values, the submit label */
+  --zuri-signup-text-subtle: #6b7280; /* color/subtle: the line under the title, the sign-in question */
+  --zuri-signup-text-muted: #8e9196; /* color/muted: placeholders, field glyphs, fine print, counters */
+  --zuri-signup-on-dark: #edeff2; /* color/text read on the brand column */
+  --zuri-signup-on-dark-subtle: #adb4bb; /* color/subtle on the brand column */
+
+  /* Accent */
+  --zuri-signup-primary: #2f6bff; /* color/primary: submit, mark tile, sign-in link, created button */
+  --zuri-signup-primary-soft: #eaf0ff; /* the submitting button's fill */
+  --zuri-signup-on-primary: #ffffff; /* label and glyph on the primary fill */
+  --zuri-signup-icon-accent: #5b8cff; /* the three feature glyphs on the brand column */
+  --zuri-signup-danger: #d14343; /* the alert glyph, the rejected field outline, the weak strength line */
+  --zuri-signup-warn: #c7861f; /* the first strength bar while the password is still weak */
+  --zuri-signup-success: #1f9d6b; /* the strong strength bars, the created disc glyph, the progress fill */
+  --zuri-signup-success-soft: #e9f6f0; /* the created disc fill */
+
+  /* Radii: the node's numbers, through the project's scale */
+  --zuri-signup-radius-card: var(--zuri-radius-modal); /* node's 12: the card */
+  --zuri-signup-radius-control: var(--zuri-radius-row); /* node's 8: fields, buttons, summary row */
+  --zuri-signup-radius-mark: var(--zuri-radius-row); /* node's 8: the mark tile */
+  --zuri-signup-radius-done: var(--zuri-radius-card); /* node's 10: the created disc */
+  --zuri-signup-radius-bar: 2px; /* node's 2: the strength bars */
+  --zuri-signup-radius-pill: var(--zuri-radius-pill); /* node's 999: the progress track */
+
+  /* The page's box: 1440 x 900, a 640 brand column, a 560 card 70 from the top */
+  --zuri-signup-brand-width: 640px; /* the node's brand column */
+  --zuri-signup-brand-inset: 48px; /* mark, headline, body and feature rows' left edge */
+  --zuri-signup-brand-name-inset: 92px; /* the wordmark, 12 to the right of the mark */
+  --zuri-signup-brand-name-top: 54px; /* centred on the 32 px mark */
+  --zuri-signup-glow-size: 640px; /* the glow disc, 640 across */
+  --zuri-signup-glow-left: -160px; /* the disc starts outside the column */
+  --zuri-signup-glow-top: 180px;
+  --zuri-signup-headline-top: 300px; /* the headline's top edge in the 900 px column */
+  --zuri-signup-headline-width: 480px; /* the headline and feature rows' measure */
+  --zuri-signup-body-top: 392px; /* the supporting line, 56 below the headline */
+  --zuri-signup-body-width: 460px; /* the supporting line's measure */
+  --zuri-signup-features-top: 488px; /* the first feature row, 52 under the supporting line */
+  --zuri-signup-feature-height: 32px; /* each feature row */
+  --zuri-signup-card-width: 560px;
+  --zuri-signup-card-height: 760px; /* the empty, submitting and out-of-reach frames */
+  --zuri-signup-card-height-error: 778px; /* one field message taller */
+  --zuri-signup-card-height-done: 400px; /* the created card */
+  --zuri-signup-card-pad: 40px; /* the card's top, left and right insets */
+  --zuri-signup-card-top: 70px; /* the card's top edge in the node's 900 px column */
+  --zuri-signup-card-top-done: 150px; /* the created card sits lower, as drawn */
+  --zuri-signup-control-height: 44px; /* fields and buttons on desktop */
+  --zuri-signup-control-height-phone: 48px;
+  --zuri-signup-field-pitch: 96px; /* 140, 236, 332: a 70 px field and a 26 px gap */
+  --zuri-signup-bar-width: 150px; /* each strength bar; 8 to the next */
+  --zuri-signup-bar-width-phone: 112px;
+  --zuri-signup-bar-gap: 8px; /* the node's 8 px between one strength bar and the next */
+  --zuri-signup-error-gap: 4px; /* the field message, 4 under the outline it explains */
+  --zuri-signup-error-height: 18px;
+  --zuri-signup-status-height: 28px; /* the phone frame's status bar */
+  --zuri-signup-progress-width: 80%; /* the node's 384 of 480 progress fill */
+  --zuri-signup-phone-inset: 20px; /* the phone frame's left and right margin */
+  --zuri-signup-phone-pitch: 88px; /* 192, 280, 368: a 74 px field and a 14 px gap */
+
+  /* Type: the node's own sizes and leading */
+  --zuri-signup-title-size: 28px; /* card title, brand headline */
+  --zuri-signup-title-leading: 36px; /* the node's 36 px title line */
+  --zuri-signup-body-size: 14px; /* the line under the title, placeholders */
+  --zuri-signup-body-leading: 22px; /* the node's 22 px body line */
+  --zuri-signup-label-size: 13px; /* field labels, sign-in question, feature labels */
+  --zuri-signup-label-leading: 18px; /* the node's 18 px label line */
+  --zuri-signup-button-size: 14px; /* the submit, created and sign-in labels */
+  --zuri-signup-button-leading: 20px; /* the node's 20 px button line */
+  --zuri-signup-button-size-phone: 15px; /* the phone frame sets 15 */
+  --zuri-signup-field-size-phone: 15px; /* the phone frame's field value size */
+  --zuri-signup-note-size: 12px; /* the field message, the created summary line */
+  --zuri-signup-note-leading: 16px; /* the node's 16 px message line */
+  --zuri-signup-small-size: 11px; /* strength hint, terms note, desktop note */
+  --zuri-signup-small-leading: 16px; /* the node's 16 px small line */
+  --zuri-signup-brand-name-size: 15px; /* the wordmark */
+  --zuri-signup-brand-name-leading: 20px;
+}
+
+/* Forgot-password page (design node 0:11991) */
+/*
+ * Read off the node's six frames: empty, sending, sent, unknown address and
+ * blank email at 1440, plus the same page at 390. The brand column is the one
+ * the sign-in page draws, with its own headline and third feature line.
+ */
+.forgot-page {
+  /* Surfaces */
+  --zuri-forgot-window: #f7f8f9; /* color/surface: the form column, the sent note, the phone inputs */
+  --zuri-forgot-card: #ffffff; /* color/inverse: the card, the desktop input, the phone page */
+  --zuri-forgot-brand-panel: #101214; /* color/sunken: the brand column */
+  --zuri-forgot-sunken: #f0f1f3; /* color/sunken: the sending input, the inert send button */
+  --zuri-forgot-quiet: #f7f8f9; /* the sent note and the resend button */
+  --zuri-forgot-hairline: #e8eaed; /* color/border: card, input and quiet button outlines */
+  --zuri-forgot-card-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* the node's 0 4 16 #0F172A14 */
+  --zuri-forgot-glow: #5b8cff; /* the brand column's glow disc */
+  --zuri-forgot-glow-opacity: 0.16; /* the node's 16% on that disc */
+  --zuri-forgot-glow-blur: 140px; /* the node's foreground blur radius */
+
+  /* Text */
+  --zuri-forgot-text: #1f2328; /* color/text: titles, labels, field values, button labels */
+  --zuri-forgot-text-subtle: #6b7280; /* color/subtle: the line under the title, the sent note */
+  --zuri-forgot-text-muted: #8e9196; /* color/muted: placeholders, field glyph, inert label */
+  --zuri-forgot-on-dark: #edeff2; /* color/text read on the brand column */
+  --zuri-forgot-on-dark-subtle: #adb4bb; /* color/subtle on the brand column */
+
+  /* Accent */
+  --zuri-forgot-primary: #2f6bff; /* color/primary: the send button, the mark tile, links */
+  --zuri-forgot-primary-soft: #eaf0ff; /* the sending button and the key disc */
+  --zuri-forgot-on-primary: #ffffff; /* label and glyph on the primary fill */
+  --zuri-forgot-icon-accent: #5b8cff; /* the three feature glyphs on the brand column */
+  --zuri-forgot-danger: #d14343; /* the alert glyph, the rejected outline, the message */
+  --zuri-forgot-success: #1f9d6b; /* the sent disc glyph */
+  --zuri-forgot-success-soft: #e9f6f0; /* the sent disc fill */
+
+  /* Radii: the node's numbers, through the project's scale */
+  --zuri-forgot-radius-card: var(--zuri-radius-modal); /* node's 12: the card */
+  --zuri-forgot-radius-control: var(--zuri-radius-row); /* node's 8: inputs, buttons, note */
+  --zuri-forgot-radius-disc: var(--zuri-radius-card); /* node's 10: the key and sent discs */
+  --zuri-forgot-radius-mark: var(--zuri-radius-row); /* node's 8: the mark tile */
+
+  /* The page's box: 1440 x 900, a 640 brand column, a 560 card 190 from the top */
+  --zuri-forgot-brand-width: 640px;
+  --zuri-forgot-brand-inset: 48px; /* mark, headline, body and feature rows' left edge */
+  --zuri-forgot-brand-name-inset: 92px; /* the wordmark, 12 to the right of the mark */
+  --zuri-forgot-brand-name-top: 54px; /* centred on the 32 px mark */
+  --zuri-forgot-glow-size: 640px;
+  --zuri-forgot-glow-left: -160px; /* the disc starts outside the column */
+  --zuri-forgot-glow-top: 180px;
+  --zuri-forgot-headline-top: 300px; /* the headline's first line */
+  --zuri-forgot-headline-width: 480px; /* the headline and feature rows' measure */
+  --zuri-forgot-body-top: 392px;
+  --zuri-forgot-body-width: 460px; /* the body's own narrower measure */
+  --zuri-forgot-features-top: 488px; /* the first feature row */
+  --zuri-forgot-feature-height: 32px;
+  --zuri-forgot-card-width: 560px; /* the card, centred in the form column */
+  --zuri-forgot-card-height: 420px; /* empty, sending and blank-email frames */
+  --zuri-forgot-card-height-error: 438px; /* one message row taller */
+  --zuri-forgot-card-height-sent: 340px;
+  --zuri-forgot-card-top: 190px; /* the card's top edge in the node's 900 px column */
+  --zuri-forgot-card-top-sent: 230px; /* the sent card keeps the same centre */
+  --zuri-forgot-card-pad: 40px; /* the card's top, left and right insets */
+  --zuri-forgot-disc-size: 44px; /* the key and sent discs */
+  --zuri-forgot-control-height: 44px; /* the input and send button on desktop */
+  --zuri-forgot-control-height-phone: 48px;
+  --zuri-forgot-quiet-width: 236px; /* the resend button and the link beside it */
+  --zuri-forgot-status-height: 28px; /* the phone frame's status bar */
+  --zuri-forgot-phone-inset: 20px; /* the phone frame's left and right margin */
+  --zuri-forgot-error-height: 18px; /* the message row under the field */
+
+  /* Gaps, the node's own: disc 84 -> 104, title 140 -> 148, sub 192 -> 212,
+   * field 282 -> 288, button 332 -> 352 in the empty frame. */
+  --zuri-forgot-title-gap: 20px;
+  --zuri-forgot-sub-gap: 8px; /* title 140 -> sub 148 */
+  --zuri-forgot-sub-height: 44px; /* the node sets both sub lines two lines tall at 480; the
+                                    app's font fits each on one, so the block keeps the drawn
+                                    height and every y below it stays on the node's grid */
+  --zuri-forgot-field-gap: 20px;
+  --zuri-forgot-submit-gap: 6px; /* field 282 -> button 288 */
+  --zuri-forgot-back-gap: 20px; /* button 332 -> back row 352 */
+  --zuri-forgot-note-gap: 20px; /* the sent note under the sub */
+  --zuri-forgot-actions-gap: 16px; /* the sent note 256 -> the resend row 272 */
+  --zuri-forgot-phone-disc-gap: 28px; /* the phone brand row 76 -> the disc 104 */
+  --zuri-forgot-phone-field-gap: 28px; /* phone sub 256 -> the field 284 */
+  --zuri-forgot-phone-submit-gap: 18px; /* phone field 358 -> the button 376 */
+
+  /* Type: the node's own sizes and leading */
+  --zuri-forgot-title-size: 28px; /* card title, brand headline */
+  --zuri-forgot-title-leading: 36px; /* the node's 36 px title line */
+  --zuri-forgot-body-size: 14px; /* the line under the title, placeholders */
+  --zuri-forgot-body-leading: 22px; /* the node's 22 px body line */
+  --zuri-forgot-label-size: 13px; /* field label, back link, feature labels */
+  --zuri-forgot-label-leading: 18px; /* the node's 18 px label line */
+  --zuri-forgot-button-size: 14px; /* the send and resend labels */
+  --zuri-forgot-button-leading: 20px; /* the node's 20 px button line */
+  --zuri-forgot-button-size-phone: 15px; /* the phone frame sets 15 */
+  --zuri-forgot-field-size-phone: 15px; /* the phone frame's field value size */
+  --zuri-forgot-note-size: 12px; /* the message row and the sent note */
+  --zuri-forgot-note-leading: 18px; /* the node's 18 px message line */
+  --zuri-forgot-small-size: 11px; /* the phone status bar */
+  --zuri-forgot-small-leading: 16px;
+  --zuri-forgot-brand-name-size: 15px; /* the wordmark */
+  --zuri-forgot-brand-name-leading: 20px;
+}
+
+/* Reset-password page (design node 0:12246) */
+/*
+ * The node draws this page five times at 1440 px and once at 390 px. The card
+ * is the sign-in card's surface and the auth column's 640/800 split, so the
+ * values repeat the auth page's numbers rather than inventing a second scale:
+ * the differences are the 470 px card, the second password field and the two
+ * result cards that sit 100 px lower and are 320 px tall.
+ */
+.reset-page {
+  /* Brand column */
+  --zuri-reset-brand-width: 640px; /* the node's 640 px column */
+  --zuri-reset-brand-panel: #101214; /* color/neutral-950: the dark column */
+  --zuri-reset-glow: #5b8cff; /* the accent disc behind the headline */
+  --zuri-reset-glow-opacity: 0.16; /* the disc's 16% opacity */
+  --zuri-reset-glow-blur: 140px; /* the disc's 140 px blur */
+  --zuri-reset-glow-size: 640px; /* the disc's 640 px diameter */
+  --zuri-reset-glow-left: -160px; /* the disc's 160 px overflow left */
+  --zuri-reset-glow-top: 180px; /* the disc's 180 px offset down */
+  --zuri-reset-brand-inset: 48px; /* the column's left inset */
+  --zuri-reset-brand-name-inset: 92px; /* wordmark, 12 px right of the 32 px mark */
+  --zuri-reset-brand-name-top: 54px; /* wordmark's 54 px baseline row */
+  --zuri-reset-headline-top: 300px; /* the headline's 300 px offset */
+  --zuri-reset-headline-width: 480px; /* the headline's 480 px measure */
+  --zuri-reset-body-top: 392px; /* the supporting line's 392 px offset */
+  --zuri-reset-body-width: 460px; /* the supporting line's 460 px measure */
+  --zuri-reset-features-top: 488px; /* the feature list's 488 px offset */
+  --zuri-reset-feature-height: 32px; /* each feature row's 32 px */
+  --zuri-reset-brand-name-size: 15px; /* the wordmark's 15 px */
+  --zuri-reset-brand-name-leading: 20px; /* the wordmark's 20 px leading */
+  --zuri-reset-on-dark: #edeff2; /* color/text on the dark column */
+  --zuri-reset-on-dark-subtle: #adb4bb; /* the column's supporting line */
+  --zuri-reset-icon-accent: #5b8cff; /* the feature glyphs */
+
+  /* Accent */
+  --zuri-reset-primary: #2f6bff; /* color/primary: buttons, links, icons */
+  --zuri-reset-primary-soft: #eaf0ff; /* the saving button's tint */
+  --zuri-reset-on-primary: #ffffff; /* text on the accent */
+  --zuri-reset-disc: #eaf0ff; /* the empty frame's icon disc */
+
+  /* Surfaces */
+  --zuri-reset-window: #f7f8f9; /* color/surface: the form column */
+  --zuri-reset-card: #ffffff; /* color/inverse: the card and the inputs */
+  --zuri-reset-sunken: #f0f1f3; /* color/sunken: the progress track, disabled input */
+  --zuri-reset-hairline: #e8eaed; /* color/border: card and control outlines */
+  --zuri-reset-card-shadow: 0 4px 16px rgba(15, 23, 42, 0.0784); /* the node's 0 4 16 #0F172A14 */
+
+  /* Text */
+  --zuri-reset-text: #1f2328; /* color/text: titles, labels, typed values */
+  --zuri-reset-text-subtle: #6b7280; /* color/subtle: the card's supporting line */
+  --zuri-reset-text-muted: #8e9196; /* color/muted: placeholders and icons */
+
+  /* States */
+  --zuri-reset-danger: #d14343; /* color/danger: mismatch message and expired glyph */
+  --zuri-reset-success: #1f9d6b; /* color/success: the saved glyph and progress */
+  --zuri-reset-success-soft: #e9f6f0; /* the saved frame's icon disc */
+
+  /* The card */
+  --zuri-reset-card-width: 560px; /* the card's 560 px width */
+  --zuri-reset-card-top: 170px; /* the form frames' 170 px offset */
+  --zuri-reset-card-top-result: 270px; /* the result frames' 270 px offset */
+  --zuri-reset-card-pad: 40px; /* the card's 40 px inset */
+  --zuri-reset-card-height: 470px; /* the empty and saving frames' height */
+  --zuri-reset-card-height-mismatch: 484px; /* the mismatched frame's height */
+  --zuri-reset-card-height-result: 320px; /* both result frames' height */
+  --zuri-reset-radius-card: 12px; /* the card's 12 px corners */
+  --zuri-reset-radius-control: 8px; /* controls' 8 px corners */
+  --zuri-reset-radius-disc: 10px; /* the icon disc's 10 px corners */
+  --zuri-reset-radius-pill: 999px; /* the progress track's pill */
+
+  /* Type: the node's sizes and leading */
+  --zuri-reset-title-size: 28px; /* the card title's 28 px */
+  --zuri-reset-title-leading: 36px; /* the card title's 36 px leading */
+  --zuri-reset-body-size: 14px; /* the card's supporting line */
+  --zuri-reset-body-leading: 22px; /* its 22 px leading */
+  --zuri-reset-label-size: 13px; /* field labels and the back link */
+  --zuri-reset-label-leading: 18px; /* their 18 px leading */
+  --zuri-reset-small-size: 12px; /* the 12 px field message */
+  --zuri-reset-small-leading: 16px; /* its 16 px leading */
+  --zuri-reset-button-size: 14px; /* the button's 14 px label */
+  --zuri-reset-button-leading: 20px; /* its 20 px leading */
+  --zuri-reset-button-size-phone: 15px; /* the phone frame's 15 px button label */
+  --zuri-reset-field-size-phone: 15px; /* the phone frame's 15 px field text */
+
+  /* Controls and their gaps */
+  --zuri-reset-control-height: 44px; /* the form frames' 44 px controls */
+  --zuri-reset-control-height-phone: 48px; /* the phone frame's 48 px controls */
+  --zuri-reset-field-first-gap: 34px; /* sub line -> first field */
+  --zuri-reset-field-gap: 26px; /* field -> field */
+  --zuri-reset-error-gap: 4px; /* field -> its message */
+  --zuri-reset-error-height: 18px; /* the message row's 18 px */
+  --zuri-reset-back-gap: 16px; /* button -> back row */
+  --zuri-reset-progress-height: 6px; /* the 6 px progress track */
+  --zuri-reset-progress-width: 408px; /* 408 of the 480 px track filled */
+
+  /* Phone frame */
+  --zuri-reset-phone-inset: 20px; /* the phone frame's 20 px inset */
+  --zuri-reset-status-height: 28px; /* its 28 px status bar */
+  --zuri-reset-status-size: 11px; /* the 11 px status time */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Account page (design node 0:12527)                                       */
+/* ------------------------------------------------------------------------ */
+/* Five frames on one page: default, dirty name field, saving, saved toast and
+   the settings.json read error. Colors sit in a page-scoped block so the node's
+   light palette survives either app theme. Radii are the tokens.json values
+   this node binds: card 10 = radius-md, dialog 12 = radius-lg, overlay 12,
+   row 8 = radius-row, avatar pill 999 = radius-pill. */
+.account-page {
+  --zuri-account-canvas: #f7f8f9; /* color/surface: page canvas, quiet button */
+  --zuri-account-surface: #ffffff; /* color/inverse: top bar, cards, dialog, toast */
+  --zuri-account-sunken: #f0f1f3; /* color/sunken: nav track, path row, stat cells */
+  --zuri-account-hairline: #edeef0; /* color/hover: card divider, device row rule */
+  --zuri-account-border: #e8eaed; /* color/border: field outline, secondary button */
+  --zuri-account-text: #1f2328; /* color/text: title, card heading, value */
+  --zuri-account-text-secondary: #6b7280; /* color/subtle: body copy, hint */
+  --zuri-account-text-muted: #8e9196; /* color/muted: section label, crumb */
+  --zuri-account-primary: #2f6bff; /* color/primary: save button, links */
+  --zuri-account-primary-strong: #245be0; /* primary at hover */
+  --zuri-account-primary-soft: #eaf0ff; /* color/primary-soft: selected segment, focus wash */
+  --zuri-account-accent: #6b4eff; /* color/accent: mark, avatar */
+  --zuri-account-success: #1f9d6b; /* color/success: saved toast glyph */
+  --zuri-account-success-soft: #e9f6f0; /* saved toast glyph disc */
+  --zuri-account-danger: #d14343; /* color/danger: danger label, banner rule, reset button */
+  --zuri-account-danger-strong: #b23535; /* danger at hover */
+  --zuri-account-danger-soft: #fdeeee; /* error banner fill, danger icon disc */
+  --zuri-account-scrim: rgba(15, 23, 42, 0.4); /* dialog scrim over the canvas */
+  --zuri-account-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card and toast, node's 0 4 16 #0F172A14 */
+  --zuri-account-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
+  --zuri-account-gutter: 40px; /* page gutter left and right */
+  --zuri-account-gutter-top: 24px; /* breadcrumb row top */
+  --zuri-account-grid-gap: 32px; /* gutter between the main and rail columns */
+  --zuri-account-grid-top: 24px; /* page head bottom to the first card */
+  --zuri-account-card-gap: 16px; /* stack gap between cards in a column */
+  --zuri-account-main-width: 900px; /* the node's left column */
+  --zuri-account-rail-width: 428px; /* the node's right rail */
+  --zuri-account-card-padding: 24px; /* card inset all sides */
+  --zuri-account-card-radius: var(--zuri-radius-md); /* tokens.json radius-card 10 */
+  --zuri-account-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-account-dialog-radius: var(--zuri-radius-lg); /* tokens.json radius-modal 12 */
+  --zuri-account-overlay-radius: var(--zuri-radius-lg); /* tokens.json radius-overlay 12 */
+  --zuri-account-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-account-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-account-tab-size: 12px; /* nav tab and breadcrumb text */
+  --zuri-account-tab-padding: 14px; /* nav tab side padding */
+  --zuri-account-title-size: 28px; /* page title */
+  --zuri-account-title-leading: 36px; /* its 36 px line */
+  --zuri-account-meta-size: 13px; /* meta line, button label, row copy */
+  --zuri-account-meta-leading: 20px; /* the 20 px meta line */
+  --zuri-account-body-size: 13px; /* paragraph and hint copy */
+  --zuri-account-body-leading: 18px; /* the node's 18 px copy line */
+  --zuri-account-card-title-size: 15px; /* card heading */
+  --zuri-account-card-title-leading: 20px; /* its 20 px line */
+  --zuri-account-value-size: 20px; /* storage count value */
+  --zuri-account-value-leading: 28px; /* its 28 px line */
+  --zuri-account-label-size: 11px; /* upper-case section label */
+  --zuri-account-label-leading: 14px; /* its 14 px line */
+  --zuri-account-label-tracking: 0.4px; /* letterSpacing on the label */
+  --zuri-account-small-size: 12px; /* field label, path, hint row */
+  --zuri-account-small-leading: 16px; /* its 16 px line */
+  --zuri-account-control-height: 38px; /* fields and buttons, the node's row boxes */
+  --zuri-account-label-gap: 6px; /* field label to its control */
+  --zuri-account-head-gap: 8px; /* title to its supporting line */
+  --zuri-account-section-gap: 16px; /* label to the card body */
+  --zuri-account-row-gap: 20px; /* body block to body block inside a card */
+  --zuri-account-avatar-size: 64px; /* profile avatar on this page */
+  --zuri-account-avatar-glyph: 20px; /* its initials */
+  --zuri-account-topbar-avatar: 32px; /* avatar chip in the bar */
+  --zuri-account-stat-min: 96px; /* each storage count column's minimum */
+  --zuri-account-dialog-width: 420px; /* reset confirmation card */
+  --zuri-account-dialog-title-size: 18px; /* the dialog's question */
+  --zuri-account-dialog-title-leading: 26px; /* its 26 px line */
+  --zuri-account-toast-width: 280px; /* saved toast */
+  --zuri-account-toast-bottom: 24px; /* toast clears the page edge */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Connectors page (design node 0:12996)                                    */
+/* ------------------------------------------------------------------------ */
+/* Eight frames on one page: connected, empty, loading, connecting, error,
+   disabled, restart and a 390 px phone frame. The node's palette is the light
+   collection its sibling settings pages use, so it sits in a page-scoped block
+   and survives either app theme. Radii are the tokens.json values this node
+   binds: card 10 = radius-md, row 8 = radius-row, pill 999 = radius-pill. */
+.connectors-page {
+  --zuri-connectors-canvas: #f7f8f9; /* color/surface: page canvas */
+  --zuri-connectors-surface: #ffffff; /* color/inverse: top bar, cards, fields */
+  --zuri-connectors-sunken: #f0f1f3; /* color/sunken: logo tile, tag, nav hover */
+  --zuri-connectors-hairline: #edeef0; /* color/hover: card and nav rules */
+  --zuri-connectors-border: #e8eaed; /* color/border: card edge, field, quiet button */
+  --zuri-connectors-text: #1f2328; /* color/text: title, name, input value */
+  --zuri-connectors-text-secondary: #6b7280; /* color/subtle: description, chip, nav row */
+  --zuri-connectors-text-muted: #8e9196; /* color/muted: scope label, note, tag */
+  --zuri-connectors-primary: #2f6bff; /* color/primary: Test connection, active nav row */
+  --zuri-connectors-primary-strong: #245be0; /* primary at hover */
+  --zuri-connectors-primary-soft: #eaf0ff; /* color/primary-soft: active nav wash, empty disc */
+  --zuri-connectors-accent: #6b4eff; /* color/accent: mark and avatar */
+  --zuri-connectors-text-on-primary: #ffffff; /* primary ramp contrast foreground */
+  --zuri-connectors-success: #1f9d6b; /* color/success: Connected badge */
+  --zuri-connectors-success-soft: #e9f6f0; /* success at its badge wash */
+  --zuri-connectors-warning: #a15c00; /* color/warning: Needs auth and Connecting badges */
+  --zuri-connectors-warning-soft: #fdf3e3; /* warning at its badge wash */
+  --zuri-connectors-danger: #d14343; /* color/danger: rejected key message */
+  --zuri-connectors-danger-soft: #fdeeee; /* danger block fill */
+  --zuri-connectors-danger-line: rgba(209, 67, 67, 0.32); /* danger block outline, node's 32% */
+  --zuri-connectors-skeleton: #edeef0; /* loading bars: color/hover at rest */
+  --zuri-connectors-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 #0F172A14 */
+
+  /* Frame and grid */
+  --zuri-connectors-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
+  --zuri-connectors-gutter: 40px; /* page gutter left and right */
+  --zuri-connectors-gutter-top: 28px; /* nav and column top */
+  --zuri-connectors-nav-width: 208px; /* settings nav column */
+  --zuri-connectors-nav-gap: 24px; /* nav -> hairline -> column */
+  --zuri-connectors-nav-hairline-gap: 24px; /* hairline -> the page column */
+  --zuri-connectors-nav-label-gap: 8px; /* label -> first row */
+  --zuri-connectors-nav-row-height: 32px; /* one nav row */
+  --zuri-connectors-nav-row-padding: 10px; /* row side padding */
+  --zuri-connectors-nav-icon-gap: 8px; /* row glyph -> label */
+  --zuri-connectors-column-width: 640px; /* the node's page column */
+  --zuri-connectors-list-gap: 20px; /* subtitle -> the card list */
+  --zuri-connectors-card-radius: var(--zuri-radius-md); /* tokens.json radius-card 10 */
+  --zuri-connectors-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-connectors-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-connectors-card-padding: 24px; /* card inset all sides */
+  --zuri-connectors-phone-card-padding: 16px; /* the phone frame's tighter inset */
+  --zuri-connectors-phone-card-gap: 12px; /* gap between the phone frame's two cards */
+  --zuri-connectors-phone-field-padding: 10px; /* Base URL row inset on the phone */
+  --zuri-connectors-phone-inset: 16px; /* phone page gutter */
+  --zuri-connectors-status-height: 28px; /* phone status bar */
+  --zuri-connectors-status-size: 11px; /* its clock */
+
+  /* Type */
+  --zuri-connectors-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-connectors-title-size: 28px; /* page title */
+  --zuri-connectors-title-leading: 36px; /* its 36 px line */
+  --zuri-connectors-card-title-size: 15px; /* connector name */
+  --zuri-connectors-card-title-leading: 20px; /* its 20 px line */
+  --zuri-connectors-meta-size: 13px; /* subtitle, nav row, button label */
+  --zuri-connectors-meta-leading: 20px; /* the 20 px meta line */
+  --zuri-connectors-body-size: 13px; /* description and empty-state copy */
+  --zuri-connectors-body-leading: 19px; /* the 19 px copy line */
+  --zuri-connectors-small-size: 12px; /* chip, note, badge, avatar initials */
+  --zuri-connectors-small-leading: 16px; /* its 16 px line */
+  --zuri-connectors-label-size: 11px; /* upper-case tag and scope label */
+  --zuri-connectors-label-leading: 14px; /* its 14 px line */
+  --zuri-connectors-label-tracking: 0.4px; /* letterSpacing on the label */
+
+  /* Inside a card */
+  --zuri-connectors-head-icon-gap: 10px; /* logo -> name */
+  --zuri-connectors-logo-size: 32px; /* connector logo tile */
+  --zuri-connectors-tag-padding: 8px; /* tag and badge side padding */
+  --zuri-connectors-badge-padding: 8px; /* status badge side padding */
+  --zuri-connectors-desc-gap: 12px; /* head -> description, field */
+  --zuri-connectors-rule-gap: 16px; /* body block -> its rule */
+  --zuri-connectors-head-gap: 8px; /* title -> its supporting line */
+  --zuri-connectors-chip-gap: 8px; /* chip -> chip */
+  --zuri-connectors-chip-row-gap: 8px; /* scope label -> the chip row */
+  --zuri-connectors-chip-icon-gap: 6px; /* glyph -> chip label */
+  --zuri-connectors-chip-padding: 10px; /* chip side padding */
+  --zuri-connectors-note-gap: 12px; /* chips -> keys note */
+  --zuri-connectors-action-gap: 16px; /* note -> the action row */
+  --zuri-connectors-control-height: 38px; /* buttons and the URL field */
+  --zuri-connectors-button-padding: 16px; /* button side padding */
+  --zuri-connectors-field-icon-gap: 8px; /* field glyph -> input */
+  --zuri-connectors-field-padding: 12px; /* field side padding */
+  --zuri-connectors-error-padding: 12px; /* rejected-key block inset */
+
+  /* Empty state and loading */
+  --zuri-connectors-empty-padding: 32px; /* empty card inset */
+  --zuri-connectors-empty-disc: 40px; /* its glyph disc */
+  --zuri-connectors-avatar-size: 28px; /* account chip in the top bar */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Desktop capabilities page (design node 0:13641)                         */
+/* ------------------------------------------------------------------------ */
+/* Five frames on one page: default, saving, empty, error and saved. The node
+   draws the light collection its sibling settings pages use, so its values sit
+   in a page-scoped block and survive either app theme. Radii are the
+   tokens.json values this node binds: card 10 = radius-md, row 8 = radius-row,
+   pill 999 = radius-pill. */
+.desktop-page {
+  --zuri-desktop-canvas: #f7f8f9; /* color/surface: page canvas */
+  --zuri-desktop-surface: #ffffff; /* color/inverse: top bar, cards, fields */
+  --zuri-desktop-sunken: #f0f1f3; /* color/sunken: tag, nav hover, entry list */
+  --zuri-desktop-hairline: #edeef0; /* color/hover: card and nav rules */
+  --zuri-desktop-border: #e8eaed; /* color/border: card edge, field, quiet button */
+  --zuri-desktop-text: #1f2328; /* color/text: title, capability name, entry */
+  --zuri-desktop-text-secondary: #6b7280; /* color/subtle: description, nav row, Remove */
+  --zuri-desktop-text-muted: #8e9196; /* color/muted: label, tag, switch note */
+  --zuri-desktop-primary: #2f6bff; /* color/primary: Save, switch on, active nav row */
+  --zuri-desktop-primary-strong: #245be0; /* primary at hover */
+  --zuri-desktop-primary-soft: #eaf0ff; /* color/primary-soft: active nav wash */
+  --zuri-desktop-text-on-primary: #ffffff; /* primary ramp contrast foreground */
+  --zuri-desktop-accent: #6b4eff; /* color/accent: mark and avatar */
+  --zuri-desktop-success: #1f9d6b; /* color/success: check mark, Saved note, toast */
+  --zuri-desktop-success-soft: #e9f6f0; /* success at its disc and toast wash */
+  --zuri-desktop-warning: #a15c00; /* color/warning: empty allow-list note */
+  --zuri-desktop-warning-soft: #fdf3e3; /* warning at its note fill */
+  --zuri-desktop-danger: #d14343; /* color/danger: refused entry, Remove hover */
+  --zuri-desktop-danger-soft: #fdeeee; /* danger block fill */
+  --zuri-desktop-danger-line: rgba(209, 67, 67, 0.32); /* danger block outline, node's 32% */
+  --zuri-desktop-switch-track: #d5d8dd; /* switch track while off */
+  --zuri-desktop-switch-knob: #ffffff; /* switch knob in both positions */
+  --zuri-desktop-knob-shadow: 0 1px 2px rgba(15, 23, 42, 0.24); /* knob lift, node's 1 2 #0F172A3D */
+  --zuri-desktop-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 #0F172A14 */
+
+  /* Geometry */
+  --zuri-desktop-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
+  --zuri-desktop-gutter: 40px; /* page gutter left and right */
+  --zuri-desktop-gutter-top: 28px; /* nav and column top */
+  --zuri-desktop-nav-width: 208px; /* settings nav column */
+  --zuri-desktop-nav-gap: 24px; /* nav -> hairline -> column */
+  --zuri-desktop-nav-hairline-gap: 24px; /* hairline -> the page column */
+  --zuri-desktop-nav-label-gap: 8px; /* label -> first row */
+  --zuri-desktop-nav-row-height: 32px; /* one nav row */
+  --zuri-desktop-nav-row-padding: 10px; /* row side padding */
+  --zuri-desktop-nav-icon-gap: 8px; /* row glyph -> label */
+  --zuri-desktop-column-width: 640px; /* the node's page column */
+  --zuri-desktop-list-gap: 20px; /* subtitle -> the capability list */
+  --zuri-desktop-card-gap: 16px; /* card -> card, and the action row above the toast */
+  --zuri-desktop-card-radius: var(--zuri-radius-md); /* tokens.json radius-card 10 */
+  --zuri-desktop-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-desktop-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-desktop-card-padding: 24px; /* card inset all sides */
+  --zuri-desktop-row-padding: 14px 24px; /* one capability row */
+  --zuri-desktop-row-gap: 12px; /* glyph -> text, text -> its note */
+  --zuri-desktop-capability-gap: 2px; /* name -> the line under it */
+  --zuri-desktop-check-size: 20px; /* the check disc */
+  --zuri-desktop-mark-size: 24px; /* app mark in the top bar */
+  --zuri-desktop-avatar-size: 28px; /* account chip in the top bar */
+  --zuri-desktop-tag-padding: 8px; /* tag side padding, toast side padding */
+  --zuri-desktop-chip-gap: 6px; /* toast glyph -> its line */
+  --zuri-desktop-head-gap: 8px; /* title -> its supporting line */
+  --zuri-desktop-label-gap: 6px; /* field label -> its control, field -> its list */
+  --zuri-desktop-note-padding: 12px; /* warning and error inset */
+
+  /* Controls */
+  --zuri-desktop-switch-width: 36px; /* switch track */
+  --zuri-desktop-switch-height: 20px; /* its height */
+  --zuri-desktop-switch-knob-size: 16px; /* knob inside the track */
+  --zuri-desktop-switch-travel: 16px; /* knob's travel when the switch is on */
+  --zuri-desktop-switch-gap: 8px; /* track -> On / Off word */
+  --zuri-desktop-control-height: 38px; /* fields and buttons */
+  --zuri-desktop-control-gap: 8px; /* field -> Add, and the action row */
+  --zuri-desktop-field-padding: 12px; /* field side padding, entry side padding */
+  --zuri-desktop-button-padding: 16px; /* button side padding */
+  --zuri-desktop-entry-height: 36px; /* one allow-list row */
+
+  /* Type */
+  --zuri-desktop-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-desktop-title-size: 28px; /* page title */
+  --zuri-desktop-title-leading: 36px; /* its 36 px line */
+  --zuri-desktop-card-title-size: 15px; /* card heading, capability name */
+  --zuri-desktop-card-title-leading: 20px; /* its 20 px line */
+  --zuri-desktop-meta-size: 13px; /* subtitle, nav row, field, button */
+  --zuri-desktop-meta-leading: 20px; /* the 20 px meta line */
+  --zuri-desktop-body-size: 13px; /* description copy */
+  --zuri-desktop-body-leading: 19px; /* the 19 px copy line */
+  --zuri-desktop-small-size: 12px; /* switch note, toast, Remove */
+  --zuri-desktop-small-leading: 16px; /* its 16 px line */
+  --zuri-desktop-label-size: 11px; /* upper-case label and tag */
+  --zuri-desktop-label-leading: 14px; /* its 14 px line */
+  --zuri-desktop-label-tracking: 0.4px; /* letterSpacing on the label */
+}
+
+/* ------------------------------------------------------------------ audit */
+/* The audit page sits in the same settings collection as the desktop page, so
+   it takes the same light palette and only adds what an entry table needs. The
+   values live here rather than in audit.css so a change to the drawn page is a
+   change to one token block. Radii are the tokens.json values this node binds:
+   card 10 = radius-md, row 8 = radius-row, pill 999 = radius-pill. */
+.audit-page {
+  --zuri-audit-canvas: #f7f8f9; /* color/surface: page canvas */
+  --zuri-audit-surface: #ffffff; /* color/inverse: top bar, cards, table */
+  --zuri-audit-sunken: #f0f1f3; /* color/sunken: table head, detail panel, hover */
+  --zuri-audit-hairline: #edeef0; /* color/hover: row rules, card and nav rules */
+  --zuri-audit-border: #e8eaed; /* color/border: card edge, select, quiet button */
+  --zuri-audit-text: #1f2328; /* color/text: title, tool name, target */
+  --zuri-audit-text-secondary: #6b7280; /* color/subtle: subtitle, time, nav row */
+  --zuri-audit-text-muted: #8e9196; /* color/muted: column label, note, chevron */
+  --zuri-audit-primary: #2f6bff; /* color/primary: current nav row, link */
+  --zuri-audit-primary-strong: #245be0; /* primary at hover */
+  --zuri-audit-primary-soft: #eaf0ff; /* color/primary-soft: active nav wash */
+  --zuri-audit-text-on-primary: #ffffff; /* primary ramp contrast foreground */
+  --zuri-audit-accent: #6b4eff; /* color/accent: mark and avatar */
+  --zuri-audit-success: #1f9d6b; /* color/success: Done, Allowed, Confirmed */
+  --zuri-audit-success-soft: #e9f6f0; /* success at its status pill wash */
+  --zuri-audit-warning: #a15c00; /* color/warning: Blocked status */
+  --zuri-audit-warning-soft: #fdf3e3; /* warning at its pill wash */
+  --zuri-audit-danger: #d14343; /* color/danger: a failed entry */
+  --zuri-audit-danger-soft: #fdeeee; /* danger pill fill */
+  --zuri-audit-danger-line: rgba(209, 67, 67, 0.32); /* danger block outline */
+  --zuri-audit-skeleton: #eef0f3; /* loading rows, node's placeholder fill */
+  --zuri-audit-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 #0F172A14 */
+
+  /* Geometry */
+  --zuri-audit-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
+  --zuri-audit-gutter: 40px; /* page gutter left and right */
+  --zuri-audit-gutter-top: 28px; /* nav and column top */
+  --zuri-audit-nav-width: 208px; /* settings nav column */
+  --zuri-audit-nav-gap: 24px; /* nav -> hairline -> column */
+  --zuri-audit-nav-hairline-gap: 24px; /* hairline -> the page column */
+  --zuri-audit-nav-label-gap: 8px; /* label -> first row */
+  --zuri-audit-nav-row-height: 32px; /* one nav row */
+  --zuri-audit-nav-row-padding: 10px; /* row side padding */
+  --zuri-audit-nav-icon-gap: 8px; /* row glyph -> label */
+  --zuri-audit-column-width: 640px; /* the node's page column */
+  --zuri-audit-toolbar-gap: 20px; /* subtitle -> the filter row */
+  --zuri-audit-card-gap: 14px; /* card -> the note under it */
+  --zuri-audit-card-radius: var(--zuri-radius-md); /* tokens.json radius-card 10 */
+  --zuri-audit-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-audit-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-audit-cell-padding: 12px 16px; /* one entry row */
+  --zuri-audit-head-padding: 9px 16px; /* the column label row */
+  --zuri-audit-mark-size: 24px; /* app mark in the top bar */
+  --zuri-audit-avatar-size: 28px; /* account chip in the top bar */
+  --zuri-audit-chip-gap: 6px; /* glyph -> word inside a pill or note */
+  --zuri-audit-head-gap: 8px; /* title -> its supporting line */
+  --zuri-audit-toolbar-gap-inline: 8px; /* select -> select -> Export */
+  --zuri-audit-empty-padding: 40px 24px; /* empty card inset */
+  --zuri-audit-empty-icon: 40px; /* the disc above the empty title */
+  --zuri-audit-detail-padding: 12px 16px 14px; /* the open entry's panel */
+  --zuri-audit-detail-gap: 12px; /* between two detail pairs */
+
+  /* Controls */
+  --zuri-audit-control-height: 34px; /* selects and Export */
+  --zuri-audit-field-padding: 10px; /* select text inset, Export side padding */
+  --zuri-audit-select-chevron: 10px; /* chevron inset from the select's right edge */
+  --zuri-audit-status-padding: 3px 8px; /* status pill inset */
+  --zuri-audit-toggle-size: 24px; /* the chevron button per row */
+
+  /* Type */
+  --zuri-audit-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-audit-title-size: 28px; /* page title */
+  --zuri-audit-title-leading: 36px; /* its 36 px line */
+  --zuri-audit-card-title-size: 15px; /* empty-state heading */
+  --zuri-audit-card-title-leading: 20px; /* its 20 px line */
+  --zuri-audit-meta-size: 13px; /* subtitle, nav row, select, cell */
+  --zuri-audit-meta-leading: 20px; /* the 20 px meta line */
+  --zuri-audit-small-size: 12px; /* note, detail value, status pill */
+  --zuri-audit-small-leading: 16px; /* its 16 px line */
+  --zuri-audit-label-size: 11px; /* upper-case label and column head */
+  --zuri-audit-label-leading: 14px; /* its 14 px line */
+  --zuri-audit-label-tracking: 0.4px; /* letterSpacing on the label */
+}
+
+/* ----------------------------------------------------- demo runner page --- */
+/* Automations demo runner (design node 0:14959). It sits in the automations
+   collection beside the automations list (0:7686) and the run result page
+   (0:8574), so it takes the same light palette and only adds what a runner
+   needs: a step row height, a status chip inset and the log panel. Radii are
+   the tokens.json values this node binds: card 10 = radius-card, row and
+   button 8 = radius-row, chip 999 = radius-pill. */
+.demo-page {
+  --zuri-demo-canvas: #f7f8f9; /* color/surface: page canvas */
+  --zuri-demo-surface: #ffffff; /* color/inverse: top bar and the two cards */
+  --zuri-demo-sunken: #f0f1f3; /* color/sunken: nav strip, log panel, chip */
+  --zuri-demo-hairline: #edeef0; /* color/hover: step rules */
+  --zuri-demo-border: #e8eaed; /* color/border: card edge, quiet button */
+  --zuri-demo-text: #1f2328; /* color/text: title, step name */
+  --zuri-demo-text-secondary: #6b7280; /* color/subtle: subtitle, step detail */
+  --zuri-demo-text-muted: #8e9196; /* color/muted: crumb, timestamp, meta */
+  --zuri-demo-primary: #2f6bff; /* color/primary: Run demo, active step */
+  --zuri-demo-primary-strong: #245be0; /* primary at hover */
+  --zuri-demo-primary-soft: #eaf0ff; /* color/primary-soft: active and restart wash */
+  --zuri-demo-on-primary: #ffffff; /* primary ramp contrast foreground */
+  --zuri-demo-accent: #6b4eff; /* color/accent: mark and avatar */
+  --zuri-demo-success: #1f9d6b; /* color/success: passed chip */
+  --zuri-demo-success-soft: #e9f6f0; /* success at its chip wash */
+  --zuri-demo-warning: #a15c00; /* color/warning: skipped chip */
+  --zuri-demo-warning-soft: #fdf3e3; /* warning at its chip wash */
+  --zuri-demo-danger: #d14343; /* color/danger: failed chip and log error */
+  --zuri-demo-danger-soft: #fdeeee; /* danger chip fill */
+  --zuri-demo-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 */
+  --zuri-demo-tab-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); /* the lit tab in the nav strip */
+
+  /* Geometry */
+  --zuri-demo-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
+  --zuri-demo-gutter: 40px; /* page gutter left and right */
+  --zuri-demo-gutter-top: 28px; /* crumbs and column top */
+  --zuri-demo-rail-width: 320px; /* scenario rail beside the step column */
+  --zuri-demo-column-gap: 24px; /* step column -> rail */
+  --zuri-demo-card-radius: var(--zuri-radius-card); /* tokens.json radius-card 10 */
+  --zuri-demo-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-demo-chip-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-demo-header-gap: 8px; /* title -> subtitle */
+  --zuri-demo-section-gap: 16px; /* header -> cards, card -> card */
+  --zuri-demo-step-padding: 14px 16px; /* one step row */
+
+  /* Controls */
+  --zuri-demo-control-height: 36px; /* Run demo and Restart */
+  --zuri-demo-chip-padding: 3px 8px; /* status chip inset */
+  --zuri-demo-chip-gap: 6px; /* glyph -> word inside a chip */
+  --zuri-demo-step-number: 24px; /* the step's numbered disc */
+  --zuri-demo-log-max-height: 268px; /* the log panel's scroll box */
+
+  /* Type */
+  --zuri-demo-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-demo-title-size: 28px; /* page title */
+  --zuri-demo-title-leading: 36px; /* its 36 px line */
+  --zuri-demo-body-size: 13px; /* subtitle, nav row, step name */
+  --zuri-demo-body-leading: 20px; /* the 20 px body line */
+  --zuri-demo-small-size: 12px; /* step detail, chip, rail value */
+  --zuri-demo-small-leading: 16px; /* its 16 px line */
+  --zuri-demo-label-size: 11px; /* upper-case label and rail key */
+  --zuri-demo-label-leading: 14px; /* its 14 px line */
+  --zuri-demo-label-tracking: 0.4px; /* letterSpacing on the label */
+  --zuri-demo-mono-size: 12px; /* one log line */
+  --zuri-demo-mono-leading: 18px; /* its 18 px line */
+}
+
+/* -------------------------------------------------------- handoff queue --- */
+/* Cloud handoff queue page (design node 0:14565). It belongs to the same
+   settings collection as the connectors, desktop and audit pages, so it takes
+   the same light palette and only adds the pieces a queue needs: a progress
+   track, a neutral "Queued" pill and the row order column. Radii are the
+   tokens.json values this node binds: card 10 = radius-md, row 8 = radius-row,
+   pill 999 = radius-pill. */
+.handoff-page {
+  --zuri-handoff-canvas: #f7f8f9; /* color/surface: page canvas */
+  --zuri-handoff-surface: #ffffff; /* color/inverse: top bar, card, footer */
+  --zuri-handoff-sunken: #f0f1f3; /* color/sunken: table head, order column wash */
+  --zuri-handoff-hairline: #edeef0; /* color/hover: row rules, card and nav rules */
+  --zuri-handoff-border: #e8eaed; /* color/border: card edge, quiet button */
+  --zuri-handoff-text: #1f2328; /* color/text: title, item name, size */
+  --zuri-handoff-text-secondary: #6b7280; /* color/subtle: subtitle, nav row, footer count */
+  --zuri-handoff-text-muted: #8e9196; /* color/muted: column label, order, note, item detail */
+  --zuri-handoff-primary: #2f6bff; /* color/primary: current nav row, Uploading pill, retry */
+  --zuri-handoff-primary-strong: #245be0; /* primary at hover */
+  --zuri-handoff-primary-soft: #eaf0ff; /* color/primary-soft: active nav wash, Uploading wash */
+  --zuri-handoff-text-on-primary: #ffffff; /* primary ramp contrast foreground */
+  --zuri-handoff-accent: #6b4eff; /* color/accent: mark and avatar */
+  --zuri-handoff-success: #1f9d6b; /* color/success: Sent pill */
+  --zuri-handoff-success-soft: #e9f6f0; /* success at its pill wash */
+  --zuri-handoff-danger: #d14343; /* color/danger: Failed pill, retry error line */
+  --zuri-handoff-danger-soft: #fdeeee; /* danger pill and inline error wash */
+  --zuri-handoff-danger-line: rgba(209, 67, 67, 0.32); /* danger block outline, node's 32% */
+  --zuri-handoff-track: #edeef0; /* progress track, at rest */
+  --zuri-handoff-skeleton: #e8eaed; /* loading rows: color/border at rest */
+  --zuri-handoff-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 #0F172A14 */
+
+  /* Frame and grid */
+  --zuri-handoff-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
+  --zuri-handoff-gutter: 40px; /* page gutter left and right */
+  --zuri-handoff-gutter-top: 28px; /* nav and column top */
+  --zuri-handoff-nav-width: 208px; /* settings nav column */
+  --zuri-handoff-nav-gap: 24px; /* nav -> hairline -> column */
+  --zuri-handoff-nav-hairline-gap: 24px; /* hairline -> the page column */
+  --zuri-handoff-nav-label-gap: 8px; /* label -> first row */
+  --zuri-handoff-nav-row-height: 32px; /* one nav row */
+  --zuri-handoff-nav-row-padding: 10px; /* row side padding */
+  --zuri-handoff-nav-icon-gap: 8px; /* row glyph -> label */
+  --zuri-handoff-column-width: 640px; /* the node's page column */
+  --zuri-handoff-head-gap: 8px; /* title -> its supporting line */
+  --zuri-handoff-card-gap: 20px; /* subtitle -> the queue card */
+  --zuri-handoff-note-gap: 14px; /* card -> the provider note */
+  --zuri-handoff-card-radius: var(--zuri-radius-md); /* tokens.json radius-card 10 */
+  --zuri-handoff-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-handoff-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-handoff-mark-size: 24px; /* app mark in the top bar */
+  --zuri-handoff-avatar-size: 28px; /* account chip in the top bar */
+
+  /* Queue rows: order, item, size, status, action */
+  --zuri-handoff-order-width: 20px; /* the drawn queue position */
+  --zuri-handoff-size-width: 68px; /* right-aligned size column */
+  --zuri-handoff-status-width: 104px; /* pill column */
+  --zuri-handoff-action-width: 76px; /* Cancel / Retry column */
+  --zuri-handoff-column-gap: 12px; /* gap between row columns */
+  --zuri-handoff-head-padding: 9px 16px; /* the column label row */
+  --zuri-handoff-cell-padding: 12px 16px; /* one queue row */
+  --zuri-handoff-footer-padding: 12px 16px; /* the count and Clear completed */
+  --zuri-handoff-icon-size: 28px; /* item type tile */
+  --zuri-handoff-icon-radius: var(--zuri-radius-row); /* tile follows the row radius */
+  --zuri-handoff-icon-gap: 10px; /* tile -> item name */
+  --zuri-handoff-name-gap: 2px; /* item name -> its supporting line */
+  --zuri-handoff-progress-height: 4px; /* the uploading row's track */
+  --zuri-handoff-progress-gap: 8px; /* detail -> progress track */
+  --zuri-handoff-spinner-size: 10px; /* the Uploading pill's ring */
+  --zuri-handoff-spinner-width: 1.5px; /* its stroke */
+  --zuri-handoff-chip-gap: 6px; /* glyph -> word inside a pill or note */
+  --zuri-handoff-status-padding: 3px 8px; /* status pill inset */
+  --zuri-handoff-control-height: 30px; /* Clear completed and a row action */
+  --zuri-handoff-clear-padding: 10px; /* Clear completed side padding */
+
+  /* Empty frame */
+  --zuri-handoff-empty-padding: 40px 24px; /* empty card inset */
+  --zuri-handoff-empty-icon: 40px; /* the disc above the empty title */
+  --zuri-handoff-empty-gap: 8px; /* disc -> title -> note */
+
+  /* Type */
+  --zuri-handoff-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-handoff-title-size: 28px; /* page title */
+  --zuri-handoff-title-leading: 36px; /* its 36 px line */
+  --zuri-handoff-card-title-size: 15px; /* empty-state heading */
+  --zuri-handoff-card-title-leading: 20px; /* its 20 px line */
+  --zuri-handoff-meta-size: 13px; /* subtitle, nav row, item name, button label */
+  --zuri-handoff-meta-leading: 20px; /* the 20 px meta line */
+  --zuri-handoff-item-name-size: 13px; /* item name inside a row */
+  --zuri-handoff-item-name-leading: 18px; /* its 18 px line */
+  --zuri-handoff-small-size: 12px; /* item detail, size, note, pill, footer count */
+  --zuri-handoff-small-leading: 16px; /* its 16 px line */
+  --zuri-handoff-label-size: 11px; /* upper-case label and column head */
+  --zuri-handoff-label-leading: 14px; /* its 14 px line */
+  --zuri-handoff-label-tracking: 0.4px; /* letterSpacing on the label */
+}
+
+/* ------------------------------------------------- self-test results page --- */
+/* Self-test results (design node 0:15423). It is the last screen of the settings
+   family, drawn beside the audit log (0:14163) and the cloud handoff queue
+   (0:14565), so it takes their palette roles rather than inventing new ones:
+   color/surface is the canvas, color/inverse the cards, color/sunken the nav
+   track and the assertion block. Radii are the tokens.json bindings this node
+   uses: cards on radius-card 10, check rows and buttons on radius-row 8, status
+   pills on radius-pill 999. */
+.selftest-page {
+  --zuri-selftest-canvas: #f7f8f9; /* color/surface: page canvas */
+  --zuri-selftest-surface: #ffffff; /* color/inverse: top bar, summary, cards, rail */
+  --zuri-selftest-sunken: #f0f1f3; /* color/sunken: nav hover, assertion block, pending rows */
+  --zuri-selftest-hairline: #edeef0; /* color/hover: row rules, card and nav rules */
+  --zuri-selftest-border: #e8eaed; /* color/border: card edge, quiet button */
+  --zuri-selftest-text: #1f2328; /* color/text: title, suite name, check name */
+  --zuri-selftest-text-secondary: #6b7280; /* color/subtle: subtitle, suite file, nav row */
+  --zuri-selftest-text-muted: #8e9196; /* color/muted: label, duration, rail key */
+  --zuri-selftest-primary: #2f6bff; /* color/primary: current nav row, Run again */
+  --zuri-selftest-primary-strong: #245be0; /* primary at hover */
+  --zuri-selftest-primary-soft: #eaf0ff; /* color/primary-soft: active nav wash, running wash */
+  --zuri-selftest-text-on-primary: #ffffff; /* primary ramp contrast foreground */
+  --zuri-selftest-accent: #6b4eff; /* color/accent: mark and avatar */
+  --zuri-selftest-success: #1f9d6b; /* color/success: passed checks, the green summary */
+  --zuri-selftest-success-soft: #e9f6f0; /* success at its summary and pill wash */
+  --zuri-selftest-danger: #d14343; /* color/danger: a failed check, the red summary */
+  --zuri-selftest-danger-soft: #fdeeee; /* danger summary and pill wash */
+  --zuri-selftest-danger-line: rgba(209, 67, 67, 0.32); /* danger block outline, node's 32% */
+  --zuri-selftest-skeleton: #eef0f3; /* loading rows, node's placeholder fill */
+  --zuri-selftest-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 #0F172A14 */
+
+  /* Frame and grid */
+  --zuri-selftest-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
+  --zuri-selftest-tabbar-height: 56px; /* phone bottom bar, one 56 px row of destinations */
+  --zuri-selftest-gutter: 40px; /* page gutter left and right */
+  --zuri-selftest-gutter-top: 28px; /* nav and column top */
+  --zuri-selftest-nav-width: 208px; /* settings nav column */
+  --zuri-selftest-nav-gap: 24px; /* nav -> hairline -> column */
+  --zuri-selftest-nav-hairline-gap: 24px; /* hairline -> the page column */
+  --zuri-selftest-nav-label-gap: 8px; /* label -> first row */
+  --zuri-selftest-nav-row-height: 32px; /* one nav row */
+  --zuri-selftest-nav-row-padding: 10px; /* row side padding */
+  --zuri-selftest-nav-icon-gap: 8px; /* row glyph -> label */
+  --zuri-selftest-rail-width: 296px; /* run detail beside the suites */
+  --zuri-selftest-column-gap: 24px; /* suites -> rail */
+  --zuri-selftest-head-gap: 8px; /* title -> its supporting line */
+  --zuri-selftest-summary-gap: 20px; /* subtitle -> summary */
+  --zuri-selftest-card-gap: 16px; /* summary -> suite, suite -> suite */
+  --zuri-selftest-rail-gap: 16px; /* rail card -> rail card */
+  --zuri-selftest-foot-gap: 20px; /* last card -> the closing note */
+
+  /* Boxes */
+  --zuri-selftest-card-radius: var(--zuri-radius-card); /* tokens.json radius-card 10 */
+  --zuri-selftest-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-selftest-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-selftest-more-radius: calc(var(--radius-radius-row) * 1px); /* the More panel, off the raw design number */
+  --zuri-selftest-mark-size: 24px; /* app mark in the top bar */
+  --zuri-selftest-avatar-size: 28px; /* account chip in the top bar */
+  --zuri-selftest-summary-padding: 18px 20px; /* the summary card inset */
+  --zuri-selftest-summary-icon: 32px; /* the disc beside the summary line */
+  --zuri-selftest-summary-gap-inline: 14px; /* disc -> summary text -> actions */
+  --zuri-selftest-suite-head-padding: 13px 20px; /* one suite header */
+  --zuri-selftest-check-padding: 9px 20px; /* one check row */
+  --zuri-selftest-check-icon: 16px; /* the tick or cross before a check name */
+  --zuri-selftest-check-gap: 10px; /* glyph -> name -> duration */
+  --zuri-selftest-assert-padding: 10px 12px; /* the failing assertion block */
+  --zuri-selftest-assert-gap: 6px; /* the assertion block under its check */
+  --zuri-selftest-rail-padding: 16px 18px; /* a rail card inset */
+  --zuri-selftest-chip-gap: 6px; /* glyph -> word inside a pill */
+  --zuri-selftest-status-padding: 3px 8px; /* status pill inset */
+  --zuri-selftest-control-height: 34px; /* Run again and Copy output */
+  --zuri-selftest-control-padding: 14px; /* their side padding */
+  --zuri-selftest-spinner-size: 12px; /* the running ring */
+  --zuri-selftest-spinner-width: 1.6px; /* its stroke */
+
+  /* Type */
+  --zuri-selftest-wordmark-size: 13px; /* app name in the top bar */
+  --zuri-selftest-title-size: 28px; /* page title */
+  --zuri-selftest-title-leading: 36px; /* its 36 px line */
+  --zuri-selftest-summary-size: 15px; /* the summary sentence */
+  --zuri-selftest-summary-leading: 20px; /* its 20 px line */
+  --zuri-selftest-card-title-size: 13px; /* suite name and rail title */
+  --zuri-selftest-card-title-leading: 18px; /* its 18 px line */
+  --zuri-selftest-meta-size: 13px; /* subtitle, nav row, check name, button label */
+  --zuri-selftest-meta-leading: 20px; /* the 20 px meta line */
+  --zuri-selftest-small-size: 12px; /* duration, note, pill, rail value */
+  --zuri-selftest-small-leading: 16px; /* its 16 px line */
+  --zuri-selftest-label-size: 11px; /* upper-case label */
+  --zuri-selftest-label-leading: 14px; /* its 14 px line */
+  --zuri-selftest-label-tracking: 0.4px; /* letterSpacing on the label */
+}
+
+/* ------------------------------------------- smoke and first-run check --- */
+/* Smoke-test and first-run check overlay (design node 0:15576). It is drawn
+   over the app shell, not beside it: the three regions the smoke check asserts
+   (#sidebar, #chat, #context-panel) are the page behind the scrim, and the
+   panel is the only thing that moves. It borrows the settings family's colour
+   roles rather than inventing a second palette, and the radii are the
+   tokens.json bindings this node uses: the panel on radius-overlay 12, the
+   assertion rows and the buttons on radius-row 8, the status pills on
+   radius-pill 999, the log block on radius-card 10. */
+.diagnostics-page {
+  --zuri-diagnostics-canvas: #f7f8f9; /* color/surface: page canvas behind the shell */
+  --zuri-diagnostics-surface: #ffffff; /* color/inverse: top bar, panel, buttons */
+  --zuri-diagnostics-sunken: #f0f1f3; /* color/sunken: search field, log block, pending rows */
+  --zuri-diagnostics-hairline: #edeef0; /* color/hover: rules inside the shell and the panel */
+  --zuri-diagnostics-border: #e8eaed; /* color/border: panel edge, quiet button */
+  --zuri-diagnostics-text: #1f2328; /* color/text: panel title, assertion name */
+  --zuri-diagnostics-text-secondary: #6b7280; /* color/subtle: subtitle, shell copy, label */
+  --zuri-diagnostics-text-muted: #8e9196; /* color/muted: duration, hint, placeholder */
+  --zuri-diagnostics-primary: #2f6bff; /* color/primary: Run shell check, focus ring */
+  --zuri-diagnostics-primary-strong: #245be0; /* primary at hover */
+  --zuri-diagnostics-primary-soft: #eaf0ff; /* color/primary-soft: running wash, selected row */
+  --zuri-diagnostics-text-on-primary: #ffffff; /* primary ramp contrast foreground */
+  --zuri-diagnostics-accent: #6b4eff; /* color/accent: mark and avatar */
+  --zuri-diagnostics-success: #1f9d6b; /* color/success: a passed assertion */
+  --zuri-diagnostics-success-soft: #e9f6f0; /* success pill and summary wash */
+  --zuri-diagnostics-danger: #d14343; /* color/danger: the failing assertion, exit code 1 */
+  --zuri-diagnostics-danger-soft: #fdeeee; /* danger pill and log wash */
+  --zuri-diagnostics-danger-line: rgba(209, 67, 67, 0.32); /* danger outline, node's 32% */
+  --zuri-diagnostics-skeleton: #eef0f3; /* loading placeholders */
+  --zuri-diagnostics-scrim: rgba(15, 23, 42, 0.32); /* the wash between shell and panel */
+  --zuri-diagnostics-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* shell cards, node's 0 4 16 #0F172A14 */
+  --zuri-diagnostics-panel-shadow: 0 24px 64px rgba(15, 23, 42, 0.28); /* the panel's lift off the shell */
+
+  /* Frame and grid */
+  --zuri-diagnostics-topbar-height: 52px; /* the shell's bar; it stays full width */
+  --zuri-diagnostics-sidebar-width: 240px; /* the shell's #sidebar column */
+  --zuri-diagnostics-context-width: 300px; /* the shell's #context-panel column */
+  --zuri-diagnostics-gutter: 24px; /* shell padding left and right */
+  --zuri-diagnostics-columns-width: 1440px; /* the shell's band on a wide screen */
+  --zuri-diagnostics-column-gap: 16px; /* shell column -> column */
+  --zuri-diagnostics-overlay-width: 560px; /* the panel's width on a desktop */
+  --zuri-diagnostics-overlay-top: 96px; /* where the panel sits under the bar */
+  --zuri-diagnostics-overlay-padding: 20px 22px 18px; /* the panel inset */
+  --zuri-diagnostics-head-gap: 12px; /* disc -> title block -> close */
+  --zuri-diagnostics-body-gap: 14px; /* label -> list -> label -> log -> path */
+  --zuri-diagnostics-actions-gap: 8px; /* quiet button -> primary */
+  --zuri-diagnostics-path-gap: 6px; /* path label -> the path itself */
+
+  /* Boxes */
+  --zuri-diagnostics-panel-radius: var(--zuri-radius-overlay); /* tokens.json radius-overlay 12 */
+  --zuri-diagnostics-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
+  --zuri-diagnostics-card-radius: var(--zuri-radius-card); /* tokens.json radius-card 10 */
+  --zuri-diagnostics-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
+  --zuri-diagnostics-mark-size: 24px; /* app mark in the shell bar */
+  --zuri-diagnostics-avatar-size: 28px; /* account chip in the shell bar */
+  --zuri-diagnostics-disc-size: 32px; /* the disc beside the panel title */
+  --zuri-diagnostics-glyph-size: 16px; /* tick, cross, spinner in an assertion row */
+  --zuri-diagnostics-close-size: 28px; /* the panel's close button */
+  --zuri-diagnostics-control-height: 34px; /* both run buttons */
+  --zuri-diagnostics-control-padding: 14px; /* their side padding */
+  --zuri-diagnostics-row-padding: 7px 10px; /* one assertion row */
+  --zuri-diagnostics-row-gap: 10px; /* glyph -> name -> duration -> pill */
+  --zuri-diagnostics-log-padding: 10px 12px; /* the console-error block */
+  --zuri-diagnostics-log-height: 96px; /* its scroll box, so a long log cannot push the buttons off */
+  --zuri-diagnostics-pill-padding: 2px 8px; /* a status pill */
+  --zuri-diagnostics-pill-gap: 5px; /* glyph -> word inside a pill */
+  --zuri-diagnostics-nav-row-height: 30px; /* a shell nav row */
+  --zuri-diagnostics-spinner-size: 12px; /* the running ring */
+  --zuri-diagnostics-spinner-width: 1.6px; /* its stroke */
+
+  /* Type */
+  --zuri-diagnostics-wordmark-size: 13px; /* app name in the shell bar */
+  --zuri-diagnostics-title-size: 15px; /* panel title */
+  --zuri-diagnostics-title-leading: 22px; /* its 22 px line */
+  --zuri-diagnostics-meta-size: 13px; /* assertion name, button label, subtitle */
+  --zuri-diagnostics-meta-leading: 20px; /* the 20 px meta line */
+  --zuri-diagnostics-small-size: 12px; /* duration, hint, pill, log line */
+  --zuri-diagnostics-small-leading: 16px; /* its 16 px line */
+  --zuri-diagnostics-code-size: 11.5px; /* the path and the log run in mono */
+  --zuri-diagnostics-code-leading: 17px; /* its 17 px line */
+  --zuri-diagnostics-label-size: 11px; /* upper-case label */
+  --zuri-diagnostics-label-leading: 14px; /* its 14 px line */
+  --zuri-diagnostics-label-tracking: 0.4px; /* letterSpacing on the label */
+}

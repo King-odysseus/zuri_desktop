@@ -1,0 +1,3610 @@
+/**
+ * Component and base styles. Every value here comes from tokens.css: no literal
+ * colour, radius or shadow belongs in this file.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--zuri-bg-canvas);
+  color: var(--zuri-text-primary);
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* -------------------------------------------------------------------------
+   Buttons
+
+   The design's button family (nodes 0:6 through 0:18) shares one box: 32 px tall
+   on radius/row, 16 px of side padding, a 13 px label regular weight. Only the
+   fill, the label colour and, for Secondary, its 1 px outline differ between
+   variants, so each variant is one class that inherits that geometry by
+   repeating it, exactly as the nodes do.
+   Button / Pill (node 0:14) is the family's chip and carries its own smaller
+   box instead: 28 px tall on radius/pill, 12 px of side padding.
+   Button / Small (node 0:16) is the compact member: the secondary shape on a
+   28 px box with 12 px of side padding, on radius/row and its 1 px outline.
+
+   Button / Ghost (node 0:10) is the quiet one that sits beside a section title
+   (its label is "See all"): color/background fill, no outline, label on
+   color/muted. Ghost in this design means "no shape of its own beyond the row
+   fill", not a transparent box, so it repeats color/background like its
+   siblings.
+
+   Button / Danger (node 0:12) is the destructive one: color/background fill,
+   no outline, label on color/danger. Both nodes' label lines are 13/18 and their
+   boxes 32 px; body-sm's 13/20 centres the same glyphs in that height, which is
+   what the other 32 px control (.empty-block-action) already does.
+   ------------------------------------------------------------------------- */
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--zuri-space-4);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-muted);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--zuri-motion-fast) var(--zuri-ease-out),
+    color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Hover, focus and disabled come from the style guide's button states, not the
+   node, which draws the default state only. The tint is the sunken surface and
+   the label steps up from muted to secondary, so the control reads as pressable
+   without gaining a border the node does not draw. */
+.btn-ghost:hover:not(:disabled) {
+  background: var(--zuri-surface-sunken);
+  color: var(--zuri-text-secondary);
+}
+
+.btn-ghost:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--zuri-space-4);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-danger);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Hover and focus come from the style guide's button states, not the node,
+   which draws the default state only. Hovering tints with the danger ramp so
+   the destructive reading gets stronger, never weaker. */
+.btn-danger:hover:not(:disabled) {
+  background: var(--zuri-danger-subtle);
+}
+
+.btn-danger:focus-visible {
+  outline: 2px solid var(--zuri-danger);
+  outline-offset: 2px;
+}
+
+/* Disabled is the guide's 40% opacity: the control still reads as present but
+   obviously not available. */
+.btn-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Button / Primary (node 0:6) is the family's filled action: a color/primary
+   fill, no outline, and a 13 px regular label on color/inverse inset 16 px from
+   the sides and centred in the 32 px box. The node's 64 px width is its "Send"
+   label (32 px) plus that padding, so the rule states the padding and lets the
+   label size the button, exactly as the ghost, danger and pill variants do.
+
+   color/primary lands on the accent role and color/inverse on the text that sits
+   over it (--zuri-accent / --zuri-text-on-accent), the same pair the style guide
+   names for btn-primary: one accent carries interactive emphasis, in both themes. */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--zuri-space-4);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Hover, focus and disabled come from the style guide's button states, not the
+   node, which draws the default state only. A filled control steps its fill, so
+   hover moves the background one accent step and leaves the label alone. The
+   focus ring is offset, so it reads against the canvas rather than the fill. */
+.btn-primary:hover:not(:disabled) {
+  background: var(--zuri-accent-hover);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Button / Secondary (node 0:8) is the family's outlined action: a
+   color/background fill carrying a 1 px color/border outline on radius/row, and
+   a 13 px regular label on color/text inset 16 px from the sides and centred in
+   the 32 px box. It is the only variant the node outlines, which is what marks it
+   as the quieter of the two solid controls; ghost and primary draw no border at
+   all. The node's 75 px width is its "Cancel" label (43 px) plus that padding, so
+   the rule states the padding and lets the label size the button, exactly as the
+   other variants do.
+
+   color/background lands on the surface role, color/border on the hairline and
+   color/text on the primary text role: the pair the style guide names for
+   btn-secondary (surface-raised bg, border-hairline, text-primary). The node wins
+   on the 32 px box and radius 8 over the guide's 36 px and radius 10, as the rest
+   of this family already does. The outline sits inside the 32 px box through the
+   global border-box rule, so it adds the node's edge without growing the control. */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--zuri-space-4);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--zuri-motion-fast) var(--zuri-ease-out),
+    border-color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Hover, focus and disabled come from the style guide's button states, not the
+   node, which draws the default state only. The guide's secondary hover is a
+   subtle surface darken, and an outlined control strengthens its edge the way an
+   input does, so the fill darkens and the outline steps up while the label stays
+   put: the label is already the strongest text step, so moving it would change
+   the control's rank rather than its state. */
+.btn-secondary:hover:not(:disabled) {
+  background: var(--zuri-surface-sunken);
+  border-color: var(--zuri-border-strong);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* Disabled is the guide's 40% opacity: the control still reads as present but
+   obviously not available. */
+.btn-secondary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Button / Small (node 0:16) is the family's compact outlined action: a 28 px
+   box on radius/row holding a 13 px regular "Add task" label on color/text inset
+   12 px from the sides, filled on color/background with a 1 px color/border
+   outline. It is Button / Secondary shrunk one step: the same fill, the same
+   hairline and the same label, on the pill's 28 px box and 12 px padding instead
+   of 32 px and 16 px. The node's 79 px width is that label (55 px) plus the
+   padding, so the rule states the padding and lets the label size the button.
+
+   color/background lands on the surface role, color/border on the hairline and
+   color/text on the primary text role, the same pair Secondary uses. The node's
+   28 px box, radius/row corner and 12 px padding win over the style guide's
+   generic 36 px button, exactly as the rest of this family already does. */
+.btn-small {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 var(--zuri-space-3);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--zuri-motion-fast) var(--zuri-ease-out),
+    border-color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Hover, focus and disabled come from the style guide's button states, not the
+   node, which draws the default state only. As with Secondary, the fill darkens
+   to the sunken surface and the hairline strengthens while the label stays put:
+   the label is already the primary text step, so moving it would change the
+   control's rank rather than its state. */
+.btn-small:hover:not(:disabled) {
+  background: var(--zuri-surface-sunken);
+  border-color: var(--zuri-border-strong);
+}
+
+.btn-small:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* Disabled is the guide's 40% opacity: still legible as a control, obviously not
+   available. */
+.btn-small:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Button / Icon (node 0:18) is the family's icon-only member: a 28 px square on
+   radius/row holding one 20 px glyph inset 4 px, color/background fill, glyph on
+   color/muted. The node is the source of truth here, so its 28 px box wins over
+   the style guide's "icon-only buttons are 36x36" line, exactly as the nodes'
+   radius/row (8) already wins over the guide's button radius (10).
+
+   The glyph is stroked, not filled: the node's vector carries 1.67 px of stroke
+   on a 20 px box (a 24-unit icon set's 2 px stroke scaled to 20). Markup keeps
+   stroke="currentColor" and the stroke width; this rule only supplies the colour
+   and the 20 px box, so swapping the icon inside does not change the shape. */
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: var(--zuri-space-1);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-muted);
+  cursor: pointer;
+  transition:
+    background var(--zuri-motion-fast) var(--zuri-ease-out),
+    color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Pinned to the node's icon box, so a glyph drawn on a 24 unit grid cannot
+   overflow the 28 px button. */
+.btn-icon-glyph {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+/* Hover and focus come from the style guide's button states, not the node,
+   which draws the default state only. The icon steps up muted to secondary over
+   the sunken surface, matching the family's other quiet control (.btn-ghost). */
+.btn-icon:hover:not(:disabled) {
+  background: var(--zuri-surface-sunken);
+  color: var(--zuri-text-secondary);
+}
+
+.btn-icon:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* Disabled is the guide's 40% opacity: still legible as a control, obviously not
+   available. */
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Button / Pill (node 0:14) is the family's chip: a 28 px pill on radius/pill,
+   filled on color/primary-soft with a 13 px regular label on color/primary.
+   The style guide describes the same control as the active mode chip
+   ("accent-subtle bg with accent text"), which is where those two design
+   variables land in the token layer; the node's 28 px box, pill corner and
+   13 px label win over the guide's 36 px, radius-md and label-md, exactly as
+   the other nodes in this family already do.
+
+   The node is 47 px wide only because its "Ask" label measures 23 px, so the
+   rule states the node's 12 px side padding and lets the label size the pill;
+   "Act" and "Autopilot" then keep the same height and grow to fit. */
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 var(--zuri-space-3);
+  border: 0;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-accent-subtle);
+  color: var(--zuri-accent);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition:
+    background var(--zuri-motion-fast) var(--zuri-ease-out),
+    color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Hover and focus come from the style guide's states, not the node, which draws
+   the default state only. The fill is already the soft accent tint, so hovering
+   steps the label one accent step instead of tinting twice. */
+.btn-pill:hover:not(:disabled) {
+  color: var(--zuri-accent-hover);
+}
+
+.btn-pill:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.btn-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Nav / Avatar Chip (node 0:76) is the navigation's account mark: a 28 px circle
+   on radius/pill, filled with color/accent, holding the person's initials on
+   color/inverse at 12/16 regular.
+
+   The node has one child, a TEXT node named "Initials" sitting 6 px in from the
+   top and the left. That 6 px is centring rather than padding: the sample "AK"
+   measures 17 x 16, so a 28 px box leaves 5.5 px at each side and 6 px above and
+   below, rounded to a whole pixel. Centring the text keeps one letter and three
+   letters in the middle the same way the node's own frame would.
+
+   The type is the node's own 12/16, which is the token layer's caption step, at
+   the family's regular weight because the node sets none. There is no border, no
+   shadow and no hover or focus styling: the node draws one flat fill and no
+   state, the guide gives avatars no state either, and this mark is not a control,
+   so a ring or a cursor here would be something the design does not have. */
+.nav-avatar-chip {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-accent);
+}
+
+/* The initials are the node's own text child, so they keep their own element:
+   the colour and the type sit here, exactly where the node puts them, and the
+   chip only centres the box. */
+.nav-avatar-chip-initials {
+  color: var(--zuri-text-on-accent);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-caption);
+  letter-spacing: normal; /* the node sets no tracking */
+}
+
+/* Nav / Top Bar (node 0:78) is the bar that heads a surface: the surface's name
+   and the model in use on the left, the search, notification and account controls
+   on the right, closed by a hairline along the bottom edge.
+
+   The node's measurements: 880 x 52 on color/background, an 880 x 51 row, then a
+   1 px color/border rectangle on the row's bottom edge. So the bar is 52 tall and
+   the content row is 51; the 1 px is the border, not a child. The title is
+   color/text at 16/24 medium, the model is color/muted at 12/16 regular, the left
+   inset is 16, and the right cluster is three 28 px controls 8 px apart (the
+   node's x 0, 36 and 72). Every one of those numbers is a step the token layer
+   already carries - heading-sm, caption, space-4 and space-2 - so nothing here
+   invents a value.
+
+   The node is 880 wide because it spans the surface it heads, the way the sidebar
+   row spans its panel, so the bar fills its parent instead of pinning 880.
+
+   The node has no auto layout, and its two clusters are hand-placed: "Left" sits
+   at x 16 holding the title at 0 and the model at 129, and "Right" is drawn 100
+   wide at x 216, which is mid-bar rather than on the trailing edge. Only the
+   measurements are meaningful there, so the bar keeps all of them and lays the
+   clusters out with space-between, because a navigation bar's actions belong at
+   the end of the bar. The title-to-model distance is the one number that does not
+   survive as drawn: the node's 33 px is the design's 32 px step plus a pixel of
+   text-metric rounding, so the bar states 32 (--zuri-space-8).
+
+   Both clusters centre on the 51 px row, which is where the node's y 12 for the
+   28 px controls comes from ((51 - 28) / 2 = 11.5). The two text boxes are 24 and
+   16 line boxes, so the left cluster aligns them on the baseline rather than on
+   the box edge: that is what keeps "Q4 summary" and "GPT-4o mini" on one reading
+   line, which is how the node draws its two 16 px text boxes at y 0.
+
+   The right cluster composes two components this file already defines: the two
+   icon buttons are Button / Icon (node 0:18) and the account mark is Nav / Avatar
+   Chip (node 0:76). Their geometry is not restated here - the bar only paints the
+   two colours the node gives the buttons in this context.
+
+   Markup:
+   <div class="nav-top-bar">
+     <div class="nav-top-bar-left">
+       <span class="nav-top-bar-title">Q4 summary</span>
+       <span class="nav-top-bar-model">GPT-4o mini</span>
+     </div>
+     <div class="nav-top-bar-right">
+       <button class="btn-icon" type="button" aria-label="Search">
+         <svg class="btn-icon-glyph" viewBox="0 0 20 20">...</svg>
+       </button>
+       <button class="btn-icon" type="button" aria-label="Notifications">
+         <svg class="btn-icon-glyph" viewBox="0 0 20 20">...</svg>
+       </button>
+       <span class="nav-avatar-chip">
+         <span class="nav-avatar-chip-initials">AK</span>
+       </span>
+     </div>
+   </div>
+   The two glyphs are the node's own vectors: 20 px boxes on the component's 20 px
+   icon box, keeping stroke="currentColor" and the node's 1.67 stroke width. */
+.nav-top-bar {
+  display: flex;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-4);
+  width: 100%;
+  height: var(--zuri-topbar-height);
+  padding: 0 var(--zuri-space-4);
+  background: var(--zuri-nav-top-bar-surface);
+  border-bottom: 1px solid var(--zuri-nav-top-bar-hairline);
+}
+
+/* Title and model share one line, so they agree on the baseline: the node puts
+   both 16 px text boxes on the same top edge, which is a shared baseline once
+   their different line heights are drawn. */
+.nav-top-bar-left {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: var(--zuri-space-8);
+}
+
+/* The surface name is the node's color/text at 16/24 medium. It is the one child
+   that can be long - a thread title - so it truncates rather than pushing the
+   model and the actions off the bar. */
+.nav-top-bar-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--zuri-nav-top-bar-title);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-heading-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-heading-sm);
+  letter-spacing: normal; /* the node sets no tracking */
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The model is the node's color/muted at 12/16 regular. It holds its size, so a
+   long title gives up width before the model does. */
+.nav-top-bar-model {
+  flex: 0 0 auto;
+  color: var(--zuri-nav-top-bar-muted);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-caption);
+  letter-spacing: normal; /* the node sets no tracking */
+  white-space: nowrap;
+}
+
+/* The node's 28 px controls at x 0, 36 and 72: three boxes one 8 px step apart. */
+.nav-top-bar-right {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+/* Inside the bar the node fills both icon buttons with color/background - the
+   bar's own surface - and draws their glyphs on color/muted, so the buttons take
+   the bar's pair instead of the button component's own surface step and muted
+   step. Hover is left to .btn-icon: this rule stands aside while a button is
+   hovered, so the component's hover fill still shows. */
+.nav-top-bar .btn-icon:not(:hover) {
+  background: var(--zuri-nav-top-bar-surface);
+  color: var(--zuri-nav-top-bar-muted);
+}
+
+/* Nav / Panel Header (node 0:73) is the heading over a group of navigation rows:
+   a 280 x 20 strip holding a sentence-case label and a small count beside it.
+
+   The node draws two text children and nothing else: "Label" at 13/18 medium and
+   "Count" at 12/16 regular, both on the same #8E9196 grey, both sitting on the 20 px
+   row's top edge. There is no fill, no stroke, no radius, no shadow and no auto
+   layout, so the row is a plain line of text and sets none of those. The two text
+   boxes are different line boxes (18 and 16), so the row centres them rather than
+   top-aligning: one shared centre keeps them on a single reading line whatever the
+   font's metrics turn out to be.
+
+   Count sits at x 39, exactly the label's right edge, so the row leaves no gap
+   between them: the count follows the label with no space of its own.
+
+   The row is 280 wide in the design, which is the width of the navigation content
+   column it heads, so it fills whatever panel holds it rather than pinning 280 px.
+
+   The count is its own element, so a caller with nothing to count leaves it out
+   (or hides it) instead of writing a zero the node never draws. */
+.nav-panel-header {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 20px;
+}
+
+.nav-panel-header-label {
+  color: var(--zuri-text-panel-header);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-panel-header);
+  letter-spacing: normal; /* the node sets no tracking */
+}
+
+.nav-panel-header-count {
+  color: var(--zuri-text-panel-header);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-caption);
+  letter-spacing: normal; /* the node sets no tracking */
+}
+
+/* Nav / Sidebar Row (node 0:63) is one row of the navigation: a 236 x 32 box on
+   radius/row filled with color/background, holding one 20 px icon inset 8 px from
+   the left and a 13/18 regular label beside it.
+
+   The node wins over the style guide here, as it does elsewhere in this family.
+   The guide's nav-item line asks for radius-md, 36 px tall, an 18 px icon and a
+   label-md (14/500) label on text-secondary; the node draws radius/row (8), 32 px,
+   a 20 px icon and a 13/18 regular label on color/text. Geometry and type follow
+   the node.
+
+   Every vertical number is centring rather than padding: the 20 px icon sits at
+   y 6 because (32 - 20) / 2 = 6, and the label's 16 px node box sits at y 8 for
+   (32 - 16) / 2 = 8. The row therefore centres both children and keeps the icon's
+   8 px left inset as its side padding. The label's line-height is the node's 18,
+   so the browser's line box is 18 tall and lands at 7, still centred in the row.
+
+   The label starts at x 36, which is the icon's right edge (8 + 20) plus 8 px, so
+   icon and label sit one 8 px step apart. That step is the gap, so a caller that
+   drops the icon keeps the row's other measurements.
+
+   The node is 236 wide because the sidebar content column is 260 - 24 = 236, so the
+   row fills whatever panel holds it instead of pinning a width.
+
+   Markup: use an <a> or a <button> with this class, the icon as an <svg
+   class="nav-sidebar-row-icon"> and the text as a
+   <span class="nav-sidebar-row-label">. The icon is the node's 20 px box around a
+   24-unit stroke icon, so it keeps stroke="currentColor" and stroke-width="2" in
+   markup: at 20 px that draws the node's 1.67 px stroke.
+
+   This node draws the default state only. Its selected twin, "Nav / Sidebar Row
+   Active" (node 0:67), is the same box with a color/active fill and the same icon
+   and label, so the fill is the one thing that variant adds and this rule must not
+   paint it. Hover and focus rings are likewise not drawn, so none are invented
+   here; the platform's own focus ring is left in place for keyboard users. */
+.nav-sidebar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  box-sizing: border-box;
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--zuri-space-2);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* The icon is the node's colour/muted child, one step back from the label. */
+.nav-sidebar-row-icon {
+  display: block;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--zuri-text-muted);
+}
+
+/* The label is the node's color/text child at 13/18 regular. The node resizes the
+   text to width and height, so it stays on one line rather than wrapping inside
+   the 32 px row. */
+.nav-sidebar-row-label {
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-nav-row);
+  letter-spacing: normal; /* the node sets no tracking */
+  white-space: nowrap;
+}
+
+/* Nav / Sidebar Row Active (node 0:67) is the same box as its default twin, node
+   0:63: 236 x 32, radius/row, a 20 px color/muted icon inset 8 px and a 13/18
+   regular label 8 px after it. The selected variant changes exactly one thing,
+   the fill, so that is all this rule paints; every other measurement is
+   inherited from .nav-sidebar-row and nothing here repeats or overrides it. If
+   the node's geometry moves, the base row moves and this variant follows.
+
+   Markup: the same element as the default row, marked current -
+   <a class="nav-sidebar-row" aria-current="page">. aria-current is the state a
+   navigation row should carry anyway (it tells a screen reader which row is the
+   current place), so the visual fill and the accessibility state are one
+   attribute rather than a class that could drift away from it.
+
+   color/active is declared once per theme: the node's fill is the design's light
+   value (#e6e8eb) and the design's dark colour collection is the dark twin
+   (#262a2f), so a theme swap picks up the design's own pair rather than a
+   derived colour. */
+.nav-sidebar-row[aria-current='page'] {
+  background: var(--zuri-surface-active);
+}
+
+/* -------------------------------------------------------------------------
+   App shell: the top bar and the three columns under it
+
+   Built from the design page "App shell (main window)", node 0:131. A 52 px
+   top bar (node 0:132) spans the window; under it #sidebar (260 px) and
+   #context-panel (320 px) sit on the canvas tone, each separated from #chat by
+   a 1 px hairline, and #chat takes the width the two panels leave.
+   ui/shell.js writes data-collapsed on a column, so one attribute drives both
+   the width and what stays visible.
+
+   The columns are flat surfaces, not glass: the nodes fill the sidebar and the
+   rail with color/surface and the centre with color/background, so the panel
+   tone itself is what separates them and no shadow is needed.
+   ------------------------------------------------------------------------- */
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  background: var(--zuri-bg-canvas);
+}
+
+.shell {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Top bar (node 0:132). One 52 px row: the sidebar toggle, the app name and the
+   model trigger on the left; search, notifications, theme and the account chip
+   on the right, 8 px apart, inset 20 px from the right edge. */
+.top-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-2);
+  height: var(--zuri-topbar-height);
+  padding: 0 var(--zuri-space-5) 0 var(--zuri-space-4);
+  border-bottom: 1px solid var(--zuri-border-hairline);
+  background: var(--zuri-surface);
+}
+
+.top-bar-leading,
+.top-bar-trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+/* The design's top-bar controls are 28 px squares on radius/row: the same box as
+   .btn-icon, so they borrow it and only the hover surface differs. */
+.top-bar-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: transparent;
+  color: var(--zuri-text-secondary);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.top-bar-button:hover {
+  background: var(--zuri-surface-active);
+  color: var(--zuri-text-primary);
+}
+
+.top-bar-button:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* Search, the first trailing control. The node draws a 28 px icon, so the control
+   rests at that box and the input grows leftwards into the bar's empty middle while
+   it has focus. Keeping the resting box at 28 px is what lets the trailing group
+   keep the node's measured 8/8/12 px gaps. */
+.top-bar-search {
+  position: relative;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+}
+
+.top-bar-search-icon {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  color: var(--zuri-text-secondary);
+  pointer-events: none;
+}
+
+.top-bar-search-input {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: transparent;
+  /* Transparent at rest so the collapsed control reads as the node's icon, not as
+     a 28 px box of placeholder text. */
+  color: transparent;
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  line-height: 28px;
+  cursor: pointer;
+  transition: width var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.top-bar-search-input::placeholder {
+  color: transparent;
+}
+
+.top-bar-search:hover .top-bar-search-input {
+  background: var(--zuri-surface-active);
+}
+
+/* Above its neighbours while open, so the grown field covers the bar's empty
+   middle rather than slipping under the bell. */
+.top-bar-search:focus-within {
+  z-index: 2;
+}
+
+.top-bar-search:focus-within .top-bar-search-icon {
+  display: none;
+}
+
+.top-bar-search:focus-within .top-bar-search-input {
+  width: 240px;
+  padding: 0 var(--zuri-space-3);
+  background: var(--zuri-surface-active);
+  color: var(--zuri-text-primary);
+  cursor: text;
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.top-bar-search:focus-within .top-bar-search-input::placeholder {
+  color: var(--zuri-text-muted);
+}
+
+/* The badge is in the DOM at zero so the count is part of the control's spoken
+   label, but a class display value would otherwise beat the hidden attribute. */
+.top-bar-badge[hidden] {
+  display: none;
+}
+
+/* The theme toggle shows the theme a click switches to, so the control reads as an
+   action: a sun on dark, a moon on light. */
+.top-bar-theme .top-bar-theme-sun {
+  display: none;
+}
+
+:root[data-theme='dark'] .top-bar-theme .top-bar-theme-sun {
+  display: block;
+}
+
+:root[data-theme='dark'] .top-bar-theme .top-bar-theme-moon {
+  display: none;
+}
+
+.top-bar .shell-toggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+/* "Zuri" is 20/28 medium in the node, and the model trigger sits 24 px after it. */
+.top-bar-title {
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-heading-md);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-heading-md);
+  white-space: nowrap;
+}
+
+/* Model selector trigger: a 124 x 28 ghost pill on color/muted with a 14 px
+   chevron 10 px in from its right edge. No fill and no outline in the node. */
+.top-bar-model {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-3);
+  min-width: 124px;
+  height: 28px;
+  margin-left: var(--zuri-space-4);
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--zuri-radius-pill);
+  background: transparent;
+  color: var(--zuri-text-muted);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.top-bar-model:hover {
+  background: var(--zuri-surface-active);
+  color: var(--zuri-text-secondary);
+}
+
+.top-bar-model:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.top-bar-model-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-bar-model-chevron {
+  flex: 0 0 auto;
+}
+
+/* The notifications badge (node 0:154) is 16 px on radius/pill, on color/danger,
+   and hangs off the button's top-right corner the way the node draws it. */
+.top-bar-notify {
+  position: relative;
+}
+
+.top-bar-badge {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-danger);
+  color: var(--zuri-text-on-accent);
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* Account chip: 28 px on radius/pill, initials on color/accent. */
+.top-bar-avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-left: var(--zuri-space-1);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.shell-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  /* The width change is not animated on purpose. Electron throttles frame
+     production for an occluded window, which can leave a width transition
+     several frames from its target; anything that reads the column width (the
+     smoke gate, a layout check) would then see a half-collapsed column. The
+     collapse itself stays a pure data-state change, so width is exact as soon
+     as data-collapsed flips. */
+}
+
+.shell-column-sidebar {
+  flex: 0 0 auto;
+  width: var(--zuri-sidebar-width);
+  background: var(--zuri-bg-canvas);
+  border-right: 1px solid var(--zuri-border-hairline);
+}
+
+.shell-column-sidebar[data-collapsed='true'] {
+  width: var(--zuri-sidebar-width-collapsed);
+}
+
+/* The 64 px sidebar rail keeps New chat as an icon, so the strip still does the
+   one thing it is for; the label, the shortcut and the foot are dropped. */
+.shell-column-sidebar[data-collapsed='true'] .sidebar-foot {
+  display: none;
+}
+
+.shell-column-sidebar[data-collapsed='true'] .sidebar-new-chat {
+  justify-content: center;
+  padding: 0;
+}
+
+.shell-column-sidebar[data-collapsed='true'] .sidebar-new-chat-label,
+.shell-column-sidebar[data-collapsed='true'] .sidebar-new-chat-shortcut {
+  display: none;
+}
+
+/* The chat column takes whatever the two panels leave. */
+.shell-column-chat {
+  flex: 1 1 auto;
+  width: auto;
+  background: var(--zuri-surface);
+}
+
+.shell-column-context {
+  flex: 0 0 auto;
+  width: var(--zuri-right-panel-width);
+  background: var(--zuri-bg-canvas);
+  border-left: 1px solid var(--zuri-border-hairline);
+}
+
+/* Chat and the context panel collapse to a thin rail, not to nothing: the rail
+   is the only way back, so it has to stay clickable. */
+.shell-column-chat[data-collapsed='true'],
+.shell-column-context[data-collapsed='true'] {
+  flex: 0 0 auto;
+  width: var(--zuri-rail-width);
+}
+
+.shell-column-body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-3);
+  min-height: 0;
+  padding: var(--zuri-space-3);
+  overflow-y: auto;
+}
+
+/* Collapsed: the column keeps its toggle, nothing else. For the sidebar that
+   toggle is the one in the top bar, so the collapsed strip is simply empty; the
+   chat and context headers keep theirs, because it is the only way back. */
+.shell-column[data-collapsed='true'] .shell-column-body,
+.shell-column[data-collapsed='true'] .sidebar-foot,
+.shell-column[data-collapsed='true'] .transcript-title,
+.shell-column[data-collapsed='true'] .transcript-meta,
+.shell-column[data-collapsed='true'] .chat-transcript,
+.shell-column[data-collapsed='true'] .composer-area,
+.shell-column[data-collapsed='true'] .error-block,
+.shell-column[data-collapsed='true'] .context-title,
+.shell-column[data-collapsed='true'] .context-status {
+  display: none;
+}
+
+.shell-column-chat[data-collapsed='true'] .transcript-header,
+.shell-column-context[data-collapsed='true'] .context-header {
+  gap: 0;
+  justify-content: center;
+  padding: 0;
+}
+
+/* Icon button, 36x36 per the style guide (a size, so not a token). */
+.shell-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--zuri-radius-md);
+  background: transparent;
+  color: var(--zuri-text-secondary);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out),
+    color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.shell-toggle:hover {
+  background: var(--zuri-accent-subtle);
+  color: var(--zuri-accent);
+}
+
+.shell-toggle:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* The chevron points the way the column will move, so it flips on collapse. */
+.shell-toggle-icon {
+  transition: transform var(--zuri-motion-base) var(--zuri-ease-out);
+}
+
+.shell-column[data-collapsed='true'] .shell-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* Phone tab bar: hidden above 768 px, where the three columns are the
+   navigation themselves. 56 px items keep each one a real tap target. */
+.shell-tabbar {
+  display: none;
+  flex: 0 0 auto;
+  align-items: stretch;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--zuri-border-hairline);
+  background: var(--zuri-surface);
+}
+
+.shell-tabbar-item {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: var(--zuri-space-2) var(--zuri-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--zuri-text-muted);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  cursor: pointer;
+}
+
+/* The item whose column is open is the accent one, the way a nav bar marks the
+   current destination. */
+.shell-tabbar-item[aria-expanded='true'] {
+  color: var(--zuri-accent);
+}
+
+.shell-tabbar-item:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: -2px;
+}
+
+/* -------------------------------------------------------------------------
+   Sidebar (node 0:164) and its foot
+
+   "New chat" is the one outlined row at the top, the thread list scrolls under
+   it, and Settings plus the Autopilot status card are pinned at the bottom
+   above a hairline so the panel keeps the same shape as threads come and go.
+   ------------------------------------------------------------------------- */
+
+.sidebar-head {
+  flex: 0 0 auto;
+  padding: var(--zuri-space-3) var(--zuri-space-3) 0;
+}
+
+.sidebar-new-chat {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--zuri-space-3) 0 10px;
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-body-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.sidebar-new-chat:hover {
+  background: var(--zuri-surface-active);
+}
+
+.sidebar-new-chat:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.sidebar-new-chat-icon {
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
+}
+
+.sidebar-new-chat-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-new-chat-shortcut {
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* Navigation (nodes 0:63 / 0:67): the destinations the central column can show,
+   one row each. The rows keep the node's own 32 px box and fill; the gutter is the
+   sidebar's, so they line up with the New chat button above and Settings below. */
+.sidebar-nav {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+  padding: var(--zuri-space-2) var(--zuri-space-3) 0;
+}
+
+/* The section label sits one row inset further than the rows themselves (the
+   node puts it at x=24 while the rows start at x=12). */
+.sidebar-body .shell-section-label {
+  padding: 0 var(--zuri-space-3);
+}
+
+.sidebar-foot {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+  padding: var(--zuri-space-2) var(--zuri-space-3) var(--zuri-space-3);
+  border-top: 1px solid var(--zuri-border-hairline);
+}
+
+/* Settings row: the design's nav row, 32 px on radius/row with a 20 px icon. */
+.sidebar-settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--zuri-space-3) 0 var(--zuri-space-2);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: transparent;
+  color: var(--zuri-text-secondary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--zuri-motion-fast) var(--zuri-ease-out),
+    color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* Current destination: the Settings row is a destination like a nav row, so the
+   selected fill is the nav row's own color/active value, not a new one. Declared
+   before :hover so the row still answers the pointer when it is the current one. */
+.sidebar-settings-row[aria-current='page'] {
+  background: var(--zuri-surface-active);
+  color: var(--zuri-text-primary);
+}
+
+.sidebar-settings-row:hover {
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+}
+
+.sidebar-settings-row:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.sidebar-settings-icon {
+  flex: 0 0 auto;
+}
+
+.sidebar-settings-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Autopilot status card (node 0:204): an 8 px dot, a 12/16 label and the state
+   on the right, inside an outlined 36 px card. */
+.autopilot-status {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 36px;
+  padding: 0 var(--zuri-space-3);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.autopilot-status-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-success);
+}
+
+.autopilot-status-label {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autopilot-status-meta {
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
+}
+
+/* -------------------------------------------------------------------------
+   Chat column chrome: the transcript header and the composer area around the
+   transcript (nodes 0:210 and 0:252)
+   ------------------------------------------------------------------------- */
+
+.transcript-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-3);
+  height: 48px;
+  padding: 0 var(--zuri-space-3) 0 var(--zuri-space-6);
+}
+
+.transcript-title {
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transcript-header-trailing {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-3);
+}
+
+.transcript-meta {
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  white-space: nowrap;
+}
+
+/* The meta slot is empty until there is something true to put in it, and an
+   empty flex child still takes its gap. */
+.transcript-meta[hidden] {
+  display: none;
+}
+
+.transcript-header .shell-toggle {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+/* The composer is inset 40 px from the column edges in the node - a layout
+   measurement rather than a token, like the node's own 40 px transcript inset -
+   with the keyboard hint 8 px under it. */
+.composer-area {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  padding: 0 40px var(--zuri-space-3);
+}
+
+/* -------------------------------------------------------------------------
+   Context panel header (node 0:271)
+
+   Inset 6 px so the 20 px collapse button sits where the node draws it, with the
+   panel name 8 px after it and the panel's state on the far right.
+   ------------------------------------------------------------------------- */
+
+.context-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 60px;
+  padding: 0 var(--zuri-space-6) 0 6px;
+}
+
+.context-toggle {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border-radius: var(--zuri-radius-row);
+}
+
+.context-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-heading-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-heading-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-status {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* Status dot before the panel state: green while a run is live, muted when the
+   scheduler has nothing to do, which is the state an empty automations file
+   means. */
+.context-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-text-muted);
+}
+
+.context-body {
+  padding: var(--zuri-space-4);
+}
+
+/* A collapsed chat or context panel is a 12 px rail (pages.md), so the toggle in
+   its header fills the strip instead of sitting as a square inside it, and the
+   icon shrinks to 10 px to fit. The strip is the whole way back. */
+.shell-column-chat[data-collapsed='true'] .shell-toggle,
+.shell-column-context[data-collapsed='true'] .shell-toggle {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+}
+
+.shell-column-chat[data-collapsed='true'] .shell-toggle-icon,
+.shell-column-context[data-collapsed='true'] .shell-toggle-icon {
+  width: 10px;
+  height: 10px;
+}
+
+/* Empty states inside a column. */
+.shell-empty {
+  margin: 0;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+  color: var(--zuri-text-muted);
+}
+
+/* The empty transcript (node 0:1221): a 56 px mark tile, the title 16 px under
+   it, a 420 px lead, then four suggestion chips on a 520 px two-column grid. */
+.shell-empty-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 520px;
+  text-align: center;
+}
+
+.transcript-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--zuri-transcript-accent-soft);
+  color: var(--zuri-transcript-accent);
+}
+
+.shell-empty-title {
+  margin: var(--zuri-space-4) 0 0;
+  color: var(--zuri-text-primary);
+  font-size: 22px;
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: 30px;
+}
+
+.shell-empty-lead {
+  max-width: 420px;
+  margin: var(--zuri-space-4) 0 0;
+  color: var(--zuri-transcript-text-secondary);
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+}
+
+.transcript-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--zuri-space-2);
+  width: 100%;
+  margin-top: var(--zuri-space-4);
+}
+
+.transcript-suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  min-height: 40px;
+  padding: var(--zuri-space-3);
+  border: 0;
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-transcript-card);
+  color: var(--zuri-text-primary);
+  font: inherit;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  text-align: left;
+  cursor: pointer;
+}
+
+.transcript-suggestion:hover {
+  background: var(--zuri-transcript-fill);
+}
+
+.transcript-suggestion-icon {
+  flex: 0 0 auto;
+  color: var(--zuri-transcript-text-secondary);
+}
+
+/* -------------------------------------------------------------------------
+   Shell states
+   Every state a column can be in is drawn, not just the happy path: empty
+   lists, a skeleton while the first state payload is in flight, the missing-key
+   notice, and disabled controls. data-state carries the same information in the
+   markup so a state is checkable without looking at the pixels.
+   ------------------------------------------------------------------------- */
+
+.shell-section-label {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+/* Sidebar empty: the page's empty screen draws this as a solid card, not a dashed
+   outline - a 28 px tinted mark, a title and muted copy, left-aligned on the
+   card's 16 px padding. */
+.shell-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--zuri-space-1);
+  padding: var(--zuri-space-4);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+}
+
+.shell-empty-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-bottom: var(--zuri-space-2);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-accent-subtle);
+  color: var(--zuri-accent);
+}
+
+.shell-empty-heading {
+  margin: 0;
+  font-size: var(--zuri-font-size-body-md);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-body-md);
+  color: var(--zuri-text-primary);
+}
+
+.shell-empty-text {
+  margin: 0;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+  color: var(--zuri-text-muted);
+}
+
+/* Empty block: the design's "Block / Empty" component (node 0:105). A solid card,
+   not the dashed shell empty state: mark, display-size title, caption, one action,
+   on the node's 24 px padding and 8 px rhythm. The title's 36 px line box already
+   reaches the caption, so the caption carries no top margin; that is what makes
+   the stack add up to the node's 184 px at 320 px wide. */
+.empty-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: var(--zuri-right-panel-width);
+  padding: var(--zuri-space-6);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+  text-align: center;
+}
+
+.empty-block-mark {
+  display: flex;
+  margin-bottom: var(--zuri-space-2);
+  color: var(--zuri-text-mark);
+}
+
+.empty-block-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-display-lg);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-display-lg);
+  letter-spacing: normal; /* the node's title carries no tracking */
+}
+
+.empty-block-text {
+  margin: 0 0 var(--zuri-space-2);
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* The action is the node's 32 px control: its label is 13/18 there, and body-sm's
+   13/20 centres the same glyphs inside the 32 px height. */
+.empty-block-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--zuri-space-4);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.empty-block-action:hover {
+  background: var(--zuri-accent-hover);
+}
+
+.empty-block-action:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* The hero and the empty states stay in the document so their text is always
+   readable; `hidden` is how the shell says "there is something else to show now".
+   A flex child ignores [hidden] on its own, hence the explicit rule. */
+.shell-empty-hero[hidden],
+.shell-empty-state[hidden],
+.empty-block[hidden] {
+  display: none;
+}
+
+/* -------------------------------------------------------------------------
+   Router views (ui/router.js)
+
+   #chat is the outlet: one .view at a time, swapped by ui/router.js. The Chat
+   view is the transcript that ships in index.html; every other view is a page
+   built by its module in views/. A page route scrolls on its own and holds its
+   content to a centred measure, so a 1920 px window gets equal margins rather
+   than one strip of text against the left edge.
+   ------------------------------------------------------------------------- */
+
+.view {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* A flex child ignores [hidden] on its own, so the router's swap says it here. */
+.view[hidden] {
+  display: none;
+}
+
+.view-page {
+  flex: 1 1 auto;
+  padding: var(--zuri-space-6);
+  overflow-y: auto;
+}
+
+.view-page-inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-5);
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.view-page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--zuri-space-3);
+}
+
+.view-page-copy {
+  display: flex;
+  flex: 1 1 260px;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.view-page-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+.view-page-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-heading-sm);
+  font-weight: var(--zuri-font-weight-semibold);
+  line-height: var(--zuri-line-height-heading-sm);
+  letter-spacing: normal;
+}
+
+.view-page-lead {
+  margin: var(--zuri-space-1) 0 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+.view-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-3);
+  padding: var(--zuri-space-4);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+}
+
+.view-card-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-md);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-body-md);
+}
+
+.view-card-text {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+/* One setting or file: what it is on the left, its control on the right. 44 px is
+   the tap target a phone needs, so the row never dips below it. */
+.view-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-2);
+  min-height: 44px;
+  padding: var(--zuri-space-2) 0;
+  border-top: 1px solid var(--zuri-border-hairline);
+}
+
+.view-row:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.view-row-copy {
+  display: flex;
+  flex: 1 1 220px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.view-row-label {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+.view-row-note {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.view-row-value {
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.view-row-choices {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--zuri-space-1);
+}
+
+/* The page's own control: the 32 px outlined button the shell already uses for
+   secondary actions, so a view never invents a third button shape. */
+.view-button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zuri-space-1);
+  height: 32px;
+  padding: 0 var(--zuri-space-3);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+  text-align: center;
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.view-button:hover {
+  background: var(--zuri-surface-active);
+}
+
+.view-button:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.view-button[disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.view-button[disabled]:hover {
+  background: var(--zuri-surface);
+}
+
+/* A chosen option in a set of two, such as the theme. */
+.view-button[aria-pressed='true'] {
+  border-color: var(--zuri-accent);
+  background: var(--zuri-accent-subtle);
+  color: var(--zuri-accent);
+}
+
+/* One file in the workspace: name, size and when it changed, then its two
+   actions. The name is the only part that flexes, so long names ellipsis rather
+   than pushing the actions off the row. */
+.view-file-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.view-file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  min-height: 44px;
+  padding: var(--zuri-space-2) 0;
+  border-top: 1px solid var(--zuri-border-hairline);
+}
+
+.view-file-row:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.view-file-name {
+  flex: 1 1 160px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.view-file-meta {
+  flex: 0 0 auto;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* Pages breathe less on a phone, where the gutter is the whole window. */
+@media (max-width: 767.98px) {
+  .view-page {
+    padding: var(--zuri-space-4);
+  }
+
+  .view-page-inner {
+    gap: var(--zuri-space-4);
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Sidebar conversation list
+
+   One row per stored thread: title on the left, how long ago it changed on the
+   right. Rows are buttons, because clicking one is the only control they have.
+   ------------------------------------------------------------------------- */
+
+.thread-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.thread-list[data-state='empty'] {
+  display: none;
+}
+
+/* A sidebar row is 32 px on radius/row, its title 13/18 regular on
+   color/text and the hint on the right on color/muted; the active row takes
+   color/active rather than an accent tint, which is what the node draws. */
+.thread-row {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  height: 32px;
+  padding: 0 var(--zuri-space-3);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: transparent;
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--zuri-motion-fast) var(--zuri-ease-out),
+    color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.thread-row:hover {
+  background: var(--zuri-surface);
+}
+
+.thread-row:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.thread-row[data-active='true'] {
+  background: var(--zuri-surface-active);
+  font-weight: var(--zuri-font-weight-regular);
+}
+
+.thread-row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-row-time {
+  flex: 0 0 auto;
+  font-size: var(--zuri-font-size-mono-sm);
+  color: var(--zuri-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Loading: skeleton rows plus a written label, so the state does not depend on
+   noticing an animation. */
+.shell-loading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+}
+
+.shell-loading-label {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  margin: 0;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+  color: var(--zuri-text-secondary);
+}
+
+.shell-spinner {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--zuri-border-strong);
+  border-top-color: var(--zuri-accent);
+  border-radius: var(--zuri-radius-pill);
+  animation: shell-spin 800ms linear infinite;
+}
+
+@keyframes shell-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+.shell-skeleton-row {
+  display: block;
+  height: 12px;
+  border-radius: var(--zuri-radius-pill);
+  /* A translucent neutral, so the placeholder reads on both a light and a dark
+     surface instead of vanishing into the panel behind it. */
+  background: var(--zuri-border-strong);
+  animation: shell-pulse 1.4s var(--zuri-ease-out) infinite;
+}
+
+.shell-skeleton-row-short {
+  width: 62%;
+}
+
+@keyframes shell-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Chat column: transcript, error block, composer
+   ------------------------------------------------------------------------- */
+
+.chat-transcript {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  /* The node's content column is 732 px inside 860, so the transcript inset is
+     64 px; the messages cap themselves at the chat max width inside it. */
+  padding: var(--zuri-space-5) 64px;
+  overflow-y: auto;
+}
+
+/* Filled: a thread reads top-down and scrolls, rather than centring like the empty
+   hero. */
+.chat-transcript[data-state='filled'] {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: var(--zuri-space-6);
+}
+
+/* -------------------------------------------------------------------------
+   Conversation transcript (node 0:1221)
+   ------------------------------------------------------------------------- */
+
+/* One turn, as the node lays it out: the reader's own words right-aligned in a
+   420 px stack under their avatar, Zuri's reply left under the 24 px mark in a
+   700 px stack. The reader's avatar rides in the meta row; Zuri's sits beside
+   the whole stack, so a long reply keeps one left edge. */
+.message {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: var(--zuri-chat-max-width);
+  margin: 0 auto;
+  align-items: flex-start;
+}
+
+.message[data-role='user'] {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.message-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  min-width: 0;
+}
+
+.message[data-role='user'] .message-stack {
+  max-width: 460px;
+  align-items: flex-end;
+}
+
+.message[data-role='assistant'] .message-stack {
+  flex: 1 1 auto;
+  max-width: 700px;
+  align-items: flex-start;
+}
+
+/* The mark: 24 px in both roles, the reader's circle carrying their initials on
+   color/primary, Zuri's carrying the sparkles glyph on the surface step. */
+.message-avatar {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--zuri-radius-pill);
+}
+
+.message-avatar[data-role='user'] {
+  background: var(--zuri-transcript-avatar);
+  color: var(--zuri-text-on-accent);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.message-avatar[data-role='assistant'] {
+  background: var(--zuri-transcript-fill);
+  color: var(--zuri-transcript-accent);
+}
+
+.message-avatar[data-state='failed'] {
+  background: var(--zuri-transcript-failed-soft);
+  color: var(--zuri-transcript-danger);
+}
+
+/* Meta row: the reader's badge plus avatar on 24 px, Zuri's name plus badge on
+   20 px, 8 px apart as the node draws them. */
+.message-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+.message[data-role='user'] .message-meta {
+  height: 24px;
+}
+
+.message[data-role='assistant'] .message-meta {
+  height: 20px;
+}
+
+.message-author {
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: 18px;
+}
+
+/* Mode badge: a 20 px pill in caption type. Ask takes the neutral surface step;
+   Act and Autopilot take the accent tint, and a failed turn takes the danger
+   tint so the badge itself reports the failure. */
+.message-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--zuri-space-2);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-transcript-fill);
+  color: var(--zuri-transcript-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.message[data-mode='act'] .message-badge,
+.message[data-mode='autopilot'] .message-badge {
+  background: var(--zuri-transcript-accent-soft);
+  color: var(--zuri-transcript-accent);
+}
+
+.message[data-state='failed'] .message-badge {
+  background: var(--zuri-transcript-failed-soft);
+  color: var(--zuri-transcript-danger);
+}
+
+/* Body: the reader's words sit in a 10 px-radius bubble on the surface step;
+   Zuri's reply is plain text capped at the node's 620 px measure, so a long
+   answer reads as writing rather than one more card. */
+.message-text {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message[data-role='user'] .message-text {
+  max-width: 460px;
+  padding: var(--zuri-space-3);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-transcript-fill);
+}
+
+/* The node draws a reply's text as a 620 px measure, so the block takes the
+   stack's width and stops at 620 rather than shrinking to its longest line. */
+.message[data-role='assistant'] .message-text {
+  width: 100%;
+  max-width: 620px;
+}
+
+/* A message main refused to save keeps its text and names the problem under it;
+   the node draws no such turn, so it only borrows the danger colour. */
+.message-error {
+  max-width: 420px;
+  margin: 0;
+  color: var(--zuri-transcript-danger);
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+/* Waiting on the write: the bubble is already in the transcript, so it is only
+   dimmed. */
+.message[data-state='pending'] .message-text {
+  opacity: 0.7;
+}
+
+/* A file the reader handed over rides under their bubble: a 28 px pill on the
+   raised surface with the node's hairline, the file name, then what happened to
+   it. */
+.message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--zuri-space-2);
+}
+
+.message-attachment {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--zuri-transcript-border);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface);
+}
+
+.message-attachment-icon {
+  flex: 0 0 auto;
+  color: var(--zuri-transcript-file);
+}
+
+.message-attachment-name {
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.message-attachment-state {
+  color: var(--zuri-transcript-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* What Act did to a file, inside the reply: a 10 px-radius card whose first row
+   names the file and the sheet with the state badge, and whose second row shows
+   the one change in mono. */
+.message-tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: 620px;
+  padding: var(--zuri-space-3);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-transcript-card);
+}
+
+.message-tool-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 20px;
+}
+
+.message-tool-icon {
+  flex: 0 0 auto;
+  color: var(--zuri-transcript-text-muted);
+}
+
+.message-tool-name {
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  font-weight: var(--zuri-font-weight-medium);
+}
+
+.message-tool-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 var(--zuri-space-2);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-transcript-accent-soft);
+  color: var(--zuri-transcript-accent);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.message-tool-diff {
+  margin: 0;
+  color: var(--zuri-transcript-text-secondary);
+  font-family: var(--zuri-font-family-mono);
+  font-size: var(--zuri-font-size-mono-sm);
+  line-height: var(--zuri-line-height-mono-sm);
+}
+
+/* The reply is still arriving: the node's 2 x 16 caret, the dots on their 8 px
+   pitch, then the label. Still rather than blinking, because the node draws one
+   frame of it. */
+.message-streaming {
+  display: flex;
+  align-items: center;
+  /* The node's row is exactly its 16 px caret tall (node 0:1221), so the stack's
+     bottom matches the turn the design draws rather than growing 6 px. */
+  height: 16px;
+  gap: var(--zuri-space-2);
+}
+
+.message-streaming-caret {
+  flex: 0 0 auto;
+  width: 2px;
+  height: 16px;
+  border-radius: 1px;
+  background: var(--zuri-transcript-accent);
+}
+
+.message-streaming-dots {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+}
+
+.message-streaming-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-text-muted);
+}
+
+.message-streaming-label {
+  color: var(--zuri-transcript-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* A reply that failed keeps the mark and the badge and puts the reason in a
+   card, with the way out underneath it. */
+.message-error-card {
+  width: 100%;
+  max-width: 620px;
+  padding: var(--zuri-space-3);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-transcript-card);
+}
+
+.message-error-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+}
+
+.message-error-detail {
+  margin: var(--zuri-space-1) 0 0;
+  color: var(--zuri-transcript-text-secondary);
+  font-size: var(--zuri-font-size-caption);
+  line-height: 18px;
+  overflow-wrap: anywhere;
+}
+
+.message-retry-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+.message-retry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 var(--zuri-space-3);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: 18px;
+  cursor: pointer;
+}
+
+.message-retry:hover {
+  background: var(--zuri-transcript-fill);
+}
+
+.message-retry-hint {
+  margin: 0;
+  color: var(--zuri-transcript-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* The node puts no clock in the transcript, but the time is still worth telling
+   a screen reader, so the stored time stays in the DOM and out of sight. */
+.message-time {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Loading a conversation (node 0:1221, fourth state): the shape of the turns
+   that are on their way. The bars are the node's 12 / 14 px on its 4 px radius
+   and its #E8EAED fill, and like the Loading Skeleton block they hold still,
+   because the node draws one frame of a placeholder rather than a loop. The three
+   groups sit 24 px apart on the node, and each group's own bars 8 px apart. */
+.transcript-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-6);
+  width: 100%;
+  max-width: var(--zuri-chat-max-width);
+  margin: 0 auto;
+}
+
+.transcript-skeleton-turn {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--zuri-space-2);
+}
+
+.transcript-skeleton-turn[data-role='user'] {
+  flex-direction: column;
+  align-items: flex-end;
+  /* The node draws the reader's group as the 420 px its widest bar needs, sitting
+     against the right edge, not as a full-width block with the bars pushed over. */
+  align-self: flex-end;
+  width: fit-content;
+  gap: var(--zuri-space-2);
+}
+
+.transcript-skeleton-avatar {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-transcript-skeleton);
+}
+
+.transcript-skeleton-lines {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+}
+
+.transcript-skeleton-bar {
+  display: block;
+  height: 14px;
+  border-radius: 4px;
+  background: var(--zuri-transcript-skeleton);
+}
+
+.transcript-skeleton-bar[data-size='meta'] {
+  width: 72px;
+  height: 12px;
+}
+
+.transcript-skeleton-bar[data-size='name'] {
+  width: 64px;
+  height: 12px;
+}
+
+.transcript-skeleton-bar[data-size='wide'] {
+  width: 420px;
+  max-width: 100%;
+}
+
+.transcript-skeleton-turn[data-role='assistant'] .transcript-skeleton-bar[data-size='wide'] {
+  width: 100%;
+}
+
+.transcript-skeleton-bar[data-size='short'] {
+  width: 280px;
+  max-width: 100%;
+}
+
+/* The node's reply closes on a longer bar than the reader's (380 against 280). */
+.transcript-skeleton-turn[data-role='assistant'] .transcript-skeleton-bar[data-size='short'] {
+  width: 380px;
+}
+
+.transcript-skeleton-note {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  margin: 0;
+  color: var(--zuri-transcript-text-secondary);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.transcript-skeleton-spinner {
+  flex: 0 0 auto;
+  color: var(--zuri-transcript-text-muted);
+}
+
+/* Loading Dots block: the design's "Block / Loading Dots" component (node 0:117).
+   A 20 x 22 box on the node's surface fill holding three 4 px dots on the node's
+   8 px pitch, so the row is vertically centred at the node's 9 px top offset. The
+   dots bind color/muted, so they follow the theme instead of carrying a grey. */
+.loading-dots {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--zuri-space-1);
+  width: 20px;
+  height: 22px;
+  background: var(--zuri-surface);
+}
+
+.loading-dots-dot {
+  flex: 0 0 auto;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-text-muted);
+}
+
+/* Waiting on the first token: the block stands alone exactly as drawn, so the
+   bubble gives up its frame and padding rather than wrapping the dots in a box
+   the node does not have. Opacity returns to 1 because the node's dots are
+   solid, unlike the dimmed text of a reply that is already arriving. */
+.message[data-state='streaming'] .message-text:has(.loading-dots) {
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  opacity: 1;
+}
+
+/* Loading Skeleton block: the design's "Block / Loading Skeleton" component
+   (node 0:113). A 320 x 84 card on the node's 16 px padding and 8 px rhythm,
+   filled color/surface and outlined color/border, holding three 12 px bars at
+   the node's 200 / 160 / 120 widths on radius/row. The node draws no animation,
+   so the block is still: it is a placeholder the content replaces, not a loop.
+   Fluid below the node's width the way the error block is, so the sidebar can
+   hold it; the bars keep their widths and shrink rather than overflow. */
+.loading-skeleton {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: 320px;
+  padding: var(--zuri-space-4);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+}
+
+.loading-skeleton-bar {
+  flex: 0 0 auto;
+  height: 12px;
+  max-width: 100%;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface-sunken);
+}
+
+/* The node stacks the bars longest to shortest, each one a step shorter than the
+   one above it. */
+.loading-skeleton-bar:nth-child(1) {
+  width: 200px;
+}
+
+.loading-skeleton-bar:nth-child(2) {
+  width: 160px;
+}
+
+.loading-skeleton-bar:nth-child(3) {
+  width: 120px;
+}
+
+/* Error block: the design's "Block / Error" component (node 0:121). A 360 px card
+   on the node's 16 px padding and 8 px rhythm: danger tint and a danger border at
+   32%, an alert mark beside a two-line message, then one action. The node binds
+   color/danger, so both the tint and the border come from the theme's danger ramp;
+   only their alphas (5.88% fill, 32% outline) are the node's own. */
+.error-block {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: 360px;
+  padding: var(--zuri-space-4);
+  border: 1px solid var(--zuri-danger-line);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-danger-tint);
+}
+
+/* The node lays the mark out 20 px wide with the message 8 px to its right, and
+   the message is what sets the row's height (22 px title plus a 4 px gap plus the
+   16 px caption). */
+.error-block-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--zuri-space-2);
+  width: 100%;
+}
+
+.error-block-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--zuri-danger);
+}
+
+.error-block-copy {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+  min-width: 0;
+}
+
+.error-block-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-md);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-md);
+}
+
+.error-block-text {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* The action is the node's 28 px control with 12 px side padding: its label is
+   13/18 there, and body-sm's 13/20 centres the same glyphs inside the 28 px height. */
+.error-block-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 var(--zuri-space-3);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-danger-tint);
+  color: var(--zuri-danger);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-sm);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.error-block-action:hover {
+  background: var(--zuri-danger-subtle);
+}
+
+.error-block-action:focus-visible {
+  outline: 2px solid var(--zuri-danger);
+  outline-offset: 2px;
+}
+
+/* Card: the design's "Card / Default" component (node 0:54). A 320 px card on the
+   node's 16 px padding and 8 px rhythm, filled color/surface and outlined 1 px
+   color/border on radius/card. The node draws no shadow, so the outline alone
+   separates the card from the canvas. Its 132 px height is the sample copy (a 24 px
+   title, a two-line 44 px body, a 16 px meta line and three 8 px gaps plus the 32 px
+   of padding), not a fixed frame, so the rule sets the rhythm and lets a longer body
+   grow the card instead of clipping it. Fluid below the node's width the way the
+   other cards are, so a narrow column can hold one. */
+.card {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: 320px;
+  padding: var(--zuri-space-4);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+}
+
+/* The node's Title: 16/24 at medium weight on color/text. */
+.card-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-heading-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-heading-sm);
+}
+
+/* The node's Body: 14/22 regular on color/text, filling the 288 px measure the
+   padding leaves so it wraps where the node wraps. */
+.card-text {
+  width: 100%;
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-md);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-body-md);
+}
+
+/* The node's Meta: 12/16 regular on color/muted, so it steps back from the body. */
+.card-meta {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* Card / Raised: the design's "Card / Raised" component (node 0:58). The same
+   geometry as Card / Default - 320 px at 16 px padding and an 8 px rhythm on
+   radius/card - with the two changes the node makes: the fill lifts from
+   color/surface to color/raised, and the card carries the node's drop shadow so it
+   reads as sitting above the canvas instead of in it. Every value is the token the
+   node binds, so a change in the open-pencil node moves the card with it. The
+   node's Title, Body and Meta are the same 16/24, 14/22 and 12/16 steps as Card /
+   Default's, so they keep the .card-title / .card-text / .card-meta classes rather
+   than a second copy that could drift. */
+.card-raised {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: 320px;
+  padding: var(--zuri-space-4);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface-raised);
+  box-shadow: var(--zuri-shadow-raised);
+}
+
+/* Input / Text: the design's "Input / Text" component (node 0:23). A 320 px
+   stack at 8 px (space-2) on nothing of its own: the node's Label (13/18 medium
+   on color/muted) sits above a 36 px Field, and the field alone draws a shape.
+
+   The node binds three values, so the rule states the same three: fills/0/color
+   color/background lands on the surface role, strokes/0/color color/border on the
+   hairline, and cornerRadius radius/row on --zuri-radius-row. The label and the
+   placeholder are both color/muted (the unmatched #8E9196 both text nodes carry),
+   and the placeholder is body-md at the node's 12 px inset - space-3, the padding
+   the style guide names for a text field.
+
+   States come from the guide, which draws them outside the node: hover strengthens
+   the edge, focus keeps that stronger edge and adds the keyboard ring, disabled
+   drops to the family's 40% opacity. The error state is its own component (Input /
+   Text Error), so this rule never paints danger. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: 320px;
+}
+
+.field-label {
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-field-label);
+}
+
+.field-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--zuri-space-3);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+}
+
+/* The node draws the field in its empty state, so its Placeholder text is the
+   only glyph colour to carry over: color/muted, one step back from typed text. */
+.field-input::placeholder {
+  color: var(--zuri-text-muted);
+}
+
+.field-input:hover:not(:disabled) {
+  border-color: var(--zuri-border-strong);
+}
+
+/* The edge strengthens while the field holds the caret, and the ring marks it for
+   keyboard users only: a ring on every click would outshine the caret. */
+.field-input:focus {
+  border-color: var(--zuri-border-strong);
+}
+
+.field-input:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.field-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Input / Text Error: the design's "Input / Text Error" component (node 0:31).
+   It is Input / Text (node 0:23) with one binding swapped, so it reuses .field,
+   .field-label and .field-input and adds only what the node changes.
+
+   The node keeps fills/0/color color/background and cornerRadius radius/row on
+   the same 36 px field and moves strokes/0/color from color/border to
+   color/danger, so only the edge turns. Its Label is the same 13/18 medium on
+   color/muted, unchanged by the state. Below the field sits a Help line the
+   plain field does not have, on color/danger at the caption step: 12/16 regular,
+   one step down from the label. That makes the stack 18 + 8 + 36 + 8 + 16 = the
+   node's 86 px on the same 320 px column at the 8 px rhythm.
+
+   The node draws the error as fixed state, so nothing here animates: the Help
+   line is always present in the markup, and a message that only appears on
+   failure would shove the field under the pointer. The dangerous state rides on
+   aria-invalid, which is also what the screen reader announces, and the hover and
+   caret rules that strengthen the edge to border-strong are overridden so a field
+   that needs attention never looks healthy. The keyboard ring stays accent, as
+   everywhere else in the family: a ring in danger would read as a second error. */
+.field-input[aria-invalid='true'],
+.field-input[aria-invalid='true']:hover,
+.field-input[aria-invalid='true']:focus {
+  border-color: var(--zuri-danger);
+}
+
+.field-error {
+  margin: 0;
+  color: var(--zuri-danger);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* Input / Textarea: the design's "Input / Textarea" component (node 0:27). It is
+   Input / Text (node 0:23) with one thing changed - the Field is 88 px tall so
+   the text can wrap - so the stack, the label and every state stay with the
+   family's rules and only the control itself is new.
+
+   The node binds the same three values as the single-line field: fills/0/color
+   color/background on the surface role, strokes/0/color color/border on the
+   hairline, cornerRadius radius/row on --zuri-radius-row. What differs is how
+   the Value sits: the single-line field centres one 36 px row, while this Field
+   insets its text 12 px on all four sides - the same space-3 the input uses
+   horizontally - and lets it run to 296 px wide, which is 320 - 2 x 12. The
+   value is the family's 14/22 on color/text, unchanged.
+
+   88 px is the resting height, not a ceiling: the node's Field is a fixed box
+   around text that resizes to fit, so the control starts at the node's 88 px and
+   grows when the text needs more rather than clipping it. resize: vertical lets
+   the person drag it taller, which a paragraph field needs and a one-line input
+   never does; the browser draws its grip in the corner, the one part of the
+   control a static frame cannot show.
+
+   No screen draws this yet: the chat prompt is its own design (decision 18, a
+   borderless pill that grows), so the first callers are the reminder and task
+   dialogs, which are drawn with a notes box under their fields. */
+.field-textarea {
+  width: 100%;
+  min-height: 88px;
+  padding: var(--zuri-space-3);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  resize: vertical;
+}
+
+.field-textarea::placeholder {
+  color: var(--zuri-text-muted);
+}
+
+.field-textarea:hover:not(:disabled) {
+  border-color: var(--zuri-border-strong);
+}
+
+.field-textarea:focus {
+  border-color: var(--zuri-border-strong);
+}
+
+/* The ring is the family's keyboard ring, on the same accent as the input: a
+   paragraph field gets no different focus treatment from a one-line one. */
+.field-textarea:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.field-textarea:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  resize: none;
+}
+
+/* Select / Default: the design's "Select / Default" component (node 0:37). It is
+   Input / Text (node 0:23) with two things changed - the Field carries an
+   Icon / chevron-down, and the column is 280 px instead of 320 - so the stack, the
+   label and every state stay with the family's rules and only the control is new.
+
+   The node binds the same three values as the single-line field: fills/0/color
+   color/background on the surface role, strokes/0/color color/border on the
+   hairline, cornerRadius radius/row on --zuri-radius-row. Its Label is the
+   family's 13/18 medium on color/muted (the unmatched #8E9196 the node carries),
+   its Value is 14/22 on color/text inset 12 px, and the chevron's own
+   strokes/0/color color/muted is the one binding the plain field does not have.
+
+   The chevron is anchored to the field's right edge, 12 px in, instead of the
+   x=89 the node packs it at: node 0:37 holds an auto-width Value (77 px), so its
+   icon lands immediately after the text, while the same Select drawn in a screen
+   (node 0:1067) right-aligns the icon at that same 12 px inset. An edge-anchored
+   chevron is also the only one that holds still while the value changes - one
+   that follows the text would slide on every choice. Nothing else moves.
+
+   The control is a real <select>: the platform keeps the option list, the keyboard
+   and the screen-reader announcement, and the field around it draws the box. That
+   is why appearance is none and the chevron is a span - the browser's own arrow
+   would sit inside the box the node draws. */
+.select {
+  max-width: 280px;
+}
+
+.select-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 36px;
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+}
+
+.select-control {
+  width: 100%;
+  height: 100%;
+  /* 12 px in from the left for the value, and 12 + 16 + 8 on the right for the
+     chevron, its own inset and a gap: a long model name truncates before it can
+     run under the icon. */
+  padding: 0 calc(var(--zuri-space-3) + 16px + var(--zuri-space-2)) 0 var(--zuri-space-3);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: none;
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  appearance: none;
+  cursor: pointer;
+}
+
+/* Decoration only: the select underneath owns the click, so the icon must never
+   swallow the press that should open the list. */
+.select-icon {
+  position: absolute;
+  right: var(--zuri-space-3);
+  display: flex;
+  align-items: center;
+  color: var(--zuri-text-muted);
+  pointer-events: none;
+}
+
+/* The native control paints no box of its own, so hover and caret focus land on
+   the field that draws the edge, and the keyboard ring goes on the control. */
+.select-field:hover {
+  border-color: var(--zuri-border-strong);
+}
+
+.select-field:focus-within {
+  border-color: var(--zuri-border-strong);
+}
+
+.select-control:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* The whole component dims, not just its text: a disabled select with a full
+   strength edge and chevron still reads as pressable. */
+.select-field:has(.select-control:disabled) {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.select-control:disabled {
+  cursor: not-allowed;
+}
+
+/* Select / Menu: the design's open list (node 0:43). It is the card surface - 260
+   px wide, color/background fill, a 1 px color/border edge on radius/card and the
+   same raised drop shadow Card / Raised carries - holding one group label and
+   three 28 px options. Every value here is a token the node binds: color/background
+   on the panel, color/border on the edge, radius/card on the corner, radius/row on
+   each option. Moving a binding in open-pencil moves this rule with it.
+
+   The height is the node's own arithmetic rather than a number: 8 px of padding,
+   the 16 px group label at 12/16, a 4 px rhythm, then 28 px options. That is
+   8 + 16 + 4 + 3x28 + 2x4 + 8 = 128, the node's height, so a fourth option grows
+   the menu the way the node's auto height would instead of clipping it.
+
+   The selected option changes exactly two things, its fill and the check mark: the
+   label stays color/text at 13/18 regular, because the node does not recolour it.
+
+   The mark is anchored to the row's right edge rather than to the x the node packs
+   it at. Node 0:45 holds an auto-width label, so its 16 px Icon / check lands
+   right after the text; a list whose rows have different label widths needs the
+   mark on the edge, or it wanders row to row. The Select / Default chevron is
+   anchored the same way for the same reason.
+
+   Markup: a host draws <div class="select-menu" role="listbox"> with a
+   .select-menu-label and one <button class="select-menu-option" role="option">
+   per choice. aria-selected carries the state, so the primary-soft fill and a
+   screen reader read the one attribute instead of a class that could drift. */
+.select-menu {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-1);
+  width: 100%;
+  max-width: 260px;
+  /* The node measures its 8 px inset from the frame edge and draws the 1 px stroke
+     inside that same 8, so the padding is the inset less the edge. Reading 8 px
+     literally would put 1 + 8 px between the edge and the first row, making the
+     menu 130 px tall and its rows 242 px wide; the node is 128 with 244 px rows. */
+  padding: calc(var(--zuri-space-2) - 1px);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface);
+  box-shadow: var(--zuri-shadow-raised);
+}
+
+/* The node's "Chat models": 12/16 regular. It carries the unmatched #8E9196 that
+   every label in this family carries, which the token layer reads as the muted
+   foreground in both themes - the same reading the select's own Label gets. */
+.select-menu-label {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-caption);
+  letter-spacing: normal; /* the node sets no tracking */
+}
+
+/* One 244 x 28 row inside the 8 px padding, on color/background, with the 13/18
+   label 8 px in from the row's edge. */
+.select-menu-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-2);
+  overflow: hidden;
+  width: 100%;
+  height: 28px;
+  padding: 0 var(--zuri-space-2);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-select-option);
+  letter-spacing: normal;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.select-menu-option[aria-selected='true'] {
+  background: var(--zuri-accent-subtle);
+}
+
+/* The node's Icon / check: a 16 px glyph whose path is a tick from (2.67, 8) to
+   (6, 11.33) to (13.33, 4), stroked at color/primary with weight 1.33 - two arms
+   of 4.7 and 10.4 on the node's grid. Two borders on a turned box draw the same
+   tick and take the accent straight from the token layer. The 3 px margin
+   centres the turned mark in the 16 px glyph, the width the node reserves for it. */
+.select-menu-option[aria-selected='true']::after {
+  content: '';
+  flex: 0 0 auto;
+  width: 5px;
+  height: 10px;
+  margin-right: 3px;
+  border-right: 1.33px solid var(--zuri-accent);
+  border-bottom: 1.33px solid var(--zuri-accent);
+  transform: rotate(45deg);
+}
+
+/* States the guide names for a control, drawn outside the node: hover is the
+   subtle surface darken and never touches the chosen row, whose fill already means
+   "this is the current choice"; the keyboard ring is the guide's accent ring. */
+.select-menu-option:hover:not([aria-selected='true']) {
+  background: var(--zuri-surface-active);
+}
+
+.select-menu-option:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+/* The composer spans the whole inset width of the column (780 px at the node's
+   860 px centre), so it is not held to the transcript's 720 px reading measure. */
+.composer-shell {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--zuri-space-2);
+  width: 100%;
+}
+
+/* Composer: the node's 60 px pill on radius/pill, 8 px padding, a 44 px attach
+   button, the draft on 14/22 and a 44 px accent send button. */
+.composer {
+  display: flex;
+  box-sizing: border-box;
+  align-items: flex-end;
+  gap: var(--zuri-space-2);
+  min-height: 60px;
+  /* 7 px padding plus the node's inside 1 px stroke is its 8 px inset, which is
+     what puts the 44 px controls 60 px tall overall as drawn. */
+  padding: 7px var(--zuri-space-2);
+  border: 1px solid var(--zuri-border-hairline);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-surface);
+  box-shadow: var(--zuri-shadow-soft);
+}
+
+.composer-button,
+.composer-send {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--zuri-radius-pill);
+  background: transparent;
+  color: var(--zuri-text-secondary);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out),
+    color var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.composer-button {
+  background: var(--zuri-bg-canvas);
+}
+
+.composer-button:hover:not(:disabled) {
+  background: var(--zuri-accent-subtle);
+  color: var(--zuri-accent);
+}
+
+.composer-send {
+  background: var(--zuri-accent);
+  color: var(--zuri-text-on-accent);
+}
+
+.composer-send:hover:not(:disabled) {
+  background: var(--zuri-accent-hover);
+}
+
+.composer-button:focus-visible,
+.composer-send:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 176px;
+  padding: 11px 0;
+  border: 0;
+  background: transparent;
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  resize: none;
+}
+
+.composer-input::placeholder {
+  color: var(--zuri-text-muted);
+}
+
+.composer-input:focus {
+  outline: none;
+}
+
+/* Disabled: a control the person cannot use has to look unusable, not just be
+   inert, so the hint below the pill names the reason too. */
+.composer-button:disabled,
+.composer-send:disabled,
+.composer-input:disabled {
+  cursor: not-allowed;
+}
+
+.composer-button:disabled,
+.composer-input:disabled {
+  color: var(--zuri-text-muted);
+}
+
+/* Node 0:823 draws the send button while a reply is in flight as a flat
+   #F0F1F3 disc with a muted arrow: the sunken step below the pill, not the accent.
+   Same treatment here, because an empty draft and a live reply both mean "this
+   button has nothing to do right now". */
+.composer-send:disabled {
+  background: var(--zuri-surface-sunken);
+  color: var(--zuri-text-muted);
+}
+
+/* -------------------------------------------------------------------------
+   Streaming status (node 0:944)
+
+   The disabled state of the shell: while a reply is arriving the composer is
+   inert, and this 48 px row on radius/card carries what is happening and the one
+   control that still applies. The node's own numbers: a 14 px accent loader at the
+   12 px inset, the label 8 px after it on caption size, and a 32 px Stop button
+   inset 12 px from the right edge. The label truncates rather than wrapping, which
+   is what the node's single-line text does.
+   ------------------------------------------------------------------------- */
+
+.stream-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  width: 100%;
+  max-width: var(--zuri-chat-max-width);
+  min-height: 48px;
+  margin: 0 auto;
+  padding: 0 var(--zuri-space-3);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-surface-sunken);
+}
+
+/* Stays in the document so its wording is always readable; `hidden` is how the
+   shell says the reply is over. A flex child ignores [hidden] on its own. */
+.stream-status[hidden] {
+  display: none;
+}
+
+.stream-status-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--zuri-accent);
+}
+
+/* The node draws the loader still; it turns here so a long reply still reads as
+   work in progress, and it stops turning for anyone who asked for less motion. */
+.stream-status-icon svg {
+  animation: shell-spin 900ms linear infinite;
+}
+
+.stream-status-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stream-status-stop {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--zuri-space-3);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-surface);
+  color: var(--zuri-text-primary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-caption);
+  cursor: pointer;
+  transition: background var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+.stream-status-stop:hover {
+  background: var(--zuri-surface-active);
+}
+
+.stream-status-stop:focus-visible {
+  outline: 2px solid var(--zuri-accent);
+  outline-offset: 2px;
+}
+
+.composer-hint-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--zuri-space-4);
+}
+
+.composer-hint {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* The mode reminder the node puts on the right of the hint line. */
+.composer-note {
+  margin: 0;
+  color: var(--zuri-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  white-space: nowrap;
+}
+
+/* A store failure is the one thing this line has to shout about. */
+.composer-hint[data-state='error'] {
+  color: var(--zuri-danger);
+}
+
+/* Modal / Scrim: the design's "Modal / Scrim" component (node 0:95). The node is
+   one filled rectangle and nothing else - 400 x 280, fill #1F232847 bound to
+   color/overlay, no corner radius, no stroke, no effect, no children - and that
+   fill is the whole component: it covers the window so the dialog above it is the
+   only thing the person can reach.
+
+   The 27.84% alpha in the node's fill is carried by the token (--zuri-overlay),
+   not baked into this rule, so the swatch and every scrim drawn on screen read one
+   value: moving the binding in open-pencil moves the CSS with it.
+
+   The node draws the sample at 400 x 280; its use is the full window. The
+   delete-conversation dialog's 1440 x 900 "Modal scrim" rectangle is the same
+   fill edge to edge, so the component is pinned to the viewport rather than sized.
+
+   z-index is layering, not design: the node carries no stacking value, it simply
+   says the scrim is the bottom of the dialog layer and the first thing above the
+   shell. Every dialog shares this one number, so dialogs never stack past it.
+
+   Nothing else from the node: no radius, no border, no shadow, no blur. A rounded,
+   edged or frosted scrim would be a redesign. */
+.modal-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--zuri-overlay);
+  animation: modal-scrim-fade var(--zuri-motion-fast) var(--zuri-ease-out);
+}
+
+/* The guide's 150 ms backdrop fade is the entering state. */
+@keyframes modal-scrim-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* Present in the markup for as long as the page is loaded, so it has to be
+   removable without removing the element: a class rule that set display would
+   beat the browser's [hidden] rule, hence the explicit pair. */
+.modal-scrim[hidden] {
+  display: none;
+}
+
+/* Modal / Shell: the design's dialog card (node 0:96). It is the raised surface that
+   sits above the scrim: a color/raised fill inside a 1 px color/border-strong outline,
+   radius/modal corners and the card drop shadow, at the guide's 480 px dialog width.
+
+   The stack is the node's own rhythm: 24 px of padding, the 28 px title, 16 px, the
+   44 px two-line body, 16 px, then the 32 px footer closing on the same 24 px. The
+   rules state that rhythm and the padding instead of the 184 px height, so a longer
+   body grows the card the way the node's HEIGHT auto-resize does.
+
+   Both texts are color/text - the title at 20/28, the body at 14/22, regular weight
+   and no tracking, because the node sets none. The footer right-aligns its two
+   actions with an 8 px gap so the confirm control reads last; those actions are the
+   button family's own classes (btn-ghost for Cancel, btn-primary for the confirm), so
+   the shell never restates their box.
+
+   Width, padding and gaps all come from tokens, so moving the node's binding or the
+   guide's 480 px moves this component and nothing else. A host centres the card over
+   .modal-scrim; the shell itself only draws the card the node draws. */
+.modal-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-space-4);
+  width: 100%;
+  max-width: var(--zuri-modal-width);
+  padding: var(--zuri-space-6);
+  border: 1px solid var(--zuri-border-strong);
+  border-radius: var(--zuri-radius-modal);
+  background: var(--zuri-surface-raised);
+  box-shadow: var(--zuri-shadow-raised);
+}
+
+.modal-shell-title {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-heading-md);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-heading-md);
+  letter-spacing: normal; /* the node's title carries no tracking */
+}
+
+.modal-shell-body {
+  margin: 0;
+  color: var(--zuri-text-primary);
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+}
+
+.modal-shell-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--zuri-space-2);
+}
+
+/* Reduced motion: the skeleton still reads as a placeholder at a fixed tone, and
+   the scrim arrives without its fade. */
+@media (prefers-reduced-motion: reduce) {
+  .shell-spinner,
+  .shell-skeleton-row,
+  .stream-status-icon svg {
+    animation: none;
+  }
+
+  .modal-scrim {
+    animation: none;
+  }
+
+  .shell-skeleton-row {
+    opacity: 0.7;
+  }
+}
+
+/* A narrow window cannot hold a 260 px list and a 320 px panel beside the
+   conversation: the sidebar drops to its icon rail and the context panel keeps
+   only a skeleton-sized column, so #chat always keeps real width. The collapse
+   state itself still comes from ui/shell.js; this is layout only. */
+@media (max-width: 999px) {
+  .shell-column-sidebar {
+    width: var(--zuri-sidebar-width-collapsed);
+  }
+
+  /* The rail keeps New chat as an icon and drops the rest of the panel, which is
+     what the collapsed design does with the same 64 px strip. */
+  .shell-column-sidebar .shell-column-body,
+  .shell-column-sidebar .sidebar-nav,
+  .shell-column-sidebar .sidebar-foot {
+    display: none;
+  }
+
+  .shell-column-sidebar .sidebar-new-chat {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .shell-column-sidebar .sidebar-new-chat-label,
+  .shell-column-sidebar .sidebar-new-chat-shortcut {
+    display: none;
+  }
+
+  .composer-area {
+    padding: 0 var(--zuri-space-4) var(--zuri-space-3);
+  }
+
+  .shell-column-context {
+    width: clamp(96px, 30vw, var(--zuri-right-panel-width));
+  }
+}
+
+/* A phone cannot show three columns at once: below 768 px the conversation takes
+   the window and the navigation moves into the bottom tab bar, with #sidebar and
+   #context-panel as sheets that slide over it. The same data-collapsed state
+   ui/shell.js already keeps decides whether a sheet is in or out, so this block
+   is layout only. */
+@media (max-width: 767.98px) {
+  .app-shell {
+    min-height: 100dvh;
+  }
+
+  .shell {
+    position: relative;
+  }
+
+  .shell-tabbar {
+    display: flex;
+  }
+
+  /* One visible column has nothing to collapse into: the chat keeps the window
+     and its own toggle steps aside. The top-bar toggle still opens the drawer. */
+  .shell-column-chat,
+  .shell-column-chat[data-collapsed='true'] {
+    width: 100%;
+  }
+
+  .shell-column-chat .transcript-header .shell-toggle {
+    display: none;
+  }
+
+  /* Drawer: both states are set here because the 999 px block would otherwise
+     leave the 64 px icon rail on screen. */
+  .shell-column-sidebar,
+  .shell-column-sidebar[data-collapsed='true'] {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 2;
+    width: min(300px, 84vw);
+    box-shadow: var(--zuri-shadow-raised);
+    transform: translateX(-100%);
+    visibility: hidden;
+  }
+
+  .shell-column-sidebar[data-collapsed='false'] {
+    transform: none;
+    visibility: visible;
+  }
+
+  /* The open drawer is the full panel again; the 999 px block drops its parts. */
+  .shell-column-sidebar .sidebar-head {
+    display: block;
+  }
+
+  .shell-column-sidebar .shell-column-body {
+    display: flex;
+  }
+
+  .shell-column-sidebar .sidebar-nav {
+    display: flex;
+  }
+
+  /* A nav row is 32 px by design, but a fingertip needs 44. */
+  .shell-column-sidebar .nav-sidebar-row {
+    height: 44px;
+  }
+
+  .shell-column-sidebar .sidebar-foot {
+    display: flex;
+  }
+
+  .shell-column-sidebar .sidebar-new-chat {
+    justify-content: flex-start;
+    padding: 0 var(--zuri-space-3) 0 10px;
+  }
+
+  .shell-column-sidebar .sidebar-new-chat-label,
+  .shell-column-sidebar .sidebar-new-chat-shortcut {
+    display: block;
+  }
+
+  /* Context panel: the sheet the tab bar pulls in from the right. */
+  .shell-column-context,
+  .shell-column-context[data-collapsed='true'] {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2;
+    width: min(var(--zuri-right-panel-width), 88vw);
+    box-shadow: var(--zuri-shadow-raised);
+    transform: translateX(100%);
+    visibility: hidden;
+  }
+
+  .shell-column-context[data-collapsed='false'] {
+    transform: none;
+    visibility: visible;
+  }
+
+  /* The model trigger would push the top bar past 390 px; the context panel
+     still names the model. */
+  .top-bar-model {
+    display: none;
+  }
+}

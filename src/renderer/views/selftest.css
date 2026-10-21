@@ -1,0 +1,909 @@
+/**
+ * Self-test results (design node 0:15423).
+ *
+ * The node draws one page in one frame; the view adds the run's other frames
+ * (idle, running, fail) plus the loading, error and disabled frames a screen
+ * check opens by name, all through `?state=` on one markup tree.
+ *
+ * Geometry from the node: 52 px top bar, 40 px page gutter, a 208 px settings
+ * nav with a hairline beside it, a summary card, one card per suite and a rail
+ * for the run's details. Radii follow the tokens.json binding: cards on
+ * radius-card 10, rows and buttons on radius-row 8, status pills on
+ * radius-pill 999. No colour literal lives here; the palette is the
+ * page-scoped block in tokens.css.
+ *
+ * Tone is one custom property per role, so a passing summary, a failing check
+ * and a pending row differ by `data-tone` and nothing else repeats the colours.
+ */
+
+/* --------------------------------------------------------------- page shell */
+
+* {
+  box-sizing: border-box;
+}
+
+.selftest-page {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--zuri-selftest-canvas);
+  color: var(--zuri-selftest-text);
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-selftest-small-size);
+  line-height: var(--zuri-selftest-small-leading);
+  -webkit-font-smoothing: antialiased;
+}
+
+.selftest-page a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.selftest-page button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.selftest-page :focus-visible {
+  outline: 2px solid var(--zuri-selftest-primary);
+  outline-offset: 2px;
+}
+
+.selftest-page [hidden] {
+  display: none !important;
+}
+
+.selftest-code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--zuri-selftest-sunken);
+  color: var(--zuri-selftest-text-secondary);
+  font-family: var(--zuri-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------- top bar */
+
+.selftest-topbar {
+  display: flex;
+  align-items: center;
+  height: var(--zuri-selftest-topbar-height);
+  padding: 0 var(--zuri-selftest-gutter);
+  border-bottom: 1px solid var(--zuri-selftest-hairline);
+  background: var(--zuri-selftest-surface);
+}
+
+.selftest-mark {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-selftest-mark-size);
+  height: var(--zuri-selftest-mark-size);
+  border-radius: var(--zuri-selftest-row-radius);
+  background: var(--zuri-selftest-accent);
+  color: var(--zuri-selftest-surface);
+}
+
+.selftest-wordmark {
+  margin: 0 0 0 var(--zuri-space-2);
+  font-size: var(--zuri-selftest-wordmark-size);
+  font-weight: 500;
+  line-height: var(--zuri-selftest-meta-leading);
+}
+
+.selftest-account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  margin-left: auto;
+}
+
+.selftest-avatar {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-selftest-avatar-size);
+  height: var(--zuri-selftest-avatar-size);
+  border-radius: var(--zuri-selftest-pill-radius);
+  background: var(--zuri-selftest-accent);
+  color: var(--zuri-selftest-surface);
+  font-size: var(--zuri-selftest-small-size);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.selftest-account-name {
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-meta-size);
+  line-height: var(--zuri-selftest-meta-leading);
+}
+
+/* ------------------------------------------------------------ settings nav */
+
+.selftest-main {
+  display: flex;
+  align-items: flex-start;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--zuri-selftest-gutter-top) var(--zuri-selftest-gutter) 56px;
+}
+
+.selftest-settings-nav {
+  flex: 0 0 auto;
+  width: var(--zuri-selftest-nav-width);
+  padding-top: 4px;
+}
+
+.selftest-nav-label {
+  margin: 0 0 var(--zuri-selftest-nav-label-gap);
+  padding: 0 var(--zuri-selftest-nav-row-padding) 0 0;
+  color: var(--zuri-selftest-text-muted);
+  font-size: var(--zuri-selftest-label-size);
+  font-weight: 600;
+  letter-spacing: var(--zuri-selftest-label-tracking);
+  line-height: var(--zuri-selftest-label-leading);
+  text-transform: uppercase;
+}
+
+.selftest-nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-selftest-nav-icon-gap);
+  height: var(--zuri-selftest-nav-row-height);
+  padding: 0 var(--zuri-selftest-nav-row-padding);
+  border-radius: var(--zuri-selftest-row-radius);
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-meta-size);
+  line-height: var(--zuri-selftest-meta-leading);
+}
+
+.selftest-nav-row:hover {
+  background: var(--zuri-selftest-sunken);
+  color: var(--zuri-selftest-text);
+}
+
+.selftest-nav-row[aria-current='page'] {
+  background: var(--zuri-selftest-primary-soft);
+  color: var(--zuri-selftest-primary);
+  font-weight: 500;
+}
+
+.selftest-nav-row svg {
+  flex: 0 0 auto;
+}
+
+.selftest-nav-hairline {
+  align-self: stretch;
+  width: 1px;
+  margin: 0 var(--zuri-selftest-nav-gap);
+  background: var(--zuri-selftest-hairline);
+}
+
+/* --------------------------------------------------------- phone bottom bar */
+/* Built from the nav rows above and shown only below 768 px, where the column
+   beside the page has no room. The bar is fixed, so it stays put while the page
+   scrolls under it, and the page keeps >= one bar height of bottom padding so
+   the closing note is never behind it. */
+
+.selftest-tabbar {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 10;
+  display: none;
+  padding-bottom: env(safe-area-inset-bottom);
+  border-top: 1px solid var(--zuri-selftest-hairline);
+  background: var(--zuri-selftest-surface);
+}
+
+.selftest-tab {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: var(--zuri-selftest-tabbar-height);
+  padding: 6px 2px;
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-label-size);
+  line-height: var(--zuri-selftest-label-leading);
+  text-align: center;
+}
+
+.selftest-tab svg {
+  flex: 0 0 auto;
+}
+
+.selftest-tab[aria-current='page'] {
+  color: var(--zuri-selftest-primary);
+  font-weight: 600;
+}
+
+.selftest-tab-label {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.selftest-tab-more {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.selftest-tab-more > summary {
+  flex: 1 1 auto;
+  cursor: pointer;
+  list-style: none;
+}
+
+.selftest-tab-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.selftest-tab-more-panel {
+  position: absolute;
+  right: 6px;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 208px;
+  padding: 6px;
+  border: 1px solid var(--zuri-selftest-border);
+  border-radius: var(--zuri-selftest-card-radius);
+  background: var(--zuri-selftest-surface);
+  box-shadow: var(--zuri-selftest-shadow);
+}
+
+.selftest-tab-more-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-selftest-nav-icon-gap);
+  min-height: 44px; /* tap target */
+  padding: 0 var(--zuri-selftest-nav-row-padding);
+  border-radius: var(--zuri-selftest-more-radius);
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-meta-size);
+  line-height: var(--zuri-selftest-meta-leading);
+}
+
+.selftest-tab-more-row:hover {
+  background: var(--zuri-selftest-sunken);
+  color: var(--zuri-selftest-text);
+}
+
+.selftest-tab-more-row[aria-current='page'] {
+  background: var(--zuri-selftest-primary-soft);
+  color: var(--zuri-selftest-primary);
+}
+
+/* -------------------------------------------------------------- page column */
+
+.selftest-column {
+  flex: 1 1 auto;
+  min-width: 0; /* the column shrinks with the window instead of pushing it wide */
+}
+
+.selftest-title {
+  margin: 0;
+  font-size: var(--zuri-selftest-title-size);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: var(--zuri-selftest-title-leading);
+}
+
+.selftest-sub {
+  margin: var(--zuri-selftest-head-gap) 0 0;
+  max-width: 640px;
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-meta-size);
+  line-height: var(--zuri-selftest-meta-leading);
+}
+
+/* The rail rides beside the suites rather than under them, so the extra width
+   of a 1920 px window goes into the check names instead of an empty strip. */
+.selftest-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--zuri-selftest-rail-width);
+  gap: var(--zuri-selftest-column-gap);
+  align-items: start;
+  margin-top: var(--zuri-selftest-summary-gap);
+}
+
+.selftest-stream {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-selftest-card-gap);
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------------ summary */
+
+.selftest-summary {
+  --tone: var(--zuri-selftest-text-muted);
+  --tone-soft: var(--zuri-selftest-sunken);
+  --tone-line: var(--zuri-selftest-border);
+
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--zuri-selftest-summary-gap-inline);
+  padding: var(--zuri-selftest-summary-padding);
+  border: 1px solid var(--tone-line);
+  border-radius: var(--zuri-selftest-card-radius);
+  background: var(--tone-soft);
+  box-shadow: var(--zuri-selftest-shadow);
+}
+
+.selftest-summary[data-tone='pass'] {
+  --tone: var(--zuri-selftest-success);
+  --tone-soft: var(--zuri-selftest-success-soft);
+  --tone-line: transparent;
+}
+
+.selftest-summary[data-tone='fail'] {
+  --tone: var(--zuri-selftest-danger);
+  --tone-soft: var(--zuri-selftest-danger-soft);
+  --tone-line: var(--zuri-selftest-danger-line);
+}
+
+.selftest-summary[data-tone='running'] {
+  --tone: var(--zuri-selftest-primary);
+  --tone-soft: var(--zuri-selftest-primary-soft);
+  --tone-line: transparent;
+}
+
+.selftest-summary-icon {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-selftest-summary-icon);
+  height: var(--zuri-selftest-summary-icon);
+  border-radius: var(--zuri-selftest-pill-radius);
+  background: var(--zuri-selftest-surface);
+  color: var(--tone);
+}
+
+.selftest-summary-title {
+  margin: 0;
+  color: var(--zuri-selftest-text);
+  font-size: var(--zuri-selftest-summary-size);
+  font-weight: 600;
+  line-height: var(--zuri-selftest-summary-leading);
+}
+
+.selftest-summary-line {
+  margin: 2px 0 0;
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-small-size);
+  line-height: var(--zuri-selftest-small-leading);
+}
+
+.selftest-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+/* ---------------------------------------------------------------- controls */
+
+.selftest-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--zuri-selftest-chip-gap);
+  height: var(--zuri-selftest-control-height);
+  padding: 0 var(--zuri-selftest-control-padding);
+  border: 1px solid var(--zuri-selftest-border);
+  border-radius: var(--zuri-selftest-row-radius);
+  background: var(--zuri-selftest-surface);
+  color: var(--zuri-selftest-text);
+  font-size: var(--zuri-selftest-meta-size);
+  line-height: var(--zuri-selftest-meta-leading);
+  white-space: nowrap;
+}
+
+.selftest-button:hover:not(:disabled) {
+  background: var(--zuri-selftest-sunken);
+}
+
+.selftest-button-primary {
+  border-color: transparent;
+  background: var(--zuri-selftest-primary);
+  color: var(--zuri-selftest-text-on-primary);
+}
+
+.selftest-button-primary:hover:not(:disabled) {
+  background: var(--zuri-selftest-primary-strong);
+}
+
+.selftest-button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* The run's own live region: quiet text under the summary, so a screen reader
+   hears the result change without the summary sentence being re-read. */
+.selftest-status {
+  margin: 0;
+  min-height: var(--zuri-selftest-small-leading);
+  color: var(--zuri-selftest-text-muted);
+  font-size: var(--zuri-selftest-small-size);
+  line-height: var(--zuri-selftest-small-leading);
+}
+
+.selftest-status:empty {
+  display: none;
+}
+
+/* ------------------------------------------------------------- suite cards */
+
+.selftest-suite {
+  border: 1px solid var(--zuri-selftest-border);
+  border-radius: var(--zuri-selftest-card-radius);
+  background: var(--zuri-selftest-surface);
+  box-shadow: var(--zuri-selftest-shadow);
+  overflow: hidden;
+}
+
+.selftest-suite-head {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  padding: var(--zuri-selftest-suite-head-padding);
+  border-bottom: 1px solid var(--zuri-selftest-hairline);
+}
+
+.selftest-suite-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--zuri-selftest-check-icon);
+  height: var(--zuri-selftest-check-icon);
+  color: var(--zuri-selftest-success);
+}
+
+.selftest-suite[data-tone='fail'] .selftest-suite-icon {
+  color: var(--zuri-selftest-danger);
+}
+
+.selftest-suite[data-tone='pending'] .selftest-suite-icon {
+  color: var(--zuri-selftest-text-muted);
+}
+
+.selftest-suite-name {
+  margin: 0;
+  font-size: var(--zuri-selftest-card-title-size);
+  font-weight: 600;
+  line-height: var(--zuri-selftest-card-title-leading);
+}
+
+.selftest-suite-file {
+  color: var(--zuri-selftest-text-muted);
+  font-family: var(--zuri-font-family-mono);
+  font-size: var(--zuri-selftest-label-size);
+  line-height: var(--zuri-selftest-label-leading);
+}
+
+.selftest-suite-stats {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  margin-left: auto;
+}
+
+.selftest-suite-meta {
+  color: var(--zuri-selftest-text-muted);
+  font-size: var(--zuri-selftest-small-size);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--zuri-selftest-small-leading);
+  white-space: nowrap;
+}
+
+.selftest-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-selftest-chip-gap);
+  padding: var(--zuri-selftest-status-padding);
+  border-radius: var(--zuri-selftest-pill-radius);
+  background: var(--zuri-selftest-sunken);
+  color: var(--zuri-selftest-text-muted);
+  font-size: var(--zuri-selftest-label-size);
+  font-weight: 600;
+  letter-spacing: var(--zuri-selftest-label-tracking);
+  line-height: var(--zuri-selftest-label-leading);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.selftest-pill[data-tone='pass'] {
+  background: var(--zuri-selftest-success-soft);
+  color: var(--zuri-selftest-success);
+}
+
+.selftest-pill[data-tone='fail'] {
+  background: var(--zuri-selftest-danger-soft);
+  color: var(--zuri-selftest-danger);
+}
+
+.selftest-pill[data-tone='running'] {
+  background: var(--zuri-selftest-primary-soft);
+  color: var(--zuri-selftest-primary);
+}
+
+/* -------------------------------------------------------------- check rows */
+
+.selftest-checks {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.selftest-check {
+  display: grid;
+  grid-template-columns: var(--zuri-selftest-check-icon) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--zuri-selftest-check-gap);
+  padding: var(--zuri-selftest-check-padding);
+  border-bottom: 1px solid var(--zuri-selftest-hairline);
+}
+
+.selftest-check:last-child {
+  border-bottom: 0;
+}
+
+.selftest-check-icon {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-selftest-check-icon);
+  height: var(--zuri-selftest-meta-leading);
+  color: var(--zuri-selftest-text-muted);
+}
+
+.selftest-check[data-tone='pass'] .selftest-check-icon {
+  color: var(--zuri-selftest-success);
+}
+
+.selftest-check[data-tone='fail'] .selftest-check-icon {
+  color: var(--zuri-selftest-danger);
+}
+
+.selftest-check[data-tone='pending'] .selftest-check-name {
+  color: var(--zuri-selftest-text-muted);
+}
+
+.selftest-check-text {
+  min-width: 0;
+}
+
+.selftest-check-name {
+  display: block;
+  color: var(--zuri-selftest-text);
+  font-size: var(--zuri-selftest-meta-size);
+  line-height: var(--zuri-selftest-meta-leading);
+}
+
+.selftest-check[data-tone='fail'] .selftest-check-name {
+  font-weight: 500;
+}
+
+.selftest-check-time {
+  color: var(--zuri-selftest-text-muted);
+  font-size: var(--zuri-selftest-small-size);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--zuri-selftest-meta-leading);
+  white-space: nowrap;
+}
+
+/* The failing assertion, in the runner's own words: expected, received and the
+   line that raised it. Mono so a value that differs by one character is visible. */
+.selftest-assert {
+  display: block;
+  margin-top: var(--zuri-selftest-assert-gap);
+  padding: var(--zuri-selftest-assert-padding);
+  border: 1px solid var(--zuri-selftest-danger-line);
+  border-radius: var(--zuri-selftest-row-radius);
+  background: var(--zuri-selftest-surface);
+  color: var(--zuri-selftest-text-secondary);
+  font-family: var(--zuri-font-family-mono);
+  font-size: 11px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.selftest-assert-line {
+  display: block;
+  white-space: pre-wrap;
+}
+
+.selftest-assert-line[data-tone='expected'] {
+  color: var(--zuri-selftest-text);
+}
+
+.selftest-assert-line[data-tone='received'] {
+  color: var(--zuri-selftest-danger);
+}
+
+.selftest-assert-at {
+  display: block;
+  margin-top: 2px;
+  color: var(--zuri-selftest-text-muted);
+}
+
+/* ------------------------------------------------------------------- rail */
+
+.selftest-rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-selftest-rail-gap);
+  min-width: 0;
+}
+
+.selftest-rail-card {
+  padding: var(--zuri-selftest-rail-padding);
+  border: 1px solid var(--zuri-selftest-border);
+  border-radius: var(--zuri-selftest-card-radius);
+  background: var(--zuri-selftest-surface);
+  box-shadow: var(--zuri-selftest-shadow);
+}
+
+.selftest-rail-title {
+  margin: 0 0 var(--zuri-selftest-nav-label-gap);
+  color: var(--zuri-selftest-text-muted);
+  font-size: var(--zuri-selftest-label-size);
+  font-weight: 600;
+  letter-spacing: var(--zuri-selftest-label-tracking);
+  line-height: var(--zuri-selftest-label-leading);
+  text-transform: uppercase;
+}
+
+.selftest-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.selftest-detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--zuri-space-2);
+}
+
+.selftest-detail-row dt {
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-small-size);
+  line-height: var(--zuri-selftest-small-leading);
+}
+
+.selftest-detail-row dd {
+  margin: 0;
+  color: var(--zuri-selftest-text);
+  font-size: var(--zuri-selftest-small-size);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--zuri-selftest-small-leading);
+  text-align: right;
+}
+
+.selftest-notes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--zuri-selftest-text-secondary);
+  font-size: var(--zuri-selftest-small-size);
+  line-height: var(--zuri-selftest-small-leading);
+}
+
+.selftest-notes li {
+  position: relative;
+  padding-left: 12px;
+}
+
+.selftest-notes li::before {
+  content: '';
+  position: absolute;
+  top: 7px;
+  left: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: var(--zuri-selftest-pill-radius);
+  background: var(--zuri-selftest-text-muted);
+}
+
+.selftest-foot {
+  max-width: 640px;
+  margin: var(--zuri-selftest-foot-gap) 0 0;
+  color: var(--zuri-selftest-text-muted);
+  font-size: var(--zuri-selftest-small-size);
+  line-height: var(--zuri-selftest-small-leading);
+}
+
+/* ------------------------------------------------------- loading and motion */
+
+.selftest-skeleton {
+  display: block;
+  height: 12px;
+  border-radius: var(--zuri-selftest-row-radius);
+  background: var(--zuri-selftest-skeleton);
+}
+
+.selftest-skeleton[data-width='icon'] {
+  width: 12px;
+  height: 12px;
+}
+
+.selftest-skeleton[data-width='name'] {
+  width: 58%;
+}
+
+.selftest-skeleton[data-width='time'] {
+  width: 34px;
+}
+
+.selftest-spinner {
+  width: var(--zuri-selftest-spinner-size);
+  height: var(--zuri-selftest-spinner-size);
+  border: var(--zuri-selftest-spinner-width) solid currentColor;
+  border-top-color: transparent;
+  border-radius: var(--zuri-selftest-pill-radius);
+  animation: selftest-spin 0.9s linear infinite;
+}
+
+@keyframes selftest-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .selftest-spinner {
+    animation: none;
+  }
+}
+
+/* -------------------------------------------------------------- responsive */
+
+/* The rail cannot keep its 296 px beside the suites below this width, so it
+   moves under them in source order rather than shrinking to a sliver. */
+@media (max-width: 1020px) {
+  .selftest-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The settings nav becomes a wrapped strip above the page: still every
+   destination, still on screen, no hamburger and nothing scrolling sideways. */
+@media (max-width: 860px) {
+  .selftest-main {
+    flex-wrap: wrap;
+    padding: var(--zuri-selftest-gutter-top) var(--zuri-selftest-gutter) 48px;
+  }
+
+  .selftest-settings-nav {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .selftest-nav-label {
+    grid-column: 1 / -1;
+    margin-bottom: 2px;
+  }
+
+  .selftest-nav-row {
+    height: auto;
+    min-height: 34px;
+    padding: 0 var(--zuri-selftest-nav-row-padding);
+    border: 1px solid var(--zuri-selftest-border);
+    background: var(--zuri-selftest-surface);
+  }
+
+  .selftest-nav-hairline {
+    display: none;
+  }
+
+  .selftest-column {
+    width: 100%;
+    margin-top: var(--zuri-selftest-column-gap);
+  }
+
+  .selftest-layout {
+    margin-top: var(--zuri-selftest-summary-gap);
+  }
+}
+
+@media (max-width: 620px) {
+  .selftest-topbar {
+    padding: 0 20px;
+  }
+
+  .selftest-account-name {
+    display: none; /* the initials carry the chip on a phone */
+  }
+
+  .selftest-main {
+    padding: 20px 20px calc(40px + env(safe-area-inset-bottom));
+  }
+
+  .selftest-title {
+    font-size: 24px;
+    line-height: 32px;
+  }
+
+  .selftest-summary {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: var(--zuri-space-3);
+  }
+
+  .selftest-summary-actions {
+    grid-column: 1 / -1;
+  }
+
+  .selftest-button {
+    flex: 1 1 auto;
+    min-height: 44px; /* tap target */
+  }
+
+  .selftest-nav-row {
+    min-height: 44px;
+  }
+
+  /* Two columns at phone width: three would wrap "Desktop capabilities" onto
+     three lines inside a chip. */
+  .selftest-settings-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .selftest-suite-head {
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .selftest-suite-stats {
+    flex: 1 1 100%;
+    margin-left: calc(var(--zuri-selftest-check-icon) + var(--zuri-space-2));
+  }
+
+  .selftest-check {
+    padding: 10px 16px;
+  }
+}
+
+/* Below this width the column beside the page becomes the bottom bar: the same
+   destinations, always on screen, and the page scrolls behind it. 768 px is
+   where a 208 px nav plus a readable column stop sharing a line. */
+@media (max-width: 767.98px) {
+  .selftest-settings-nav,
+  .selftest-nav-hairline {
+    display: none;
+  }
+
+  .selftest-tabbar {
+    display: flex;
+  }
+
+  .selftest-column {
+    margin-top: 0;
+  }
+
+  /* One bar height plus the safe area, so the closing note clears the bar. */
+  .selftest-page {
+    padding-bottom: calc(var(--zuri-selftest-tabbar-height) + env(safe-area-inset-bottom));
+  }
+
+  .selftest-main {
+    padding-bottom: 40px;
+  }
+}

@@ -1,0 +1,11 @@
+# Dependencies and build output
+node_modules/
+dist/
+release/
+
+# Provider API keys never belong in the repository. The app writes this file into
+# userData/zuri, outside the checkout, and this pattern also covers a stray copy
+# inside the tree (for example one left by a manual test).
+secrets.json
+.env
+.env.*

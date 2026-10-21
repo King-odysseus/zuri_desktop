@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Audit log - Zuri Desktop</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="audit.css" />
+  </head>
+
+  <!--
+    Drawn from the open-pencil page "Audit log (/settings/audit)" (node
+    0:14163). One markup tree carries every frame, switched by `?state=`:
+    default, loading, empty, filtered, expanded, exporting, and the error and
+    disabled frames a screen check opens. See audit.js.
+  -->
+  <body class="audit-page" data-state="default">
+    <header class="audit-topbar">
+      <span class="audit-mark" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M10.6 4.4 12.3 8.9 16.8 10.6 12.3 12.3 10.6 16.8 8.9 12.3 4.4 10.6 8.9 8.9Z"
+            fill="currentColor"
+          />
+          <path
+            d="M17.4 14.6 18.3 16.9 20.6 17.8 18.3 18.7 17.4 21 16.5 18.7 14.2 17.8 16.5 16.9Z"
+            fill="currentColor"
+          />
+        </svg>
+      </span>
+      <p class="audit-wordmark">Zuri Desktop</p>
+
+      <span class="audit-account-chip">
+        <span class="audit-avatar" aria-hidden="true">AR</span>
+        <span class="audit-account-name">Ana Ribeiro</span>
+      </span>
+    </header>
+
+    <main class="audit-main">
+      <nav class="audit-settings-nav" aria-label="Settings">
+        <p class="audit-nav-label">Settings</p>
+        <a class="audit-nav-row" href="account.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="8.4" r="3.6" stroke="currentColor" stroke-width="1.6" />
+            <path
+              d="M4.8 19.6c1.1-3.3 3.9-5.2 7.2-5.2s6.1 1.9 7.2 5.2"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+            />
+          </svg>
+          Account
+        </a>
+        <a class="audit-nav-row" href="connectors.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M9 3v4M15 3v4M7 7h10v3.4a5 5 0 0 1-5 5 5 5 0 0 1-5-5V7ZM12 15.4V21"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Connectors
+        </a>
+        <a class="audit-nav-row" href="desktop.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <rect x="3" y="4.4" width="18" height="12.4" rx="2.4" stroke="currentColor" stroke-width="1.6" />
+            <path d="M9 20h6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+          Desktop capabilities
+        </a>
+        <a class="audit-nav-row" href="audit.html" aria-current="page">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path
+              d="M6 3h9l4 4v14H6V3ZM14.4 3.4V7.6h4.2M9 11h7M9 14.6h7M9 18.2h4"
+              stroke="currentColor"
+              stroke-width="1.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Audit log
+        </a>
+      </nav>
+      <span class="audit-nav-hairline" aria-hidden="true"></span>
+
+      <section class="audit-column" aria-labelledby="audit-title">
+        <h1 class="audit-title" id="audit-title">Audit log</h1>
+        <p class="audit-sub">Every tool call, confirmation and automation run, kept on this PC.</p>
+
+        <!-- Filters sit above the table: the log is read, not edited, so the only
+             controls are the three that narrow what is shown and one export. -->
+        <div class="audit-toolbar" role="group" aria-label="Filter the log">
+          <label class="audit-sr" for="audit-filter-tool">Tool</label>
+          <span class="audit-select-wrap">
+            <select class="audit-select" id="audit-filter-tool">
+              <option value="all">All tools</option>
+              <option value="Automation">Automation</option>
+              <option value="openApp">openApp</option>
+              <option value="openUrl">openUrl</option>
+              <option value="readFile">readFile</option>
+              <option value="writeFile">writeFile</option>
+              <option value="webFetch">webFetch</option>
+              <option value="webSearch">webSearch</option>
+              <option value="summarizeDocument">summarizeDocument</option>
+            </select>
+            <svg class="audit-select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+
+          <label class="audit-sr" for="audit-filter-status">Status</label>
+          <span class="audit-select-wrap">
+            <select class="audit-select" id="audit-filter-status">
+              <option value="all">All statuses</option>
+              <option value="Done">Done</option>
+              <option value="Allowed">Allowed</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Read">Read</option>
+              <option value="Blocked">Blocked</option>
+            </select>
+            <svg class="audit-select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+
+          <label class="audit-sr" for="audit-filter-date">Date range</label>
+          <span class="audit-select-wrap">
+            <select class="audit-select" id="audit-filter-date">
+              <option value="1">Last 24 hours</option>
+              <option value="7" selected>Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="all">Any date</option>
+            </select>
+            <svg class="audit-select-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </span>
+
+          <button class="audit-export" id="audit-export" type="button">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M12 3.6v10.2M8 10.2 12 14.2l4-4M4.8 16.2v2.4a1.8 1.8 0 0 0 1.8 1.8h10.8a1.8 1.8 0 0 0 1.8-1.8v-2.4"
+                stroke="currentColor"
+                stroke-width="1.7"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            <span id="audit-export-label">Export CSV</span>
+          </button>
+        </div>
+
+        <div class="audit-card">
+          <table class="audit-table">
+            <caption class="audit-sr">Audit entries, newest first</caption>
+            <thead class="audit-head">
+              <tr>
+                <th scope="col" class="audit-col-time">Time</th>
+                <th scope="col" class="audit-col-tool">Tool</th>
+                <th scope="col" class="audit-col-target">Target</th>
+                <th scope="col" class="audit-col-status">Status</th>
+                <th scope="col" class="audit-col-toggle"><span class="audit-sr">Details</span></th>
+              </tr>
+            </thead>
+            <tbody class="audit-rows" id="audit-rows"></tbody>
+
+            <!-- Two states that replace the rows rather than sit beside them: a
+                 log that has never recorded anything, and filters that match
+                 nothing. Each keeps the table frame so the page does not jump. -->
+            <tbody id="audit-empty-body" hidden>
+              <tr>
+                <td colspan="5">
+                  <div class="audit-empty">
+                    <span class="audit-empty-icon" aria-hidden="true">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M6 3h9l4 4v14H6V3ZM14.4 3.4V7.6h4.2M9 11h7M9 14.6h7M9 18.2h4"
+                          stroke="currentColor"
+                          stroke-width="1.7"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <p class="audit-empty-title">No activity yet</p>
+                    <p class="audit-empty-note">
+                      Tool calls, confirmations and automation runs appear here as they happen.
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+
+            <tbody id="audit-filtered-body" hidden>
+              <tr>
+                <td colspan="5">
+                  <div class="audit-empty">
+                    <p class="audit-empty-title">No entries match these filters</p>
+                    <p class="audit-empty-note">Try another tool, status or date range.</p>
+                    <button class="audit-clear" id="audit-clear" type="button">Clear filters</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+
+            <!-- The error frame: the log could not be read, so the table keeps
+                 its frame and says so rather than showing an empty log that
+                 looks like a quiet day. -->
+            <tbody id="audit-error-body" hidden>
+              <tr>
+                <td colspan="5">
+                  <div class="audit-empty audit-error">
+                    <span class="audit-empty-icon audit-error-icon" aria-hidden="true">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                        <path
+                          d="M12 4.2 20.4 19.4H3.6L12 4.2Z"
+                          stroke="currentColor"
+                          stroke-width="1.7"
+                          stroke-linejoin="round"
+                        />
+                        <path d="M12 9.4v4.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+                        <circle cx="12" cy="16.6" r="0.9" fill="currentColor" />
+                      </svg>
+                    </span>
+                    <p class="audit-empty-title">The audit log could not be read</p>
+                    <p class="audit-empty-note">
+                      entries.json could not be opened. Check that the data folder is readable, then try
+                      again.
+                    </p>
+                    <button class="audit-clear audit-retry" id="audit-retry" type="button">Try again</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p class="audit-footnote" id="audit-footnote">Kept on this PC. Nothing is uploaded.</p>
+        <p class="audit-live" id="audit-live" role="status" aria-live="polite"></p>
+      </section>
+    </main>
+
+    <!-- One entry and its detail panel, cloned per row so the markup for a row
+         lives in one place and the script only fills values into it. -->
+    <template id="audit-row-template">
+      <tr class="audit-row">
+        <td class="audit-cell audit-cell-time"></td>
+        <td class="audit-cell audit-cell-tool"></td>
+        <td class="audit-cell audit-cell-target"></td>
+        <td class="audit-cell audit-cell-status"><span class="audit-status"></span></td>
+        <td class="audit-cell audit-cell-toggle">
+          <button class="audit-toggle" type="button" aria-expanded="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </button>
+        </td>
+      </tr>
+      <tr class="audit-detail-row" hidden>
+        <td colspan="5">
+          <dl class="audit-detail"></dl>
+        </td>
+      </tr>
+    </template>
+
+    <script src="audit.js"></script>
+  </body>
+</html>

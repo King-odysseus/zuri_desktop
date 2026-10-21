@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark light" />
+    <!-- No inline script or style: the token layer and modules are the only sources. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    />
+    <title>Zuri</title>
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/components.css" />
+  </head>
+  <body>
+    <!-- App shell (main window), design node 0:131: one 52 px top bar across the
+         window, then the three columns under it. #sidebar and #context-panel sit
+         on the canvas tone, #chat is the solid reading surface between them, and
+         the two side panels are separated from it by a 1 px hairline.
+         ui/shell.js owns which column is collapsed and mirrors it into
+         data-collapsed; the sidebar's toggle lives in the top bar, where the
+         design puts it. -->
+    <div class="app-shell" id="app">
+      <!-- Top bar (node 0:132): sidebar toggle, the app name, the model trigger,
+           then search, notifications, theme and the account chip, right-aligned. -->
+      <header class="top-bar">
+        <div class="top-bar-leading">
+          <button
+            class="shell-toggle top-bar-button top-bar-sidebar-toggle"
+            type="button"
+            aria-controls="sidebar"
+            aria-expanded="true"
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+          >
+            <svg
+              class="shell-toggle-icon"
+              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path
+                d="M4 5.5A1.5 1.5 0 015.5 4h13A1.5 1.5 0 0120 5.5v13A1.5 1.5 0 0118.5 20h-13A1.5 1.5 0 014 18.5v-13z"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.5"
+              ></path>
+              <path d="M9.5 4v16" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+            </svg>
+          </button>
+          <span class="top-bar-title">Zuri</span>
+          <!-- Model chip, search, notifications, theme and the account chip are
+               rendered by ui/topbar.js from settings. The sidebar toggle and app
+               name above are shell layout and stay in the markup. -->
+        </div>
+
+        <div class="top-bar-trailing"></div>
+      </header>
+
+      <div class="shell">
+        <aside
+          class="shell-column shell-column-sidebar"
+          id="sidebar"
+          aria-label="Sidebar"
+          data-collapsed="false"
+        >
+          <!-- New chat (node 0:165): the one filled row in the panel, with its
+               shortcut on the right so the keyboard route is discoverable. -->
+          <div class="sidebar-head">
+            <!-- data-route: a new chat is still the Chats destination, so starting
+                 one from any other view also brings the conversation back. -->
+            <button
+              class="sidebar-new-chat"
+              id="new-chat-button"
+              type="button"
+              data-route="chats"
+            >
+              <svg
+                class="sidebar-new-chat-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M12 5v14M5 12h14"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                  stroke-linecap="round"
+                ></path>
+              </svg>
+              <span class="sidebar-new-chat-label">New chat</span>
+              <span class="sidebar-new-chat-shortcut" aria-hidden="true">Ctrl N</span>
+            </button>
+          </div>
+
+          <!-- Navigation (nodes 0:63 / 0:67, "Nav / Sidebar Row"): the destinations
+               the central column can show, one row each. ui/router.js owns which row
+               carries aria-current="page", so the fill and the announced state are
+               the same attribute. New chat and Settings stay outside this list
+               because they are the two pinned rows above and below it. -->
+          <nav class="sidebar-nav" id="sidebar-nav" aria-label="Main">
+            <button class="nav-sidebar-row" type="button" data-route="chats" aria-current="page">
+              <svg
+                class="nav-sidebar-row-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M4 6h16v11H9l-5 4V6z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                ></path>
+              </svg>
+              <span class="nav-sidebar-row-label">Chats</span>
+            </button>
+
+            <button class="nav-sidebar-row" type="button" data-route="agents">
+              <svg
+                class="nav-sidebar-row-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M12 3.5l1.9 4.6 4.6 1.9-4.6 1.9L12 16.5l-1.9-4.6L5.5 10l4.6-1.9L12 3.5z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                ></path>
+                <path
+                  d="M18.5 17v3M17 18.5h3"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                ></path>
+              </svg>
+              <span class="nav-sidebar-row-label">Agents</span>
+            </button>
+
+            <button class="nav-sidebar-row" type="button" data-route="tasks">
+              <svg
+                class="nav-sidebar-row-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M4 5.5h5v5H4v-5zM4 13.5h5v5H4v-5z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                ></path>
+                <path
+                  d="M12 8h8M12 16h8"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                ></path>
+              </svg>
+              <span class="nav-sidebar-row-label">Tasks</span>
+            </button>
+
+            <button class="nav-sidebar-row" type="button" data-route="reminders">
+              <svg
+                class="nav-sidebar-row-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="7.5"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                ></circle>
+                <path
+                  d="M12 7.8v4.6l3 1.8"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                ></path>
+              </svg>
+              <span class="nav-sidebar-row-label">Reminders</span>
+            </button>
+
+            <button class="nav-sidebar-row" type="button" data-route="automations">
+              <svg
+                class="nav-sidebar-row-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M13.4 3.5L5.8 13.6H11l-1 6.9 7.6-10.1H12l1.4-6.9z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                ></path>
+              </svg>
+              <span class="nav-sidebar-row-label">Automations</span>
+            </button>
+
+            <button class="nav-sidebar-row" type="button" data-route="files">
+              <svg
+                class="nav-sidebar-row-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M4 6.5h5.2l2 2.2H20V19H4V6.5z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linejoin="round"
+                ></path>
+              </svg>
+              <span class="nav-sidebar-row-label">Files</span>
+            </button>
+          </nav>
+
+          <div class="shell-column-body sidebar-body">
+            <p class="shell-section-label" id="thread-list-label">Conversations</p>
+
+            <!-- Thread rows: built by ui/chats.js from chats.json, newest first.
+                 Built in JS because the list is data, not markup. -->
+            <div
+              class="thread-list"
+              id="thread-list"
+              data-state="empty"
+              role="list"
+              aria-labelledby="thread-list-label"
+            ></div>
+
+            <!-- Empty state: chats.json has no threads yet (pages.md, "Sidebar
+                 conversation list"). Hidden, never removed, once a thread exists. -->
+            <div class="shell-empty-state" id="conversations-empty-state" data-state="empty">
+              <span class="shell-empty-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="16" height="16" focusable="false">
+                  <path
+                    d="M4 6h16v10H9l-5 4V6z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ></path>
+                </svg>
+              </span>
+              <p class="shell-empty-heading">No conversations yet</p>
+              <p class="shell-empty-text">Your chats with Zuri appear here. Start with a question.</p>
+            </div>
+          </div>
+
+          <!-- Foot: the Settings row and the Autopilot status card (node 0:204),
+               pinned under a hairline. Both are always in the same place, so the
+               panel does not jump when the thread list grows. -->
+          <div class="sidebar-foot">
+            <!-- Settings row: drawn here, routed by the sidebar-router card. It is
+                 a button rather than a link so it cannot strand the shell in a view
+                 that has no way back. -->
+            <button
+              class="sidebar-settings-row"
+              id="sidebar-settings-row"
+              type="button"
+              title="Settings"
+              data-route="settings"
+            >
+              <svg
+                class="sidebar-settings-icon"
+                viewBox="0 0 24 24"
+                width="20"
+                height="20"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M12 15.2a3.2 3.2 0 100-6.4 3.2 3.2 0 000 6.4z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.5"
+                ></path>
+                <path
+                  d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 1.56V21a2 2 0 11-4 0v-.09A1.7 1.7 0 009 19.4a1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-1.56-1H3a2 2 0 110-4h.09A1.7 1.7 0 004.6 9a1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-1.56V3a2 2 0 114 0v.09A1.7 1.7 0 0015 4.6a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06A1.7 1.7 0 0019.4 9v.09a1.7 1.7 0 001.56 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.2"
+                  stroke-linejoin="round"
+                ></path>
+              </svg>
+              <span class="sidebar-settings-label">Settings</span>
+            </button>
+
+            <div class="autopilot-status">
+              <span class="autopilot-status-dot" aria-hidden="true"></span>
+              <span class="autopilot-status-label">Autopilot</span>
+              <span class="autopilot-status-meta">While Zuri is open</span>
+            </div>
+          </div>
+        </aside>
+
+        <main
+          class="shell-column shell-column-chat"
+          id="chat"
+          aria-label="Chat"
+          data-collapsed="false"
+        >
+          <!-- The central column is the router outlet: one .view at a time.
+               ui/router.js swaps which one is shown, and this section is the Chats
+               view, whose markup stays in this file because ui/chats.js reads these
+               ids on load. -->
+          <section class="view view-chats" id="view-chats" data-view="chats" aria-label="Chats">
+            <!-- Transcript header (node 0:210): the open thread on the left, what is
+               known about it on the right. -->
+          <div class="transcript-header">
+            <span class="transcript-title" id="chat-title">New chat</span>
+            <div class="transcript-header-trailing">
+              <span class="transcript-meta" id="chat-meta">No messages yet</span>
+              <button
+                class="shell-toggle"
+                type="button"
+                aria-controls="chat"
+                aria-expanded="true"
+                aria-label="Collapse chat"
+                title="Collapse chat"
+              >
+                <svg
+                  class="shell-toggle-icon"
+                  viewBox="0 0 24 24"
+                  width="16"
+                  height="16"
+                  aria-hidden="true"
+                  focusable="false"
+                >
+                  <path
+                    d="M4 12h11M10.5 7.5L15 12l-4.5 4.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.75"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ></path>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="chat-transcript" id="chat-transcript" data-state="empty">
+            <!-- Empty transcript (node 0:1221, second state): the mark, what the
+                 column is for, and four openings a person can send as they are.
+                 Hidden rather than removed once a thread has messages. -->
+            <div class="shell-empty-hero" id="chat-empty-hero" data-state="empty">
+              <span class="transcript-empty-mark" aria-hidden="true">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path
+                    d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"
+                  ></path>
+                  <path d="M20 3v4"></path>
+                  <path d="M22 5h-4"></path>
+                  <path d="M4 17v2"></path>
+                  <path d="M5 18H3"></path>
+                </svg>
+              </span>
+              <h1 class="shell-empty-title" id="chat-empty-title">New chat with Zuri</h1>
+              <p class="shell-empty-lead">
+                The composer is ready below. Ask a question, or hand Zuri an open file to work
+                on.
+              </p>
+              <div class="transcript-suggestions" role="group" aria-label="Suggested prompts">
+                <button
+                  class="transcript-suggestion"
+                  type="button"
+                  data-suggestion="Which lines are over budget?"
+                >
+                  <svg
+                    class="transcript-suggestion-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 3v16a2 2 0 0 0 2 2h16"></path>
+                    <path d="M18 17V9"></path>
+                    <path d="M13 17V5"></path>
+                    <path d="M8 17v-3"></path>
+                  </svg>
+                  <span class="transcript-suggestion-label">Which lines are over budget?</span>
+                </button>
+                <button
+                  class="transcript-suggestion"
+                  type="button"
+                  data-suggestion="Add a variance column to Budget.xlsx"
+                >
+                  <svg
+                    class="transcript-suggestion-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path>
+                    <path d="M14 2v4a2 2 0 0 0 2 2h4"></path>
+                    <path d="M8 13h2"></path>
+                    <path d="M14 13h2"></path>
+                    <path d="M8 17h2"></path>
+                    <path d="M14 17h2"></path>
+                  </svg>
+                  <span class="transcript-suggestion-label">
+                    Add a variance column to Budget.xlsx
+                  </span>
+                </button>
+                <button
+                  class="transcript-suggestion"
+                  type="button"
+                  data-suggestion="Schedule a Monday inbox brief"
+                >
+                  <svg
+                    class="transcript-suggestion-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"></path>
+                    <path d="M16 2v4"></path>
+                    <path d="M8 2v4"></path>
+                    <path d="M3 10h5"></path>
+                    <path d="M17.5 17.5 16 16.3V14"></path>
+                    <circle cx="16" cy="16" r="6"></circle>
+                  </svg>
+                  <span class="transcript-suggestion-label">Schedule a Monday inbox brief</span>
+                </button>
+                <button
+                  class="transcript-suggestion"
+                  type="button"
+                  data-suggestion="Find last month's unpaid invoices"
+                >
+                  <svg
+                    class="transcript-suggestion-icon"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M10.7 20H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H20a2 2 0 0 1 2 2v4"
+                    ></path>
+                    <path d="m21 21-1.9-1.9"></path>
+                    <circle cx="17" cy="17" r="3"></circle>
+                  </svg>
+                  <span class="transcript-suggestion-label">
+                    Find last month's unpaid invoices
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Disabled (streaming) state: the design's "Streaming status" row (node
+                 0:944) from the shell's streaming frame (node 0:823). While a reply is
+                 arriving the composer cannot take input, so this row says what the app is
+                 doing and carries the one control that still applies. It rides at the end
+                 of the transcript and is hidden whenever nothing is in flight. -->
+            <div
+              class="stream-status"
+              id="chat-stream-status"
+              data-state="streaming"
+              role="status"
+              aria-live="polite"
+              hidden
+            >
+              <span class="stream-status-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+                  <path
+                    d="M21 12a9 9 0 1 1-6.219-8.56"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  ></path>
+                </svg>
+              </span>
+              <p class="stream-status-label" id="chat-stream-label">Zuri is writing</p>
+              <button class="stream-status-stop" id="chat-stream-stop" type="button">Stop</button>
+            </div>
+          </div>
+
+          <!-- Error state: the design's Block / Error component (node 0:121) - a
+               danger-tinted card with the node's alert mark, its two lines of copy
+               and a Retry. The mark is that node's own vector, drawn in
+               currentColor so it follows the danger token. Retry re-asks for the
+               reply that did not come back (ui/chats.js). -->
+          <div class="error-block" id="chat-error-block" data-state="error" role="status" aria-live="polite">
+            <div class="error-block-row">
+              <span class="error-block-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <path
+                    d="M1.67 10C1.67 12.976 3.258 15.726 5.835 17.214C8.412 18.702 11.588 18.702 14.165 17.214C16.742 15.726 18.33 12.976 18.33 10C18.33 7.024 16.742 4.274 14.165 2.786C11.588 1.298 8.412 1.298 5.835 2.786C3.258 4.274 1.67 7.024 1.67 10Z"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6667"
+                    stroke-linejoin="round"
+                  ></path>
+                  <path
+                    d="M10 6.67V10M10 13.33H10.01"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.6667"
+                  ></path>
+                </svg>
+              </span>
+              <div class="error-block-copy">
+                <p class="error-block-title">Couldn't reach the provider</p>
+                <p class="error-block-text">Check your API key in Settings, then try again.</p>
+              </div>
+            </div>
+            <button class="error-block-action" id="chat-error-retry" type="button">Retry</button>
+          </div>
+
+          <!-- Composer area (node 0:252): the input pill inset 40 px from the
+               column edges, with the keyboard hint under it. -->
+          <div class="composer-area">
+            <!-- Ready state: the input and send are live. Send stays disabled while
+                 the input is empty. The shell also carries data-state="disabled"
+                 (node 0:823) while a reply is in flight: the input, the attach button
+                 and the send button are all inert then, and the status row above
+                 explains why. -->
+            <div class="composer-shell" id="composer-shell" data-state="ready">
+              <div class="composer">
+                <button
+                  class="composer-button"
+                  type="button"
+                  aria-label="Attach a file"
+                  title="Add an AI key in Settings to attach files"
+                  disabled
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                    <path
+                      d="M9 12.5l5.2-5.2a3 3 0 114.2 4.2l-7.1 7.1a5 5 0 11-7.1-7.1l7.4-7.4"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="1.75"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    ></path>
+                  </svg>
+                </button>
+                <textarea
+                  class="composer-input"
+                  id="composer-input"
+                  name="message"
+                  rows="1"
+                  placeholder="Ask Zuri anything, or describe a task for it to do…"
+                  aria-label="Ask Zuri anything, or describe a task for it to do"
+                ></textarea>
+                <button
+                  class="composer-send"
+                  id="composer-send"
+                  type="button"
+                  aria-label="Send message"
+                  aria-disabled="true"
+                  title="Send message"
+                  disabled
+                >
+                  <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                    <path
+                      d="M12 19V6M6 12l6-6 6 6"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    ></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="composer-hint-row">
+              <p class="composer-hint" id="composer-hint">Enter to send &middot; Shift and Enter for a new line</p>
+              <p class="composer-note">Act asks before it changes a file</p>
+            </div>
+          </div>
+          </section>
+        </main>
+
+        <aside
+          class="shell-column shell-column-context"
+          id="context-panel"
+          aria-label="Context panel"
+          data-collapsed="false"
+        >
+          <!-- Context header (node 0:271): the collapse control, the panel name and
+               its state, on the rail's own tone. -->
+          <div class="context-header">
+            <button
+              class="shell-toggle context-toggle"
+              type="button"
+              aria-controls="context-panel"
+              aria-expanded="true"
+              aria-label="Collapse context panel"
+              title="Collapse context panel"
+            >
+              <svg
+                class="shell-toggle-icon"
+                viewBox="0 0 24 24"
+                width="16"
+                height="16"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path
+                  d="M10 6l6 6-6 6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                ></path>
+              </svg>
+            </button>
+            <span class="context-title">Autopilot</span>
+            <span class="context-status"><span class="context-status-dot" aria-hidden="true"></span>Idle</span>
+          </div>
+
+          <div class="shell-column-body context-body">
+            <p class="shell-section-label">Active work</p>
+
+            <!-- Loading state: the panel fills from the main process once the first
+                 state payload arrives, so it starts as a labelled skeleton rather
+                 than pretending there is nothing to show. -->
+            <div class="shell-loading" data-state="loading" role="status" aria-live="polite">
+              <p class="shell-loading-label">
+                <span class="shell-spinner" aria-hidden="true"></span>
+                Loading active work
+              </p>
+              <span class="shell-skeleton-row" aria-hidden="true"></span>
+              <span class="shell-skeleton-row" aria-hidden="true"></span>
+              <span class="shell-skeleton-row shell-skeleton-row-short" aria-hidden="true"></span>
+            </div>
+
+            <p class="shell-section-label">Reminders</p>
+
+            <!-- Empty: the design's Block / Empty component (node 0:105) - mark,
+                 title, caption and one action. The mark is that node's own vector,
+                 drawn in currentColor so it follows the mark token. -->
+            <div class="empty-block" data-state="empty">
+              <span class="empty-block-mark" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                  <path
+                    d="M4.87 11.72C2.96 9.09 3.35 5.45 5.76 3.28C8.17 1.11 11.83 1.11 14.24 3.28C16.65 5.45 17.04 9.09 15.13 11.72"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.47"
+                    stroke-linecap="round"
+                  ></path>
+                  <path
+                    d="M6.88 7.08C6.88 7.61 7.31 8.05 7.85 8.05C8.38 8.05 8.81 7.61 8.81 7.08C8.81 6.55 8.38 6.12 7.85 6.12C7.31 6.12 6.88 6.55 6.88 7.08"
+                    fill="currentColor"
+                  ></path>
+                  <path
+                    d="M11.19 7.08C11.19 7.61 11.62 8.05 12.16 8.05C12.69 8.05 13.12 7.61 13.12 7.08C13.12 6.55 12.69 6.12 12.16 6.12C11.62 6.12 11.19 6.55 11.19 7.08Z"
+                    fill="currentColor"
+                  ></path>
+                  <path
+                    d="M4.9 13.88C4.9 15.57 7.18 16.94 10 16.94C12.82 16.94 15.1 15.57 15.1 13.88C15.1 12.19 12.82 10.82 10 10.82C7.18 10.82 4.9 12.19 4.9 13.88Z"
+                    fill="currentColor"
+                  ></path>
+                  <path
+                    d="M7.51 14.33L12.49 14.33L9.55 19.09L7.51 14.33Z"
+                    fill="currentColor"
+                  ></path>
+                </svg>
+              </span>
+              <h2 class="empty-block-title">No reminders yet</h2>
+              <p class="empty-block-text">
+                Scheduled tasks and their reminders will appear here once Autopilot runs.
+              </p>
+              <button class="empty-block-action" id="reminders-empty-action" type="button">
+                Create a task
+              </button>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- Phone navigation: below 768 px the three columns cannot share the
+           window, so #sidebar becomes a drawer and this bar is the navigation
+           that stays on screen. It is inert above that width (styles only show
+           it there), and its two column tabs mirror the same collapse state in
+           ui/shell.js that the desktop toggles use. -->
+      <nav class="shell-tabbar" aria-label="Primary">
+        <button
+          class="shell-tabbar-item"
+          type="button"
+          data-shell-tab="chats"
+          aria-controls="sidebar"
+          aria-expanded="false"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path
+              d="M4 6h16v10H9l-5 4V6z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ></path>
+          </svg>
+          <span class="shell-tabbar-label">Chats</span>
+        </button>
+
+        <button class="shell-tabbar-item" type="button" data-shell-tab="new">
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path
+              d="M12 5v14M5 12h14"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.75"
+              stroke-linecap="round"
+            ></path>
+          </svg>
+          <span class="shell-tabbar-label">New chat</span>
+        </button>
+
+        <button
+          class="shell-tabbar-item"
+          type="button"
+          data-shell-tab="context"
+          aria-controls="context-panel"
+          aria-expanded="false"
+        >
+          <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path
+              d="M4 5.5A1.5 1.5 0 015.5 4h13A1.5 1.5 0 0120 5.5v13A1.5 1.5 0 0118.5 20h-13A1.5 1.5 0 014 18.5v-13z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.5"
+            ></path>
+            <path d="M14.5 4v16" fill="none" stroke="currentColor" stroke-width="1.5"></path>
+          </svg>
+          <span class="shell-tabbar-label">Context</span>
+        </button>
+      </nav>
+    </div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

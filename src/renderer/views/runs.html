@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Run result - Zuri Desktop</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="runs.css" />
+  </head>
+
+  <!--
+    Drawn from the open-pencil page "Automation run result / history (/)" (node 0:8574).
+    All six frames of that page are below as `<section class="runs-state">` blocks:
+    main, empty, loading, error, blocked and accepted. `?state=` picks one.
+  -->
+  <body class="runs-page" data-state="main">
+    <header class="runs-topbar">
+      <span class="runs-mark" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M11 6.2 12.4 9.9 16.1 11.3 12.4 12.7 11 16.4 9.6 12.7 5.9 11.3 9.6 9.9Z"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M16.6 15.2l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6Z"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </span>
+      <p class="runs-wordmark">Zuri Desktop</p>
+
+      <nav class="runs-nav" aria-label="Main">
+        <a class="runs-tab" href="../index.html">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path
+              d="M10.5 6a4.5 4.5 0 0 1-6.7 3.9L2 10.5l.6-1.8A4.5 4.5 0 1 1 10.5 6Z"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Chat
+        </a>
+        <a class="runs-tab" href="automations.html" aria-current="page">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path
+              d="M1.6 3.5 2.6 4.5 4.4 2.6"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M1.6 8.2 2.6 9.2 4.4 7.3"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M6.6 3.6h4M6.6 8.3h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+          </svg>
+          Tasks
+        </a>
+        <a class="runs-tab" href="settings.html">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.1" />
+            <path
+              d="M6 1.3v1.4M6 9.3v1.4M1.3 6h1.4M9.3 6h1.4M2.7 2.7l1 1M8.3 8.3l1 1M9.3 2.7l-1 1M3.7 8.3l-1 1"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linecap="round"
+            />
+          </svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="runs-topbar-end">
+        <button
+          class="runs-theme"
+          id="runs-theme"
+          type="button"
+          aria-pressed="true"
+          aria-label="Switch to the light theme"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M13 9.4A5.6 5.6 0 1 1 6.6 3a4.8 4.8 0 0 0 6.4 6.4Z"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <span class="runs-avatar" aria-hidden="true">AR</span>
+      </div>
+    </header>
+
+    <main class="runs-main">
+      <nav class="runs-crumbs" aria-label="Breadcrumb">
+        <a class="runs-crumb" href="automations.html">Automations</a>
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+          <path d="M2.5 1 5.5 4 2.5 7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+        </svg>
+        <a class="runs-crumb" href="automations.html">Morning inbox triage</a>
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+          <path d="M2.5 1 5.5 4 2.5 7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+        </svg>
+        <span class="runs-crumb runs-crumb-current" aria-current="page">Run today 08:00</span>
+      </nav>
+
+      <!-- ---------------------------------------------------------------- main -->
+      <section class="runs-state" data-state="main" aria-label="Run result, completed">
+        <div class="runs-header">
+          <h1 class="runs-title">Morning inbox triage</h1>
+          <span class="runs-badge runs-badge-completed">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6.2 4.6 8.8 10 3.4"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Completed
+          </span>
+          <p class="runs-meta">Today at 08:00 &middot; took 1m 12s &middot; triggered by Daily schedule</p>
+          <button class="runs-rerun" type="button" data-run-again>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6a4 4 0 0 1 6.8-2.8L10 4.4M10 1.6v2.8H7.2"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M10 6a4 4 0 0 1-6.8 2.8L2 7.6M2 10.4V7.6h2.8"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Run again
+          </button>
+        </div>
+
+        <div class="runs-grid">
+          <div class="runs-column">
+            <article class="runs-card">
+              <header class="runs-card-head">
+                <p class="runs-card-label">Result</p>
+                <p class="runs-card-note">rendered by markdown.js</p>
+                <button class="runs-copy" type="button">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <rect x="4" y="4" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.1" />
+                    <path
+                      d="M8 4V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1"
+                      stroke="currentColor"
+                      stroke-width="1.1"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  Copy
+                </button>
+              </header>
+              <div class="runs-card-body">
+                <h2 class="runs-md-h2">Inbox triaged &mdash; 42 messages reviewed</h2>
+                <p class="runs-md-p">
+                  Zuri read every new message in Outlook, drafted replies to the routine ones in your tone, and
+                  set the rest aside for you to decide on.
+                </p>
+                <h3 class="runs-md-h3">What changed</h3>
+                <ul class="runs-md-list">
+                  <li>6 replies drafted and saved to Drafts &mdash; nothing sent</li>
+                  <li>3 flagged for your review: 2 invoices and 1 legal notice</li>
+                  <li>12 newsletters archived, 1 calendar invite accepted</li>
+                  <li>
+                    2 messages matched the <span class="runs-code">invoice-2026</span> label and were left
+                    untouched
+                  </li>
+                </ul>
+                <div class="runs-note">
+                  <span class="runs-note-icon" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="5.4" stroke="currentColor" stroke-width="1.17" />
+                    </svg>
+                  </span>
+                  <p class="runs-note-text">Zuri did not send anything. Drafts wait in Outlook until you press Send.</p>
+                </div>
+                <p class="runs-output">Output logged to runs/2026-10-18T08-00.jsonl</p>
+              </div>
+            </article>
+
+            <article class="runs-card runs-offer" data-offer>
+              <span class="runs-offer-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M9.6 5l1.1 2.9 2.9 1.1-2.9 1.1L9.6 13l-1.1-2.9L5.6 9l2.9-1.1Z"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M13.6 12.4l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6Z"
+                    stroke="currentColor"
+                    stroke-width="1.1"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <h2 class="runs-offer-title">Want Zuri to follow up on this?</h2>
+              <p class="runs-offer-body">
+                The 3 flagged messages are still unanswered. Zuri can nudge you, or put the work on your board.
+              </p>
+              <div class="runs-offer-actions">
+                <button class="runs-btn runs-btn-primary" type="button" data-accept-offer>
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path
+                      d="M2.6 8.4h5.4V5.5a2.7 2.7 0 0 0-5.4 0v2.9Z"
+                      stroke="currentColor"
+                      stroke-width="1.1"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M4.4 10.2h1.8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+                    <path
+                      d="M9.6 2.2v2.4M8.4 3.4h2.4"
+                      stroke="currentColor"
+                      stroke-width="1.1"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  Create reminder
+                </button>
+                <button class="runs-btn runs-btn-outline" type="button">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path
+                      d="M1.6 3.5 2.6 4.5 4.4 2.6"
+                      stroke="currentColor"
+                      stroke-width="1.1"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path
+                      d="M1.6 8.2 2.6 9.2 4.4 7.3"
+                      stroke="currentColor"
+                      stroke-width="1.1"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                    <path d="M6.6 3.6h4M6.6 8.3h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+                  </svg>
+                  Create task
+                </button>
+                <button class="runs-btn runs-btn-plain" type="button" data-dismiss-offer>Not now</button>
+              </div>
+            </article>
+
+            <article class="runs-card runs-blocked-log">
+              <header class="runs-blocked-head">
+                <span class="runs-blocked-lock" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <rect x="2.6" y="6.2" width="8.8" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.17" />
+                    <path
+                      d="M4.8 6.2V4.6a2.2 2.2 0 0 1 4.4 0v1.6"
+                      stroke="currentColor"
+                      stroke-width="1.17"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </span>
+                <h2 class="runs-blocked-title">Blocked actions</h2>
+                <p class="runs-blocked-count">2 attempts were stopped before they ran</p>
+                <button class="runs-blocked-link" type="button" data-show-blocked>Why blocked</button>
+              </header>
+              <div class="runs-blocked-lines">
+                <p class="runs-blocked-line">
+                  Send mail to billing@northwind.co &mdash; sending is not allowed without approval
+                  <span class="runs-blocked-time">08:01</span>
+                </p>
+                <p class="runs-blocked-line runs-blocked-line-indent">
+                  Open C:\Invoices\Q4.xlsx and edit cells &mdash; app control needs your confirmation
+                  <span class="runs-blocked-time">08:02</span>
+                </p>
+              </div>
+            </article>
+          </div>
+
+          <aside class="runs-rail">
+            <div class="runs-rail-card runs-rail-card-full">
+              <p class="runs-rail-label">Run history</p>
+              <p class="runs-rail-range">Last 30 days &middot; 12 runs</p>
+              <ol class="runs-timeline">
+                <li class="runs-entry runs-entry-selected" aria-current="true">
+                  <span class="runs-entry-dot runs-dot-primary" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Today 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 12s &middot; 6 drafts</p>
+                  <span class="runs-tag">Now</span>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Yesterday 08:00</p>
+                  <p class="runs-entry-status">Completed in 58s &middot; 4 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-warning" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Fri 08:00</p>
+                  <p class="runs-entry-status">Completed with 2 blocked actions</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-danger" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Thu 08:00</p>
+                  <p class="runs-entry-status">Failed &mdash; Outlook was not open</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Wed 09:04</p>
+                  <p class="runs-entry-status">Caught up after sleep &middot; ran once</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Tue 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 04s &middot; 5 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Mon 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 20s &middot; 7 drafts</p>
+                </li>
+              </ol>
+              <p class="runs-rail-foot">Runs older than 30 days are removed</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------------------- empty -->
+      <section class="runs-state" data-state="empty" aria-label="Run result, not run yet">
+        <div class="runs-header">
+          <h1 class="runs-title">Morning inbox triage</h1>
+          <span class="runs-badge runs-badge-quiet">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6.2 4.6 8.8 10 3.4"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Not run yet
+          </span>
+          <p class="runs-meta">Scheduled daily at 08:00 &middot; first run has not happened yet</p>
+          <button class="runs-rerun" type="button" data-run-again>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6a4 4 0 0 1 6.8-2.8L10 4.4M10 1.6v2.8H7.2"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M10 6a4 4 0 0 1-6.8 2.8L2 7.6M2 10.4V7.6h2.8"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Run again
+          </button>
+        </div>
+
+        <div class="runs-grid">
+          <div class="runs-column">
+            <article class="runs-card runs-empty-card">
+              <span class="runs-empty-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M3.4 10a6.6 6.6 0 1 0 1.9-4.6"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                  />
+                  <path
+                    d="M3.2 3.2v3.4h3.4"
+                    stroke="currentColor"
+                    stroke-width="1.4"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path d="M10 6.8V10l2.4 1.4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+                </svg>
+              </span>
+              <h2 class="runs-empty-title">No runs yet</h2>
+              <p class="runs-empty-body">
+                This automation hasn&rsquo;t fired. Its first result will appear here, with anything it wanted to
+                do but couldn&rsquo;t.
+              </p>
+              <button class="runs-btn runs-btn-primary runs-btn-wide" type="button" data-run-again>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                  <path d="M3.2 2.2 9.4 6l-6.2 3.8V2.2Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round" />
+                </svg>
+                Run it now to test
+              </button>
+              <p class="runs-empty-foot">Next scheduled run: tomorrow at 08:00</p>
+            </article>
+          </div>
+
+          <aside class="runs-rail">
+            <div class="runs-rail-card runs-rail-card-empty">
+              <p class="runs-rail-label">Run history</p>
+              <p class="runs-rail-range">Nothing recorded yet</p>
+              <div class="runs-rail-empty">
+                <span class="runs-rail-empty-icon" aria-hidden="true">
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                    <rect x="2.6" y="3.4" width="14.8" height="13.2" rx="2" stroke="currentColor" stroke-width="1.3" />
+                    <path d="M2.6 7.6h14.8" stroke="currentColor" stroke-width="1.3" />
+                    <path d="M6.4 11.2h4M6.4 13.8h6.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+                  </svg>
+                </span>
+                <p class="runs-rail-empty-title">No history to show</p>
+                <p class="runs-rail-empty-body">Runs are kept for 30 days once they happen.</p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------- loading -->
+      <section class="runs-state" data-state="loading" aria-label="Run result, running">
+        <div class="runs-header">
+          <h1 class="runs-title">Morning inbox triage</h1>
+          <span class="runs-badge runs-badge-running">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2.6 6a3.4 3.4 0 1 1 3.4 3.4"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+              />
+            </svg>
+            Running
+          </span>
+          <p class="runs-meta">Started today at 08:00 &middot; 6s in &middot; streaming result</p>
+          <!-- "Run again" is the state the loading frame locks: one run at a time, so
+               a second one cannot be started while this one streams. -->
+          <button
+            class="runs-rerun"
+            type="button"
+            data-run-again
+            data-state="disabled"
+            disabled
+            aria-disabled="true"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6a4 4 0 0 1 6.8-2.8L10 4.4M10 1.6v2.8H7.2"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M10 6a4 4 0 0 1-6.8 2.8L2 7.6M2 10.4V7.6h2.8"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Run again
+          </button>
+        </div>
+
+        <div class="runs-grid">
+          <div class="runs-column">
+            <article class="runs-card" aria-busy="true">
+              <header class="runs-card-head">
+                <p class="runs-card-label">Result</p>
+                <span class="runs-stream-badge">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path
+                      d="M6 1.6a4.4 4.4 0 1 0 4.4 4.4"
+                      stroke="currentColor"
+                      stroke-width="1.3"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  Streaming&hellip;
+                </span>
+                <p class="runs-stream-meta">412 tokens &middot; 6s in</p>
+              </header>
+              <div class="runs-card-body">
+                <h2 class="runs-md-h2">Inbox triaged &mdash; 42 messages reviewed</h2>
+                <p class="runs-md-p">
+                  Zuri read every new message in Outlook, drafted replies to the routine ones in your tone, and
+                  set the rest aside for you to decide on.
+                </p>
+                <h3 class="runs-md-h3">What changed</h3>
+                <ul class="runs-md-list">
+                  <li>6 replies drafted and saved to Drafts &mdash; nothing sent</li>
+                  <li>3 flagged for your review: 2 invoices and 1 legal notice</li>
+                </ul>
+                <div class="runs-caret-row" aria-hidden="true">
+                  <span class="runs-caret"></span>
+                  <span class="runs-skeleton runs-skeleton-first"></span>
+                </div>
+                <div class="runs-skeletons" aria-hidden="true">
+                  <span class="runs-skeleton runs-skeleton-2"></span>
+                  <span class="runs-skeleton runs-skeleton-3"></span>
+                </div>
+              </div>
+              <footer class="runs-stream-foot">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <rect x="2.4" y="2.4" width="9.2" height="9.2" rx="1.6" stroke="currentColor" stroke-width="1.17" />
+                </svg>
+                <p>Follow-ups appear when the run finishes &mdash; Stop cancels the remaining work.</p>
+              </footer>
+            </article>
+          </div>
+
+          <aside class="runs-rail">
+            <div class="runs-rail-card runs-rail-card-live">
+              <p class="runs-rail-label">Run history</p>
+              <p class="runs-rail-range">Last 30 days &middot; 12 runs</p>
+              <ol class="runs-timeline">
+                <li class="runs-entry runs-entry-selected" aria-current="true">
+                  <span class="runs-entry-dot runs-dot-primary" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Today 08:00</p>
+                  <p class="runs-entry-status">Running&hellip; 6s in</p>
+                  <span class="runs-tag runs-tag-live">Live</span>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Yesterday 08:00</p>
+                  <p class="runs-entry-status">Completed in 58s &middot; 4 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-warning" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Fri 08:00</p>
+                  <p class="runs-entry-status">Completed with 2 blocked actions</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-danger" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Thu 08:00</p>
+                  <p class="runs-entry-status">Failed &mdash; Outlook was not open</p>
+                </li>
+                <li class="runs-entry runs-entry-skeleton" aria-hidden="true">
+                  <span class="runs-entry-dot runs-dot-skeleton"></span>
+                  <span class="runs-skeleton runs-skeleton-entry-1"></span>
+                  <span class="runs-skeleton runs-skeleton-entry-2"></span>
+                </li>
+                <li class="runs-entry runs-entry-skeleton" aria-hidden="true">
+                  <span class="runs-entry-dot runs-dot-skeleton"></span>
+                  <span class="runs-skeleton runs-skeleton-entry-1"></span>
+                  <span class="runs-skeleton runs-skeleton-entry-2"></span>
+                </li>
+              </ol>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- --------------------------------------------------------------- error -->
+      <section class="runs-state" data-state="error" aria-label="Run result, failed">
+        <div class="runs-header">
+          <h1 class="runs-title">Morning inbox triage</h1>
+          <span class="runs-badge runs-badge-failed">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2 6h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+            </svg>
+            Failed
+          </span>
+          <p class="runs-meta">Today at 08:00 &middot; stopped after 12s &middot; Outlook was not open</p>
+          <button class="runs-rerun" type="button" data-run-again>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6a4 4 0 0 1 6.8-2.8L10 4.4M10 1.6v2.8H7.2"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M10 6a4 4 0 0 1-6.8 2.8L2 7.6M2 10.4V7.6h2.8"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Run again
+          </button>
+        </div>
+
+        <div class="runs-grid">
+          <div class="runs-column">
+            <article class="runs-card">
+              <header class="runs-card-head">
+                <p class="runs-card-label">Result</p>
+                <p class="runs-card-note">run stopped before producing output</p>
+              </header>
+              <div class="runs-card-body">
+                <div class="runs-alert" role="alert">
+                  <span class="runs-alert-icon" aria-hidden="true">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                      <circle cx="10" cy="10" r="7.6" stroke="currentColor" stroke-width="1.67" />
+                      <path d="M10 6v5" stroke="currentColor" stroke-width="1.67" stroke-linecap="round" />
+                      <path d="M10 13.6h.01" stroke="currentColor" stroke-width="1.67" stroke-linecap="round" />
+                    </svg>
+                  </span>
+                  <h2 class="runs-alert-title">This run failed &mdash; Outlook was not open</h2>
+                  <p class="runs-alert-body">
+                    Zuri needed an active Outlook window to read the mailbox and found none, so it stopped
+                    instead of guessing.
+                  </p>
+                  <button class="runs-alert-retry" type="button" data-run-again>
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                      <path
+                        d="M2 6a4 4 0 0 1 6.8-2.8L10 4.4M10 1.6v2.8H7.2"
+                        stroke="currentColor"
+                        stroke-width="1.1"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                      <path
+                        d="M10 6a4 4 0 0 1-6.8 2.8L2 7.6M2 10.4V7.6h2.8"
+                        stroke="currentColor"
+                        stroke-width="1.1"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      />
+                    </svg>
+                    Run again now
+                  </button>
+                </div>
+                <h3 class="runs-md-h3">What Zuri managed before it stopped</h3>
+                <ul class="runs-md-list">
+                  <li>Connected to the mailbox and listed 42 unread messages</li>
+                  <li>No drafts were written and nothing was sent</li>
+                </ul>
+                <div class="runs-note runs-note-danger">
+                  <span class="runs-note-icon" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="5.4" stroke="currentColor" stroke-width="1.17" />
+                    </svg>
+                  </span>
+                  <p class="runs-note-text">
+                    The next scheduled run is tomorrow at 08:00. Nothing is retried automatically.
+                  </p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <aside class="runs-rail">
+            <div class="runs-rail-card runs-rail-card-full">
+              <p class="runs-rail-label">Run history</p>
+              <p class="runs-rail-range">Last 30 days &middot; 12 runs</p>
+              <ol class="runs-timeline">
+                <li class="runs-entry runs-entry-selected" aria-current="true">
+                  <span class="runs-entry-dot runs-dot-primary" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Today 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 12s &middot; 6 drafts</p>
+                  <span class="runs-tag">Now</span>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Yesterday 08:00</p>
+                  <p class="runs-entry-status">Completed in 58s &middot; 4 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-warning" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Fri 08:00</p>
+                  <p class="runs-entry-status">Completed with 2 blocked actions</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-danger" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Thu 08:00</p>
+                  <p class="runs-entry-status">Failed &mdash; Outlook was not open</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Wed 09:04</p>
+                  <p class="runs-entry-status">Caught up after sleep &middot; ran once</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Tue 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 04s &middot; 5 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Mon 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 20s &middot; 7 drafts</p>
+                </li>
+              </ol>
+              <p class="runs-rail-foot">Runs older than 30 days are removed</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------- blocked -->
+      <section class="runs-state" data-state="blocked" aria-label="Run result, blocked actions">
+        <div class="runs-header">
+          <h1 class="runs-title">Morning inbox triage</h1>
+          <span class="runs-badge runs-badge-blocked">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2.6 8.4h5.4V5.5a2.7 2.7 0 0 0-5.4 0v2.9Z"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linejoin="round"
+              />
+              <path d="M4.4 10.2h1.8" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+            </svg>
+            Blocked
+          </span>
+          <p class="runs-meta">Today at 08:00 &middot; took 1m 40s &middot; 3 actions needed approval</p>
+          <button class="runs-rerun" type="button" data-run-again>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6a4 4 0 0 1 6.8-2.8L10 4.4M10 1.6v2.8H7.2"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M10 6a4 4 0 0 1-6.8 2.8L2 7.6M2 10.4V7.6h2.8"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Run again
+          </button>
+        </div>
+
+        <div class="runs-grid">
+          <div class="runs-column">
+            <article class="runs-card">
+              <header class="runs-card-head">
+                <p class="runs-card-label">Blocked actions</p>
+                <p class="runs-card-note runs-card-note-wide">3 attempts stopped before they ran</p>
+              </header>
+              <div class="runs-card-body runs-blocked-body">
+                <ul class="runs-blocked-list">
+                  <li class="runs-blocked-item">
+                    <span class="runs-blocked-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="1.6" y="3.4" width="12.8" height="9.2" rx="1.4" stroke="currentColor" stroke-width="1.33" />
+                        <path d="m2.4 4.4 5.6 4 5.6-4" stroke="currentColor" stroke-width="1.33" stroke-linejoin="round" />
+                      </svg>
+                    </span>
+                    <p class="runs-blocked-item-title">Send mail to billing@northwind.co</p>
+                    <p class="runs-blocked-item-reason">
+                      Sending is not allowed without your approval &mdash; Zuri left the draft in Outlook.
+                    </p>
+                    <span class="runs-blocked-item-time">08:01</span>
+                    <span class="runs-blocked-item-tag">Blocked</span>
+                  </li>
+                  <li class="runs-blocked-item">
+                    <span class="runs-blocked-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <rect x="1.8" y="2.6" width="12.4" height="10.8" rx="1.4" stroke="currentColor" stroke-width="1.33" />
+                        <path d="M1.8 6.4h12.4M6.4 6.4v7M1.8 9.6h12.4" stroke="currentColor" stroke-width="1.33" />
+                      </svg>
+                    </span>
+                    <p class="runs-blocked-item-title">Edit C:\Invoices\Q4.xlsx cells D14:F40</p>
+                    <p class="runs-blocked-item-reason">
+                      App control needs a confirmation you didn&rsquo;t give in time &mdash; the file is unchanged.
+                    </p>
+                    <span class="runs-blocked-item-time">08:02</span>
+                    <span class="runs-blocked-item-tag">Blocked</span>
+                  </li>
+                  <li class="runs-blocked-item">
+                    <span class="runs-blocked-icon" aria-hidden="true">
+                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path
+                          d="M9.2 1.8H3.6a1.2 1.2 0 0 0-1.2 1.2v10a1.2 1.2 0 0 0 1.2 1.2h8.8a1.2 1.2 0 0 0 1.2-1.2V6.2Z"
+                          stroke="currentColor"
+                          stroke-width="1.33"
+                          stroke-linejoin="round"
+                        />
+                        <path d="M9.2 1.8v4.4h4.4" stroke="currentColor" stroke-width="1.33" stroke-linejoin="round" />
+                        <path d="M5.2 8.6h5.6M5.2 11h3.6" stroke="currentColor" stroke-width="1.33" stroke-linecap="round" />
+                      </svg>
+                    </span>
+                    <p class="runs-blocked-item-title">Overwrite the master contract template.docx</p>
+                    <p class="runs-blocked-item-reason">
+                      Overwriting a template is outside this automation&rsquo;s permissions.
+                    </p>
+                    <span class="runs-blocked-item-time">08:03</span>
+                    <span class="runs-blocked-item-tag">Blocked</span>
+                  </li>
+                </ul>
+                <div class="runs-blocked-foot">
+                  <div class="runs-blocked-foot-copy">
+                    <p class="runs-blocked-foot-title">Let Zuri do this next time?</p>
+                    <p class="runs-blocked-foot-body">
+                      Approving adds the action to this automation&rsquo;s permissions for future runs.
+                    </p>
+                  </div>
+                  <button class="runs-btn runs-btn-quiet" type="button">Review</button>
+                  <button class="runs-btn runs-btn-primary" type="button">Allow all</button>
+                </div>
+                <p class="runs-blocked-logged">Blocked attempts are logged with the reason shown above.</p>
+              </div>
+            </article>
+          </div>
+
+          <aside class="runs-rail">
+            <div class="runs-rail-card runs-rail-card-full">
+              <p class="runs-rail-label">Run history</p>
+              <p class="runs-rail-range">Last 30 days &middot; 12 runs</p>
+              <ol class="runs-timeline">
+                <li class="runs-entry runs-entry-selected" aria-current="true">
+                  <span class="runs-entry-dot runs-dot-primary" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Today 08:00</p>
+                  <p class="runs-entry-status">3 blocked actions &middot; 6 drafts</p>
+                  <span class="runs-tag">Now</span>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Yesterday 08:00</p>
+                  <p class="runs-entry-status">Completed in 58s &middot; 4 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-warning" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Fri 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 02s &middot; 5 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-danger" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Thu 08:00</p>
+                  <p class="runs-entry-status">Failed &mdash; Outlook was not open</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Wed 09:04</p>
+                  <p class="runs-entry-status">Caught up after sleep &middot; ran once</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Tue 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 04s &middot; 5 drafts</p>
+                </li>
+              </ol>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- ------------------------------------------------------------ accepted -->
+      <section class="runs-state" data-state="accepted" aria-label="Run result, reminder created">
+        <div class="runs-header">
+          <h1 class="runs-title">Morning inbox triage</h1>
+          <span class="runs-badge runs-badge-completed">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6.2 4.6 8.8 10 3.4"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Completed
+          </span>
+          <p class="runs-meta">Today at 08:00 &middot; took 1m 12s &middot; reminder created</p>
+          <button class="runs-rerun" type="button" data-run-again>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path
+                d="M2 6a4 4 0 0 1 6.8-2.8L10 4.4M10 1.6v2.8H7.2"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+              <path
+                d="M10 6a4 4 0 0 1-6.8 2.8L2 7.6M2 10.4V7.6h2.8"
+                stroke="currentColor"
+                stroke-width="1.1"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+            Run again
+          </button>
+        </div>
+
+        <div class="runs-grid">
+          <div class="runs-column">
+            <article class="runs-card">
+              <header class="runs-card-head">
+                <p class="runs-card-label">Result</p>
+                <p class="runs-card-note">rendered by markdown.js</p>
+                <button class="runs-copy" type="button">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <rect x="4" y="4" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.1" />
+                    <path
+                      d="M8 4V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1"
+                      stroke="currentColor"
+                      stroke-width="1.1"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                  Copy
+                </button>
+              </header>
+              <div class="runs-card-body">
+                <h2 class="runs-md-h2">Inbox triaged &mdash; 42 messages reviewed</h2>
+                <p class="runs-md-p">
+                  Zuri read every new message in Outlook, drafted replies to the routine ones in your tone, and
+                  set the rest aside for you to decide on.
+                </p>
+                <h3 class="runs-md-h3">What changed</h3>
+                <ul class="runs-md-list">
+                  <li>6 replies drafted and saved to Drafts &mdash; nothing sent</li>
+                  <li>3 flagged for your review: 2 invoices and 1 legal notice</li>
+                  <li>12 newsletters archived, 1 calendar invite accepted</li>
+                  <li>
+                    2 messages matched the <span class="runs-code">invoice-2026</span> label and were left
+                    untouched
+                  </li>
+                </ul>
+                <div class="runs-note">
+                  <span class="runs-note-icon" aria-hidden="true">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                      <circle cx="7" cy="7" r="5.4" stroke="currentColor" stroke-width="1.17" />
+                    </svg>
+                  </span>
+                  <p class="runs-note-text">Zuri did not send anything. Drafts wait in Outlook until you press Send.</p>
+                </div>
+                <p class="runs-output">Output logged to runs/2026-10-18T08-00.jsonl</p>
+              </div>
+            </article>
+
+            <article class="runs-card runs-answer">
+              <span class="runs-answer-icon" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M4.4 10.4 8.2 14.2 15.6 6.4"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <h2 class="runs-answer-title">Reminder created for today at 12:00</h2>
+              <p class="runs-answer-body">
+                &ldquo;Follow up on 3 flagged messages&rdquo; is on your reminders list. Zuri will nudge you once.
+              </p>
+              <div class="runs-answer-actions">
+                <button class="runs-btn runs-btn-quiet" type="button">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+                    <path d="M2.5 6h7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+                    <path
+                      d="M7 3.5 9.5 6 7 8.5"
+                      stroke="currentColor"
+                      stroke-width="1.1"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  View reminder
+                </button>
+                <button class="runs-btn runs-btn-plain" type="button" data-undo-offer>Undo</button>
+              </div>
+            </article>
+
+            <article class="runs-card runs-blocked-log">
+              <header class="runs-blocked-head">
+                <span class="runs-blocked-lock" aria-hidden="true">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <rect x="2.6" y="6.2" width="8.8" height="6.2" rx="1.4" stroke="currentColor" stroke-width="1.17" />
+                    <path
+                      d="M4.8 6.2V4.6a2.2 2.2 0 0 1 4.4 0v1.6"
+                      stroke="currentColor"
+                      stroke-width="1.17"
+                      stroke-linecap="round"
+                    />
+                  </svg>
+                </span>
+                <h2 class="runs-blocked-title">Blocked actions</h2>
+                <p class="runs-blocked-count">2 attempts were stopped before they ran</p>
+                <button class="runs-blocked-link" type="button" data-show-blocked>Why blocked</button>
+              </header>
+              <div class="runs-blocked-lines">
+                <p class="runs-blocked-line">
+                  Send mail to billing@northwind.co &mdash; sending is not allowed without approval
+                  <span class="runs-blocked-time">08:01</span>
+                </p>
+                <p class="runs-blocked-line runs-blocked-line-indent">
+                  Open C:\Invoices\Q4.xlsx and edit cells &mdash; app control needs your confirmation
+                  <span class="runs-blocked-time">08:02</span>
+                </p>
+              </div>
+            </article>
+          </div>
+
+          <aside class="runs-rail">
+            <div class="runs-rail-card runs-rail-card-full">
+              <p class="runs-rail-label">Run history</p>
+              <p class="runs-rail-range">Last 30 days &middot; 12 runs</p>
+              <ol class="runs-timeline">
+                <li class="runs-entry runs-entry-selected" aria-current="true">
+                  <span class="runs-entry-dot runs-dot-primary" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Today 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 12s &middot; 6 drafts</p>
+                  <span class="runs-tag">Now</span>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Yesterday 08:00</p>
+                  <p class="runs-entry-status">Completed in 58s &middot; 4 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-warning" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Fri 08:00</p>
+                  <p class="runs-entry-status">Completed with 2 blocked actions</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-danger" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Thu 08:00</p>
+                  <p class="runs-entry-status">Failed &mdash; Outlook was not open</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Wed 09:04</p>
+                  <p class="runs-entry-status">Caught up after sleep &middot; ran once</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Tue 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 04s &middot; 5 drafts</p>
+                </li>
+                <li class="runs-entry">
+                  <span class="runs-entry-dot runs-dot-success" aria-hidden="true"></span>
+                  <p class="runs-entry-time">Mon 08:00</p>
+                  <p class="runs-entry-status">Completed in 1m 20s &middot; 7 drafts</p>
+                </li>
+              </ol>
+              <p class="runs-rail-foot">Runs older than 30 days are removed</p>
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="runs.js"></script>
+  </body>
+</html>

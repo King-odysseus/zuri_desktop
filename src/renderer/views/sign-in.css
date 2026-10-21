@@ -1,0 +1,794 @@
+/**
+ * Sign-in view (design node 0:11371).
+ *
+ * The node draws the page five times: empty (default), loading, rejected
+ * credentials, signed-in, and the same page at 390 px. All five share one card
+ * and one brand column, so both are drawn once here and the body's data-state
+ * attribute picks the frame's differences: the banner, the submitting button,
+ * the filled field look, the signed-in panel and the card's height.
+ *
+ * Nothing in this file holds a colour literal: the palette is the page token
+ * block in tokens.css, named after the same node.
+ *
+ * Two deliberate corrections to the drawing, both invisible at the node's own
+ * width: the phone frame places the password value 2 px further in than the
+ * email value, and this page uses one inset (40 px) for both; and a password
+ * field masks what is typed (the error frame draws "wrong-password" in plain
+ * text because it is a picture, not a working field).
+ */
+
+/* --------------------------------------------------------------- page shell */
+
+* {
+  box-sizing: border-box;
+}
+
+.signin-page {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--zuri-signin-window);
+  color: var(--zuri-signin-text);
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-signin-body-size);
+  line-height: var(--zuri-signin-body-leading);
+  -webkit-font-smoothing: antialiased;
+}
+
+.signin-page a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.signin-page button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.signin-page :focus-visible {
+  outline: 2px solid var(--zuri-signin-primary);
+  outline-offset: 2px;
+}
+
+/* Every glyph is a 24 unit outline scaled by its own width and height, which is
+ * how the node stores them (stroke 2 at 24 = the node's 1.3333 at 16 px). */
+.signin-page svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.signin-layout {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* ------------------------------------------------------------ brand column */
+
+.signin-brand {
+  position: relative;
+  flex: none;
+  width: var(--zuri-signin-brand-width);
+  overflow: hidden;
+  background: var(--zuri-signin-brand-panel);
+}
+
+/* A 640 px disc at 16% behind a 140 px blur: the node's own recipe, clipped by
+ * the column exactly as the node clips it. */
+.signin-glow {
+  position: absolute;
+  left: var(--zuri-signin-glow-left);
+  top: var(--zuri-signin-glow-top);
+  display: block;
+  width: var(--zuri-signin-glow-size);
+  height: var(--zuri-signin-glow-size);
+  border-radius: 50%;
+  background: var(--zuri-signin-glow);
+  opacity: var(--zuri-signin-glow-opacity);
+  filter: blur(var(--zuri-signin-glow-blur));
+}
+
+.signin-brand-mark {
+  position: absolute;
+  left: var(--zuri-signin-brand-inset);
+  top: var(--zuri-signin-brand-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--zuri-signin-radius-mark);
+  background: var(--zuri-signin-primary);
+  color: var(--zuri-signin-on-primary);
+}
+
+.signin-brand-name {
+  position: absolute;
+  left: var(--zuri-signin-brand-name-inset);
+  top: var(--zuri-signin-brand-name-top);
+  font-size: var(--zuri-signin-brand-name-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-signin-brand-name-leading);
+  color: var(--zuri-signin-on-dark);
+}
+
+.signin-brand-headline {
+  position: absolute;
+  left: var(--zuri-signin-brand-inset);
+  top: var(--zuri-signin-headline-top);
+  width: var(--zuri-signin-headline-width);
+  margin: 0;
+  font-size: var(--zuri-signin-title-size);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-signin-title-leading);
+  color: var(--zuri-signin-on-dark);
+}
+
+.signin-brand-body {
+  position: absolute;
+  left: var(--zuri-signin-brand-inset);
+  top: var(--zuri-signin-body-top);
+  width: var(--zuri-signin-body-width);
+  margin: 0;
+  color: var(--zuri-signin-on-dark-subtle);
+}
+
+.signin-features {
+  position: absolute;
+  left: var(--zuri-signin-brand-inset);
+  top: var(--zuri-signin-features-top);
+  width: var(--zuri-signin-headline-width);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.signin-feature {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: var(--zuri-signin-feature-height);
+  font-size: var(--zuri-signin-label-size);
+  line-height: var(--zuri-signin-label-leading);
+  color: var(--zuri-signin-on-dark);
+}
+
+.signin-feature + .signin-feature {
+  margin-top: 8px;
+}
+
+.signin-feature svg {
+  flex: none;
+  color: var(--zuri-signin-icon-accent);
+}
+
+/* --------------------------------------------------------------- form column */
+
+.signin-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+  min-height: 100vh;
+  padding: var(--zuri-signin-card-top) 24px 48px;
+}
+
+/* The phone frame only: the status bar and wordmark above the title. */
+.signin-status,
+.signin-phone-brand {
+  display: none;
+}
+
+.signin-card {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  width: var(--zuri-signin-card-width);
+  max-width: 100%;
+  height: var(--zuri-signin-card-height);
+  padding: var(--zuri-signin-card-pad) var(--zuri-signin-card-pad) 0;
+  /* The node's 1 px outline sits inside the frame, so it is drawn as an inset
+   * shadow rather than a border: a border would push the card's 40 px inset
+   * and its 560 x 600 box off the node by the border's width. */
+  box-shadow:
+    inset 0 0 0 1px var(--zuri-signin-hairline),
+    var(--zuri-signin-card-shadow);
+  border-radius: var(--zuri-signin-radius-card);
+  background: var(--zuri-signin-card);
+}
+
+/* The error frame is one 40 px banner taller; the signed-in card is shorter. */
+.signin-page[data-state="error"] .signin-card {
+  height: var(--zuri-signin-card-height-error);
+}
+
+.signin-page[data-state="signed-in"] .signin-card {
+  height: var(--zuri-signin-card-height-done);
+}
+
+.signin-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.signin-panel-done {
+  display: none;
+}
+
+.signin-page[data-state="signed-in"] .signin-panel-form {
+  display: none;
+}
+
+.signin-page[data-state="signed-in"] .signin-panel-done {
+  display: flex;
+}
+
+.signin-title {
+  margin: 0;
+  font-size: var(--zuri-signin-title-size);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-signin-title-leading);
+  color: var(--zuri-signin-text);
+}
+
+.signin-sub {
+  margin: 8px 0 0;
+  color: var(--zuri-signin-text-subtle);
+}
+
+/* ------------------------------------------------------------- error banner */
+
+.signin-error {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin-top: 18px;
+  padding: 0 12px;
+  border-radius: var(--zuri-signin-radius-control);
+  background: var(--zuri-signin-sunken);
+}
+
+.signin-page[data-state="error"] .signin-error {
+  display: flex;
+}
+
+.signin-error svg {
+  flex: none;
+  color: var(--zuri-signin-danger);
+}
+
+.signin-error-message {
+  font-size: var(--zuri-signin-note-size);
+  line-height: var(--zuri-signin-note-leading);
+  color: var(--zuri-signin-text);
+}
+
+/* ------------------------------------------------------------------- fields */
+
+.signin-fields {
+  display: flex;
+  flex-direction: column;
+}
+
+.signin-field {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The node's own gaps: 34 below the sub line, 26 between the two fields, and
+ * 32 under the banner once the error frame pushes the fields down. */
+.signin-field-email {
+  margin-top: 34px;
+}
+
+.signin-page[data-state="error"] .signin-field-email {
+  margin-top: 32px;
+}
+
+.signin-field-password {
+  margin-top: 26px;
+}
+
+.signin-label {
+  font-size: var(--zuri-signin-label-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-signin-label-leading);
+  color: var(--zuri-signin-text);
+}
+
+.signin-input {
+  display: flex;
+  align-items: center;
+  height: var(--zuri-signin-control-height);
+  margin-top: 8px;
+  padding: 0 20px 0 14px;
+  border-radius: var(--zuri-signin-radius-control);
+  background: var(--zuri-signin-card);
+  box-shadow: inset 0 0 0 1px var(--zuri-signin-hairline);
+}
+
+/* No focus ring is drawn in the node; a filled field shows where typing goes. */
+.signin-input:focus-within {
+  box-shadow: inset 0 0 0 1px var(--zuri-signin-primary);
+}
+
+.signin-page[data-state="loading"] .signin-input {
+  background: var(--zuri-signin-sunken);
+}
+
+.signin-page[data-state="error"] .signin-field-password .signin-input {
+  box-shadow: inset 0 0 0 1px var(--zuri-signin-danger);
+}
+
+.signin-input-icon {
+  flex: none;
+  color: var(--zuri-signin-text-muted);
+}
+
+.signin-input input {
+  flex: 1;
+  min-width: 0;
+  margin-left: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--zuri-signin-text);
+  font: inherit;
+  font-size: var(--zuri-signin-body-size);
+  line-height: var(--zuri-signin-body-leading);
+}
+
+.signin-input input::placeholder {
+  color: var(--zuri-signin-text-muted);
+  opacity: 1;
+}
+
+/* The submitting frame draws filled fields the user cannot change yet. */
+.signin-input input:disabled {
+  cursor: default;
+  color: var(--zuri-signin-text);
+  -webkit-text-fill-color: var(--zuri-signin-text);
+}
+
+.signin-reveal {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--zuri-signin-text-muted);
+}
+
+.signin-reveal:disabled {
+  cursor: default;
+}
+
+/* ---------------------------------------------------------- remember + link */
+
+.signin-remember-row {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  margin-top: 2px;
+}
+
+.signin-remember {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--zuri-signin-label-size);
+  line-height: var(--zuri-signin-label-leading);
+  color: var(--zuri-signin-text);
+  cursor: pointer;
+}
+
+.signin-checkbox {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.signin-check {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  appearance: none;
+  border-radius: var(--zuri-signin-radius-check);
+  background: var(--zuri-signin-card);
+  box-shadow: inset 0 0 0 1px var(--zuri-signin-hairline);
+  cursor: pointer;
+}
+
+.signin-check:checked {
+  background: var(--zuri-signin-primary);
+  box-shadow: inset 0 0 0 1px var(--zuri-signin-primary);
+}
+
+/* The tick is 12 px inside the 20 px box, four in from each edge. */
+.signin-check-icon {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  color: var(--zuri-signin-on-primary);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.signin-check:checked + .signin-check-icon {
+  opacity: 1;
+}
+
+/* Scoped to the page so the link colour outranks `.signin-page a { color: inherit }`:
+ * the node paints this one on the accent, not on the body text colour. */
+.signin-page .signin-forgot {
+  margin-left: auto;
+  font-size: var(--zuri-signin-label-size);
+  line-height: var(--zuri-signin-label-leading);
+  color: var(--zuri-signin-primary);
+}
+
+/* ------------------------------------------------------------------ actions */
+
+/* Scoped to the page so it outranks the `.signin-page button { font: inherit }`
+ * reset above: the submit is a <button> in three frames and an <a> in the
+ * signed-in frame, and the node draws all four of them at its own size and
+ * weight rather than inheriting the page's 14/22 regular. */
+.signin-page .signin-submit {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: var(--zuri-signin-control-height);
+  margin-top: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--zuri-signin-radius-control);
+  background: var(--zuri-signin-primary);
+  color: var(--zuri-signin-on-primary);
+  font-size: var(--zuri-signin-button-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-signin-button-leading);
+}
+
+.signin-page[data-state="loading"] .signin-submit:disabled {
+  cursor: progress;
+}
+
+/* The submitting frame keeps the label centred and sets the spinner to its
+ * left, so the spinner is taken out of the flex row rather than pushing it.
+ * The node puts it 150 px from the button's left edge; a 50% - 90px form is
+ * the same number at 480 wide but resolves a fraction short of it. */
+.signin-submit-icon {
+  display: none;
+  position: absolute;
+  left: 150px;
+  top: calc((var(--zuri-signin-control-height) - 16px) / 2);
+  color: var(--zuri-signin-primary);
+}
+
+.signin-page[data-state="loading"] .signin-submit {
+  background: var(--zuri-signin-primary-soft);
+  color: var(--zuri-signin-primary);
+}
+
+.signin-page[data-state="loading"] .signin-submit-icon {
+  display: block;
+  animation: signin-spin 900ms linear infinite;
+}
+
+@keyframes signin-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .signin-page[data-state="loading"] .signin-submit-icon {
+    animation: none;
+  }
+}
+
+.signin-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 20px;
+  margin-top: 24px;
+  color: var(--zuri-signin-text-muted);
+  font-size: var(--zuri-signin-small-size);
+  line-height: var(--zuri-signin-small-leading);
+}
+
+.signin-divider::before,
+.signin-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--zuri-signin-hairline);
+}
+
+.signin-divider span {
+  flex: none;
+  width: 36px;
+  text-align: center;
+}
+
+.signin-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--zuri-signin-control-height);
+  margin-top: 12px;
+  border-radius: var(--zuri-signin-radius-control);
+  background: var(--zuri-signin-window);
+  box-shadow: inset 0 0 0 1px var(--zuri-signin-hairline);
+  color: var(--zuri-signin-text);
+  font-size: var(--zuri-signin-button-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-signin-button-leading);
+}
+
+/* The empty frame draws this button in the page colour; the submitting and
+ * error frames lift it to the card colour. */
+.signin-page[data-state="loading"] .signin-secondary,
+.signin-page[data-state="error"] .signin-secondary {
+  background: var(--zuri-signin-card);
+}
+
+.signin-print {
+  margin: 24px 0 0;
+  font-size: var(--zuri-signin-small-size);
+  line-height: var(--zuri-signin-small-leading);
+  text-align: center;
+  color: var(--zuri-signin-text-muted);
+}
+
+.signin-print-phone {
+  display: none;
+}
+
+/* ------------------------------------------------------------ disabled state */
+
+/* The node draws no frame for the disabled state, so this adds no drawing: it is
+ * the empty frame with the form out of reach, in the style guide's disabled
+ * control look (40% opacity, no pointer). Every rule is scoped to the state, so
+ * the four drawn frames and the phone frame are untouched. */
+.signin-page[data-state="disabled"] .signin-input,
+.signin-page[data-state="disabled"] .signin-remember-row,
+.signin-page[data-state="disabled"] .signin-submit,
+.signin-page[data-state="disabled"] .signin-secondary {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* The submitting frame already draws the field that cannot be typed into; the
+ * disabled state borrows that fill and only fades it. */
+.signin-page[data-state="disabled"] .signin-input {
+  background: var(--zuri-signin-sunken);
+}
+
+/* ------------------------------------------------------------- signed-in card */
+
+.signin-done-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--zuri-signin-radius-done);
+  background: var(--zuri-signin-success-soft);
+  color: var(--zuri-signin-success);
+}
+
+.signin-panel-done .signin-title {
+  margin-top: 20px;
+}
+
+.signin-panel-done .signin-sub {
+  margin-top: 8px;
+}
+
+.signin-progress {
+  height: 6px;
+  margin-top: 34px;
+  border-radius: var(--zuri-signin-radius-pill);
+  background: var(--zuri-signin-sunken);
+  overflow: hidden;
+}
+
+.signin-progress-fill {
+  display: block;
+  width: var(--zuri-signin-progress-width);
+  height: 100%;
+  border-radius: var(--zuri-signin-radius-pill);
+  background: var(--zuri-signin-success);
+}
+
+.signin-redirect {
+  margin: 18px 0 0;
+  font-size: var(--zuri-signin-small-size);
+  line-height: var(--zuri-signin-small-leading);
+  color: var(--zuri-signin-text-muted);
+}
+
+.signin-panel-done .signin-submit {
+  margin-top: 20px;
+}
+
+/* --------------------------------------------------------------- wide window */
+
+/* Below the brand column's own 640 plus the card's 560, there is no room for
+ * both; the node's phone frame then takes over the single column. */
+@media (max-width: 1100px) {
+  .signin-brand {
+    display: none;
+  }
+}
+
+/* ------------------------------------------------------- phone frame (390) */
+
+/* The node's fifth frame: one column on the card colour, with its own status
+ * bar, worldmark row, 48 px controls and the fine print on the bottom edge. */
+@media (max-width: 720px) {
+  .signin-layout {
+    background: var(--zuri-signin-card);
+  }
+
+  .signin-form {
+    min-height: 100vh;
+    /* The phone frame is one left-aligned column, not a centred card. */
+    align-items: stretch;
+    padding: 0 20px var(--zuri-signin-print-bottom);
+    background: var(--zuri-signin-card);
+  }
+
+  .signin-status {
+    display: flex;
+    align-items: center;
+    height: var(--zuri-signin-status-height);
+    margin: 0 -20px;
+    padding: 0 28px 0 16px;
+  }
+
+  .signin-status-time {
+    margin-right: auto;
+    font-size: var(--zuri-signin-small-size);
+    font-weight: var(--zuri-font-weight-medium);
+    line-height: 14px;
+    color: var(--zuri-signin-text);
+  }
+
+  .signin-status svg {
+    margin-left: 8px;
+    color: var(--zuri-signin-text);
+  }
+
+  .signin-phone-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    height: 32px;
+    margin-top: 24px;
+  }
+
+  /* The mark is placed absolutely in the brand column; in this row it is
+   * simply the first item. */
+  .signin-phone-brand .signin-brand-mark {
+    position: static;
+  }
+
+  .signin-phone-brand-name {
+    font-size: var(--zuri-signin-brand-name-size);
+    font-weight: var(--zuri-font-weight-medium);
+    line-height: var(--zuri-signin-brand-name-leading);
+    color: var(--zuri-signin-text);
+  }
+
+  .signin-card {
+    width: 100%;
+    height: auto;
+    padding: 0;
+    box-shadow: none;
+    border-radius: 0;
+    background: none;
+  }
+
+  /* The signed-in card keeps its box on desktop; here the page is one column,
+   * so it keeps the drawn heights out of the way of the print line. */
+  .signin-page[data-state="signed-in"] .signin-card {
+    height: auto;
+  }
+
+  .signin-title {
+    margin-top: 28px;
+  }
+
+  .signin-sub {
+    margin-top: 8px;
+  }
+
+  .signin-error {
+    margin-top: 18px;
+  }
+
+  .signin-field-email {
+    margin-top: 42px;
+  }
+
+  .signin-page[data-state="error"] .signin-field-email {
+    margin-top: 32px;
+  }
+
+  .signin-field-password {
+    margin-top: 18px;
+  }
+
+  .signin-input {
+    height: var(--zuri-signin-control-height-phone);
+    padding: 0 14px;
+    background: var(--zuri-signin-window);
+  }
+
+  .signin-input input {
+    font-size: var(--zuri-signin-field-size-phone);
+  }
+
+  /* The phone frame has no remember box, only the reset link on the right. */
+  .signin-remember-row {
+    margin-top: 18px;
+  }
+
+  .signin-remember {
+    display: none;
+  }
+
+  .signin-page .signin-submit {
+    height: var(--zuri-signin-control-height-phone);
+    /* The phone frame has no 20 px remember row around the reset link, so the
+       gap to the button is 20 rather than the desktop's 28. */
+    margin-top: 20px;
+    font-size: var(--zuri-signin-button-size-phone);
+    font-weight: var(--zuri-font-weight-medium);
+  }
+
+  .signin-submit-icon {
+    top: calc((var(--zuri-signin-control-height-phone) - 16px) / 2);
+  }
+
+  .signin-divider {
+    margin-top: 24px;
+  }
+
+  .signin-divider span {
+    width: 26px;
+  }
+
+  .signin-secondary {
+    height: var(--zuri-signin-control-height-phone);
+    margin-top: 12px;
+    font-size: var(--zuri-signin-button-size-phone);
+    background: var(--zuri-signin-window);
+  }
+
+  .signin-print-app {
+    display: none;
+  }
+
+  /* The frame prints this line 48 px above the bottom edge. */
+  .signin-print-phone {
+    display: block;
+    margin-top: auto;
+  }
+}

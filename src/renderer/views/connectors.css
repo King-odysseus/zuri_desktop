@@ -1,0 +1,862 @@
+/**
+ * Connectors (design node 0:12996).
+ *
+ * The node draws one page in eight frames: connected (the default), empty,
+ * loading, connecting, error (the key was rejected), disabled (a run is in
+ * flight), restart (status re-read from the backend) and a 390 px phone frame
+ * that turns the two cards into a settings list. They are one markup tree
+ * below, switched by `?state=` and by width, the way the other page views
+ * switch frames.
+ *
+ * Geometry from the node: 52 px top bar, 40 px page gutter, a 208 px settings
+ * nav with a hairline beside it, a 640 px page column, 24 px card padding and a
+ * 1 px divider between the two connector cards. Radii follow the tokens.json
+ * binding: cards on radius-card 10, inner rows, fields and buttons on
+ * radius-row 8, the avatar on radius-pill. No colour literal lives here; the
+ * palette is the page-scoped block in tokens.css.
+ */
+
+/* --------------------------------------------------------------- page shell */
+
+* {
+  box-sizing: border-box;
+}
+
+.connectors-page {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--zuri-connectors-canvas);
+  color: var(--zuri-connectors-text);
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-connectors-body-size);
+  line-height: var(--zuri-connectors-body-leading);
+  -webkit-font-smoothing: antialiased;
+}
+
+.connectors-page a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.connectors-page button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.connectors-page :focus-visible {
+  outline: 2px solid var(--zuri-connectors-primary);
+  outline-offset: 2px;
+}
+
+.connectors-page [hidden] {
+  display: none !important;
+}
+
+/* ----------------------------------------------------------------- top bar */
+
+.connectors-topbar {
+  display: flex;
+  align-items: center;
+  height: var(--zuri-connectors-topbar-height);
+  padding: 0 var(--zuri-connectors-gutter) 0 var(--zuri-space-4);
+  border-bottom: 1px solid var(--zuri-connectors-hairline);
+  background: var(--zuri-connectors-surface);
+}
+
+.connectors-mark {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--zuri-connectors-row-radius);
+  background: var(--zuri-connectors-accent);
+  color: var(--zuri-connectors-surface);
+}
+
+.connectors-wordmark {
+  margin: 0 0 0 var(--zuri-space-2);
+  font-size: var(--zuri-connectors-wordmark-size);
+  font-weight: 500;
+  line-height: var(--zuri-connectors-meta-leading);
+}
+
+.connectors-account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  margin-left: auto;
+}
+
+.connectors-avatar {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-connectors-avatar-size);
+  height: var(--zuri-connectors-avatar-size);
+  border-radius: var(--zuri-connectors-pill-radius);
+  background: var(--zuri-connectors-accent);
+  color: var(--zuri-connectors-surface);
+  font-size: var(--zuri-connectors-small-size);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.connectors-account-name {
+  color: var(--zuri-connectors-text-secondary);
+  font-size: var(--zuri-connectors-meta-size);
+  line-height: var(--zuri-connectors-meta-leading);
+}
+
+/* ----------------------------------------------------------- settings nav */
+
+.connectors-main {
+  display: flex;
+  align-items: flex-start;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--zuri-connectors-gutter-top) var(--zuri-connectors-gutter) 56px;
+}
+
+.connectors-settings-nav {
+  flex: 0 0 auto;
+  width: var(--zuri-connectors-nav-width);
+  padding-top: 4px;
+}
+
+.connectors-nav-label {
+  margin: 0 0 var(--zuri-connectors-nav-label-gap);
+  padding: 0 var(--zuri-connectors-nav-row-padding) 0 0;
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-label-size);
+  font-weight: 600;
+  letter-spacing: var(--zuri-connectors-label-tracking);
+  line-height: var(--zuri-connectors-label-leading);
+  text-transform: uppercase;
+}
+
+.connectors-nav-row {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-connectors-nav-icon-gap);
+  height: var(--zuri-connectors-nav-row-height);
+  padding: 0 var(--zuri-connectors-nav-row-padding);
+  border-radius: var(--zuri-connectors-row-radius);
+  color: var(--zuri-connectors-text-secondary);
+  font-size: var(--zuri-connectors-meta-size);
+  line-height: var(--zuri-connectors-meta-leading);
+}
+
+.connectors-nav-row:hover {
+  background: var(--zuri-connectors-sunken);
+  color: var(--zuri-connectors-text);
+}
+
+.connectors-nav-row[aria-current='page'] {
+  background: var(--zuri-connectors-primary-soft);
+  color: var(--zuri-connectors-primary);
+  font-weight: 500;
+}
+
+.connectors-nav-row-pending {
+  color: var(--zuri-connectors-text-muted);
+  cursor: default;
+}
+
+.connectors-nav-row-pending:hover {
+  background: transparent;
+  color: var(--zuri-connectors-text-muted);
+}
+
+.connectors-nav-hairline {
+  align-self: stretch;
+  width: 1px;
+  margin: 0 var(--zuri-connectors-nav-gap);
+  background: var(--zuri-connectors-hairline);
+}
+
+/* ------------------------------------------------------------ page column */
+
+.connectors-column {
+  flex: 1 1 auto;
+  min-width: 0; /* the column shrinks with the window instead of pushing it wide */
+  max-width: var(--zuri-connectors-column-width);
+  padding-left: var(--zuri-connectors-nav-hairline-gap);
+}
+
+.connectors-title {
+  margin: 0;
+  font-size: var(--zuri-connectors-title-size);
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  line-height: var(--zuri-connectors-title-leading);
+}
+
+.connectors-sub {
+  margin: var(--zuri-connectors-head-gap) 0 0;
+  color: var(--zuri-connectors-text-secondary);
+  font-size: var(--zuri-connectors-meta-size);
+  line-height: var(--zuri-connectors-meta-leading);
+}
+
+.connectors-sub-phone {
+  display: none;
+}
+
+.connectors-list {
+  margin-top: var(--zuri-connectors-list-gap);
+  border: 1px solid var(--zuri-connectors-border);
+  border-radius: var(--zuri-connectors-card-radius);
+  background: var(--zuri-connectors-surface);
+  box-shadow: var(--zuri-connectors-shadow);
+  overflow: hidden;
+}
+
+/* ------------------------------------------------------------------- card */
+
+.connectors-card {
+  padding: var(--zuri-connectors-card-padding);
+}
+
+.connectors-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-connectors-head-icon-gap);
+}
+
+.connectors-logo {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--zuri-connectors-logo-size);
+  height: var(--zuri-connectors-logo-size);
+  border-radius: var(--zuri-connectors-row-radius);
+  background: var(--zuri-connectors-sunken);
+  color: var(--zuri-connectors-text-secondary);
+}
+
+.connectors-name {
+  margin: 0;
+  font-size: var(--zuri-connectors-card-title-size);
+  font-weight: 600;
+  line-height: var(--zuri-connectors-card-title-leading);
+}
+
+.connectors-tag {
+  padding: 2px var(--zuri-connectors-tag-padding);
+  border-radius: var(--zuri-connectors-pill-radius);
+  background: var(--zuri-connectors-sunken);
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-label-size);
+  font-weight: 500;
+  letter-spacing: var(--zuri-connectors-label-tracking);
+  line-height: var(--zuri-connectors-label-leading);
+  text-transform: uppercase;
+}
+
+.connectors-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 3px var(--zuri-connectors-badge-padding);
+  border-radius: var(--zuri-connectors-pill-radius);
+  font-size: var(--zuri-connectors-small-size);
+  font-weight: 500;
+  line-height: var(--zuri-connectors-small-leading);
+  white-space: nowrap;
+}
+
+.connectors-badge-connected {
+  background: var(--zuri-connectors-success-soft);
+  color: var(--zuri-connectors-success);
+}
+
+.connectors-badge-warning {
+  background: var(--zuri-connectors-warning-soft);
+  color: var(--zuri-connectors-warning);
+}
+
+.connectors-badge-spinner {
+  display: none;
+}
+
+.connectors-card-desc {
+  margin: var(--zuri-connectors-desc-gap) 0 0;
+  color: var(--zuri-connectors-text-secondary);
+  font-size: var(--zuri-connectors-body-size);
+  line-height: var(--zuri-connectors-body-leading);
+}
+
+.connectors-rule {
+  margin: var(--zuri-connectors-rule-gap) 0 0;
+  border: 0;
+  border-top: 1px solid var(--zuri-connectors-hairline);
+}
+
+/* A divider, not a card edge: it has to touch both sides of the surface. */
+.connectors-rule-split {
+  margin: 0;
+}
+
+.connectors-scope-label {
+  margin: var(--zuri-connectors-rule-gap) 0 0;
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-label-size);
+  font-weight: 600;
+  letter-spacing: var(--zuri-connectors-label-tracking);
+  line-height: var(--zuri-connectors-label-leading);
+  text-transform: uppercase;
+}
+
+.connectors-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--zuri-connectors-chip-gap);
+  margin: var(--zuri-connectors-chip-row-gap) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.connectors-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-connectors-chip-icon-gap);
+  padding: 4px var(--zuri-connectors-chip-padding);
+  border: 1px solid var(--zuri-connectors-border);
+  border-radius: var(--zuri-connectors-pill-radius);
+  color: var(--zuri-connectors-text-secondary);
+  font-size: var(--zuri-connectors-small-size);
+  line-height: var(--zuri-connectors-small-leading);
+}
+
+.connectors-note {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-connectors-chip-icon-gap);
+  margin: var(--zuri-connectors-note-gap) 0 0;
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-small-size);
+  line-height: var(--zuri-connectors-small-leading);
+}
+
+/* ---------------------------------------------------------------- actions */
+
+.connectors-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-connectors-action-gap);
+  margin-top: var(--zuri-connectors-action-gap);
+}
+
+.connectors-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--zuri-connectors-control-height);
+  padding: 0 var(--zuri-connectors-button-padding);
+  border: 1px solid transparent;
+  border-radius: var(--zuri-connectors-row-radius);
+  font-size: var(--zuri-connectors-meta-size);
+  font-weight: 500;
+  line-height: var(--zuri-connectors-meta-leading);
+}
+
+.connectors-button-primary {
+  background: var(--zuri-connectors-primary);
+  color: var(--zuri-connectors-text-on-primary);
+}
+
+.connectors-button-primary:hover:not(:disabled) {
+  background: var(--zuri-connectors-primary-strong);
+}
+
+.connectors-button-quiet {
+  border-color: var(--zuri-connectors-border);
+  background: var(--zuri-connectors-surface);
+  color: var(--zuri-connectors-text-secondary);
+}
+
+.connectors-button-quiet:hover:not(:disabled) {
+  background: var(--zuri-connectors-sunken);
+  color: var(--zuri-connectors-text);
+}
+
+.connectors-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* The lock only exists in the disabled frame, where a run holds the keys. */
+.connectors-button-lock {
+  display: none;
+}
+
+/* ------------------------------------------------------------------ field */
+
+.connectors-field {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-connectors-field-icon-gap);
+  height: var(--zuri-connectors-control-height);
+  margin-top: var(--zuri-connectors-desc-gap);
+  padding: 0 var(--zuri-connectors-field-padding);
+  border: 1px solid var(--zuri-connectors-border);
+  border-radius: var(--zuri-connectors-row-radius);
+  background: var(--zuri-connectors-surface);
+  color: var(--zuri-connectors-text-muted);
+}
+
+.connectors-field:focus-within {
+  border-color: var(--zuri-connectors-primary);
+}
+
+.connectors-field-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+}
+
+.connectors-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--zuri-connectors-text);
+  font: inherit;
+  font-size: var(--zuri-connectors-meta-size);
+  line-height: var(--zuri-connectors-meta-leading);
+}
+
+.connectors-input:focus {
+  outline: none;
+}
+
+/* ------------------------------------------------------------------ error */
+
+.connectors-error {
+  margin-top: var(--zuri-connectors-desc-gap);
+  padding: var(--zuri-connectors-error-padding);
+  border: 1px solid var(--zuri-connectors-danger-line);
+  border-radius: var(--zuri-connectors-row-radius);
+  background: var(--zuri-connectors-danger-soft);
+  color: var(--zuri-connectors-danger);
+}
+
+.connectors-error-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--zuri-connectors-meta-size);
+  font-weight: 600;
+  line-height: var(--zuri-connectors-meta-leading);
+}
+
+.connectors-error-text {
+  margin: 4px 0 0;
+  font-size: var(--zuri-connectors-small-size);
+  line-height: var(--zuri-connectors-small-leading);
+}
+
+/* ------------------------------------------------------------- empty state */
+
+.connectors-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: var(--zuri-connectors-list-gap);
+  padding: var(--zuri-connectors-empty-padding);
+  border: 1px solid var(--zuri-connectors-border);
+  border-radius: var(--zuri-connectors-card-radius);
+  background: var(--zuri-connectors-surface);
+  box-shadow: var(--zuri-connectors-shadow);
+  text-align: center;
+}
+
+.connectors-empty-disc {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-connectors-empty-disc);
+  height: var(--zuri-connectors-empty-disc);
+  border-radius: var(--zuri-connectors-pill-radius);
+  background: var(--zuri-connectors-primary-soft);
+  color: var(--zuri-connectors-primary);
+}
+
+.connectors-empty-title {
+  margin: var(--zuri-connectors-desc-gap) 0 0;
+  font-size: var(--zuri-connectors-card-title-size);
+  font-weight: 600;
+  line-height: var(--zuri-connectors-card-title-leading);
+}
+
+.connectors-empty-text {
+  max-width: 420px;
+  margin: var(--zuri-connectors-head-gap) 0 0;
+  color: var(--zuri-connectors-text-secondary);
+  font-size: var(--zuri-connectors-body-size);
+  line-height: var(--zuri-connectors-body-leading);
+}
+
+.connectors-empty .connectors-button {
+  margin-top: var(--zuri-connectors-rule-gap);
+}
+
+.connectors-empty-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: var(--zuri-connectors-rule-gap) 0 0;
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-small-size);
+  line-height: var(--zuri-connectors-small-leading);
+}
+
+/* ----------------------------------------------------------------- loading */
+
+.connectors-skeleton {
+  margin-top: var(--zuri-connectors-list-gap);
+  padding: var(--zuri-connectors-card-padding);
+  border: 1px solid var(--zuri-connectors-border);
+  border-radius: var(--zuri-connectors-card-radius);
+  background: var(--zuri-connectors-surface);
+  box-shadow: var(--zuri-connectors-shadow);
+}
+
+.connectors-skeleton-bar {
+  display: block;
+  border-radius: var(--zuri-connectors-row-radius);
+  background: var(--zuri-connectors-skeleton);
+  animation: connectors-pulse 1.4s ease-in-out infinite;
+}
+
+.connectors-skeleton-head {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-connectors-head-icon-gap);
+}
+
+.connectors-skeleton-logo {
+  width: var(--zuri-connectors-logo-size);
+  height: var(--zuri-connectors-logo-size);
+}
+
+.connectors-skeleton-text {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+
+.connectors-skeleton-name {
+  width: 96px;
+  height: 14px;
+}
+
+.connectors-skeleton-desc {
+  width: 260px;
+  height: 10px;
+}
+
+.connectors-skeleton-badge {
+  width: 72px;
+  height: 20px;
+  margin-left: auto;
+}
+
+.connectors-skeleton-label {
+  width: 84px;
+  height: 10px;
+  margin-top: var(--zuri-connectors-rule-gap);
+}
+
+.connectors-skeleton-chips {
+  display: flex;
+  gap: var(--zuri-connectors-chip-gap);
+  margin-top: var(--zuri-connectors-chip-row-gap);
+}
+
+.connectors-skeleton-chip {
+  width: 104px;
+  height: 24px;
+  border-radius: var(--zuri-connectors-pill-radius);
+}
+
+.connectors-skeleton-note {
+  width: 190px;
+  height: 10px;
+  margin-top: var(--zuri-connectors-note-gap);
+}
+
+.connectors-skeleton-button {
+  width: 108px;
+  height: var(--zuri-connectors-control-height);
+  margin-top: var(--zuri-connectors-action-gap);
+}
+
+@keyframes connectors-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .connectors-skeleton-bar {
+    animation: none;
+  }
+
+  .connectors-badge-spinner {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------ state frames */
+
+.connectors-live {
+  margin: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* connecting: the badge holds a spinner and the keys are out of reach. */
+.connectors-page[data-state='connecting'] .connectors-badge-spinner {
+  display: block;
+  animation: connectors-spin 0.9s linear infinite;
+}
+
+.connectors-page[data-state='connecting'] .connectors-badge-icon {
+  display: none;
+}
+
+.connectors-page[data-state='connecting'] #composio-status {
+  background: var(--zuri-connectors-warning-soft);
+  color: var(--zuri-connectors-warning);
+}
+
+@keyframes connectors-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* disabled: a run is in flight, so every control that writes is locked. */
+.connectors-page[data-state='disabled'] .connectors-button-lock {
+  display: block;
+}
+
+.connectors-page[data-state='disabled'] .connectors-field {
+  opacity: 0.6;
+}
+
+/* Elements the phone frame adds: hidden until the page is that frame. */
+.connectors-scope-line,
+.connectors-note-phone,
+.connectors-meta,
+.connectors-field-label {
+  display: none;
+}
+
+/* ------------------------------------------------------------- phone frame */
+
+.connectors-status {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  height: var(--zuri-connectors-status-height);
+  padding: 0 var(--zuri-connectors-phone-inset);
+  background: var(--zuri-connectors-surface);
+  color: var(--zuri-connectors-text);
+  font-size: var(--zuri-connectors-status-size);
+  font-weight: 600;
+  line-height: var(--zuri-connectors-status-size);
+}
+
+.connectors-status-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--zuri-connectors-text-secondary);
+}
+
+.connectors-page.is-phone .connectors-status {
+  display: flex;
+  border-bottom: 1px solid var(--zuri-connectors-hairline);
+}
+
+.connectors-page.is-phone .connectors-topbar,
+.connectors-page.is-phone .connectors-settings-nav,
+.connectors-page.is-phone .connectors-nav-hairline {
+  display: none;
+}
+
+.connectors-page.is-phone .connectors-main {
+  display: block;
+  padding: var(--zuri-connectors-phone-inset) var(--zuri-connectors-phone-inset) 40px;
+}
+
+.connectors-page.is-phone .connectors-column {
+  max-width: none;
+  padding-left: 0;
+}
+
+.connectors-page.is-phone .connectors-sub-full {
+  display: none;
+}
+
+.connectors-page.is-phone .connectors-sub-phone {
+  display: block;
+}
+
+.connectors-page.is-phone .connectors-list,
+.connectors-page.is-phone .connectors-empty,
+.connectors-page.is-phone .connectors-skeleton {
+  border-radius: var(--zuri-connectors-card-radius);
+}
+
+/* The phone frame draws two separate cards with a gap, not one split surface. */
+.connectors-page.is-phone .connectors-list {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+.connectors-page.is-phone .connectors-card {
+  padding: var(--zuri-connectors-phone-card-padding);
+  border: 1px solid var(--zuri-connectors-border);
+  border-radius: var(--zuri-connectors-card-radius);
+  background: var(--zuri-connectors-surface);
+  box-shadow: var(--zuri-connectors-shadow);
+}
+
+.connectors-page.is-phone .connectors-rule-split {
+  margin: var(--zuri-connectors-phone-card-gap) 0;
+  border: 0;
+}
+
+/* The phone frame turns the scope chips into one scope line and the keys note
+   into its short form. */
+.connectors-page.is-phone .connectors-scope-label,
+.connectors-page.is-phone .connectors-chips,
+.connectors-page.is-phone .connectors-note-long,
+.connectors-page.is-phone .connectors-card-desc {
+  display: none;
+}
+
+.connectors-page.is-phone .connectors-scope-line {
+  display: block;
+  margin: var(--zuri-connectors-desc-gap) 0 0;
+  color: var(--zuri-connectors-text-secondary);
+  font-size: var(--zuri-connectors-small-size);
+  line-height: var(--zuri-connectors-small-leading);
+}
+
+.connectors-page.is-phone .connectors-note-phone {
+  display: inline;
+}
+
+/* Railway keeps its status in the meta line on the phone, so the badge goes. */
+.connectors-page.is-phone .connectors-meta {
+  display: block;
+  grid-area: meta;
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-small-size);
+  line-height: var(--zuri-connectors-small-leading);
+}
+
+.connectors-page.is-phone #railway-status {
+  display: none;
+}
+
+/* Disconnect is a text link on the phone, not a bordered button. */
+.connectors-page.is-phone .connectors-disconnect {
+  align-self: flex-start;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--zuri-connectors-primary);
+  font-weight: 500;
+  justify-content: flex-start;
+}
+
+.connectors-page.is-phone .connectors-field {
+  display: block;
+  height: auto;
+  padding: var(--zuri-connectors-phone-field-padding);
+}
+
+.connectors-page.is-phone .connectors-field-icon {
+  display: none;
+}
+
+.connectors-page.is-phone .connectors-input {
+  width: 100%;
+}
+
+.connectors-page.is-phone .connectors-field-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-label-size);
+  line-height: var(--zuri-connectors-label-leading);
+}
+
+/* The phone frame stacks name and its meta line, and keeps the badge right. */
+.connectors-page.is-phone .connectors-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'logo name badge'
+    'logo meta badge';
+  column-gap: var(--zuri-connectors-head-icon-gap);
+  row-gap: 2px;
+  align-items: center;
+}
+
+.connectors-page.is-phone .connectors-logo {
+  grid-area: logo;
+}
+
+.connectors-page.is-phone .connectors-name {
+  grid-area: name;
+}
+
+.connectors-page.is-phone .connectors-badge {
+  grid-area: badge;
+  margin-left: 0;
+}
+
+.connectors-page.is-phone .connectors-tag {
+  grid-area: meta;
+  justify-self: start;
+  padding: 0;
+  background: transparent;
+  color: var(--zuri-connectors-text-muted);
+  font-size: var(--zuri-connectors-small-size);
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: var(--zuri-connectors-small-leading);
+  text-transform: none;
+}
+
+.connectors-page.is-phone .connectors-chips {
+  gap: 6px;
+}
+
+.connectors-page.is-phone .connectors-actions {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.connectors-page.is-phone .connectors-button {
+  width: 100%;
+}

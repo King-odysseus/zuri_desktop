@@ -1,0 +1,994 @@
+/**
+ * Quick assistant overlay (design node 0:9961) - the floating always-on-top
+ * window (decision 15), drawn over the desktop it is meant to float above.
+ *
+ * Every offset below is the node's own: the window sits at (460, 140) in a
+ * 1440x900 scene, the prompt field is 496 wide inside a 12 px window inset, and
+ * the four frames differ only in the window height, the title-row height and
+ * where the prompt field sits. The desktop behind it (wallpaper glows, the Excel
+ * window, the taskbar) is scenery drawn from the same frames, so it is marked
+ * aria-hidden in the markup.
+ *
+ * Colours, radii, the shadow and the type sizes come from tokens.css; the
+ * geometry stays here because it is layout, not a design value.
+ */
+
+/* Border-box so the title row's 1 px hairline counts inside its drawn height,
+   which keeps every offset below on the node's own grid. */
+.overlay-page *,
+.overlay-page *::before,
+.overlay-page *::after {
+  box-sizing: border-box;
+}
+
+.overlay-page {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--zuri-overlay-scene);
+  color: var(--zuri-overlay-text);
+  font-family: var(--zuri-font-family);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The node's canvas is 1440x900. Below that the page shows the same drawing in
+   whatever room it has instead of a 1440 px canvas with a horizontal scrollbar,
+   so the width and height are the node's values capped by the viewport. */
+.overlay-scene {
+  position: relative;
+  width: min(1440px, 100%);
+  height: min(900px, 100vh);
+  overflow: hidden;
+  background: var(--zuri-overlay-scene);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Scenery: the desktop the window floats over                              */
+/* ------------------------------------------------------------------------ */
+.overlay-desktop {
+  position: absolute;
+  inset: 0;
+}
+
+/* The two background glows are painted circles under a Gaussian blur, exactly
+   as the node draws them: 760 px centred on (180, 500) and 720 px centred on
+   (1240, 200), both clipped by the scene. */
+.overlay-glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(var(--zuri-overlay-glow-blur));
+}
+
+.overlay-glow-left {
+  left: -200px;
+  top: 120px;
+  width: 760px;
+  height: 760px;
+  background: var(--zuri-overlay-glow-accent);
+  opacity: 0.18;
+}
+
+.overlay-glow-right {
+  left: 880px;
+  top: -160px;
+  width: 720px;
+  height: 720px;
+  background: var(--zuri-overlay-glow-secondary);
+  opacity: 0.14;
+}
+
+/* The other app: the workbook the user was editing when the overlay opened. */
+.overlay-app {
+  position: absolute;
+  left: 120px;
+  top: 90px;
+  width: 960px;
+  height: 164px;
+  background: var(--zuri-overlay-window);
+  border-radius: var(--zuri-overlay-radius-field);
+}
+
+/* Once the overlay closes, focus lands back on this window: the closed frame
+   draws it with a focus ring and the title bar says "focused". Both are drawn
+   by state, so the scenery stays one copy in the markup. */
+.overlay-app::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  display: none;
+  border: 1px solid var(--zuri-overlay-primary);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+[data-state="closed"] .overlay-app::after {
+  display: block;
+}
+
+.overlay-app-focus {
+  display: none;
+}
+
+[data-state="closed"] .overlay-app-focus {
+  display: inline;
+}
+
+.overlay-app-titlebar {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  background: var(--zuri-overlay-titlebar);
+  border-radius: var(--zuri-overlay-radius-field) var(--zuri-overlay-radius-field) 0 0;
+}
+
+.overlay-app-title {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--zuri-overlay-text-secondary);
+}
+
+.overlay-app-divider {
+  position: absolute;
+  left: 24px;
+  top: 64px;
+  width: 912px;
+  height: 1px;
+  background: var(--zuri-overlay-hairline);
+}
+
+.overlay-app-chip {
+  position: absolute;
+  left: 24px;
+  top: 96px;
+  width: 912px;
+  height: 28px;
+  background: var(--zuri-overlay-raised);
+  border-radius: var(--zuri-overlay-radius-chip);
+}
+
+.overlay-app-chip-label {
+  position: absolute;
+  left: 40px;
+  top: 102px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--zuri-overlay-text-muted);
+}
+
+.overlay-app-note {
+  position: absolute;
+  left: 24px;
+  top: 148px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--zuri-overlay-text-muted);
+}
+
+/* Windows taskbar, pinned to the bottom of the scene. */
+.overlay-taskbar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1440px;
+  height: 48px;
+  background: var(--zuri-overlay-taskbar);
+}
+
+.overlay-start {
+  position: absolute;
+  left: 12px;
+  top: 2px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background: var(--zuri-overlay-titlebar);
+  border-radius: var(--zuri-overlay-radius-key);
+  color: var(--zuri-overlay-text);
+}
+
+.overlay-task-icon {
+  position: absolute;
+  top: 16px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+}
+
+.overlay-task-icon-sheet {
+  left: 72px;
+  color: var(--zuri-overlay-text);
+}
+
+.overlay-task-icon-mail {
+  left: 104px;
+  color: var(--zuri-overlay-glyph);
+}
+
+.overlay-task-icon-folder {
+  left: 136px;
+  color: var(--zuri-overlay-glyph);
+}
+
+.overlay-task-clock {
+  position: absolute;
+  left: 1240px;
+  top: 17px;
+  width: 120px;
+  text-align: right;
+  font-size: 12px;
+  line-height: var(--zuri-overlay-meta-leading);
+  color: var(--zuri-overlay-text);
+}
+
+.overlay-task-mark {
+  position: absolute;
+  left: 1388px;
+  top: 16px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--zuri-overlay-primary);
+}
+
+/* The tray pill that appears once the overlay has closed and focus is back on
+   the workbook. It belongs to the closed frame only. */
+.overlay-focus-pill {
+  position: absolute;
+  left: 64px;
+  top: 810px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 150px;
+  height: 24px;
+  padding-left: 8px;
+  background: var(--zuri-overlay-titlebar);
+  border-radius: var(--zuri-overlay-radius-key);
+  color: var(--zuri-overlay-primary-soft);
+}
+
+.overlay-focus-label {
+  font-size: var(--zuri-overlay-label-size);
+  line-height: var(--zuri-overlay-label-leading);
+  color: var(--zuri-overlay-text-secondary);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Frames: one section per drawn state, one visible at a time                */
+/* ------------------------------------------------------------------------ */
+.overlay-state {
+  position: absolute;
+  inset: 0;
+}
+
+.overlay-state[hidden] {
+  display: none;
+}
+
+.overlay-window {
+  position: absolute;
+  left: 460px;
+  top: 140px;
+  width: 520px;
+  background: var(--zuri-overlay-card);
+  border-radius: var(--zuri-overlay-radius-window);
+  /* The node's stroke is inside-aligned, so an inset ring keeps every offset
+     below on the node's own grid instead of shifting it by the border. */
+  box-shadow:
+    inset 0 0 0 1px var(--zuri-overlay-card-border),
+    var(--zuri-overlay-shadow);
+}
+
+.overlay-state[data-state="empty"] .overlay-window,
+.overlay-state[data-state="closed"] .overlay-window {
+  height: 148px;
+}
+
+.overlay-state[data-state="loading"] .overlay-window {
+  height: 180px;
+}
+
+.overlay-state[data-state="error"] .overlay-window {
+  height: 224px;
+}
+
+/* Title row: 44 px while the prompt field is the only body, 56 px once the
+   answer or the error card sits under it. */
+.overlay-title-row {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 520px;
+  height: 44px;
+  border-bottom: 1px solid var(--zuri-overlay-hairline);
+}
+
+.overlay-state[data-state="loading"] .overlay-title-row,
+.overlay-state[data-state="error"] .overlay-title-row {
+  height: 56px;
+}
+
+.overlay-mark {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: var(--zuri-overlay-primary);
+  border-radius: var(--zuri-overlay-radius-key);
+  color: var(--zuri-text-on-accent);
+}
+
+.overlay-title {
+  position: absolute;
+  left: 40px;
+  top: 13px;
+  margin: 0;
+  font-size: var(--zuri-overlay-title-size);
+  line-height: var(--zuri-overlay-title-leading);
+  font-weight: var(--zuri-font-weight-medium);
+  color: var(--zuri-overlay-text);
+}
+
+.overlay-mode {
+  position: absolute;
+  left: 136px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 20px;
+  background: var(--zuri-overlay-raised);
+  border-radius: var(--zuri-overlay-radius-pill);
+  font-size: var(--zuri-overlay-label-size);
+  line-height: var(--zuri-overlay-label-leading);
+  color: var(--zuri-overlay-text-secondary);
+}
+
+.overlay-streaming {
+  position: absolute;
+  left: 188px;
+  top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 96px;
+  height: 20px;
+  padding-left: 7px;
+  background: var(--zuri-overlay-primary);
+  border-radius: var(--zuri-overlay-radius-pill);
+}
+
+.overlay-streaming-glyph {
+  color: var(--zuri-overlay-primary-soft);
+}
+
+.overlay-streaming-label {
+  font-size: var(--zuri-overlay-label-size);
+  line-height: var(--zuri-overlay-label-leading);
+  color: var(--zuri-overlay-text-secondary);
+  white-space: nowrap;
+}
+
+/* The glyph boxes are 12 px inside these controls but the drawn glyph fills
+   only their lower-right 8 px, so the node places each box 2 px up and left of
+   centre to land the stroke on the control's optical centre. */
+.overlay-close svg,
+.overlay-send svg {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+}
+
+.overlay-state[data-state="loading"] .overlay-close svg,
+.overlay-state[data-state="error"] .overlay-close svg,
+.overlay-state[data-state="loading"] .overlay-send svg,
+.overlay-state[data-state="error"] .overlay-send svg {
+  left: 14px;
+  top: 14px;
+}
+
+.overlay-close {
+  position: absolute;
+  right: 12px;
+  top: 8px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: var(--zuri-overlay-close);
+  border-radius: var(--zuri-overlay-radius-control);
+  color: var(--zuri-overlay-glyph);
+  cursor: pointer;
+}
+
+.overlay-state[data-state="loading"] .overlay-close,
+.overlay-state[data-state="error"] .overlay-close {
+  top: 6px;
+  width: 44px;
+  height: 44px;
+  background: var(--zuri-overlay-raised);
+  color: var(--zuri-overlay-text-secondary);
+}
+
+/* The prompt field: 496 wide, 12 px in from either side of the window. */
+.overlay-field {
+  position: absolute;
+  left: 12px;
+  width: 496px;
+  height: 44px;
+  background: var(--zuri-overlay-titlebar);
+  border-radius: var(--zuri-overlay-radius-field);
+  box-shadow: inset 0 0 0 1px var(--zuri-overlay-card-border);
+}
+
+.overlay-state[data-state="empty"] .overlay-field {
+  top: 56px;
+}
+
+.overlay-state[data-state="loading"] .overlay-field {
+  top: 124px;
+}
+
+.overlay-state[data-state="error"] .overlay-field {
+  top: 140px;
+}
+
+/* Once a prompt is running the field only keeps a hint of its outline. */
+.overlay-state[data-state="loading"] .overlay-field,
+.overlay-state[data-state="error"] .overlay-field {
+  box-shadow: inset 0 0 0 1px var(--zuri-overlay-field-border);
+}
+
+.overlay-field-glyph {
+  position: absolute;
+  left: 12px;
+  top: 14px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--zuri-overlay-text-subtle);
+}
+
+.overlay-field-glyph-active {
+  color: var(--zuri-overlay-text-muted);
+}
+
+.overlay-input {
+  position: absolute;
+  left: 38px;
+  top: 11px;
+  width: 402px;
+  height: 22px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: var(--zuri-overlay-body-size);
+  line-height: var(--zuri-overlay-body-leading);
+  color: var(--zuri-overlay-text);
+}
+
+.overlay-input::placeholder {
+  color: var(--zuri-overlay-text-muted);
+  opacity: 1;
+}
+
+/* Keyboard focus gets a visible ring; the drawn state is unfocused, so the
+   node's own field outline stays what the design shows. */
+.overlay-input:focus-visible {
+  outline: 2px solid var(--zuri-overlay-primary);
+  outline-offset: 2px;
+}
+
+.overlay-send {
+  position: absolute;
+  left: 448px;
+  top: 4px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: var(--zuri-overlay-primary);
+  border-radius: var(--zuri-overlay-radius-control);
+  color: var(--zuri-text-on-accent);
+  cursor: pointer;
+}
+
+.overlay-state[data-state="loading"] .overlay-send,
+.overlay-state[data-state="error"] .overlay-send {
+  left: 440px;
+  top: 0;
+  width: 44px;
+  height: 44px;
+  background: var(--zuri-overlay-raised);
+}
+
+.overlay-send-stop {
+  color: var(--zuri-overlay-text);
+}
+
+.overlay-send-idle {
+  color: var(--zuri-overlay-text-subtle);
+}
+
+.overlay-hint {
+  position: absolute;
+  left: 12px;
+  margin: 0;
+  font-size: var(--zuri-overlay-label-size);
+  line-height: var(--zuri-overlay-label-leading);
+  color: var(--zuri-overlay-text-muted);
+}
+
+.overlay-state[data-state="empty"] .overlay-hint {
+  top: 112px;
+}
+
+.overlay-state[data-state="error"] .overlay-hint {
+  top: 192px;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Disabled prompt: the empty window, with a field that cannot send          */
+/* ------------------------------------------------------------------------ */
+/* The state `disabled` draws no frame of its own; it is the empty window with
+   its prompt inert until a provider key exists. The field keeps the drawn
+   outline and the control gets the style guide's disabled treatment: dimmed at
+   40% with no pointer. */
+.overlay-field[data-state="disabled"] {
+  box-shadow: inset 0 0 0 1px var(--zuri-overlay-field-border);
+}
+
+.overlay-field[data-state="disabled"] .overlay-input,
+.overlay-field[data-state="disabled"] .overlay-input::placeholder {
+  color: var(--zuri-overlay-text-subtle);
+}
+
+.overlay-field[data-state="disabled"] .overlay-send {
+  background: var(--zuri-overlay-raised);
+  color: var(--zuri-overlay-text-subtle);
+}
+
+.overlay-field[data-state="disabled"] .overlay-input,
+.overlay-field[data-state="disabled"] .overlay-send {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* One of the two hints is on screen at a time: the drawn one while the prompt
+   is live, the disabled copy while it is not. */
+.overlay-hint-disabled {
+  display: none;
+}
+
+[data-state="disabled"] .overlay-hint {
+  display: none;
+}
+
+[data-state="disabled"] .overlay-hint-disabled {
+  display: block;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Streaming answer                                                         */
+/* ------------------------------------------------------------------------ */
+.overlay-answer {
+  position: absolute;
+  left: 12px;
+  top: 56px;
+  width: 496px;
+  height: 68px;
+}
+
+.overlay-answer-avatar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: var(--zuri-overlay-raised);
+  border-radius: var(--zuri-overlay-radius-pill);
+  color: var(--zuri-overlay-primary);
+}
+
+.overlay-answer-line {
+  position: absolute;
+  left: 28px;
+  margin: 0;
+  font-size: var(--zuri-overlay-answer-size);
+  line-height: var(--zuri-overlay-answer-leading);
+  color: var(--zuri-overlay-text);
+  white-space: nowrap;
+}
+
+.overlay-answer-line:nth-of-type(1) {
+  top: 0;
+}
+
+.overlay-answer-line:nth-of-type(2) {
+  top: 18px;
+}
+
+.overlay-caret {
+  position: absolute;
+  left: 148px;
+  top: 40px;
+  width: 2px;
+  height: 14px;
+  background: var(--zuri-overlay-primary);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Provider error                                                           */
+/* ------------------------------------------------------------------------ */
+.overlay-answer-card {
+  position: absolute;
+  left: 12px;
+  top: 56px;
+  width: 496px;
+  height: 76px;
+  background: var(--zuri-overlay-raised);
+  border-radius: var(--zuri-overlay-radius-control);
+}
+
+.overlay-answer-glyph {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--zuri-overlay-danger);
+}
+
+.overlay-answer-title {
+  position: absolute;
+  left: 34px;
+  top: 10px;
+  margin: 0;
+  font-size: var(--zuri-overlay-answer-size);
+  line-height: var(--zuri-overlay-answer-leading);
+  font-weight: var(--zuri-font-weight-medium);
+  color: var(--zuri-overlay-text);
+}
+
+.overlay-answer-body {
+  position: absolute;
+  left: 34px;
+  top: 28px;
+  margin: 0;
+  font-size: var(--zuri-overlay-label-size);
+  line-height: var(--zuri-overlay-label-leading);
+  color: var(--zuri-overlay-text-muted);
+}
+
+.overlay-answer-link {
+  position: absolute;
+  left: 34px;
+  top: 48px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
+  font-size: var(--zuri-overlay-label-size);
+  line-height: var(--zuri-overlay-label-leading);
+  font-weight: var(--zuri-font-weight-medium);
+  color: var(--zuri-overlay-primary-soft);
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Closed: the window ghosts, focus goes back to the app behind             */
+/* ------------------------------------------------------------------------ */
+.overlay-window-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 520px;
+  height: 100px;
+  background: var(--zuri-overlay-window);
+  border-radius: var(--zuri-overlay-radius-window);
+  box-shadow: inset 0 0 0 1px var(--zuri-overlay-card-border);
+  opacity: var(--zuri-overlay-ghost);
+}
+
+.overlay-ghost-mark {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  background: var(--zuri-overlay-primary);
+  border-radius: var(--zuri-overlay-radius-key);
+  color: var(--zuri-text-on-accent);
+  opacity: var(--zuri-overlay-ghost-mark);
+}
+
+.overlay-ghost-title {
+  position: absolute;
+  left: 40px;
+  top: 13px;
+  font-size: var(--zuri-overlay-title-size);
+  line-height: var(--zuri-overlay-title-leading);
+  font-weight: var(--zuri-font-weight-medium);
+  color: var(--zuri-overlay-text-muted);
+}
+
+.overlay-closed-note {
+  position: absolute;
+  left: 0;
+  top: 108px;
+  width: 520px;
+  margin: 0;
+  text-align: center;
+  font-size: var(--zuri-overlay-label-size);
+  line-height: var(--zuri-overlay-label-leading);
+  color: var(--zuri-overlay-text-muted);
+}
+
+/* Reduced motion: none of the four frames animates, so only the caret's blink
+   would move. The node draws it solid, so nothing is lost by leaving it still. */
+@media (prefers-reduced-motion: reduce) {
+  .overlay-caret {
+    animation: none;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Narrower than the node's 1440 px canvas                                   */
+/* ------------------------------------------------------------------------ */
+/* The node draws the window centred on its canvas (460 + 520 / 2 = 720), so
+   centring it here keeps it exactly where the node puts it while leaving no
+   part of the drawing past the right edge. The taskbar spans the window and the
+   tray keeps its distance from the right edge instead of its 1440 px offset. */
+@media (max-width: 1439px) {
+  .overlay-page {
+    overflow-x: hidden;
+  }
+
+  .overlay-window {
+    left: 50%;
+    margin-left: -260px;
+  }
+
+  .overlay-taskbar {
+    width: 100%;
+  }
+
+  .overlay-task-clock {
+    left: auto;
+    right: 80px;
+  }
+
+  .overlay-task-mark {
+    left: auto;
+    right: 36px;
+  }
+}
+
+/* At phone width the canvas is gone rather than cropped: the desktop scenery
+   (the workbook, the taskbar) is part of the 1440 px drawing and would be cut in
+   half, so the quick window itself is laid out in the room available. The frame
+   heights, offsets and the title row's fixed widths belong to that canvas, so
+   here the window becomes a column that grows with its content and the reply
+   lines wrap. */
+@media (max-width: 720px) {
+  .overlay-scene {
+    width: 100%;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 24px 16px 32px;
+  }
+
+  .overlay-desktop,
+  .overlay-taskbar {
+    display: none;
+  }
+
+  .overlay-state {
+    position: static;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .overlay-state[hidden] {
+    display: none;
+  }
+
+  .overlay-window {
+    position: relative;
+    left: auto;
+    top: auto;
+    margin-left: 0;
+    width: 100%;
+    max-width: 520px;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    /* The 12 px the node keeps between the window edge and its content. */
+    padding: 0 12px 12px;
+  }
+
+  /* The per-frame heights are the drawing's; at this width the window grows
+     with what is in it instead of clipping the reply. */
+  .overlay-state[data-state="empty"] .overlay-window,
+  .overlay-state[data-state="loading"] .overlay-window,
+  .overlay-state[data-state="error"] .overlay-window,
+  .overlay-state[data-state="closed"] .overlay-window {
+    height: auto;
+  }
+
+  .overlay-title-row,
+  .overlay-field,
+  .overlay-answer,
+  .overlay-answer-card,
+  .overlay-hint,
+  .overlay-window-ghost,
+  .overlay-closed-note {
+    position: relative;
+    left: auto;
+    right: auto;
+    top: auto;
+    width: 100%;
+  }
+
+  /* Title row: the same parts, laid out by flex so the close control keeps to
+     the right edge and the title truncates instead of pushing it away. */
+  .overlay-title-row,
+  .overlay-state[data-state="loading"] .overlay-title-row,
+  .overlay-state[data-state="error"] .overlay-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    /* Full width of the window, so the hairline still spans it, with the 12 px
+       inset taken from the window's padding. */
+    width: auto;
+    align-self: stretch;
+    margin: 0 -12px;
+    height: auto;
+    min-height: 44px;
+    padding: 8px 12px;
+  }
+
+  .overlay-mark,
+  .overlay-mode,
+  .overlay-streaming {
+    position: static;
+    flex: 0 0 auto;
+  }
+
+  .overlay-title {
+    position: static;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* The close control keeps its drawn glyph offsets, so it stays anchored to
+     itself rather than to the window. */
+  .overlay-close,
+  .overlay-state[data-state="loading"] .overlay-close,
+  .overlay-state[data-state="error"] .overlay-close {
+    position: relative;
+    top: auto;
+    right: auto;
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  /* Prompt field: the same 44 px row, sized by the window instead of 496 px. */
+  .overlay-field,
+  .overlay-state[data-state="empty"] .overlay-field,
+  .overlay-state[data-state="loading"] .overlay-field,
+  .overlay-state[data-state="error"] .overlay-field {
+    position: relative;
+    top: auto;
+    width: 100%;
+  }
+
+  .overlay-input {
+    right: 56px;
+    width: auto;
+  }
+
+  .overlay-send,
+  .overlay-state[data-state="loading"] .overlay-send,
+  .overlay-state[data-state="error"] .overlay-send {
+    left: auto;
+    right: 12px;
+  }
+
+  /* Streaming reply: the two lines wrap and the caret follows the text. */
+  .overlay-answer {
+    height: auto;
+    padding: 2px 0 6px;
+  }
+
+  .overlay-answer-line {
+    position: static;
+    white-space: normal;
+    margin: 0 0 4px 28px;
+  }
+
+  .overlay-caret {
+    position: static;
+    display: inline-block;
+    margin-left: 28px;
+  }
+
+  /* Error block: the copy wraps and the link stays under it. */
+  .overlay-answer-card {
+    height: auto;
+    padding: 10px 12px 12px 34px;
+  }
+
+  .overlay-answer-glyph {
+    position: absolute;
+    left: 12px;
+    top: 12px;
+  }
+
+  .overlay-answer-title,
+  .overlay-answer-body {
+    position: static;
+    margin: 0 0 4px;
+  }
+
+  .overlay-answer-link {
+    position: static;
+    margin: 0;
+  }
+
+  .overlay-hint,
+  .overlay-state[data-state="empty"] .overlay-hint,
+  .overlay-state[data-state="error"] .overlay-hint {
+    top: auto;
+    margin: 0;
+  }
+
+  .overlay-window-ghost {
+    height: 100px;
+  }
+
+  .overlay-closed-note {
+    margin: 0;
+    text-align: center;
+  }
+
+  /* The tray pill belongs to the taskbar scenery, which is not on screen here,
+     so it trails the ghost window rather than floating over it. */
+  .overlay-focus-pill {
+    position: relative;
+    left: auto;
+    top: auto;
+    margin: 12px 0 0;
+  }
+}

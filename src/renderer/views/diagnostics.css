@@ -1,0 +1,913 @@
+/**
+ * Smoke-test and first-run check overlay (design node 0:15576).
+ *
+ * The node draws the app shell with one panel floating over it, so this file is
+ * two layers: the shell (scenery, always inert) and the check panel (the
+ * subject). The panel is 560 px wide on a desktop and sits under the shell's bar;
+ * on a phone it becomes a sheet that fills the width and keeps the last row off
+ * the home indicator.
+ *
+ * Nothing here holds a colour literal: the palette is the page token block in
+ * tokens.css, named after the same node. The radii are the tokens.json bindings
+ * the node uses - overlay 12 for the panel, row 8 for the assertion rows and the
+ * buttons, card 10 for the log block, pill 999 for the status chips - so a
+ * change in open-pencil is one value in one file.
+ *
+ * The shell is drawn quietly on purpose: it is what the smoke run asserts, not
+ * what the person reads, and the scrim over it keeps the panel the only subject.
+ */
+
+/* --------------------------------------------------------------- page shell */
+
+* {
+  box-sizing: border-box;
+}
+
+.diagnostics-page {
+  margin: 0;
+  min-height: 100dvh;
+  width: 100%;
+  background: var(--zuri-diagnostics-canvas);
+  color: var(--zuri-diagnostics-text);
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-diagnostics-meta-size);
+  line-height: var(--zuri-diagnostics-meta-leading);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+.diagnostics-page button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.diagnostics-page :focus-visible {
+  outline: 2px solid var(--zuri-diagnostics-primary);
+  outline-offset: 2px;
+}
+
+.diagnostics-page code {
+  font-family: var(--zuri-font-family-mono);
+}
+
+/* Every glyph is a 24 unit outline scaled by its own width and height, which is
+ * how the node stores them (stroke 2 at 24 = the node's 1.1667 at 14 px). */
+.diagnostics-page svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ------------------------------------------------------------ shell scenery */
+
+.diagnostics-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  width: 100%;
+}
+
+.diagnostics-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: var(--zuri-diagnostics-topbar-height);
+  padding: 0 var(--zuri-diagnostics-gutter);
+  background: var(--zuri-diagnostics-surface);
+  border-bottom: 1px solid var(--zuri-diagnostics-hairline);
+}
+
+.diagnostics-mark {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zuri-diagnostics-mark-size);
+  height: var(--zuri-diagnostics-mark-size);
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-accent);
+  color: var(--zuri-diagnostics-text-on-primary);
+}
+
+.diagnostics-mark svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  stroke: none;
+}
+
+.diagnostics-wordmark {
+  margin: 0;
+  font-size: var(--zuri-diagnostics-wordmark-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  font-weight: 600;
+  color: var(--zuri-diagnostics-text);
+}
+
+.diagnostics-search {
+  min-width: 0;
+  flex: 1 1 auto;
+  max-width: 360px;
+  margin-left: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--zuri-diagnostics-border);
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-muted);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diagnostics-account-chip {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.diagnostics-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zuri-diagnostics-avatar-size);
+  height: var(--zuri-diagnostics-avatar-size);
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-accent);
+  color: var(--zuri-diagnostics-text-on-primary);
+  font-size: var(--zuri-diagnostics-label-size);
+  line-height: var(--zuri-diagnostics-label-leading);
+  font-weight: 600;
+  letter-spacing: var(--zuri-diagnostics-label-tracking);
+}
+
+.diagnostics-account-name {
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  color: var(--zuri-diagnostics-text-secondary);
+}
+
+/* The three columns the smoke check names. min-width 0 keeps a long word from
+ * widening the page, so nothing scrolls sideways at any width. The shell is
+ * centred in a 1440 px band on a large screen, so the rails do not sit against
+ * the window edge with a dead strip beside them. */
+.diagnostics-columns {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  gap: var(--zuri-diagnostics-column-gap);
+  width: 100%;
+  max-width: var(--zuri-diagnostics-columns-width);
+  margin: 0 auto;
+  min-height: 0;
+  padding: var(--zuri-diagnostics-gutter) var(--zuri-diagnostics-gutter) 0;
+}
+
+.diagnostics-column {
+  min-width: 0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--zuri-diagnostics-surface);
+  border: 1px solid var(--zuri-diagnostics-hairline);
+  border-radius: var(--zuri-diagnostics-card-radius);
+  box-shadow: var(--zuri-diagnostics-shadow);
+  overflow: hidden;
+}
+
+.diagnostics-sidebar {
+  flex: none;
+  width: var(--zuri-diagnostics-sidebar-width);
+}
+
+.diagnostics-chat {
+  flex: 1 1 auto;
+}
+
+.diagnostics-context {
+  flex: none;
+  width: var(--zuri-diagnostics-context-width);
+}
+
+.diagnostics-new-chat {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--zuri-diagnostics-row-radius);
+  background: var(--zuri-diagnostics-primary);
+  color: var(--zuri-diagnostics-text-on-primary);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  font-weight: 600;
+}
+
+.diagnostics-nav-row,
+.diagnostics-thread {
+  display: flex;
+  align-items: center;
+  height: var(--zuri-diagnostics-nav-row-height);
+  padding: 0 10px;
+  border-radius: var(--zuri-diagnostics-row-radius);
+  color: var(--zuri-diagnostics-text-secondary);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.diagnostics-nav-row[data-current="true"] {
+  background: var(--zuri-diagnostics-primary-soft);
+  color: var(--zuri-diagnostics-primary);
+  font-weight: 600;
+}
+
+.diagnostics-sidebar-label {
+  margin: 10px 0 2px;
+  padding: 0 10px;
+  font-size: var(--zuri-diagnostics-label-size);
+  line-height: var(--zuri-diagnostics-label-leading);
+  letter-spacing: var(--zuri-diagnostics-label-tracking);
+  text-transform: uppercase;
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-thread[data-current="true"] {
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text);
+}
+
+.diagnostics-chat-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--zuri-diagnostics-hairline);
+}
+
+.diagnostics-chat-title {
+  margin: 0;
+  font-size: var(--zuri-diagnostics-meta-size);
+  line-height: var(--zuri-diagnostics-meta-leading);
+  font-weight: 600;
+  color: var(--zuri-diagnostics-text);
+}
+
+.diagnostics-chat-meta {
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-messages {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 6px 0;
+}
+
+.diagnostics-message {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.diagnostics-message[data-role="user"] {
+  justify-content: flex-end;
+}
+
+.diagnostics-message-line {
+  margin: 0;
+  max-width: 78%;
+  padding: 8px 12px;
+  border-radius: var(--zuri-diagnostics-card-radius);
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-secondary);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+}
+
+.diagnostics-message-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-accent);
+  color: var(--zuri-diagnostics-text-on-primary);
+  font-size: var(--zuri-diagnostics-label-size);
+  line-height: var(--zuri-diagnostics-label-leading);
+  font-weight: 600;
+}
+
+.diagnostics-message-text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  padding-top: 4px;
+}
+
+/* Placeholder rules stand in for reply text: the shell is scenery, and drawing
+ * invented answers under the scrim would read as the page's own content. */
+.diagnostics-line {
+  height: 8px;
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-skeleton);
+}
+
+.diagnostics-line[data-width="long"] {
+  width: 76%;
+}
+
+.diagnostics-line[data-width="medium"] {
+  width: 58%;
+}
+
+.diagnostics-line[data-width="short"] {
+  width: 34%;
+}
+
+.diagnostics-composer {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--zuri-diagnostics-border);
+  border-radius: var(--zuri-diagnostics-card-radius);
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-muted);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+}
+
+.diagnostics-context-label {
+  margin: 8px 0 0;
+  font-size: var(--zuri-diagnostics-label-size);
+  line-height: var(--zuri-diagnostics-label-leading);
+  letter-spacing: var(--zuri-diagnostics-label-tracking);
+  text-transform: uppercase;
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-context-row {
+  padding: 6px 8px;
+  border-radius: var(--zuri-diagnostics-row-radius);
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-secondary);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ------------------------------------------------------------------- scrim */
+
+.diagnostics-scrim {
+  position: fixed;
+  inset: 0;
+  display: block;
+  background: var(--zuri-diagnostics-scrim);
+}
+
+/* ----------------------------------------------------------------- overlay */
+
+.diagnostics-overlay {
+  position: fixed;
+  top: var(--zuri-diagnostics-overlay-top);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  width: calc(100% - 32px);
+  max-width: var(--zuri-diagnostics-overlay-width);
+  max-height: calc(100dvh - var(--zuri-diagnostics-overlay-top) - 24px);
+  overflow-y: auto;
+  background: var(--zuri-diagnostics-surface);
+  border: 1px solid var(--zuri-diagnostics-border);
+  border-radius: var(--zuri-diagnostics-panel-radius);
+  box-shadow: var(--zuri-diagnostics-panel-shadow);
+}
+
+.diagnostics-overlay:focus {
+  outline: none;
+}
+
+.diagnostics-overlay-head {
+  flex: none;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--zuri-diagnostics-head-gap);
+  padding: var(--zuri-diagnostics-overlay-padding);
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--zuri-diagnostics-hairline);
+}
+
+.diagnostics-disc {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zuri-diagnostics-disc-size);
+  height: var(--zuri-diagnostics-disc-size);
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-success-soft);
+  color: var(--zuri-diagnostics-success);
+}
+
+.diagnostics-disc svg {
+  width: var(--zuri-diagnostics-glyph-size);
+  height: var(--zuri-diagnostics-glyph-size);
+}
+
+.diagnostics-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.diagnostics-title {
+  margin: 0;
+  font-size: var(--zuri-diagnostics-title-size);
+  line-height: var(--zuri-diagnostics-title-leading);
+  font-weight: 600;
+  color: var(--zuri-diagnostics-text);
+}
+
+.diagnostics-summary {
+  margin: 2px 0 0;
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  color: var(--zuri-diagnostics-text-secondary);
+}
+
+.diagnostics-close {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zuri-diagnostics-close-size);
+  height: var(--zuri-diagnostics-close-size);
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--zuri-diagnostics-row-radius);
+  background: transparent;
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-close:hover {
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text);
+}
+
+.diagnostics-overlay-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-diagnostics-body-gap);
+  padding: 14px 22px;
+  min-height: 0;
+}
+
+.diagnostics-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--zuri-diagnostics-label-size);
+  line-height: var(--zuri-diagnostics-label-leading);
+  letter-spacing: var(--zuri-diagnostics-label-tracking);
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-label-count {
+  padding: 1px 6px;
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-secondary);
+  font-size: var(--zuri-diagnostics-label-size);
+  line-height: var(--zuri-diagnostics-label-leading);
+  letter-spacing: 0;
+}
+
+/* ------------------------------------------------------- assertion rows */
+
+.diagnostics-assertions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.diagnostics-assertion {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-diagnostics-row-gap);
+  min-height: 34px;
+  padding: var(--zuri-diagnostics-row-padding);
+  border-radius: var(--zuri-diagnostics-row-radius);
+  background: var(--zuri-diagnostics-surface);
+}
+
+.diagnostics-assertion + .diagnostics-assertion {
+  box-shadow: inset 0 1px 0 var(--zuri-diagnostics-hairline);
+}
+
+.diagnostics-assertion[data-tone="fail"] {
+  background: var(--zuri-diagnostics-danger-soft);
+  box-shadow: inset 0 0 0 1px var(--zuri-diagnostics-danger-line);
+}
+
+.diagnostics-assertion[data-tone="running"] {
+  background: var(--zuri-diagnostics-primary-soft);
+}
+
+.diagnostics-glyph {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zuri-diagnostics-glyph-size);
+  height: var(--zuri-diagnostics-glyph-size);
+  color: var(--zuri-diagnostics-success);
+}
+
+.diagnostics-glyph[data-glyph="cross"] {
+  color: var(--zuri-diagnostics-danger);
+}
+
+.diagnostics-glyph[data-glyph="dash"] {
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-glyph[data-glyph="spinner"] {
+  width: var(--zuri-diagnostics-spinner-size);
+  height: var(--zuri-diagnostics-spinner-size);
+  border: var(--zuri-diagnostics-spinner-width) solid var(--zuri-diagnostics-primary);
+  border-right-color: transparent;
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  animation: diagnostics-spin 720ms linear infinite;
+}
+
+@keyframes diagnostics-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .diagnostics-glyph[data-glyph="spinner"] {
+    animation: none;
+  }
+}
+
+.diagnostics-assertion-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--zuri-diagnostics-row-gap);
+}
+
+.diagnostics-assertion-name {
+  flex: none;
+  font-family: var(--zuri-font-family-mono);
+  font-size: var(--zuri-diagnostics-code-size);
+  line-height: var(--zuri-diagnostics-code-leading);
+  color: var(--zuri-diagnostics-text);
+  white-space: nowrap;
+}
+
+.diagnostics-assertion-note {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  color: var(--zuri-diagnostics-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* A failing row has two long sentences to say (what was expected, what came
+ * back), so it stacks them instead of clipping the second one away. */
+.diagnostics-assertion[data-tone="fail"] .diagnostics-assertion-text {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+
+.diagnostics-assertion[data-tone="fail"] .diagnostics-assertion-note {
+  flex: none;
+  white-space: normal;
+  color: var(--zuri-diagnostics-danger);
+}
+
+/* The failing row has two lines of its own, so its duration would sit on the
+ * second one; the pill already says the run did not finish on time. */
+.diagnostics-assertion[data-tone="fail"] .diagnostics-assertion-ms {
+  display: none;
+}
+
+.diagnostics-assertion-ms {
+  flex: none;
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  color: var(--zuri-diagnostics-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.diagnostics-pill {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-diagnostics-pill-gap);
+  padding: var(--zuri-diagnostics-pill-padding);
+  border-radius: var(--zuri-diagnostics-pill-radius);
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-muted);
+  font-size: var(--zuri-diagnostics-label-size);
+  line-height: var(--zuri-diagnostics-label-leading);
+  letter-spacing: var(--zuri-diagnostics-label-tracking);
+  text-transform: uppercase;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.diagnostics-pill[data-tone="pass"] {
+  background: var(--zuri-diagnostics-success-soft);
+  color: var(--zuri-diagnostics-success);
+}
+
+.diagnostics-pill[data-tone="fail"] {
+  background: var(--zuri-diagnostics-danger-soft);
+  color: var(--zuri-diagnostics-danger);
+}
+
+.diagnostics-pill[data-tone="running"] {
+  background: var(--zuri-diagnostics-primary-soft);
+  color: var(--zuri-diagnostics-primary);
+}
+
+/* ------------------------------------------------------ console error log */
+
+.diagnostics-log {
+  max-height: var(--zuri-diagnostics-log-height);
+  overflow-y: auto;
+  padding: var(--zuri-diagnostics-log-padding);
+  border-radius: var(--zuri-diagnostics-card-radius);
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-secondary);
+  font-family: var(--zuri-font-family-mono);
+  font-size: var(--zuri-diagnostics-code-size);
+  line-height: var(--zuri-diagnostics-code-leading);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.diagnostics-log[data-tone="fail"] {
+  background: var(--zuri-diagnostics-danger-soft);
+  color: var(--zuri-diagnostics-danger);
+}
+
+.diagnostics-log-line {
+  margin: 0;
+}
+
+.diagnostics-log-line + .diagnostics-log-line {
+  margin-top: 2px;
+}
+
+/* ------------------------------------------------------------ settings path */
+
+.diagnostics-path {
+  display: flex;
+  flex-direction: column;
+  gap: var(--zuri-diagnostics-path-gap);
+}
+
+.diagnostics-path-value {
+  display: block;
+  padding: 7px 10px;
+  border: 1px solid var(--zuri-diagnostics-border);
+  border-radius: var(--zuri-diagnostics-row-radius);
+  background: var(--zuri-diagnostics-surface);
+  color: var(--zuri-diagnostics-text);
+  font-size: var(--zuri-diagnostics-code-size);
+  line-height: var(--zuri-diagnostics-code-leading);
+  /* The markup puts <wbr> after each separator, so the path wraps between
+     folders; break-word is only the fallback for a segment wider than the box. */
+  overflow-wrap: break-word;
+}
+
+.diagnostics-path-note {
+  margin: 0;
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+/* ------------------------------------------------------------------- foot */
+
+.diagnostics-overlay-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 22px 16px;
+  border-top: 1px solid var(--zuri-diagnostics-hairline);
+}
+
+.diagnostics-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-diagnostics-actions-gap);
+}
+
+.diagnostics-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--zuri-diagnostics-control-height);
+  padding: 0 var(--zuri-diagnostics-control-padding);
+  border: 1px solid var(--zuri-diagnostics-border);
+  border-radius: var(--zuri-diagnostics-row-radius);
+  background: var(--zuri-diagnostics-surface);
+  color: var(--zuri-diagnostics-text);
+  font-size: var(--zuri-diagnostics-small-size);
+  line-height: var(--zuri-diagnostics-small-leading);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.diagnostics-button:hover {
+  background: var(--zuri-diagnostics-sunken);
+}
+
+.diagnostics-button-primary {
+  border-color: var(--zuri-diagnostics-primary);
+  background: var(--zuri-diagnostics-primary);
+  color: var(--zuri-diagnostics-text-on-primary);
+}
+
+.diagnostics-button-primary:hover {
+  background: var(--zuri-diagnostics-primary-strong);
+  border-color: var(--zuri-diagnostics-primary-strong);
+}
+
+.diagnostics-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+/* ------------------------------------------------------------ state frames */
+
+/* Pass is the default drawing, so only the other three need a rule. The disc,
+ * the summary, the rows, the pills and the log all read their tone from the
+ * frame, which is why one attribute repaints the whole panel. */
+.diagnostics-page[data-state="fail"] .diagnostics-disc {
+  background: var(--zuri-diagnostics-danger-soft);
+  color: var(--zuri-diagnostics-danger);
+}
+
+.diagnostics-page[data-state="running"] .diagnostics-disc {
+  background: var(--zuri-diagnostics-primary-soft);
+  color: var(--zuri-diagnostics-primary);
+}
+
+.diagnostics-page[data-state="idle"] .diagnostics-disc {
+  background: var(--zuri-diagnostics-sunken);
+  color: var(--zuri-diagnostics-text-muted);
+}
+
+.diagnostics-page[data-state="running"] .diagnostics-summary,
+.diagnostics-page[data-state="fail"] .diagnostics-summary {
+  color: var(--zuri-diagnostics-text);
+}
+
+/* ---------------------------------------------- narrow windows and phones */
+
+/* A 1024 px window cannot hold three columns inside 560 px of panel: the rails
+ * give way first, then the sidebar, so the panel never sits on a crush. */
+@media (max-width: 1180px) {
+  .diagnostics-context {
+    display: none;
+  }
+}
+
+@media (max-width: 880px) {
+  .diagnostics-sidebar {
+    display: none;
+  }
+
+  .diagnostics-columns {
+    padding: var(--zuri-diagnostics-gutter) var(--zuri-diagnostics-gutter) 0;
+  }
+}
+
+/* The phone frame: the panel is the page. It fills the width, starts under the
+ * bar and keeps a 44 px action pair with the safe area under it, so the last row
+ * is never covered by the home indicator. */
+@media (max-width: 620px) {
+  .diagnostics-search {
+    display: none;
+  }
+
+  .diagnostics-account-name {
+    display: none;
+  }
+
+  .diagnostics-columns {
+    padding: 12px 12px 0;
+  }
+
+  .diagnostics-column {
+    padding: 10px;
+  }
+
+  .diagnostics-overlay {
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    max-height: calc(100dvh - 24px);
+  }
+
+  .diagnostics-overlay-head {
+    padding: 16px 16px 12px;
+  }
+
+  .diagnostics-overlay-body {
+    padding: 12px 16px;
+  }
+
+  .diagnostics-overlay-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .diagnostics-status {
+    order: 2;
+  }
+
+  .diagnostics-actions {
+    order: 1;
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .diagnostics-button {
+    height: 44px;
+  }
+
+  .diagnostics-close {
+    width: 44px;
+    height: 44px;
+  }
+
+  .diagnostics-assertion {
+    min-height: 44px;
+  }
+
+  /* The phone row stacks its subject and its note, and drops the duration: three
+   * columns on 390 px would clip every subject to "#c...". */
+  .diagnostics-assertion-text {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
+  }
+
+  .diagnostics-assertion-ms {
+    display: none;
+  }
+}

@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="light" />
+    <!-- No inline script or style: the token layer and modules are the only sources. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Create your account - Zuri Desktop</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="sign-up.css" />
+  </head>
+  <!-- Design node 0:11637. The node draws this page five times at 1440: empty
+       (the default), a submit in progress, a rejected email, the form out of
+       reach, and the created account; a sixth frame is the same page at 390 px.
+       ?state= picks one, and the phone frame is the media query in sign-up.css. -->
+  <body class="signup-page" data-state="empty">
+    <div class="signup-layout">
+      <!-- The brand column: the node draws it as decoration beside the form, so
+           its text is not a heading the page can be navigated by. -->
+      <aside class="signup-brand">
+        <span class="signup-glow" aria-hidden="true"></span>
+
+        <span class="signup-brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0Z" />
+            <path d="M20 3v4" />
+            <path d="M22 5h-4" />
+          </svg>
+        </span>
+        <span class="signup-brand-name">Zuri Desk</span>
+
+        <p class="signup-brand-headline">Your account, everywhere you work.</p>
+        <p class="signup-brand-body">
+          One account for the browser and Windows. Create it once and your chats, tasks and
+          automations are waiting on both.
+        </p>
+
+        <ul class="signup-features">
+          <li class="signup-feature">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z" />
+            </svg>
+            Ask, Act and Autopilot in one workspace
+          </li>
+          <li class="signup-feature">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+            </svg>
+            Cloud handoff between devices
+          </li>
+          <li class="signup-feature">
+            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+              <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+              <path d="m9 12 2 2 4-4" />
+            </svg>
+            Provider keys stay in your account
+          </li>
+        </ul>
+      </aside>
+
+      <main class="signup-form">
+        <!-- The phone frame draws a status bar and the wordmark above the title;
+             the desktop frames keep the wordmark in the brand column. -->
+        <div class="signup-status" aria-hidden="true">
+          <span class="signup-status-time">08:24</span>
+          <span class="signup-status-icon signup-status-wifi">
+            <svg viewBox="0 0 24 24" width="12" height="12">
+              <path d="M12 20h.01" />
+              <path d="M2 8.82a15 15 0 0 1 20 0" />
+              <path d="M5 12.86a10 10 0 0 1 14 0" />
+              <path d="M8.5 16.43a5 5 0 0 1 7 0" />
+            </svg>
+          </span>
+          <span class="signup-status-icon signup-status-battery">
+            <svg viewBox="0 0 24 24" width="12" height="12">
+              <path d="M2 9a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2z" />
+              <path d="M22 11v2" />
+              <path d="M6 11v2" />
+              <path d="M10 11v2" />
+            </svg>
+          </span>
+        </div>
+
+        <div class="signup-phone-brand">
+          <span class="signup-brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16">
+              <path d="M9.94 15.5A2 2 0 0 0 8.5 14.06l-6.14-1.58a.5.5 0 0 1 0-.96L8.5 9.94A2 2 0 0 0 9.94 8.5l1.58-6.14a.5.5 0 0 1 .96 0L14.06 8.5A2 2 0 0 0 15.5 9.94l6.14 1.58a.5.5 0 0 1 0 .96L15.5 14.06a2 2 0 0 0-1.44 1.44l-1.58 6.14a.5.5 0 0 1-.96 0Z" />
+              <path d="M20 3v4" />
+              <path d="M22 5h-4" />
+            </svg>
+          </span>
+          <span class="signup-phone-brand-name">Zuri Desk</span>
+        </div>
+
+        <section class="signup-card">
+          <div class="signup-panel signup-panel-form">
+            <h1 class="signup-title">Create your account</h1>
+            <p class="signup-sub">One account for the web app and the desktop app.</p>
+
+            <form class="signup-fields" id="signup-form" novalidate>
+              <div class="signup-field signup-field-name">
+                <label class="signup-label" for="signup-name">Name</label>
+                <div class="signup-input">
+                  <svg class="signup-input-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                  <input
+                    id="signup-name"
+                    name="name"
+                    type="text"
+                    autocomplete="name"
+                    placeholder="Ana Ribeiro"
+                  />
+                </div>
+              </div>
+
+              <div class="signup-field signup-field-email">
+                <label class="signup-label" for="signup-email">Email</label>
+                <div class="signup-input">
+                  <svg class="signup-input-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                  </svg>
+                  <input
+                    id="signup-email"
+                    name="email"
+                    type="email"
+                    autocomplete="username"
+                    placeholder="you@studio.com"
+                    required
+                  />
+                </div>
+
+                <!-- The rejected frame puts this message 4 px under the field it
+                     explains, and the field below it moves down with it. -->
+                <p class="signup-error" role="alert">
+                  <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <path d="M12 8v4" />
+                    <path d="M12 16h.01" />
+                  </svg>
+                  <span class="signup-error-message">
+                    That email already has an account &mdash; sign in instead.
+                  </span>
+                </p>
+              </div>
+
+              <div class="signup-field signup-field-password">
+                <label class="signup-label" for="signup-password">Password</label>
+                <div class="signup-input">
+                  <svg class="signup-input-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <rect x="3" y="11" width="18" height="11" rx="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <input
+                    id="signup-password"
+                    name="password"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="At least 10 characters"
+                    minlength="10"
+                    required
+                  />
+                  <!-- The node draws an eye glyph here; a control that only
+                       repeats the picture would be dead weight, so it reveals
+                       what was typed. -->
+                  <button
+                    class="signup-reveal"
+                    type="button"
+                    aria-label="Show password"
+                    aria-pressed="false"
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                      <path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Three bars and a line: the node draws the empty measure and
+                   the weak one, and the submitting frame the strong one. The
+                   bars are decoration; the line is the advice, so it is read. -->
+              <div class="signup-strength" data-strength="empty">
+                <span class="signup-bar signup-bar-1" aria-hidden="true"></span>
+                <span class="signup-bar signup-bar-2" aria-hidden="true"></span>
+                <span class="signup-bar signup-bar-3" aria-hidden="true"></span>
+                <span class="signup-strength-hint" data-signup-strength-hint aria-live="polite">
+                  Use 10+ characters with a number or symbol
+                </span>
+              </div>
+
+              <button class="signup-submit" type="submit">
+                <svg class="signup-submit-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                  <path d="M21 12a9 9 0 1 1-6.22-8.56" />
+                </svg>
+                <span data-signup-submit-label>Create account</span>
+              </button>
+
+              <p class="signup-terms">
+                By creating an account you agree to the Terms and the Privacy Policy.
+              </p>
+
+              <div class="signup-divider"></div>
+
+              <div class="signup-signin-row">
+                <span class="signup-signin-question">Already have an account?</span>
+                <a class="signup-signin-link" href="sign-in.html">Sign in</a>
+              </div>
+            </form>
+
+            <p class="signup-print">
+              In the desktop app you continue straight to first-run setup.
+            </p>
+          </div>
+
+          <div class="signup-panel signup-panel-done">
+            <span class="signup-done-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="20" height="20">
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            </span>
+            <h1 class="signup-title">Account created</h1>
+            <p class="signup-sub">
+              Welcome, Ana. This account now works in the browser and on Windows &mdash; continuing
+              to first-run setup&hellip;
+            </p>
+            <span class="signup-progress">
+              <span class="signup-progress-fill"></span>
+            </span>
+            <p class="signup-summary">
+              <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                <rect x="2" y="4" width="20" height="16" rx="2" />
+                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+              </svg>
+              <span data-signup-account>A verification email is on its way to ana@studio.com</span>
+            </p>
+            <a class="signup-submit" href="onboarding.html">
+              <span>Continue to setup</span>
+            </a>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module" src="sign-up.js"></script>
+  </body>
+</html>

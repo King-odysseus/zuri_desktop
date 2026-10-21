@@ -1,0 +1,995 @@
+/**
+ * Automations list (design node 0:7686).
+ *
+ * The node draws the same screen six times - main, empty, loading, error,
+ * disabled and caught-up - so all six bodies live in automations.html and only
+ * the one named by data-state is shown. Every colour, radius and line height
+ * comes from the .automations-page block in styles/tokens.css; nothing here
+ * holds a literal value, so a node edit is a single token edit.
+ *
+ * Geometry follows the node at 1440x900: a 52 px top bar, a page padded 40 px
+ * on both sides, a 1360 px card whose rows are laid out on the node's column
+ * positions (16 / 532 / 782 / 1018 / 1204 / 1300).
+ */
+
+/* --- Page and top bar ---------------------------------------------------- */
+
+.automations-page {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--zuri-automations-canvas);
+  color: var(--zuri-automations-text);
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  -webkit-font-smoothing: antialiased;
+}
+
+.automations-page *,
+.automations-page *::before,
+.automations-page *::after {
+  box-sizing: border-box;
+}
+
+.automations-topbar {
+  display: flex;
+  align-items: center;
+  height: var(--zuri-automations-topbar-height);
+  padding: 0 var(--zuri-space-3) 0 var(--zuri-space-4);
+  border-bottom: 1px solid var(--zuri-automations-border);
+  background: var(--zuri-automations-surface);
+}
+
+.automations-mark {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-space-6);
+  height: var(--zuri-space-6);
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-automations-primary);
+  color: var(--zuri-automations-surface);
+  flex: none;
+}
+
+.automations-app-title {
+  margin-left: var(--zuri-space-2);
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-automations-body-sm-line);
+  white-space: nowrap;
+}
+
+/* The node puts the tab group at x=200, 70 px after the app title. */
+.automations-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-1);
+  margin-left: 70px;
+  padding: 2px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-sunken);
+}
+
+.automations-nav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 28px;
+  padding: 0 var(--zuri-space-3) 0 10px;
+  border-radius: var(--zuri-radius-pill);
+  color: var(--zuri-automations-text-secondary);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  text-decoration: none;
+}
+
+.automations-nav-tab:hover {
+  color: var(--zuri-automations-text);
+}
+
+.automations-nav-tab[aria-current='page'] {
+  background: var(--zuri-automations-surface);
+  color: var(--zuri-automations-text);
+  font-weight: var(--zuri-font-weight-medium);
+  box-shadow: 0 1px 2px var(--zuri-automations-hover);
+}
+
+.automations-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-1);
+  margin-left: auto;
+}
+
+.automations-theme-button {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-space-8);
+  height: var(--zuri-space-8);
+  padding: 0;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-automations-canvas);
+  color: var(--zuri-automations-text);
+  cursor: pointer;
+}
+
+.automations-theme-button:hover {
+  background: var(--zuri-automations-sunken);
+}
+
+.automations-avatar {
+  display: grid;
+  place-items: center;
+  width: var(--zuri-space-8);
+  height: var(--zuri-space-8);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-accent);
+  color: var(--zuri-automations-surface);
+  font-size: var(--zuri-font-size-label-caps);
+  line-height: var(--zuri-automations-label-line);
+  letter-spacing: 0.2px;
+  flex: none;
+}
+
+/* --- Page body ----------------------------------------------------------- */
+
+.automations-main {
+  padding: 28px var(--zuri-space-10) var(--zuri-space-10);
+}
+
+.automations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-6);
+  min-height: 62px;
+}
+
+.automations-title {
+  margin: 0;
+  font-size: var(--zuri-font-size-display-lg);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-display-lg);
+  letter-spacing: -0.2px;
+}
+
+.automations-subtitle {
+  margin: var(--zuri-space-1) 0 0;
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  color: var(--zuri-automations-text-secondary);
+}
+
+.automations-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 38px;
+  padding: 0 var(--zuri-space-4) 0 var(--zuri-space-4);
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-automations-primary);
+  color: var(--zuri-automations-surface);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-automations-body-sm-line);
+  cursor: pointer;
+  flex: none;
+}
+
+.automations-primary:hover {
+  filter: brightness(0.94);
+}
+
+/* --- Toolbar ------------------------------------------------------------- */
+
+.automations-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-6);
+  margin: var(--zuri-space-4) 0;
+  min-height: 28px;
+}
+
+.automations-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+}
+
+.automations-filter {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  height: 28px;
+  padding: 0 var(--zuri-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--zuri-radius-pill);
+  background: transparent;
+  color: var(--zuri-automations-text-secondary);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  cursor: pointer;
+}
+
+.automations-filter[aria-pressed='true'] {
+  border-color: var(--zuri-automations-border);
+  background: var(--zuri-automations-surface);
+  color: var(--zuri-automations-text);
+  font-weight: var(--zuri-font-weight-medium);
+}
+
+.automations-filter-count {
+  font-size: var(--zuri-font-size-label-caps);
+  line-height: var(--zuri-automations-label-line);
+  color: var(--zuri-automations-text-muted);
+}
+
+.automations-check-meta {
+  margin: 0;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-text-muted);
+  text-align: right;
+}
+
+/* --- Card ---------------------------------------------------------------- */
+
+.automations-state[hidden] {
+  display: none;
+}
+
+/* A hidden row would otherwise keep its grid display and stay visible. */
+.automations-row[hidden] {
+  display: none;
+}
+
+.automations-card {
+  border-radius: var(--zuri-radius-lg);
+  background: var(--zuri-automations-surface);
+  box-shadow: var(--zuri-automations-shadow);
+  overflow: hidden;
+}
+
+.automations-head,
+.automations-row {
+  display: grid;
+  grid-template-columns: var(--zuri-automations-grid);
+  align-items: center;
+  padding: 0 var(--zuri-space-4);
+}
+
+.automations-head {
+  height: var(--zuri-automations-head-height);
+  background: var(--zuri-automations-canvas);
+}
+
+.automations-head-cell {
+  font-size: var(--zuri-font-size-label-caps);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-automations-label-line);
+  letter-spacing: var(--zuri-automations-label-tracking);
+  text-transform: uppercase;
+  color: var(--zuri-automations-text-muted);
+}
+
+.automations-head-cell-history {
+  /* The node right-aligns HISTORY to the card's inner edge, so it spans the
+     link and switch tracks rather than the link track alone. */
+  grid-column: 5 / -1;
+  text-align: right;
+}
+
+.automations-row {
+  position: relative;
+  height: var(--zuri-automations-row-height);
+}
+
+.automations-row + .automations-row::before,
+.automations-head + .automations-row::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--zuri-automations-hover);
+}
+
+.automations-row-name {
+  min-width: 0;
+}
+
+.automations-name {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--zuri-font-size-label-md);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-label-md);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.automations-description {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.automations-schedule {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* The node draws every chip 176 x 26 with the clock at 10 and the label at 28,
+     so the chip keeps that fixed width instead of hugging its text. */
+  width: 176px;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-sunken);
+  color: var(--zuri-automations-text);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  white-space: nowrap;
+  justify-self: start;
+}
+
+.automations-schedule svg {
+  flex: none;
+  color: var(--zuri-automations-text-muted);
+}
+
+.automations-run {
+  min-width: 0;
+}
+
+.automations-run-value {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-automations-body-sm-line);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.automations-run-detail {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.automations-status {
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.automations-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--zuri-space-1);
+  height: var(--zuri-space-6);
+  padding: 0 var(--zuri-space-1) 0 6px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-success-tint);
+  color: var(--zuri-automations-success-text);
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.automations-badge-detail {
+  margin: 2px 0 0;
+  font-size: var(--zuri-font-size-label-caps);
+  line-height: var(--zuri-automations-label-line);
+  color: var(--zuri-automations-text-muted);
+  white-space: nowrap;
+}
+
+/* The node's history track is 80 px followed by a 16 px gap: the link right-aligns
+   inside its own 80 px, so it never touches the switch. */
+.automations-history {
+  justify-self: start;
+  width: 80px;
+  text-align: right;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-primary);
+  text-decoration: none;
+}
+
+.automations-history:hover {
+  text-decoration: underline;
+}
+
+/* The switch is a real checkbox so it is keyboard operable and announced as a
+   switch; the drawn 44x24 track and 20 px knob are the label's two pseudo
+   elements, with the knob moved by :checked rather than by script. */
+.automations-switch {
+  position: relative;
+  display: block;
+  justify-self: end;
+  width: 44px;
+  height: var(--zuri-space-6);
+}
+
+.automations-switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.automations-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-border-strong);
+  pointer-events: none;
+}
+
+.automations-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: var(--zuri-space-5);
+  height: var(--zuri-space-5);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-surface);
+  transition: transform 120ms ease-out;
+}
+
+.automations-switch input:checked + .automations-switch-track {
+  background: var(--zuri-automations-primary);
+}
+
+.automations-switch input:checked + .automations-switch-track::after {
+  transform: translateX(var(--zuri-space-5));
+}
+
+.automations-switch input:focus-visible + .automations-switch-track {
+  outline: 2px solid var(--zuri-automations-primary);
+  outline-offset: 2px;
+}
+
+.automations-switch input:disabled {
+  cursor: not-allowed;
+}
+
+.automations-switch input:disabled + .automations-switch-track {
+  background: var(--zuri-automations-border-strong);
+}
+
+.automations-switch input:disabled + .automations-switch-track::after {
+  transform: translateX(var(--zuri-space-5));
+}
+
+/* A locked row carries no History link (node 0:8122), so the switch takes the
+   node's last column (x 1300) explicitly instead of sliding into History's. */
+.automations-row-locked .automations-switch {
+  grid-column: 6;
+}
+
+.automations-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--zuri-space-6);
+  height: 52px;
+  padding: 0 var(--zuri-space-4);
+  background: var(--zuri-automations-canvas);
+  color: var(--zuri-automations-text-secondary);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.automations-footer p {
+  margin: 0;
+}
+
+.automations-footer-retention {
+  color: var(--zuri-automations-text-muted);
+}
+
+/* --- Empty --------------------------------------------------------------- */
+
+.automations-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 320px;
+  padding: 56px var(--zuri-space-4) 0;
+  text-align: center;
+}
+
+.automations-empty-disc {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-primary-soft);
+  color: var(--zuri-automations-primary);
+}
+
+.automations-empty-title {
+  margin: var(--zuri-space-5) 0 0;
+  font-size: var(--zuri-font-size-heading-md);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-line-height-heading-md);
+}
+
+.automations-empty-body {
+  max-width: 700px;
+  margin: var(--zuri-space-2) 0 0;
+  font-size: var(--zuri-font-size-body-md);
+  line-height: var(--zuri-line-height-body-md);
+  color: var(--zuri-automations-text-muted);
+}
+
+.automations-empty .automations-primary {
+  margin-top: var(--zuri-space-3);
+}
+
+.automations-empty-hint {
+  margin: var(--zuri-space-3) 0 0;
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-text-muted);
+}
+
+/* --- Loading ------------------------------------------------------------- */
+
+.automations-skeleton {
+  display: grid;
+  grid-template-columns: var(--zuri-automations-grid);
+  align-items: center;
+  position: relative;
+  height: var(--zuri-automations-row-height);
+  padding: 0 var(--zuri-space-4);
+}
+
+.automations-skeleton + .automations-skeleton::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--zuri-automations-hover);
+}
+
+.automations-skeleton-each {
+  display: grid;
+  gap: var(--zuri-space-2);
+  justify-items: start;
+}
+
+.automations-skeleton-each span {
+  display: block;
+  border-radius: 4px;
+  background: var(--zuri-automations-sunken);
+}
+
+.automations-skeleton-name {
+  height: 14px;
+  background: var(--zuri-automations-active) !important;
+}
+
+.automations-skeleton-description {
+  height: 10px;
+}
+
+.automations-skeleton-schedule {
+  display: block;
+  height: 26px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-sunken);
+}
+
+.automations-skeleton-run {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--zuri-automations-active);
+}
+
+.automations-skeleton-next {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--zuri-automations-sunken);
+}
+
+.automations-skeleton-actions {
+  display: block;
+  justify-self: end;
+  width: 44px;
+  height: var(--zuri-space-6);
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-automations-sunken);
+}
+
+/* Each of the four drawn rows has its own bar widths. The history column stays
+   empty in the skeleton so the grid keeps the node's six tracks. */
+.automations-skeleton-a .automations-skeleton-name {
+  width: 196px;
+}
+
+.automations-skeleton-a .automations-skeleton-description {
+  width: 352px;
+}
+
+.automations-skeleton-a .automations-skeleton-schedule {
+  width: 124px;
+}
+
+.automations-skeleton-a .automations-skeleton-run {
+  width: 96px;
+}
+
+.automations-skeleton-a .automations-skeleton-next {
+  width: 110px;
+}
+
+.automations-skeleton-b .automations-skeleton-name {
+  width: 228px;
+}
+
+.automations-skeleton-b .automations-skeleton-description {
+  width: 318px;
+}
+
+.automations-skeleton-b .automations-skeleton-schedule {
+  width: 140px;
+}
+
+.automations-skeleton-b .automations-skeleton-run {
+  width: 84px;
+}
+
+.automations-skeleton-b .automations-skeleton-next {
+  width: 126px;
+}
+
+.automations-skeleton-c .automations-skeleton-name {
+  width: 176px;
+}
+
+.automations-skeleton-c .automations-skeleton-description {
+  width: 336px;
+}
+
+.automations-skeleton-c .automations-skeleton-schedule {
+  width: 132px;
+}
+
+.automations-skeleton-c .automations-skeleton-run {
+  width: 102px;
+}
+
+.automations-skeleton-c .automations-skeleton-next {
+  width: 118px;
+}
+
+.automations-skeleton-d .automations-skeleton-name {
+  width: 204px;
+}
+
+.automations-skeleton-d .automations-skeleton-description {
+  width: 300px;
+}
+
+.automations-skeleton-d .automations-skeleton-schedule {
+  width: 128px;
+}
+
+.automations-skeleton-d .automations-skeleton-run {
+  width: 88px;
+}
+
+.automations-skeleton-d .automations-skeleton-next {
+  width: 112px;
+}
+
+.automations-loading-note {
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  height: 48px;
+  padding: 0 var(--zuri-space-4);
+  background: var(--zuri-automations-canvas);
+  color: var(--zuri-automations-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+.automations-loading-note svg {
+  flex: none;
+  color: var(--zuri-automations-text-muted);
+}
+
+/* --- Error --------------------------------------------------------------- */
+
+.automations-error {
+  padding: var(--zuri-space-6) var(--zuri-space-4) 56px;
+}
+
+.automations-alert {
+  /* Two columns: the alert glyph, then the copy. The action row sits under
+     both so Retry lines up with the glyph at the node's x=20, not with the copy. */
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  column-gap: var(--zuri-space-3);
+  padding: 22px var(--zuri-space-5) 10px;
+  border-radius: var(--zuri-radius-md);
+  background: var(--zuri-automations-sunken);
+}
+
+.automations-alert-icon {
+  color: var(--zuri-automations-danger);
+  flex: none;
+  align-self: flex-start;
+}
+
+.automations-alert-body {
+  min-width: 0;
+}
+
+.automations-alert-title {
+  margin: 0;
+  font-size: var(--zuri-font-size-body-lg);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-body-sm);
+  color: var(--zuri-automations-text);
+}
+
+.automations-alert-text {
+  margin: 2px 0 0;
+  font-size: var(--zuri-font-size-body-sm);
+  line-height: var(--zuri-automations-body-sm-line);
+  color: var(--zuri-automations-text-secondary);
+}
+
+.automations-alert-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--zuri-space-2);
+  margin-top: 2px;
+}
+
+.automations-quiet-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  min-width: 88px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-automations-surface);
+  color: var(--zuri-automations-text);
+  font-family: inherit;
+  font-size: var(--zuri-font-size-caption);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-automations-body-sm-line);
+  cursor: pointer;
+}
+
+.automations-quiet-button:hover {
+  background: var(--zuri-automations-hover);
+}
+
+.automations-quiet-button svg {
+  flex: none;
+}
+
+/* Banner actions are the node's 84 x 28 control with the glyph 12 px in. */
+.automations-quiet-button-compact {
+  height: 28px;
+  min-width: 84px;
+  padding: 0 12px;
+  justify-content: flex-start;
+}
+
+/* Dismiss has no glyph, so its label centres in the full 84 px. */
+.automations-quiet-button-center {
+  justify-content: center;
+  padding: 0;
+}
+
+/* The node draws the Reveal control 190 px wide beside the 88 px Retry one. */
+.automations-quiet-button-wide {
+  min-width: 190px;
+}
+
+.automations-alert-path {
+  margin: 0 0 0 var(--zuri-space-1);
+  font-size: var(--zuri-font-size-label-caps);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.automations-silhouette {
+  display: grid;
+  place-items: center;
+  height: 100px;
+  margin-top: var(--zuri-space-4);
+  border-radius: var(--zuri-radius-md);
+  background: var(--zuri-automations-canvas);
+  color: var(--zuri-automations-text-muted);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+}
+
+/* --- Running (rows locked) ---------------------------------------------- */
+
+.automations-running-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 var(--zuri-space-5);
+  background: var(--zuri-automations-primary-soft);
+}
+
+.automations-running-banner svg {
+  flex: none;
+  color: var(--zuri-automations-primary);
+}
+
+.automations-running-title {
+  margin: 0;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+.automations-running-meta {
+  margin: 0;
+  font-size: var(--zuri-font-size-label-caps);
+  line-height: var(--zuri-automations-label-line);
+  color: var(--zuri-automations-text-secondary);
+}
+
+.automations-running-actions {
+  margin-left: auto;
+}
+
+.automations-row-locked .automations-row-name {
+  display: grid;
+  grid-template-columns: 16px 1fr;
+  column-gap: 10px;
+  align-items: start;
+}
+
+.automations-row-locked .automations-lock {
+  color: var(--zuri-automations-text-muted);
+  margin-top: 2px;
+}
+
+.automations-row-locked .automations-name {
+  color: var(--zuri-automations-text-secondary);
+  font-weight: var(--zuri-font-weight-regular);
+}
+
+.automations-row-locked .automations-description {
+  grid-column: 2;
+}
+
+.automations-running-note {
+  margin: var(--zuri-space-3) 0 0;
+  padding: 0 var(--zuri-space-4);
+  font-size: var(--zuri-font-size-caption);
+  line-height: var(--zuri-line-height-caption);
+  color: var(--zuri-automations-text-muted);
+  text-align: center;
+}
+
+.automations-running-body {
+  padding-bottom: 56px;
+}
+
+/* --- Caught up ----------------------------------------------------------- */
+
+.automations-caught-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 58px;
+  padding: 0 var(--zuri-space-5);
+  background: var(--zuri-automations-success-wash);
+}
+
+.automations-caught-banner svg {
+  flex: none;
+  color: var(--zuri-automations-success);
+}
+
+.automations-caught-title {
+  margin: 0;
+  font-size: var(--zuri-font-size-body-sm);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-line-height-body-sm);
+}
+
+.automations-caught-meta {
+  margin: 0;
+  font-size: var(--zuri-font-size-label-caps);
+  line-height: var(--zuri-automations-label-line);
+  color: var(--zuri-automations-text-secondary);
+}
+
+.automations-caught-actions {
+  margin-left: auto;
+}
+
+.automations-row-caught {
+  background: var(--zuri-automations-caught-row);
+}
+
+/* The caught-up row sits on its own tint, so the node lifts the chip to white. */
+.automations-row-caught .automations-schedule {
+  background: var(--zuri-automations-surface);
+}
+
+/* The node leaves 76 px below the third row, room for the toast it shows next. */
+.automations-caught-body {
+  padding-bottom: 76px;
+}
+
+/* --- Narrow screens ------------------------------------------------------ */
+
+/* The node is drawn at 1440 px. Below 1100 px the two wide text columns give up
+   their width first so the switch and the history link stay reachable. */
+@media (max-width: 1100px) {
+  .automations-main {
+    padding: var(--zuri-space-6) var(--zuri-space-5) var(--zuri-space-6);
+  }
+
+  .automations-nav {
+    margin-left: var(--zuri-space-6);
+  }
+
+  .automations-header {
+    flex-wrap: wrap;
+    gap: var(--zuri-space-3);
+  }
+
+  .automations-toolbar {
+    flex-wrap: wrap;
+    gap: var(--zuri-space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .automations-switch-track::after {
+    transition: none;
+  }
+}

@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Autopilot demo - Zuri Desktop</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="demo.css" />
+  </head>
+
+  <!--
+    Drawn from the open-pencil page "Automations demo runner (scripted scenario)"
+    (node 0:14959). The node draws the runner five times - idle, running, pass,
+    fail and restarting - so all five frames are below as `<section class="demo-state">`
+    blocks and `?state=` picks one. The scenario rail is shared and sits outside
+    the frames because the node repeats it unchanged in every frame.
+  -->
+  <body class="demo-page" data-state="idle">
+    <header class="demo-topbar">
+      <span class="demo-mark" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M11 6.2 12.4 9.9 16.1 11.3 12.4 12.7 11 16.4 9.6 12.7 5.9 11.3 9.6 9.9Z"
+            stroke="currentColor"
+            stroke-width="1.4"
+            stroke-linejoin="round"
+          />
+          <path
+            d="M16.6 15.2l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6Z"
+            stroke="currentColor"
+            stroke-width="1.2"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </span>
+      <p class="demo-wordmark">Zuri Desktop</p>
+
+      <nav class="demo-nav" aria-label="Main">
+        <a class="demo-nav-tab" href="../index.html">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path
+              d="M10.5 6a4.5 4.5 0 0 1-6.7 3.9L2 10.5l.6-1.8A4.5 4.5 0 1 1 10.5 6Z"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linejoin="round"
+            />
+          </svg>
+          Chat
+        </a>
+        <a class="demo-nav-tab" href="automations.html" aria-current="page">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <path
+              d="M1.6 3.5 2.6 4.5 4.4 2.6"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path
+              d="M1.6 8.2 2.6 9.2 4.4 7.3"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <path d="M6.6 3.6h4M6.6 8.3h4" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+          </svg>
+          Tasks
+        </a>
+        <a class="demo-nav-tab" href="settings.html">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+            <circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.1" />
+            <path
+              d="M6 1.3v1.4M6 9.3v1.4M1.3 6h1.4M9.3 6h1.4M2.7 2.7l1 1M8.3 8.3l1 1M9.3 2.7l-1 1M3.7 8.3l-1 1"
+              stroke="currentColor"
+              stroke-width="1.1"
+              stroke-linecap="round"
+            />
+          </svg>
+          Settings
+        </a>
+      </nav>
+
+      <div class="demo-topbar-end">
+        <button
+          class="demo-theme"
+          id="demo-theme"
+          type="button"
+          aria-pressed="false"
+          aria-label="Switch to the dark theme"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path
+              d="M13 9.4A5.6 5.6 0 1 1 6.6 3a4.8 4.8 0 0 0 6.4 6.4Z"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <span class="demo-avatar" aria-hidden="true">AR</span>
+      </div>
+    </header>
+
+    <main class="demo-main">
+      <nav class="demo-crumbs" aria-label="Breadcrumb">
+        <a class="demo-crumb" href="automations.html">Automations</a>
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+          <path d="M2.5 1 5.5 4 2.5 7" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" />
+        </svg>
+        <span class="demo-crumb demo-crumb-current" aria-current="page">Demo runner</span>
+      </nav>
+
+      <div class="demo-header">
+        <div class="demo-header-text">
+          <h1 class="demo-title">Autopilot demo</h1>
+          <p class="demo-subtitle">
+            A scripted scenario that proves scheduling, notifications, reminders and catch-up on this machine.
+          </p>
+        </div>
+        <button class="demo-primary" id="demo-run" type="button">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+            <path d="M4.5 2.8 11 7l-6.5 4.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+          </svg>
+          <span id="demo-run-label">Run demo</span>
+        </button>
+      </div>
+
+      <div class="demo-grid">
+        <div class="demo-column">
+          <!-- ------------------------------------------------------------- idle -->
+          <section class="demo-state" data-state="idle">
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Checks</h2>
+                <span class="demo-card-meta">5 steps</span>
+              </header>
+              <ol class="demo-steps">
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">1</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Schedule a run one minute out</span>
+                    <span class="demo-step-detail">Writes an automation with its first run 60 seconds away.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">2</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Let the schedule fire</span>
+                    <span class="demo-step-detail">The main-process scheduler starts the run on time.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">3</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Post the finished notification</span>
+                    <span class="demo-step-detail">A desktop notification announces the result.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">4</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Add the follow-up reminder</span>
+                    <span class="demo-step-detail">The run's result becomes a reminder for later today.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">5</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Restart and catch up</span>
+                    <span class="demo-step-detail">A run missed while closed is replayed on the next launch.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+              </ol>
+            </article>
+
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Output</h2>
+                <span class="demo-card-meta">Nothing yet</span>
+              </header>
+              <pre class="demo-log" aria-label="Demo output"><span class="demo-log-line"><span class="demo-log-time">--:--:--</span><span class="demo-log-text demo-log-muted">demo: ready. Run the demo to write each step's line here.</span></span></pre>
+            </article>
+          </section>
+
+          <!-- ---------------------------------------------------------- running -->
+          <section class="demo-state" data-state="running">
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Checks</h2>
+                <span class="demo-card-meta">Step 2 of 5</span>
+              </header>
+              <ol class="demo-steps">
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">1</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Schedule a run one minute out</span>
+                    <span class="demo-step-detail">Next run 08:01, repeating every minute during the demo.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="active">
+                  <span class="demo-step-number" aria-hidden="true">2</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Let the schedule fire</span>
+                    <span class="demo-step-detail">Waiting for the scheduler to start the run.</span>
+                  </span>
+                  <span class="demo-chip"><span class="demo-spinner" aria-hidden="true"></span>Running</span>
+                </li>
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">3</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Post the finished notification</span>
+                    <span class="demo-step-detail">A desktop notification announces the result.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">4</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Add the follow-up reminder</span>
+                    <span class="demo-step-detail">The run's result becomes a reminder for later today.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+                <li class="demo-step" data-status="pending">
+                  <span class="demo-step-number" aria-hidden="true">5</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Restart and catch up</span>
+                    <span class="demo-step-detail">A run missed while closed is replayed on the next launch.</span>
+                  </span>
+                  <span class="demo-chip">Waiting</span>
+                </li>
+              </ol>
+            </article>
+
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Output</h2>
+                <span class="demo-card-meta demo-card-meta-live">Running</span>
+              </header>
+              <pre class="demo-log" aria-label="Demo output"><span class="demo-log-line"><span class="demo-log-time">08:00:00</span><span class="demo-log-text">demo: writing automation "Demo autopilot" (* * * * *)</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:00:01</span><span class="demo-log-text">store: automations.json saved</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:00:01</span><span class="demo-log-text demo-log-pass">check 1 passed: next run 08:01</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:00:02</span><span class="demo-log-text">demo: waiting for the scheduler...</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:00:02</span><span class="demo-log-text demo-log-muted">demo: nothing else to show until the run starts.</span></span></pre>
+            </article>
+          </section>
+
+          <!-- ------------------------------------------------------------- pass -->
+          <section class="demo-state" data-state="pass">
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Checks</h2>
+                <span class="demo-card-meta demo-card-meta-pass">5 of 5 passed</span>
+              </header>
+              <ol class="demo-steps">
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">1</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Schedule a run one minute out</span>
+                    <span class="demo-step-detail">Automation stored with its first run 60 seconds out.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">2</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Let the schedule fire</span>
+                    <span class="demo-step-detail">Run started 08:01:00 and finished 08:01:08, 8 actions.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">3</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Post the finished notification</span>
+                    <span class="demo-step-detail">"Demo run finished" was posted to the notification centre.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">4</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Add the follow-up reminder</span>
+                    <span class="demo-step-detail">Reminder "Follow up: demo run" saved for 12:00 today.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">5</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Restart and catch up</span>
+                    <span class="demo-step-detail">One missed run replayed on the next launch.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+              </ol>
+            </article>
+
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Output</h2>
+                <span class="demo-card-meta demo-card-meta-pass">Passed</span>
+              </header>
+              <pre class="demo-log" aria-label="Demo output"><span class="demo-log-line"><span class="demo-log-time">08:00:01</span><span class="demo-log-text demo-log-pass">check 1 passed: next run 08:01</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:08</span><span class="demo-log-text demo-log-pass">check 2 passed: run finished, 8 actions</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-pass">check 3 passed: notification posted</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-pass">check 4 passed: reminder saved for 12:00</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:02:05</span><span class="demo-log-text demo-log-pass">check 5 passed: 1 missed run replayed</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:02:05</span><span class="demo-log-text demo-log-pass">PASS 5/5 checks</span></span></pre>
+            </article>
+          </section>
+
+          <!-- ------------------------------------------------------------- fail -->
+          <section class="demo-state" data-state="fail">
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Checks</h2>
+                <span class="demo-card-meta demo-card-meta-fail">1 of 5 failed</span>
+              </header>
+              <ol class="demo-steps">
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">1</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Schedule a run one minute out</span>
+                    <span class="demo-step-detail">Automation stored with its first run 60 seconds out.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">2</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Let the schedule fire</span>
+                    <span class="demo-step-detail">Run started 08:01:00 and finished 08:01:07, 8 actions.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">3</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Post the finished notification</span>
+                    <span class="demo-step-detail">"Demo run finished" was posted to the notification centre.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="failed">
+                  <span class="demo-step-number" aria-hidden="true">4</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Add the follow-up reminder</span>
+                    <span class="demo-step-detail">No reminder was written. reminders.json still holds 0 entries.</span>
+                  </span>
+                  <span class="demo-chip">Failed</span>
+                </li>
+                <li class="demo-step" data-status="skipped">
+                  <span class="demo-step-number" aria-hidden="true">5</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Restart and catch up</span>
+                    <span class="demo-step-detail">Not run, because the reminder check failed first.</span>
+                  </span>
+                  <span class="demo-chip">Skipped</span>
+                </li>
+              </ol>
+            </article>
+
+            <article class="demo-card demo-card-fail">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Output</h2>
+                <span class="demo-card-meta demo-card-meta-fail">Failed at step 4</span>
+              </header>
+              <pre class="demo-log" aria-label="Demo output"><span class="demo-log-line"><span class="demo-log-time">08:01:08</span><span class="demo-log-text demo-log-pass">check 2 passed: run finished, 8 actions</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-pass">check 3 passed: notification posted</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-fail">check 4 failed: reminders.json has no entry for this run</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-muted">demo: the run's follow-up field was empty, so no reminder was created.</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-muted">demo: check 5 skipped.</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-fail">FAIL 3/4 checks</span></span></pre>
+              <p class="demo-hint">
+                The automation's result had no follow-up line, so the reminder step had nothing to save. Run the demo
+                again after the automation saves a follow-up, or read the run in the automations list.
+              </p>
+            </article>
+          </section>
+
+          <!-- -------------------------------------------------------- restarting -->
+          <section class="demo-state" data-state="restarting">
+            <article class="demo-banner">
+              <span class="demo-banner-icon" aria-hidden="true">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path
+                    d="M13 8a5 5 0 1 1-1.6-3.7M13 2.6v2.8H10"
+                    stroke="currentColor"
+                    stroke-width="1.3"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                </svg>
+              </span>
+              <span class="demo-banner-text">
+                <span class="demo-banner-title">Zuri restarted at 08:02</span>
+                <span class="demo-banner-detail">One run was missed while the app was closed. Replaying it now.</span>
+              </span>
+              <button class="demo-quiet" id="demo-restart" type="button">Replay again</button>
+            </article>
+
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Checks</h2>
+                <span class="demo-card-meta">Step 5 of 5</span>
+              </header>
+              <ol class="demo-steps">
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">1</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Schedule a run one minute out</span>
+                    <span class="demo-step-detail">Automation stored with its first run 60 seconds out.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">2</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Let the schedule fire</span>
+                    <span class="demo-step-detail">Run started 08:01:00 and finished 08:01:08, 8 actions.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">3</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Post the finished notification</span>
+                    <span class="demo-step-detail">"Demo run finished" was posted to the notification centre.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="passed">
+                  <span class="demo-step-number" aria-hidden="true">4</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Add the follow-up reminder</span>
+                    <span class="demo-step-detail">Reminder "Follow up: demo run" saved for 12:00 today.</span>
+                  </span>
+                  <span class="demo-chip">Passed</span>
+                </li>
+                <li class="demo-step" data-status="active">
+                  <span class="demo-step-number" aria-hidden="true">5</span>
+                  <span class="demo-step-text">
+                    <span class="demo-step-name">Restart and catch up</span>
+                    <span class="demo-step-detail">Reading nextRunAt and replaying the run it missed.</span>
+                  </span>
+                  <span class="demo-chip"><span class="demo-spinner" aria-hidden="true"></span>Running</span>
+                </li>
+              </ol>
+            </article>
+
+            <article class="demo-card">
+              <header class="demo-card-head">
+                <h2 class="demo-card-title">Output</h2>
+                <span class="demo-card-meta demo-card-meta-live">Catching up</span>
+              </header>
+              <pre class="demo-log" aria-label="Demo output"><span class="demo-log-line"><span class="demo-log-time">08:01:09</span><span class="demo-log-text demo-log-pass">check 4 passed: reminder saved for 12:00</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:02:03</span><span class="demo-log-text">app: closed</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:02:04</span><span class="demo-log-text">app: ready, sweep found 1 automation past its next run</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:02:04</span><span class="demo-log-text">run: replaying "Demo autopilot" scheduled 08:02</span></span>
+<span class="demo-log-line"><span class="demo-log-time">08:02:05</span><span class="demo-log-text demo-log-muted">demo: waiting for the replayed run to finish...</span></span></pre>
+            </article>
+          </section>
+        </div>
+
+        <aside class="demo-rail" aria-label="Scenario">
+          <article class="demo-card">
+            <header class="demo-card-head">
+              <h2 class="demo-card-title">Scenario</h2>
+            </header>
+            <dl class="demo-meta">
+              <div class="demo-meta-row">
+                <dt class="demo-meta-key">Route</dt>
+                <dd class="demo-meta-value">/automations/demo</dd>
+              </div>
+              <div class="demo-meta-row">
+                <dt class="demo-meta-key">Script</dt>
+                <dd class="demo-meta-value">scripts/demo-autopilot.js</dd>
+              </div>
+              <div class="demo-meta-row">
+                <dt class="demo-meta-key">Trigger</dt>
+                <dd class="demo-meta-value">Manual</dd>
+              </div>
+              <div class="demo-meta-row">
+                <dt class="demo-meta-key">Takes about</dt>
+                <dd class="demo-meta-value">15 seconds</dd>
+              </div>
+              <div class="demo-meta-row">
+                <dt class="demo-meta-key">Last run</dt>
+                <dd class="demo-meta-value">Today 08:02</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article class="demo-card demo-card-note">
+            <h2 class="demo-card-title">Safe to repeat</h2>
+            <p class="demo-note">
+              The demo writes its own automation, reminder and run history, then removes them when it finishes. Your
+              real schedules are not touched.
+            </p>
+          </article>
+        </aside>
+      </div>
+    </main>
+
+    <script type="module" src="demo.js"></script>
+  </body>
+</html>

@@ -1,0 +1,701 @@
+/**
+ * Error / not-found view (design node 0:11074).
+ *
+ * The node draws the window four times: the failed view, an unknown route, a
+ * reload in progress, and the same panel at 390 px. All four share one panel
+ * (600 x 340, a 44 px icon disc, 40 px actions, a 48 px restart strip) inside
+ * the chat shell, so the shell is drawn once here and the state attribute picks
+ * the panel the node drew for it.
+ *
+ * Nothing in this file holds a colour literal: the palette is the page token
+ * block in tokens.css, named after the same node.
+ *
+ * One deliberate correction to the drawing: in the node the panel's 600 px box
+ * starts at x 550 and the rail (which begins at x 1120) cuts the message off
+ * mid-sentence. The panel keeps the node's size and every inner measurement but
+ * is centred in the conversation column, so the copy is readable.
+ */
+
+/* --------------------------------------------------------------- page shell */
+
+* {
+  box-sizing: border-box;
+}
+
+.error-page {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--zuri-error-window);
+  color: var(--zuri-error-text);
+  font-family: var(--zuri-font-family);
+  font-size: var(--zuri-error-body-size);
+  line-height: var(--zuri-error-body-leading);
+  -webkit-font-smoothing: antialiased;
+}
+
+.error-page a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.error-page button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.error-page :focus-visible {
+  outline: 2px solid var(--zuri-error-primary);
+  outline-offset: 2px;
+}
+
+/* Every glyph is a 24 unit outline scaled by its own width and height, which is
+ * how the node stores them (stroke 2 at 24 = the node's 1.1667 at 14 px). */
+.error-page svg {
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --------------------------------------------------------------- title bar */
+
+.error-titlebar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--zuri-error-titlebar-height);
+  padding: 0 16px 0 12px;
+  border-bottom: 1px solid var(--zuri-error-hairline);
+  background: var(--zuri-error-window);
+}
+
+.error-mark {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--zuri-error-primary);
+  color: var(--zuri-error-on-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.error-mark svg {
+  width: 12px;
+  height: 12px;
+}
+
+.error-window-title {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--zuri-error-text-subtle);
+}
+
+.error-window-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--zuri-error-text-muted);
+}
+
+.error-window-controls svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ----------------------------------------------------------------- top bar */
+
+.error-topbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  height: var(--zuri-error-topbar-height);
+  padding: 0 24px 0 20px;
+  border-bottom: 1px solid var(--zuri-error-hairline);
+  background: var(--zuri-error-window);
+}
+
+.error-app-title {
+  flex: none;
+  width: 52px;
+  font-size: var(--zuri-error-label-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-error-label-leading);
+}
+
+/* The phone frame moves the mark out of the title bar and into the top bar. */
+.error-topbar-mark {
+  display: none;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background: var(--zuri-error-primary);
+  color: var(--zuri-error-on-primary);
+  align-items: center;
+  justify-content: center;
+}
+
+.error-tabs {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 256px;
+  height: 28px;
+  padding: 2px 4px;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-error-sunken);
+}
+
+.error-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: var(--zuri-error-label-leading);
+  color: var(--zuri-error-text-muted);
+}
+
+.error-tab svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+/* The node fades the toggle and the avatar: with the view down, both are a
+ * drawing of the shell rather than a control that still works. */
+.error-toggle {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  width: 92px;
+  height: 28px;
+  padding: 3px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-error-sunken);
+  opacity: var(--zuri-error-chrome-fade);
+}
+
+.error-toggle-segment {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  border-radius: var(--zuri-radius-pill);
+  color: var(--zuri-error-text-muted);
+}
+
+.error-toggle-segment-light {
+  width: 43px;
+  background: var(--zuri-error-window);
+}
+
+.error-toggle-segment-dark {
+  width: 42px;
+}
+
+.error-toggle-segment svg {
+  width: 14px;
+  height: 14px;
+}
+
+.error-avatar {
+  flex: none;
+  margin-left: 60px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--zuri-radius-pill);
+  background: var(--zuri-error-avatar);
+  color: var(--zuri-error-on-primary);
+  font-size: 12px;
+  line-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: var(--zuri-error-chrome-fade);
+}
+
+/* The phone frame replaces the tabs, toggle and avatar with one menu button. */
+.error-menu {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 32px;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  background: none;
+  color: var(--zuri-error-text-muted);
+}
+
+.error-menu svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* -------------------------------------------------------------------- body */
+
+.error-body {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+/* Sidebar: the node repeats the recent-chat shape with every row at
+ * color/muted, because the conversation below it failed to render. */
+.error-sidebar {
+  flex: none;
+  width: var(--zuri-error-sidebar-width);
+  padding: 12px;
+  border-right: 1px solid var(--zuri-error-hairline);
+  background: var(--zuri-error-surface);
+  color: var(--zuri-error-text-muted);
+}
+
+.error-new-chat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-error-sunken);
+  font-size: var(--zuri-error-label-size);
+  line-height: var(--zuri-error-label-leading);
+}
+
+.error-new-chat svg {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+.error-section-label {
+  margin: 18px 0 0 12px;
+  font-size: var(--zuri-error-section-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-error-section-leading);
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.error-recent {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.error-recent-row {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--zuri-radius-row);
+  font-size: var(--zuri-error-label-size);
+  line-height: var(--zuri-error-label-leading);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.error-recent li + li {
+  margin-top: 4px;
+}
+
+/* Conversation column: the panel sits 150 px under the body's top edge, which
+ * is the node's 70 px group offset plus its 80 px inset. */
+.error-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: var(--zuri-error-main-top) 24px 40px;
+  overflow: auto;
+}
+
+/* Rail: one task card at 60%, the node's way of showing the panel replaced the
+ * content without taking the shell away. */
+.error-rail {
+  flex: none;
+  width: var(--zuri-error-rail-width);
+  padding: 20px 16px 0;
+  border-left: 1px solid var(--zuri-error-hairline);
+  background: var(--zuri-error-surface);
+}
+
+.error-rail .error-section-label {
+  margin: 0;
+}
+
+.error-rail-task {
+  display: flex;
+  flex-direction: column;
+  height: 72px;
+  margin-top: 10px;
+  padding: 12px 14px;
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-error-window);
+  opacity: var(--zuri-error-card-fade);
+}
+
+.error-rail-task-title {
+  margin: 0;
+  font-size: var(--zuri-error-label-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-error-label-leading);
+  color: var(--zuri-error-text-muted);
+}
+
+.error-rail-task-meta {
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--zuri-error-text-muted);
+}
+
+/* The icon leads the title in the node's card, so the copy is indented past it. */
+.error-rail-task-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.error-rail-task-head svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.error-rail-task-head > div {
+  min-width: 0;
+}
+
+/* ------------------------------------------------------------ the panel */
+
+.error-state {
+  display: none;
+  width: min(100%, var(--zuri-error-panel-width));
+}
+
+/* Each state opens the drawn frame it belongs to. `empty` borrows the
+ * unknown-route frame (nothing lives at the address) and `loading` the reload
+ * frame, so the two standard states add no drawing of their own. `disabled`
+ * borrows the failed frame and takes its actions away below. */
+.error-page[data-state="error"] .error-state[data-state="error"],
+.error-page[data-state="disabled"] .error-state[data-state="error"],
+.error-page[data-state="not-found"] .error-state[data-state="not-found"],
+.error-page[data-state="empty"] .error-state[data-state="not-found"],
+.error-page[data-state="recovering"] .error-state[data-state="recovering"],
+.error-page[data-state="loading"] .error-state[data-state="recovering"] {
+  display: block;
+}
+
+.error-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-height: var(--zuri-error-panel-min-height);
+  padding: var(--zuri-error-panel-padding);
+  background: var(--zuri-error-panel);
+  border: 1px solid var(--zuri-error-hairline);
+  border-radius: var(--zuri-radius-modal);
+  box-shadow: var(--zuri-error-panel-shadow);
+}
+
+.error-disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--zuri-error-disc);
+  height: var(--zuri-error-disc);
+  border-radius: var(--zuri-radius-card);
+  background: var(--zuri-error-sunken);
+  color: var(--zuri-error-alert);
+}
+
+.error-disc svg {
+  width: 20px;
+  height: 20px;
+}
+
+.error-state[data-state="recovering"] .error-disc {
+  color: var(--zuri-error-primary);
+}
+
+.error-title {
+  margin: 20px 0 0;
+  font-size: var(--zuri-error-title-size);
+  font-weight: var(--zuri-font-weight-regular);
+  line-height: var(--zuri-error-title-leading);
+  color: var(--zuri-error-text);
+}
+
+.error-message {
+  margin: 8px 0 0;
+  font-size: var(--zuri-error-body-size);
+  line-height: var(--zuri-error-body-leading);
+  color: var(--zuri-error-text-subtle);
+}
+
+/* Only the failed frame is drawn at 390 px; it says "this view" where the
+ * desktop frames say "the chat view". */
+.error-message-short {
+  display: none;
+}
+
+.error-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.error-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--zuri-error-control-height);
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--zuri-radius-row);
+  font-size: var(--zuri-error-label-size);
+  font-weight: var(--zuri-font-weight-medium);
+  line-height: var(--zuri-error-label-leading);
+}
+
+.error-action svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.error-action-primary {
+  background: var(--zuri-error-primary);
+  color: var(--zuri-error-on-primary);
+}
+
+.error-action-quiet {
+  background: var(--zuri-error-sunken);
+  color: var(--zuri-error-text);
+}
+
+/* Hover is the only state the node cannot draw; it darkens the button's own
+ * fill rather than introducing a colour the page has no token for. */
+.error-action-primary:hover,
+.error-action-quiet:hover {
+  filter: brightness(0.96);
+}
+
+/* Recovering frame: the primary button is drawn disabled (sunken fill, muted
+ * label) but keeps the white glyph the node binds to it. */
+.error-state[data-state="recovering"] .error-action-primary {
+  background: var(--zuri-error-sunken);
+  color: var(--zuri-error-text-muted);
+}
+
+.error-state[data-state="recovering"] .error-action-primary svg {
+  stroke: var(--zuri-error-on-primary);
+}
+
+.error-state[data-state="recovering"] .error-action {
+  cursor: default;
+}
+
+.error-state[data-state="recovering"] .error-action:hover {
+  filter: none;
+}
+
+/* Disabled state: no frame of its own, so it is the failed frame with both
+ * actions drawn the way the reload frame draws its unavailable button - sunken
+ * fill, muted label, the white glyph the node keeps bound to the primary. */
+.error-page[data-state="disabled"] .error-state[data-state="error"] .error-action-primary {
+  background: var(--zuri-error-sunken);
+  color: var(--zuri-error-text-muted);
+}
+
+.error-page[data-state="disabled"] .error-state[data-state="error"] .error-action-primary svg {
+  stroke: var(--zuri-error-on-primary);
+}
+
+.error-page[data-state="disabled"] .error-state[data-state="error"] .error-action {
+  cursor: default;
+  filter: none;
+}
+
+.error-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: var(--zuri-error-hint-height);
+  margin: 20px 0 0;
+  padding: 0 12px;
+  border-radius: var(--zuri-radius-row);
+  background: var(--zuri-error-surface);
+  font-size: var(--zuri-error-hint-size);
+  line-height: var(--zuri-error-hint-leading);
+  color: var(--zuri-error-text-subtle);
+}
+
+.error-hint svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  color: var(--zuri-error-text-muted);
+}
+
+.error-hint-short {
+  display: none;
+}
+
+/* ------------------------------------------------------------- phone width */
+
+/*
+ * The fourth frame is 390 px wide: the sidebar and both rails are gone, the
+ * title bar gives way to the top bar, and the panel runs edge to edge with
+ * 16 px margins. Its actions are one 230 px button plus a 48 px icon button,
+ * and the restart strip says the shorter sentence it draws.
+ *
+ * The frame also draws a phone status bar (clock, wifi, battery). That is
+ * device chrome, not this window, so it is not reproduced: the app runs in a
+ * desktop window, and every other view here makes the same call.
+ */
+@media (max-width: 720px) {
+  .error-titlebar {
+    display: none;
+  }
+
+  .error-topbar {
+    padding: 0 16px;
+  }
+
+  .error-topbar-mark {
+    display: flex;
+  }
+
+  .error-app-title {
+    width: auto;
+    margin-left: 8px;
+    font-size: 15px;
+    line-height: 20px;
+  }
+
+  .error-tabs,
+  .error-toggle,
+  .error-avatar {
+    display: none;
+  }
+
+  .error-menu {
+    display: flex;
+    margin-left: auto;
+  }
+
+  .error-sidebar,
+  .error-rail {
+    display: none;
+  }
+
+  .error-main {
+    padding: 32px 16px 24px;
+  }
+
+  .error-panel {
+    min-height: 0;
+    padding: 24px 20px 20px;
+  }
+
+  .error-message {
+    font-size: 13px;
+    line-height: 20px;
+  }
+
+  .error-actions {
+    align-self: stretch;
+    margin-top: 32px;
+  }
+  .error-action {
+    height: 44px;
+  }
+
+  /* The node draws the primary at a fixed 230 px and the 48 px glyph button 8 px
+   * after it, so the pair stops short of the panel's right edge. */
+  .error-action-primary {
+    flex: none;
+    width: 230px;
+    justify-content: center;
+  }
+
+  /* The label leaves the flow, which is what the node draws: a 48 px square
+   * that holds the refresh glyph only. It stays in the accessibility tree. */
+  .error-action-quiet {
+    width: 48px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .error-action-quiet .error-action-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .error-hint {
+    min-height: 32px;
+    margin-top: 12px;
+    padding: 0 10px;
+    gap: 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    line-height: 16px;
+  }
+
+  .error-hint svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  /* Only the failed frame is drawn at this width, and it says the shorter
+   * sentence. The other two states keep the desktop sentence, which the strip
+   * grows to fit: inventing copy for them would be drawing something the node
+   * does not have. */
+  .error-state[data-state="error"] .error-hint-short {
+    display: inline;
+  }
+
+  .error-state[data-state="error"] .error-hint-long {
+    display: none;
+  }
+
+  .error-state[data-state="error"] .error-message-short {
+    display: inline;
+  }
+
+  .error-state[data-state="error"] .error-message-long {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .error-page * {
+    transition: none;
+    animation: none;
+  }
+}

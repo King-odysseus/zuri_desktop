@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="color-scheme" content="dark light" />
+    <!-- No inline script or style: the token layer and modules are the only sources. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'"
+    />
+    <title>Files - Zuri</title>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/components.css" />
+    <link rel="stylesheet" href="files.css" />
+  </head>
+  <body class="files-page">
+    <!-- Files view: what Act saved in userData/workspace, listed through the
+         bridge. The folder itself is created by the main process on first run. -->
+    <main class="files-view" id="files-view">
+      <header class="files-header">
+        <p class="files-eyebrow">Files</p>
+        <h1 class="files-title">Saved to your workspace</h1>
+        <p class="files-lead">
+          Act keeps its results in one folder on this computer. Summarize a document you
+          choose and the Markdown summary is saved here; open a result, or show it in
+          File Explorer to move or share it.
+        </p>
+      </header>
+
+      <section class="files-panel" aria-labelledby="files-list-heading">
+        <div class="files-toolbar">
+          <h2 class="files-list-heading" id="files-list-heading">Workspace files</h2>
+          <div class="files-actions">
+            <button class="files-summarize" id="files-summarize" type="button">Summarize a document</button>
+            <button class="files-refresh" id="files-refresh" type="button">Refresh</button>
+          </div>
+        </div>
+
+        <p class="files-status" id="files-status" role="status">Loading files...</p>
+        <p class="files-note" id="files-truncated" hidden>
+          Only the newest files are shown. Open the folder in Explorer to see the rest.
+        </p>
+
+        <div class="files-empty" id="files-empty" hidden>
+          <p class="files-empty-title">No files yet</p>
+          <p class="files-empty-text">Summarize a document, or ask Act to save a result, and it will appear here.</p>
+        </div>
+
+        <ul class="files-list" id="files-list" data-state="empty"></ul>
+      </section>
+
+      <section class="files-summary" id="files-summary" aria-labelledby="files-summary-title" hidden>
+        <header class="files-summary-head">
+          <h2 class="files-summary-title" id="files-summary-title">Document summary</h2>
+          <p class="files-summary-meta" id="files-summary-meta"></p>
+        </header>
+        <p class="files-summary-body" id="files-summary-body"></p>
+        <p class="files-summary-saved" id="files-summary-saved"></p>
+        <div class="files-summary-actions">
+          <button class="file-action" id="files-summary-open" type="button">Open</button>
+          <button class="file-action file-action-quiet" id="files-summary-reveal" type="button">
+            Reveal in Explorer
+          </button>
+        </div>
+      </section>
+
+      <p class="files-error" id="files-error" role="alert" hidden></p>
+    </main>
+
+    <script type="module" src="files.js"></script>
+  </body>
+</html>
