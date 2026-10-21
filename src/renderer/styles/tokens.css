@@ -113,6 +113,8 @@
   --zuri-accent: #006fee; /* tokens.json Dark --color-primary, the design's blue */
   --zuri-accent-hover: #338ef7; /* tokens.json Dark --color-primary-hover */
   --zuri-accent-subtle: rgba(0, 111, 238, 0.16); /* tokens.json Dark --color-primary-soft (#001731) as a tint */
+  --zuri-primary-soft: #001731; /* tokens.json Dark --color-primary-soft at full strength: the active mode chip fill */
+  --zuri-primary-soft-foreground: #338ef7; /* tokens.json Dark --color-primary-soft-foreground: that chip's label */
   --zuri-success: #3ddc84; /* heroUI success ramp, dark step */
   --zuri-success-subtle: rgba(61, 220, 132, 0.16); /* heroUI success ramp at 16% alpha */
   --zuri-warning: #f5a623; /* heroUI warning ramp, dark step */
@@ -309,6 +311,8 @@
   --zuri-accent: #006fee; /* tokens.json Light --color-primary, the design's blue */
   --zuri-accent-hover: #005bc4; /* tokens.json Light --color-primary-hover */
   --zuri-accent-subtle: rgba(0, 111, 238, 0.1); /* tokens.json Light --color-primary-soft (#E6F1FE) as a tint */
+  --zuri-primary-soft: #e6f1fe; /* tokens.json Light --color-primary-soft at full strength: the active mode chip fill */
+  --zuri-primary-soft-foreground: #005bc4; /* tokens.json Light --color-primary-soft-foreground: that chip's label */
   --zuri-success: #17a34a; /* heroUI success ramp, light step */
   --zuri-success-subtle: rgba(23, 163, 74, 0.1); /* heroUI success ramp at 10% alpha */
   --zuri-warning: #d97706; /* heroUI warning ramp, light step */

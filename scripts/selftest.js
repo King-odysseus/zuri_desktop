@@ -509,8 +509,9 @@ check('the Button / Ghost is drawn from node 0:10', () => {
     return css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
   };
 
-  // The node is 73 x 32 on color/background and radius/row, with a 13 px regular
-  // label on color/muted and 16 px of side padding. Its 73 px width is the label
+  // The node is 73 x 32 on color/background and radius/row, with 16 px of side
+  // padding and the guide's 14 px button label (label-md) on color/muted, where
+  // the node draws its own 13 px line. Its 73 px width is the label
   // "See all" plus that padding, so the rule states the padding and lets the label
   // size it, exactly as the other variants of this family do.
   const button = ruleBody('.btn-ghost');
@@ -520,7 +521,7 @@ check('the Button / Ghost is drawn from node 0:10', () => {
     ['the radius/row corner', /border-radius:\s*var\(--zuri-radius-row\)/],
     ['the color/background fill', /background:\s*var\(--zuri-surface\)/],
     ['the color/muted label', /color:\s*var\(--zuri-text-muted\)/],
-    ['the 13 px label size', /font-size:\s*var\(--zuri-font-size-body-sm\)/],
+    ['the 14 px label size', /font-size:\s*var\(--zuri-font-size-label-md\)/],
     ['the regular label weight', /font-weight:\s*var\(--zuri-font-weight-regular\)/],
   ];
   const buttonMissing = buttonChecks.filter(([, pattern]) => !pattern.test(button)).map(([label]) => label);
@@ -614,7 +615,7 @@ check('the Button / Icon is drawn from node 0:18', () => {
   return '28 x 28, radius 8, surface fill, 20 px muted icon inset 4 px';
 });
 
-check('the Button / Pill is drawn from node 0:14', () => {
+check('the Button / Pill is drawn from node 0:3599: the active mode chip', () => {
   const css = read('src/renderer/styles/components.css');
 
   const ruleBody = (selector) => {
@@ -623,19 +624,19 @@ check('the Button / Pill is drawn from node 0:14', () => {
     return css.slice(css.indexOf('{', at) + 1, css.indexOf('}', at));
   };
 
-  // The node is 47 x 28 on color/primary-soft and radius/pill, with a 13 px
-  // regular "Ask" label on color/primary inset 12 px from the sides and 6 px
-  // from the top. Its 47 px width is that label (23 px) plus the padding, so the
-  // rule states the padding and lets the label size the pill, exactly as the
-  // other variants of this family do.
+  // Node 0:3599 draws the segmented control's active mode chip: 22 px tall on
+  // radius/pill, 16 px of side padding, filled on color/primary-soft with a
+  // 14 px regular label on color/primary-soft-foreground. The node's fixed slot
+  // width is the control's, not label plus padding, so the rule states the
+  // padding and lets the label size the pill, as the rest of the family does.
   const pill = ruleBody('.btn-pill');
   const pillChecks = [
-    ['the 28 px node height', /height:\s*28px/],
-    ['the 12 px side padding as the spacing token', /padding:\s*0 var\(--zuri-space-3\)/],
+    ['the 22 px node height', /height:\s*22px/],
+    ['the 16 px side padding as the spacing token', /padding:\s*0 var\(--zuri-space-4\)/],
     ['the radius/pill corner', /border-radius:\s*var\(--zuri-radius-pill\)/],
-    ['the color/primary-soft fill', /background:\s*var\(--zuri-accent-subtle\)/],
-    ['the color/primary label', /color:\s*var\(--zuri-accent\)/],
-    ['the 13 px label size', /font-size:\s*var\(--zuri-font-size-body-sm\)/],
+    ['the color/primary-soft fill', /background:\s*var\(--zuri-primary-soft\)/],
+    ['the color/primary-soft-foreground label', /color:\s*var\(--zuri-primary-soft-foreground\)/],
+    ['the 14 px label size', /font-size:\s*var\(--zuri-font-size-label-md\)/],
     ['the regular label weight', /font-weight:\s*var\(--zuri-font-weight-regular\)/],
   ];
   const pillMissing = pillChecks.filter(([, pattern]) => !pattern.test(pill)).map(([label]) => label);
@@ -655,10 +656,10 @@ check('the Button / Pill is drawn from node 0:14', () => {
   }
 
   // The guide's hover is a state step, not a second tint: the fill is already the
-  // soft accent, so the label moves one accent step. Focus and disabled follow
-  // the rest of the family.
+  // soft accent and the label its foreground, so hovering moves the label to the
+  // accent itself. Focus and disabled follow the rest of the family.
   const hover = ruleBody('.btn-pill:hover:not(:disabled)');
-  if (!/color:\s*var\(--zuri-accent-hover\)/.test(hover)) {
+  if (!/color:\s*var\(--zuri-accent\)/.test(hover)) {
     throw new Error('the pill label does not step up on hover');
   }
 

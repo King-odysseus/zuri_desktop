@@ -28,12 +28,15 @@ body {
    Buttons
 
    The design's button family (nodes 0:6 through 0:18) shares one box: 32 px tall
-   on radius/row, 16 px of side padding, a 13 px label regular weight. Only the
+   on radius/row, 16 px of side padding and a 13 px label regular weight, except
+   Ghost, which takes the style guide's 14 px button label (label-md). Only the
    fill, the label colour and, for Secondary, its 1 px outline differ between
    variants, so each variant is one class that inherits that geometry by
    repeating it, exactly as the nodes do.
-   Button / Pill (node 0:14) is the family's chip and carries its own smaller
-   box instead: 28 px tall on radius/pill, 12 px of side padding.
+   Button / Pill is the chip on the segmented mode control (node 0:3599, "Mode
+   Chip Active"): 22 px tall on radius/pill, 16 px of side padding, filled on
+   color/primary-soft with a 14 px regular label on
+   color/primary-soft-foreground.
    Button / Small (node 0:16) is the compact member: the secondary shape on a
    28 px box with 12 px of side padding, on radius/row and its 1 px outline.
 
@@ -60,9 +63,9 @@ body {
   background: var(--zuri-surface);
   color: var(--zuri-text-muted);
   font-family: inherit;
-  font-size: var(--zuri-font-size-body-sm);
+  font-size: var(--zuri-font-size-label-md);
   font-weight: var(--zuri-font-weight-regular);
-  line-height: var(--zuri-line-height-body-sm);
+  line-height: var(--zuri-line-height-label-md);
   cursor: pointer;
   transition:
     background var(--zuri-motion-fast) var(--zuri-ease-out),
@@ -338,31 +341,31 @@ body {
   cursor: not-allowed;
 }
 
-/* Button / Pill (node 0:14) is the family's chip: a 28 px pill on radius/pill,
-   filled on color/primary-soft with a 13 px regular label on color/primary.
-   The style guide describes the same control as the active mode chip
-   ("accent-subtle bg with accent text"), which is where those two design
-   variables land in the token layer; the node's 28 px box, pill corner and
-   13 px label win over the guide's 36 px, radius-md and label-md, exactly as
-   the other nodes in this family already do.
+/* Button / Pill is the segmented control's active chip (design node 0:3599): a
+   22 px pill on radius/pill, filled on color/primary-soft with a 14 px regular
+   label on color/primary-soft-foreground. The style guide names the same
+   control ("active chip accent-subtle bg with accent text and label-md"), and
+   the node's own values win where the two differ, as they do across this
+   family.
 
-   The node is 47 px wide only because its "Ask" label measures 23 px, so the
-   rule states the node's 12 px side padding and lets the label size the pill;
-   "Act" and "Autopilot" then keep the same height and grow to fit. */
+   The node's 58 px width is the control's fixed slot for a mode ("Ask" and
+   "Act" are both 58, "Autopilot" 74), not label plus padding, so the rule
+   states 16 px of side padding and lets the label size the pill. The three
+   modes then share one height and only their labels differ. */
 .btn-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
-  padding: 0 var(--zuri-space-3);
+  height: 22px;
+  padding: 0 var(--zuri-space-4);
   border: 0;
   border-radius: var(--zuri-radius-pill);
-  background: var(--zuri-accent-subtle);
-  color: var(--zuri-accent);
+  background: var(--zuri-primary-soft);
+  color: var(--zuri-primary-soft-foreground);
   font-family: inherit;
-  font-size: var(--zuri-font-size-body-sm);
+  font-size: var(--zuri-font-size-label-md);
   font-weight: var(--zuri-font-weight-regular);
-  line-height: var(--zuri-line-height-body-sm);
+  line-height: var(--zuri-line-height-label-md);
   cursor: pointer;
   transition:
     background var(--zuri-motion-fast) var(--zuri-ease-out),
@@ -370,10 +373,10 @@ body {
 }
 
 /* Hover and focus come from the style guide's states, not the node, which draws
-   the default state only. The fill is already the soft accent tint, so hovering
-   steps the label one accent step instead of tinting twice. */
+   the default state only. The label starts on the primary-soft foreground, so
+   hovering moves it one step to the accent rather than tinting the fill twice. */
 .btn-pill:hover:not(:disabled) {
-  color: var(--zuri-accent-hover);
+  color: var(--zuri-accent);
 }
 
 .btn-pill:focus-visible {

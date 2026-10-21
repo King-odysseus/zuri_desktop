@@ -18,6 +18,7 @@ import {
   captureConsoleErrors,
   createReporter,
   reloadAndWait,
+  useScratchProfile,
   waitForFirstWindow,
   waitForLoad,
 } from './lib/app-launch.js';
@@ -34,6 +35,10 @@ const RESET_ENTRY = path.join(root, 'src', 'renderer', 'views', 'reset-password.
 const PRELOAD_ENTRY = path.join(root, 'src', 'main', 'preload.js');
 
 const report = createReporter();
+// This run gets its own Electron profile before the app is ready. The app pins its
+// name, so the default profile is shared with every other run on the machine and
+// overlapping runs stall each other on the same cache and profile locks.
+useScratchProfile();
 // Registered before the app is ready, so load-time messages are captured.
 const consoleCapture = captureConsoleErrors();
 
@@ -1129,8 +1134,8 @@ app.whenReady().then(async () => {
       if (box.color !== tokens.muted) {
         problems.push(`${theme}: the label is ${box.color}, the node binds color/muted (${tokens.muted})`);
       }
-      if (box.fontSize !== '13px' || box.fontWeight !== '400') {
-        problems.push(`${theme}: the label is ${box.fontSize} at weight ${box.fontWeight}, the node sets 13 px regular`);
+      if (box.fontSize !== '14px' || box.fontWeight !== '400') {
+        problems.push(`${theme}: the label is ${box.fontSize} at weight ${box.fontWeight}, the node sets 14 px regular`);
       }
       if (box.border !== '0px') {
         problems.push(`${theme}: the button draws a ${box.border} border the node does not have`);
@@ -1248,7 +1253,8 @@ app.whenReady().then(async () => {
     return `${box.width}x${box.height}, ${box.iconWidth} px icon inset ${box.insetLeft} px, radius ${box.radius}, surface fill and muted icon in both themes`;
   });
 
-  // Button / Pill (design node 0:14). Built as markup on the live page rather
+  // Button / Pill (design node 0:3599, the segmented control's active chip).
+  // Built as markup on the live page rather
   // than through a view, because the composer's mode selector (where the node's
   // "Ask" chip belongs) is its own card. The numbers still come from the
   // stylesheet in force, not from a copy of them here.
@@ -1273,7 +1279,7 @@ app.whenReady().then(async () => {
       return getComputedStyle(probe).borderTopLeftRadius;
     };
 
-    // The node is 47 px wide because its "Ask" label is 23 px between 12 px of
+    // The node is 47 px wide because its "Ask" label is 23 px between 16 px of
     // padding, so the check reads the label and confirms the pill hugs it.
     const label = document.createRange();
     label.selectNodeContents(pill);
@@ -1296,8 +1302,8 @@ app.whenReady().then(async () => {
       };
     };
     const readTokens = () => ({
-      soft: colourToken('--zuri-accent-subtle'),
-      primary: colourToken('--zuri-accent'),
+      soft: colourToken('--zuri-primary-soft'),
+      softForeground: colourToken('--zuri-primary-soft-foreground'),
       pillRadius: radiusToken('--zuri-radius-pill'),
     });
 
@@ -1312,17 +1318,17 @@ app.whenReady().then(async () => {
     return { dark, light };
   })()`);
 
-  report.check('the Button / Pill matches node 0:14', () => {
+  report.check('the Button / Pill matches node 0:3599: the active mode chip', () => {
     const problems = [];
 
     for (const [theme, run] of [['dark', pillRun.dark], ['light', pillRun.light]]) {
       const { box, tokens } = run;
-      if (box.height !== 28) problems.push(`${theme}: the box is ${box.height} px tall, the node is 28`);
-      if (box.padding !== '12px 12px') {
-        problems.push(`${theme}: side padding is ${box.padding}, the node keeps 12 px each side`);
+      if (box.height !== 22) problems.push(`${theme}: the box is ${box.height} px tall, the node is 22`);
+      if (box.padding !== '16px 16px') {
+        problems.push(`${theme}: side padding is ${box.padding}, the node keeps 16 px each side`);
       }
-      if (box.width !== box.labelWidth + 24) {
-        problems.push(`${theme}: the pill is ${box.width} px wide for a ${box.labelWidth} px label, the node adds 12 px of padding each side`);
+      if (box.width !== box.labelWidth + 32) {
+        problems.push(`${theme}: the pill is ${box.width} px wide for a ${box.labelWidth} px label, the node adds 16 px of padding each side`);
       }
       if (box.radius !== tokens.pillRadius) {
         problems.push(`${theme}: the corner is ${box.radius}, the node binds radius/pill (${tokens.pillRadius})`);
@@ -1330,11 +1336,11 @@ app.whenReady().then(async () => {
       if (box.background !== tokens.soft) {
         problems.push(`${theme}: the fill is ${box.background}, the node binds color/primary-soft (${tokens.soft})`);
       }
-      if (box.color !== tokens.primary) {
-        problems.push(`${theme}: the label is ${box.color}, the node binds color/primary (${tokens.primary})`);
+      if (box.color !== tokens.softForeground) {
+        problems.push(`${theme}: the label is ${box.color}, the node binds color/primary-soft-foreground (${tokens.softForeground})`);
       }
-      if (box.fontSize !== '13px' || box.fontWeight !== '400') {
-        problems.push(`${theme}: the label is ${box.fontSize} at weight ${box.fontWeight}, the node sets 13 px regular`);
+      if (box.fontSize !== '14px' || box.fontWeight !== '400') {
+        problems.push(`${theme}: the label is ${box.fontSize} at weight ${box.fontWeight}, the node sets 14 px regular`);
       }
       if (box.border !== '0px') {
         problems.push(`${theme}: the pill draws a ${box.border} border the node does not have`);
@@ -1344,7 +1350,7 @@ app.whenReady().then(async () => {
     if (problems.length > 0) throw new Error(problems.join('; '));
 
     const { box } = pillRun.dark;
-    return `${box.width}x${box.height} pill around a ${box.labelWidth} px label, ${box.padding} padding, radius ${box.radius}, primary-soft fill and primary 13 px label in both themes`;
+    return `${box.width}x${box.height} pill around a ${box.labelWidth} px label, ${box.padding} padding, radius ${box.radius}, primary-soft fill and its 14 px foreground label in both themes`;
   });
 
   // Nav / Avatar Chip (design node 0:76). Built as markup on the live page rather
