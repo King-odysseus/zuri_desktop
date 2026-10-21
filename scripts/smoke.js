@@ -522,9 +522,10 @@ app.whenReady().then(async () => {
   setStoreRoot(storeRoot);
 
   // Below 1000px the context panel starts collapsed. The breakpoint is read once
-  // at start, so the window has to be resized and reloaded to test it.
-  window.setSize(940, 800);
-  await wait(200);
+  // at start, so the window has to be resized and reloaded to test it. The resize
+  // must have reached the page before that reload: a fixed sleep here once let the
+  // fresh document read the old, wider viewport and start expanded.
+  await resizeAndSettle(window, 940, 800);
   await reloadAndWait(window);
   await wait(300); // the collapse animates over motion-base, so measure after it settles
   const narrow = await readShell(window);
@@ -541,7 +542,7 @@ app.whenReady().then(async () => {
   await window.webContents.executeJavaScript(
     `document.querySelector('.shell-toggle[aria-controls="context-panel"]').click() && true`,
   );
-  window.setSize(1200, 800);
+  await resizeAndSettle(window, 1200, 800);
   await wait(300);
   const widened = await readShell(window);
 
