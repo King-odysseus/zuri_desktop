@@ -36,6 +36,7 @@ This project was planned in the KAI Project Studio. Everything you need to conti
 - Start with browser_tabs, action "list". If it shows tabs you did not open, other agents are using this browser: open your own with browser_tabs, action "new", and work only in it. Never navigate, resize or close a tab that is not yours. If it shows a single blank tab, use that one.
 - Stay in that one tab. Navigate it with browser_navigate and change its size with browser_resize (390, 768, 1280 and 1920 wide) to look at each size. Do not open a second tab or window to compare sizes, do not open links in a new window, and do not start another browser.
 - At 390px wide, scroll to the bottom and confirm the navigation is still visible and the last item is not covered. At 1920px wide, confirm no large strip of the screen is empty.
+- browser_resize fixes a tab at that size, and the tab then ignores its window: maximising the browser changes nothing in it, and the rest of the window sits empty. So do all your resizing in a tab you opened yourself, never in a tab the person was already looking at, and close it when you finish with browser_tabs, action "close". Closing the tab removes the fixed size. If you used the single blank tab, close that one too.
 - When you finish, close the tab you opened with browser_tabs, action "close". Do not call browser_close: the browser is shared and will refuse.
 
 _This file is maintained by KAI while it carries the first line above. Delete that line to take it over._
