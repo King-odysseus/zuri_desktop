@@ -1,21 +1,73 @@
 {
   "name": "zuri-desktop",
+  "productName": "Zuri",
   "version": "0.1.0",
   "private": true,
   "description": "Zuri Desktop - a local AI command centre for Windows",
+  "author": "Zuri",
   "type": "module",
   "main": "src/main/main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "node scripts/preview.js --electron",
-    "preview": "node scripts/preview.js",
     "smoke": "electron scripts/smoke.js",
     "selftest": "node scripts/selftest.js",
     "firstrun": "electron scripts/firstrun.js",
-    "icon": "electron scripts/make-icon.js",
-    "test": "npm run smoke && npm run selftest && npm run firstrun"
+    "demo:act": "node scripts/demo-act.js",
+    "demo:autopilot": "node scripts/demo-autopilot.js",
+    "react:dev": "vite",
+    "react:build": "vite build",
+    "dist": "electron-builder --win nsis",
+    "test": "npm run react:build && npm run smoke && npm run selftest && npm run firstrun && npm run demo:act && npm run demo:autopilot"
   },
   "devDependencies": {
-    "electron": "^41.7.1"
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "electron": "^41.7.1",
+    "electron-builder": "^25.1.8",
+    "tailwindcss": "^4.3.3",
+    "vite": "^6.4.5"
+  },
+  "build": {
+    "appId": "com.zuri.desktop",
+    "productName": "Zuri",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "package.json",
+      "src/main/**/*",
+      "dist-react/**/*"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "src/main/assets/zuri-icon.ico",
+      "artifactName": "${productName}-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "installerIcon": "src/main/assets/zuri-icon.ico",
+      "uninstallerIcon": "src/main/assets/zuri-icon.ico",
+      "installerHeaderIcon": "src/main/assets/zuri-icon.ico",
+      "shortcutName": "Zuri",
+      "uninstallDisplayName": "Zuri ${version}"
+    }
+  },
+  "dependencies": {
+    "@heroui/react": "^3.2.6",
+    "@heroui/styles": "^3.2.6",
+    "framer-motion": "^14.6.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
   }
 }

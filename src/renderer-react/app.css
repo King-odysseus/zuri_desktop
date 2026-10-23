@@ -1,0 +1,57 @@
+/*
+ * HeroUI v3 ships its own Tailwind v4 entry: @heroui/styles pulls in tailwindcss,
+ * the base layer, every component's structure and the default theme (which carries
+ * the .dark / [data-theme="dark"] variable blocks the legacy app already toggles on
+ * <html>). @source tells Tailwind v4 which of our own files to scan for utility
+ * classes, since the renderer root only holds the mount point.
+ */
+@import "@heroui/styles";
+@source "./**/*.{jsx,js}";
+
+/*
+ * Maps the legacy app's navy/dark palette (src/renderer/styles/tokens.css)
+ * onto HeroUI's own variable names, in the layer HeroUI's theme already
+ * declares them in so this overrides rather than competes with it. Hex, not
+ * oklch, because these values are copied straight from tokens.css rather than
+ * recomputed - keeping the same numbers in both places is what keeps them
+ * from drifting apart again later.
+ */
+@layer base {
+  /* Light is the default look, matching the reference screen: white page, a
+     barely-grey list panel, near-black text and a single blue accent. */
+  [data-theme="light"] {
+    --background: #ffffff;
+    --foreground: #0d0d0d;
+    --surface: #ffffff;
+    --surface-foreground: #0d0d0d;
+    --surface-secondary: #f9f9f9;
+    --surface-secondary-foreground: #0d0d0d;
+    --surface-tertiary: #f3f3f3;
+    --surface-tertiary-foreground: #0d0d0d;
+    --default: #f0f0f0;
+    --default-foreground: #0d0d0d;
+    --muted: #8f8f8f;
+    --accent: #3b82f6;
+    --accent-foreground: #ffffff;
+    --border: #ececec;
+    --separator: #ececec;
+    --field-background: #ffffff;
+  }
+
+  [data-theme="dark"] {
+    --background: #0b0b0f;
+    --foreground: #f4f4f6;
+    --surface: #16161c;
+    --surface-foreground: #f4f4f6;
+    --surface-secondary: #10243b; /* tokens.css --zuri-sidebar-surface */
+    --surface-secondary-foreground: #f4f4f6;
+    --surface-tertiary: #3f3f46;
+    --surface-tertiary-foreground: #f4f4f6;
+    --default: #27272a;
+    --default-foreground: #f4f4f6;
+    --accent: #006fee; /* tokens.css --zuri-accent */
+    --accent-foreground: #ffffff;
+    --border: rgba(255, 255, 255, 0.1);
+    --separator: rgba(255, 255, 255, 0.1);
+  }
+}

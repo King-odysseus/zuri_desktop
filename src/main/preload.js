@@ -42,11 +42,28 @@ const CHANNELS = Object.freeze([
   'zuri:tasks:create',
   'zuri:tasks:update',
   'zuri:tasks:delete',
+  // The run card in the Context panel sums up the stored schedules and the runs
+  // on record, so it reads the same files the scheduler writes.
+  'zuri:automations:list',
+  'zuri:automations:create',
+  'zuri:automations:update',
+  'zuri:automations:delete',
+  'zuri:reminders:list',
+  'zuri:reminders:create',
+  'zuri:reminders:complete',
+  'zuri:notifications:list',
   'zuri:files:list',
   'zuri:files:open',
   'zuri:files:reveal',
   'zuri:files:choose',
   'zuri:files:summarize',
+  // The tool registry, so the agents page ticks the tools that really exist rather
+  // than trusting a copy kept in the renderer.
+  'zuri:tools:list',
+  // Running and stopping one Act step. A destructive tool still needs the
+  // confirmed flag in its payload, so the renderer cannot start one on its own.
+  'zuri:tools:run',
+  'zuri:tools:cancel',
 ]);
 
 // `zuri:<area>:<action>`, per the project naming convention.

@@ -20,7 +20,7 @@
  */
 
 import { DEFAULT_PROVIDER, PROVIDERS, getKey } from '../secrets.js';
-import { appendMessage, readStore } from '../store.js';
+import { appendMessage, findAgent, readStore } from '../store.js';
 
 /**
  * Channel main pushes token events on. It is a one-way push, not an `invoke`
@@ -56,7 +56,8 @@ const MAX_ERROR_DETAIL = 240;
 
 /**
  * Everything that differs between providers. One entry per provider in
- * secrets.PROVIDERS, so a new provider is a table entry plus a delta reader.
+ * secrets.PROVIDERS, so a new provider is a table entry, plus a delta reader only
+ * when the provider does not speak the OpenAI dialect.
  */
 const PROVIDER_CONFIG = Object.freeze({
   openai: Object.freeze({
@@ -64,12 +65,43 @@ const PROVIDER_CONFIG = Object.freeze({
     endpoint: 'https://api.openai.com/v1/chat/completions',
     defaultModel: 'gpt-4o-mini',
     version: '2024-06-01',
+    modelPattern: /^(gpt-|chatgpt-|o1|o3)/,
   }),
   anthropic: Object.freeze({
     label: 'Anthropic',
     endpoint: 'https://api.anthropic.com/v1/messages',
     defaultModel: 'claude-3-5-haiku-latest',
     version: '2023-06-01',
+    modelPattern: /^claude-/,
+  }),
+  // DeepSeek, Kimi and GLM all speak the OpenAI chat-completions dialect, so each
+  // needs no delta reader or request body of its own: requestBody, requestHeaders
+  // and deltaText take the OpenAI branch for them, and a provider stays a table
+  // entry. A reasoning model may also stream reasoning_content, which the reader
+  // ignores, so thinking models work without a second code path.
+  deepseek: Object.freeze({
+    label: 'DeepSeek',
+    endpoint: 'https://api.deepseek.com/chat/completions',
+    // `deepseek-flash` is the current id and is served by DeepSeek-V4.1-Flash-1017.
+    // The older `deepseek-chat` and `deepseek-reasoner` aliases were retired in July
+    // 2026, so they must not be used as a fallback or a default.
+    defaultModel: 'deepseek-flash',
+    version: '2024-06-01',
+    modelPattern: /^deepseek-/,
+  }),
+  moonshot: Object.freeze({
+    label: 'Kimi',
+    endpoint: 'https://api.moonshot.ai/v1/chat/completions',
+    defaultModel: 'kimi-k3',
+    version: '2024-06-01',
+    modelPattern: /^kimi-/,
+  }),
+  zai: Object.freeze({
+    label: 'Z.ai GLM',
+    endpoint: 'https://api.z.ai/api/paas/v4/chat/completions',
+    defaultModel: 'glm-5.3',
+    version: '2024-06-01',
+    modelPattern: /^glm-/,
   }),
 });
 
@@ -106,19 +138,23 @@ function redact(value) {
  * Order: the provider named in settings, then the first provider that actually has
  * a key, then the default. Falling back to a provider that has a key is what makes
  * a stored Anthropic key work without the user also having to name it.
- * A model saved for a different provider is ignored, so a model name can never be
- * sent to the wrong API.
+ * A model is only reused when it belongs to the provider that won, so a model name
+ * can never be sent to the wrong API.
  * @param {any} settings The store's settings object.
- * @returns {{ provider: 'openai'|'anthropic', model: string }}
+ * @returns {{ provider: 'openai'|'anthropic'|'deepseek'|'moonshot'|'zai', model: string }}
  */
 export function resolveChatTarget(settings) {
   const configured = PROVIDERS.includes(settings?.provider) ? settings.provider : null;
   const provider = configured ?? PROVIDERS.find((name) => getKey(name) !== null) ?? DEFAULT_PROVIDER;
 
-  const savedModel = provider === configured ? settings?.model : undefined;
+  // Ownership, not equality, decides this. Settings carry a model even when the
+  // provider changed afterwards (the defaults hold gpt-4o), so trusting the saved
+  // name would send gpt-4o to DeepSeek or Anthropic and fail a request the person
+  // cannot fix from the error. A name that does not belong falls back instead.
+  const savedModel = typeof settings?.model === 'string' ? settings.model.trim() : '';
   const model =
-    typeof savedModel === 'string' && savedModel.trim() !== ''
-      ? savedModel.trim()
+    savedModel !== '' && PROVIDER_CONFIG[provider].modelPattern.test(savedModel)
+      ? savedModel
       : PROVIDER_CONFIG[provider].defaultModel;
 
   return { provider, model };
@@ -150,7 +186,7 @@ function splitMessages(messages) {
 /**
  * Request body per provider. Kept together so a second provider's shape sits
  * next to the first rather than in a second code path.
- * @param {'openai'|'anthropic'} provider
+ * @param {'openai'|'anthropic'|'deepseek'|'moonshot'|'zai'} provider
  * @param {string} model
  * @param {{ system: string, turns: { role: string, content: string }[] }} conversation
  * @returns {Record<string, unknown>}
@@ -179,7 +215,7 @@ function requestBody(provider, model, conversation) {
 
 /**
  * Auth headers per provider. The key is written here and nowhere else.
- * @param {'openai'|'anthropic'} provider
+ * @param {'openai'|'anthropic'|'deepseek'|'moonshot'|'zai'} provider
  * @param {string} key
  * @returns {Record<string, string>}
  */
@@ -202,7 +238,7 @@ function requestHeaders(provider, key) {
 
 /**
  * The text in one streamed event, or '' when the event carries none.
- * @param {'openai'|'anthropic'} provider
+ * @param {'openai'|'anthropic'|'deepseek'|'moonshot'|'zai'} provider
  * @param {any} event Parsed JSON from one `data:` line.
  * @returns {string}
  */
@@ -282,7 +318,7 @@ async function readEventStream(body, onEvent) {
  * Send one conversation to the configured provider and collect the streamed reply.
  * This is the single request path: chat and document summaries both come through
  * it, so the provider's error mapping lives in one place.
- * @param {'openai'|'anthropic'} provider
+ * @param {'openai'|'anthropic'|'deepseek'|'moonshot'|'zai'} provider
  * @param {string} model
  * @param {string} key
  * @param {{ system: string, turns: { role: string, content: string }[] }} conversation
@@ -292,6 +328,14 @@ async function readEventStream(body, onEvent) {
 async function streamReply(provider, model, key, conversation, options = {}) {
   const config = PROVIDER_CONFIG[provider];
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+
+  // Reaching this line takes a few milliseconds (the thread and the key are read
+  // first), so Stop can land while the reply is still being prepared. Nothing is left
+  // to ask for then: report the stop and send nothing. Guarding here also keeps the
+  // request from going out with a signal that has already fired.
+  if (options.signal?.aborted) {
+    return failure('CHAT_STOPPED', 'That reply was stopped before it arrived.');
+  }
 
   let response;
   try {
@@ -477,8 +521,18 @@ export async function sendChatMessage(threadId, options = {}) {
     return failure('CHAT_EMPTY_THREAD', 'There is nothing in this chat to reply to yet.');
   }
 
-  const { provider, model } = resolveChatTarget((await readStore('settings')).data);
+  const settings = (await readStore('settings')).data;
+  const { provider, model } = resolveChatTarget(settings);
   const config = PROVIDER_CONFIG[provider];
+
+  // An agent's system prompt rides in front of any the thread already carries, so
+  // the picked agent decides how the reply is written without losing the thread's own.
+  const agent = findAgent(settings, options.agentId);
+  if (agent !== null && agent.systemPrompt.trim() !== '') {
+    conversation.system = [agent.systemPrompt.trim(), conversation.system]
+      .filter((part) => part !== '')
+      .join('\n\n');
+  }
 
   const key = getKey(provider);
   if (key === null) {

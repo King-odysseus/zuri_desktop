@@ -49,6 +49,13 @@ export const DEFAULT_DATA = Object.freeze({
     model: 'gpt-4o',
     allowedApps: Object.freeze([]),
     allowedUrls: Object.freeze([]),
+    // The floating quick-ask window is opt-in: it sits above every other application,
+    // so it opens at launch only after the person switches it on in Settings.
+    overlayEnabled: false,
+    // The chat the main window last had on screen. The overlay appends to this thread,
+    // so a question asked from over another application lands in the conversation the
+    // person was reading. Written by the chat view; empty until a thread is opened.
+    activeThreadId: '',
   }),
 });
 
@@ -285,6 +292,37 @@ export async function saveSettings(patch, options = {}) {
 
     return { ok: true, data: next };
   });
+}
+
+/**
+ * One agent record out of settings.json: `{ id, name, systemPrompt, allowedTools }`.
+ *
+ * The chat adapter and the tool registry both want this normalised shape rather
+ * than the raw entry: a record with no prompt still has to be trimmable, and one
+ * with no allow-list still has to be iterable. An empty id means "whoever is
+ * active", which is what the composer sends when no agent is picked; with no
+ * active agent either there is no agent, and the caller keeps plain chat
+ * behaviour.
+ * @param {object} settings
+ * @param {string} [agentId] Defaults to `settings.activeAgentId`.
+ * @returns {{ id: string, name: string, systemPrompt: string, allowedTools: string[] } | null}
+ */
+export function findAgent(settings, agentId = '') {
+  const agents = Array.isArray(settings?.agents) ? settings.agents : [];
+  const wanted = typeof agentId === 'string' && agentId !== '' ? agentId : settings?.activeAgentId;
+  if (typeof wanted !== 'string' || wanted === '') return null;
+
+  const found = agents.find((agent) => agent?.id === wanted);
+  if (found === undefined) return null;
+
+  return {
+    id: found.id,
+    name: typeof found.name === 'string' ? found.name : '',
+    systemPrompt: typeof found.systemPrompt === 'string' ? found.systemPrompt : '',
+    allowedTools: Array.isArray(found.allowedTools)
+      ? found.allowedTools.filter((tool) => typeof tool === 'string')
+      : [],
+  };
 }
 
 /* ---------------------------------------------------------------------------
@@ -736,6 +774,1068 @@ function normaliseTitle(text) {
   const flat = text.replace(/\s+/g, ' ').trim();
   if (flat.length <= THREAD_TITLE_MAX_LENGTH) return flat;
   return `${flat.slice(0, THREAD_TITLE_MAX_LENGTH - 3).trimEnd()}...`;
+}
+
+/* ---------------------------------------------------------------------------
+   Reminders
+
+   reminders.json holds one entry per reminder: what to nudge about, when it next
+   fires, and how it repeats. `dueAt` is the entire schedule - the tick in
+   reminders.js only compares it with the clock - so a reminder that can still
+   fire carries one, and a finished one carries null.
+
+   A reminder is `{ id, title, repeat: 'once' | 'interval' | 'daily', dueAt,
+   intervalMinutes, timeOfDay, status: 'pending' | 'done', lastFiredAt, createdAt,
+   updatedAt, completedAt }`. Only the field the repeat rule names is filled:
+   interval keeps `intervalMinutes`, daily keeps `timeOfDay`, once keeps neither,
+   so a row cannot read back a rule it is not on.
+   ------------------------------------------------------------------------- */
+
+/** Gap used for an interval reminder the caller gave no usable gap for. */
+export const REMINDER_INTERVAL_DEFAULT_MINUTES = 60;
+/** The repeat rules the Reminders page offers, in the order it lists them. */
+export const REMINDER_REPEATS = Object.freeze(['once', 'interval', 'daily']);
+export const REMINDER_TITLE_MAX_LENGTH = 200;
+
+/**
+ * Serialises reminder writes. A save from the view and a fire from the ten-second
+ * tick are both read-modify-write on one file: without this the second would read
+ * the list the first is about to replace and drop the change.
+ * @type {Promise<void>}
+ */
+let remindersChain = Promise.resolve();
+
+/**
+ * @param {() => Promise<T>} task
+ * @returns {Promise<T>}
+ * @template T
+ */
+function withRemindersLock(task) {
+  const result = remindersChain.then(task, task);
+  remindersChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string}
+ */
+function normaliseReminderTitle(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, REMINDER_TITLE_MAX_LENGTH);
+}
+
+/**
+ * Minutes past midnight for an "HH:MM" string. reminders.js uses the same reader
+ * to work out when a daily reminder next fires, so the two agree on what the
+ * stored time means.
+ * @param {unknown} value
+ * @returns {number|null} null when the value is not a 24-hour clock time.
+ */
+export function parseTimeOfDay(value) {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value.trim());
+  if (match === null) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
+}
+
+/**
+ * @param {number} minutes Minutes past midnight.
+ * @returns {string} The same moment as "HH:MM".
+ */
+function formatTimeOfDay(minutes) {
+  const hours = String(Math.floor(minutes / 60)).padStart(2, '0');
+  const rest = String(minutes % 60).padStart(2, '0');
+  return `${hours}:${rest}`;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {number} Whole minutes, at least one.
+ */
+function normaliseReminderInterval(value) {
+  const minutes = Number(value);
+  if (!Number.isFinite(minutes) || minutes < 1) return REMINDER_INTERVAL_DEFAULT_MINUTES;
+  return Math.floor(minutes);
+}
+
+/**
+ * @param {Date} date
+ * @returns {string} The wall clock of `date`, local time, as "HH:MM".
+ */
+function clockOf(date) {
+  return formatTimeOfDay(date.getHours() * 60 + date.getMinutes());
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string|undefined} 'once' when nothing was named; undefined when the
+ *   value is not one of REMINDER_REPEATS.
+ */
+function normaliseReminderRepeat(value) {
+  if (value === undefined || value === null || value === '') return 'once';
+  const candidate = String(value).toLowerCase();
+  return REMINDER_REPEATS.includes(candidate) ? candidate : undefined;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string|null|undefined} null means "no fire time", undefined means
+ *   "not a date".
+ */
+function normaliseReminderDue(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') return undefined;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return undefined;
+  return parsed.toISOString();
+}
+
+/**
+ * A stored entry is only a reminder if it can name itself; anything else in the
+ * file (a hand edit, an older shape) is skipped rather than crashing the list.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isReminderEntry(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.id === 'string' &&
+    typeof value.title === 'string'
+  );
+}
+
+/**
+ * Pending before done, then the soonest fire first. A reminder with no `dueAt`
+ * has nothing left to fire, so it sorts last whatever its status says.
+ * @param {object} left
+ * @param {object} right
+ * @returns {number}
+ */
+function compareReminders(left, right) {
+  const leftDone = left.status === 'done' ? 1 : 0;
+  const rightDone = right.status === 'done' ? 1 : 0;
+  if (leftDone !== rightDone) return leftDone - rightDone;
+
+  const leftDue = typeof left.dueAt === 'string' ? Date.parse(left.dueAt) : Number.POSITIVE_INFINITY;
+  const rightDue = typeof right.dueAt === 'string' ? Date.parse(right.dueAt) : Number.POSITIVE_INFINITY;
+  if (leftDue !== rightDue) return leftDue - rightDue;
+
+  return String(left.createdAt ?? '').localeCompare(String(right.createdAt ?? ''));
+}
+
+/**
+ * The reminders still to come, soonest first. A done reminder is history, so it
+ * is not in this list: the Reminders page and the right-hand rail both draw what
+ * is left to fire.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object[] } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function listReminders(options = {}) {
+  const read = await readStore('reminders', options);
+  if (!read.ok) return read;
+  return {
+    ok: true,
+    data: read.data
+      .filter(isReminderEntry)
+      .filter((reminder) => reminder.status !== 'done')
+      .sort(compareReminders),
+  };
+}
+
+/**
+ * Add one reminder and return it. The id, the timestamps and `status: 'pending'`
+ * are set here, so a renderer cannot invent a reminder the tick would then skip.
+ * @param {{ title?: unknown, repeat?: unknown, dueAt?: unknown, intervalMinutes?: unknown, timeOfDay?: unknown }} input
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function createReminder(input, options = {}) {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return failure('REMINDER_INVALID_INPUT', 'Saving a reminder expects the fields to save.');
+  }
+
+  const title = normaliseReminderTitle(input.title);
+  if (title === '') {
+    return failure('REMINDER_TITLE_REQUIRED', 'A reminder needs a title before it can be saved.');
+  }
+
+  const repeat = normaliseReminderRepeat(input.repeat);
+  if (repeat === undefined) {
+    return failure('REMINDER_INVALID_REPEAT', `The repeat must be one of ${REMINDER_REPEATS.join(', ')}.`);
+  }
+
+  const due = normaliseReminderDue(input.dueAt);
+  if (due === undefined) {
+    return failure('REMINDER_INVALID_DUE', 'The reminder needs a date and time, or none at all.');
+  }
+  // Every rule fires from a moment and the tick only compares that moment with the
+  // clock, so a reminder with no dueAt could never fire and never be listed.
+  if (due === null) {
+    return failure('REMINDER_INVALID_DUE', 'Pick a date and time for the reminder.');
+  }
+
+  const intervalMinutes = repeat === 'interval' ? normaliseReminderInterval(input.intervalMinutes) : null;
+
+  let timeOfDay = null;
+  if (repeat === 'daily') {
+    const named = typeof input.timeOfDay === 'string' && input.timeOfDay.trim() !== '';
+    const minutes = parseTimeOfDay(input.timeOfDay);
+    if (named && minutes === null) {
+      return failure('REMINDER_INVALID_TIME', 'The daily time must be a 24-hour time such as 09:30.');
+    }
+    // The first fire time is the wall clock the reminder repeats at, so a daily
+    // reminder saved without a time repeats at the time it was given.
+    timeOfDay = minutes === null ? clockOf(new Date(due)) : formatTimeOfDay(minutes);
+  }
+
+  const now = new Date().toISOString();
+
+  return withRemindersLock(async () => {
+    const read = await readStore('reminders', options);
+    if (!read.ok) return read;
+
+    const reminder = {
+      id: randomUUID(),
+      title,
+      repeat,
+      dueAt: due,
+      intervalMinutes,
+      timeOfDay,
+      status: 'pending',
+      lastFiredAt: null,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+    };
+    const next = [...read.data.filter(isReminderEntry), reminder].sort(compareReminders);
+    const written = await writeStore('reminders', next, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: reminder };
+  });
+}
+
+/**
+ * Mark one reminder done. A done reminder has no next fire, so clearing `dueAt`
+ * is what keeps the tick from picking it up again.
+ * @param {string} reminderId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function completeReminder(reminderId, options = {}) {
+  if (typeof reminderId !== 'string' || reminderId === '') {
+    return failure('REMINDER_INVALID_ID', 'Which reminder to mark done was not given.');
+  }
+
+  return withRemindersLock(async () => {
+    const read = await readStore('reminders', options);
+    if (!read.ok) return read;
+
+    const reminders = read.data.filter(isReminderEntry);
+    const index = reminders.findIndex((reminder) => reminder.id === reminderId);
+    if (index === -1) {
+      return failure('REMINDER_NOT_FOUND', 'That reminder is no longer in reminders.json. Reload the list.');
+    }
+
+    const now = new Date().toISOString();
+    const next = {
+      ...reminders[index],
+      status: 'done',
+      dueAt: null,
+      completedAt: now,
+      updatedAt: now,
+    };
+    reminders[index] = next;
+
+    const written = await writeStore('reminders', [...reminders].sort(compareReminders), options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: next };
+  });
+}
+
+/**
+ * Record that a reminder fired and move it to its next fire. `dueAt: null` means
+ * the rule has no next fire, which is how a one-off leaves the pending list.
+ * @param {string} reminderId
+ * @param {{ dueAt?: unknown, firedAt?: unknown }} patch
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function recordReminderFire(reminderId, patch = {}, options = {}) {
+  if (typeof reminderId !== 'string' || reminderId === '') {
+    return failure('REMINDER_INVALID_ID', 'Which reminder fired was not given.');
+  }
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    return failure('REMINDER_INVALID_PATCH', 'Recording a reminder fire expects an object of the fields to change.');
+  }
+
+  const due = normaliseReminderDue(patch.dueAt);
+  if (due === undefined) {
+    return failure('REMINDER_INVALID_DUE', 'The next fire time must be a date, or empty for a reminder that is finished.');
+  }
+  const fired = normaliseReminderDue(patch.firedAt);
+  if (fired === undefined) {
+    return failure('REMINDER_INVALID_FIRED_AT', 'The moment the reminder fired must be a date.');
+  }
+
+  return withRemindersLock(async () => {
+    const read = await readStore('reminders', options);
+    if (!read.ok) return read;
+
+    const reminders = read.data.filter(isReminderEntry);
+    const index = reminders.findIndex((reminder) => reminder.id === reminderId);
+    if (index === -1) {
+      return failure('REMINDER_NOT_FOUND', 'That reminder is no longer in reminders.json.');
+    }
+
+    const firedAt = fired ?? new Date().toISOString();
+    const next = { ...reminders[index], dueAt: due, lastFiredAt: firedAt, updatedAt: firedAt };
+    if (due === null) {
+      next.status = 'done';
+      next.completedAt = firedAt;
+    }
+
+    reminders[index] = next;
+    const written = await writeStore('reminders', [...reminders].sort(compareReminders), options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: next };
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   Automations
+
+   schedules.json holds one entry per automation: `{ id, prompt, mode, cadence,
+   agentId, allowedTools, lastRunAt }` plus the scheduling bookkeeping the tick
+   reads (`enabled`, `nextRunAt`) and the two timestamps. `cadence` is the rule and
+   is one of `{ type: 'once', at }`, `{ type: 'interval', minutes }` or
+   `{ type: 'daily', timeOfDay }`. `nextRunAt` is that same rule as a moment, kept
+   in the file so a run missed while Zuri was closed can be replayed on launch
+   (scheduler.js only compares `nextRunAt` with the clock).
+   ------------------------------------------------------------------------- */
+
+export const AUTOMATION_MODES = Object.freeze(['ask', 'act', 'autopilot']);
+export const AUTOMATION_CADENCE_TYPES = Object.freeze(['once', 'interval', 'daily']);
+export const AUTOMATION_PROMPT_MAX_LENGTH = 2000;
+
+/**
+ * Serialises schedule writes. Create, edit and delete are each a read-modify-write
+ * of the same file, and two of them in one tick would otherwise lose an entry.
+ * @type {Promise<void>}
+ */
+let schedulesChain = Promise.resolve();
+
+/**
+ * @param {() => Promise<T>} task
+ * @returns {Promise<T>}
+ * @template T
+ */
+function withSchedulesLock(task) {
+  const result = schedulesChain.then(task, task);
+  schedulesChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string} The prompt without its surrounding whitespace, capped to what
+ *   the chat view can hold comfortably.
+ */
+export function normaliseAutomationPrompt(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().slice(0, AUTOMATION_PROMPT_MAX_LENGTH);
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string|undefined} 'ask' when nothing was named, because an automation
+ *   that only reads is the safe default; undefined when the mode is not one of
+ *   AUTOMATION_MODES.
+ */
+function normaliseAutomationMode(value) {
+  if (value === undefined || value === null || value === '') return 'ask';
+  const candidate = String(value).toLowerCase();
+  return AUTOMATION_MODES.includes(candidate) ? candidate : undefined;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string} An agent id, or '' for "whoever is active".
+ */
+function normaliseAutomationAgentId(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * The allow-list as stored: names only, no repeats, order kept so the same pick
+ * reads the same way twice.
+ * @param {unknown} value
+ * @returns {string[]}
+ */
+function normaliseAutomationTools(value) {
+  if (!Array.isArray(value)) return [];
+  const names = new Set();
+  for (const entry of value) {
+    if (typeof entry !== 'string') continue;
+    const name = entry.trim();
+    if (name !== '') names.add(name);
+  }
+  return [...names];
+}
+
+/**
+ * @param {unknown} value
+ * @returns {string|null} An ISO moment, or null when the value is not a date.
+ */
+function normaliseAutomationAt(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string' && typeof value !== 'number') return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+}
+
+/**
+ * The cadence exactly as schedules.json stores it.
+ *
+ * The reader is strict rather than forgiving: a cadence the tick cannot read would
+ * be stored forever and never fire, so a bad one is refused while the person is
+ * still looking at the form.
+ * @param {unknown} value
+ * @returns {{ ok: true, data: object } | { ok: false, error: string }}
+ */
+export function normaliseAutomationCadence(value) {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return { ok: false, error: 'A schedule needs a cadence: once, every few minutes, or daily.' };
+  }
+
+  const type = typeof value.type === 'string' ? value.type.trim().toLowerCase() : '';
+  if (!AUTOMATION_CADENCE_TYPES.includes(type)) {
+    return { ok: false, error: `The cadence must be one of ${AUTOMATION_CADENCE_TYPES.join(', ')}.` };
+  }
+
+  if (type === 'once') {
+    const at = normaliseAutomationAt(value.at);
+    if (at === null) {
+      return { ok: false, error: 'A one-off automation needs the date and time it runs.' };
+    }
+    return { ok: true, data: { type, at } };
+  }
+
+  if (type === 'interval') {
+    const minutes = Number(value.minutes);
+    if (!Number.isFinite(minutes) || minutes < 1) {
+      return { ok: false, error: 'The gap between runs must be at least one minute.' };
+    }
+    return { ok: true, data: { type, minutes: Math.floor(minutes) } };
+  }
+
+  const clock = parseTimeOfDay(value.timeOfDay);
+  if (clock === null) {
+    return { ok: false, error: 'The daily time must be a 24-hour time such as 09:30.' };
+  }
+  return { ok: true, data: { type, timeOfDay: formatTimeOfDay(clock) } };
+}
+
+/**
+ * The moment a cadence next comes round, in local time.
+ *
+ * `once` keeps its own moment; `interval` counts from the clock the caller hands
+ * in (so an edit or a finished run can move it forward); `daily` is today's time
+ * of day if that has not passed yet, otherwise tomorrow's.
+ * @param {{ type: string, at?: string, minutes?: number, timeOfDay?: string }} cadence
+ * @param {number} [from] Clock in milliseconds.
+ * @returns {string|null} An ISO moment, or null when the cadence cannot be read.
+ */
+export function nextRunAtFor(cadence, from = Date.now()) {
+  if (cadence === null || typeof cadence !== 'object') return null;
+  if (!Number.isFinite(from)) return null;
+
+  if (cadence.type === 'once') {
+    return normaliseAutomationAt(cadence.at);
+  }
+
+  if (cadence.type === 'interval') {
+    const minutes = Number(cadence.minutes);
+    if (!Number.isFinite(minutes) || minutes < 1) return null;
+    return new Date(from + Math.floor(minutes) * 60_000).toISOString();
+  }
+
+  if (cadence.type === 'daily') {
+    const clock = parseTimeOfDay(cadence.timeOfDay);
+    if (clock === null) return null;
+    const now = new Date(from);
+    const next = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+      Math.floor(clock / 60),
+      clock % 60,
+      0,
+      0,
+    );
+    if (next.getTime() <= from) next.setDate(next.getDate() + 1);
+    return next.toISOString();
+  }
+
+  return null;
+}
+
+/**
+ * A stored entry is only an automation if it can name itself and state its rule;
+ * anything else in the file is skipped rather than crashing the list.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isAutomationEntry(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.id === 'string' &&
+    typeof value.prompt === 'string' &&
+    value.cadence !== null &&
+    typeof value.cadence === 'object'
+  );
+}
+
+/**
+ * Soonest run first, paused ones last: the automations page is a schedule, not an
+ * archive, so what fires next is what the person needs at the top.
+ * @param {object} left
+ * @param {object} right
+ * @returns {number}
+ */
+function compareAutomations(left, right) {
+  const leftPaused = left.enabled === false ? 1 : 0;
+  const rightPaused = right.enabled === false ? 1 : 0;
+  if (leftPaused !== rightPaused) return leftPaused - rightPaused;
+
+  const leftNext =
+    typeof left.nextRunAt === 'string' ? Date.parse(left.nextRunAt) : Number.POSITIVE_INFINITY;
+  const rightNext =
+    typeof right.nextRunAt === 'string' ? Date.parse(right.nextRunAt) : Number.POSITIVE_INFINITY;
+  if (Number.isFinite(leftNext) && Number.isFinite(rightNext) && leftNext !== rightNext) {
+    return leftNext - rightNext;
+  }
+
+  return String(left.createdAt ?? '').localeCompare(String(right.createdAt ?? ''));
+}
+
+/**
+ * Every automation in schedules.json, in the order the page draws them.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object[] } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function listAutomations(options = {}) {
+  const read = await readStore('schedules', options);
+  if (!read.ok) return read;
+  return {
+    ok: true,
+    data: read.data.filter(isAutomationEntry).sort(compareAutomations),
+  };
+}
+
+/**
+ * Add one automation and return it. The id, `lastRunAt: null` and `nextRunAt` are
+ * set here rather than accepted from the caller, so a renderer cannot hand the
+ * tick an automation it would then skip forever.
+ * @param {{ prompt?: unknown, mode?: unknown, cadence?: unknown, agentId?: unknown, allowedTools?: unknown }} input
+ * @param {{ root?: string, now?: number }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function createAutomation(input, options = {}) {
+  if (input === null || typeof input !== 'object' || Array.isArray(input)) {
+    return failure('AUTOMATION_INVALID_INPUT', 'Saving an automation expects the fields to save.');
+  }
+
+  const prompt = normaliseAutomationPrompt(input.prompt);
+  if (prompt === '') {
+    return failure('AUTOMATION_PROMPT_REQUIRED', 'An automation needs a prompt to run.');
+  }
+
+  const mode = normaliseAutomationMode(input.mode);
+  if (mode === undefined) {
+    return failure(
+      'AUTOMATION_INVALID_MODE',
+      `The mode must be one of ${AUTOMATION_MODES.join(', ')}.`,
+    );
+  }
+
+  const cadence = normaliseAutomationCadence(input.cadence);
+  if (!cadence.ok) {
+    return failure('AUTOMATION_INVALID_CADENCE', cadence.error);
+  }
+
+  const now = Number.isFinite(options.now) ? options.now : Date.now();
+  const nowIso = new Date(now).toISOString();
+  const entry = {
+    id: randomUUID(),
+    prompt,
+    mode,
+    cadence: cadence.data,
+    agentId: normaliseAutomationAgentId(input.agentId),
+    allowedTools: normaliseAutomationTools(input.allowedTools),
+    lastRunAt: null,
+    enabled: true,
+    // Kept alongside the rule so the tick only has to compare one moment with the
+    // clock, and so a run missed while Zuri was closed is visible after a restart.
+    nextRunAt: nextRunAtFor(cadence.data, now),
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  };
+
+  return withSchedulesLock(async () => {
+    const read = await readStore('schedules', options);
+    if (!read.ok) return read;
+
+    const schedules = read.data.filter(isAutomationEntry);
+    const written = await writeStore(
+      'schedules',
+      [...schedules, entry].sort(compareAutomations),
+      options,
+    );
+    if (!written.ok) return written;
+
+    return { ok: true, data: entry };
+  });
+}
+
+/**
+ * Change the named fields of one automation. Only the fields in `patch` change, so
+ * the page can save a new prompt without resending the cadence, and the next run
+ * moves only when the rule or the pause state does.
+ * @param {string} automationId
+ * @param {{ prompt?: unknown, mode?: unknown, cadence?: unknown, agentId?: unknown, allowedTools?: unknown, enabled?: unknown, lastRunAt?: unknown }} patch
+ * @param {{ root?: string, now?: number }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function updateAutomation(automationId, patch = {}, options = {}) {
+  if (typeof automationId !== 'string' || automationId === '') {
+    return failure('AUTOMATION_INVALID_ID', 'Which automation to change was not given.');
+  }
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    return failure(
+      'AUTOMATION_INVALID_PATCH',
+      'Changing an automation expects an object of the fields to change.',
+    );
+  }
+
+  const next = {};
+  if (Object.hasOwn(patch, 'prompt')) {
+    const prompt = normaliseAutomationPrompt(patch.prompt);
+    if (prompt === '') {
+      return failure('AUTOMATION_PROMPT_REQUIRED', 'An automation needs a prompt to run.');
+    }
+    next.prompt = prompt;
+  }
+  if (Object.hasOwn(patch, 'mode')) {
+    const mode = normaliseAutomationMode(patch.mode);
+    if (mode === undefined) {
+      return failure(
+        'AUTOMATION_INVALID_MODE',
+        `The mode must be one of ${AUTOMATION_MODES.join(', ')}.`,
+      );
+    }
+    next.mode = mode;
+  }
+  if (Object.hasOwn(patch, 'cadence')) {
+    const cadence = normaliseAutomationCadence(patch.cadence);
+    if (!cadence.ok) {
+      return failure('AUTOMATION_INVALID_CADENCE', cadence.error);
+    }
+    next.cadence = cadence.data;
+  }
+  if (Object.hasOwn(patch, 'agentId')) {
+    next.agentId = normaliseAutomationAgentId(patch.agentId);
+  }
+  if (Object.hasOwn(patch, 'allowedTools')) {
+    next.allowedTools = normaliseAutomationTools(patch.allowedTools);
+  }
+  if (Object.hasOwn(patch, 'enabled')) {
+    next.enabled = patch.enabled !== false;
+  }
+  if (Object.hasOwn(patch, 'lastRunAt')) {
+    const lastRunAt = normaliseAutomationAt(patch.lastRunAt);
+    if (lastRunAt === null && patch.lastRunAt !== null) {
+      return failure('AUTOMATION_INVALID_LAST_RUN', 'The last run must be a date, or empty.');
+    }
+    next.lastRunAt = lastRunAt;
+  }
+
+  const now = Number.isFinite(options.now) ? options.now : Date.now();
+
+  return withSchedulesLock(async () => {
+    const read = await readStore('schedules', options);
+    if (!read.ok) return read;
+
+    const schedules = read.data.filter(isAutomationEntry);
+    const index = schedules.findIndex((schedule) => schedule.id === automationId);
+    if (index === -1) {
+      return failure('AUTOMATION_NOT_FOUND', 'That automation is no longer in schedules.json.');
+    }
+
+    const current = schedules[index];
+    const updated = { ...current, ...next, updatedAt: new Date(now).toISOString() };
+    // The tick fires on `nextRunAt` alone, so it is recomputed whenever the rule or
+    // the pause state changes: a paused automation keeps its moment, and resuming
+    // picks the next one up from now rather than replaying the whole pause.
+    if (Object.hasOwn(next, 'cadence') || (Object.hasOwn(next, 'enabled') && updated.enabled)) {
+      updated.nextRunAt = nextRunAtFor(updated.cadence, now);
+    }
+
+    schedules[index] = updated;
+    const written = await writeStore('schedules', [...schedules].sort(compareAutomations), options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: updated };
+  });
+}
+
+/**
+ * Remove one automation from schedules.json.
+ * @param {string} automationId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { id: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function deleteAutomation(automationId, options = {}) {
+  if (typeof automationId !== 'string' || automationId === '') {
+    return failure('AUTOMATION_INVALID_ID', 'Which automation to delete was not given.');
+  }
+
+  return withSchedulesLock(async () => {
+    const read = await readStore('schedules', options);
+    if (!read.ok) return read;
+
+    const schedules = read.data.filter(isAutomationEntry);
+    const remaining = schedules.filter((schedule) => schedule.id !== automationId);
+    if (remaining.length === schedules.length) {
+      return failure('AUTOMATION_NOT_FOUND', 'That automation is no longer in schedules.json.');
+    }
+
+    const written = await writeStore('schedules', remaining, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { id: automationId } };
+  });
+}
+
+
+/* ---------------------------------------------------------------------------
+   Runs
+
+   runs.json is the scheduler's log: one entry per automation that fired, written
+   before the first step runs and updated when the last one finishes, so a crash
+   mid-run leaves a `running` row rather than no trace of it. An entry is
+   `{ id, automationId, title, mode, status, startedAt, finishedAt, stepsDone,
+   stepsTotal, needsAttention, resultPath, error }`.
+
+   The order is newest first: the run card in the Context panel reads the top of
+   the file, and the runs page pages backwards from it.
+   ------------------------------------------------------------------------- */
+
+/** The three states a run can be in; `running` is the one written at the start. */
+export const RUN_STATUSES = Object.freeze(['running', 'completed', 'failed']);
+
+/** The log is capped so a minute-by-minute automation cannot grow it without end. */
+export const RUNS_MAX_ENTRIES = 500;
+
+/**
+ * Serialises run writes. Start and finish are each a read-modify-write of the same
+ * file, and two automations due on one tick would otherwise lose a row.
+ * @type {Promise<void>}
+ */
+let runsChain = Promise.resolve();
+
+/**
+ * @param {() => Promise<T>} task
+ * @returns {Promise<T>}
+ * @template T
+ */
+function withRunsLock(task) {
+  const result = runsChain.then(task, task);
+  runsChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+/**
+ * A stored row is only a run if it can name itself and say where it got to;
+ * anything else in the file is skipped rather than crashing the list.
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isRunEntry(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.id === 'string' &&
+    typeof value.startedAt === 'string' &&
+    typeof value.status === 'string'
+  );
+}
+
+/**
+ * Newest start first. Ties fall back to id so two runs starting in the same
+ * millisecond keep a stable order across reads.
+ * @param {object} left
+ * @param {object} right
+ * @returns {number}
+ */
+function compareRuns(left, right) {
+  const byStart = Date.parse(right.startedAt) - Date.parse(left.startedAt);
+  if (Number.isFinite(byStart) && byStart !== 0) return byStart;
+  return String(left.id ?? '').localeCompare(String(right.id ?? ''));
+}
+
+/**
+ * The run log, newest first.
+ * @param {{ root?: string, limit?: number }} [options]
+ * @returns {Promise<{ ok: true, data: object[] } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function listRuns(options = {}) {
+  const read = await readStore('runs', options);
+  if (!read.ok) return read;
+
+  const runs = read.data.filter(isRunEntry).sort(compareRuns);
+  const limit = Number.isFinite(options.limit) && options.limit > 0 ? Math.floor(options.limit) : 0;
+  return { ok: true, data: limit > 0 ? runs.slice(0, limit) : runs };
+}
+
+/**
+ * Write the opening row of a run. The id, status and `finishedAt: null` are set
+ * here rather than accepted from the caller, so a row on disk always reads as a
+ * run that started and has not finished yet.
+ * @param {{ automationId?: unknown, title?: unknown, mode?: unknown, stepsTotal?: unknown, startedAt?: unknown }} entry
+ * @param {{ root?: string, now?: number, id?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function startRun(entry, options = {}) {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+    return failure('RUN_INVALID_INPUT', 'Starting a run expects the run fields.');
+  }
+
+  const startedAt = normaliseAutomationAt(entry.startedAt) ?? new Date(Date.now()).toISOString();
+  const run = {
+    id: typeof options.id === 'string' && options.id !== '' ? options.id : randomUUID(),
+    automationId: typeof entry.automationId === 'string' ? entry.automationId : null,
+    title: typeof entry.title === 'string' ? entry.title.slice(0, AUTOMATION_PROMPT_MAX_LENGTH) : '',
+    mode: typeof entry.mode === 'string' ? entry.mode : 'autopilot',
+    status: 'running',
+    startedAt,
+    finishedAt: null,
+    stepsDone: 0,
+    stepsTotal: Number.isFinite(Number(entry.stepsTotal)) ? Math.max(0, Math.floor(Number(entry.stepsTotal))) : 0,
+    needsAttention: false,
+    resultPath: null,
+    error: null,
+  };
+
+  return withRunsLock(async () => {
+    const read = await readStore('runs', options);
+    if (!read.ok) return read;
+
+    const next = [...read.data.filter(isRunEntry), run].sort(compareRuns).slice(0, RUNS_MAX_ENTRIES);
+    const written = await writeStore('runs', next, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: run };
+  });
+}
+
+/**
+ * Close a run: set its status, end time and how far it got. Only the fields in
+ * `patch` change, and `finishedAt` is stamped here so the caller cannot leave a
+ * `completed` row without an end time.
+ * @param {string} runId
+ * @param {{ status?: unknown, stepsDone?: unknown, needsAttention?: unknown, resultPath?: unknown, error?: unknown, finishedAt?: unknown }} patch
+ * @param {{ root?: string, now?: number }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function finishRun(runId, patch = {}, options = {}) {
+  if (typeof runId !== 'string' || runId === '') {
+    return failure('RUN_INVALID_ID', 'Which run to close was not given.');
+  }
+  if (patch === null || typeof patch !== 'object' || Array.isArray(patch)) {
+    return failure('RUN_INVALID_PATCH', 'Closing a run expects an object of the fields to change.');
+  }
+
+  const status = typeof patch.status === 'string' ? patch.status : undefined;
+  if (status !== undefined && !RUN_STATUSES.includes(status)) {
+    return failure('RUN_INVALID_STATUS', `A run status must be one of ${RUN_STATUSES.join(', ')}.`);
+  }
+
+  const now = Number.isFinite(options.now) ? options.now : Date.now();
+
+  return withRunsLock(async () => {
+    const read = await readStore('runs', options);
+    if (!read.ok) return read;
+
+    const runs = read.data.filter(isRunEntry);
+    const index = runs.findIndex((run) => run.id === runId);
+    if (index === -1) {
+      return failure('RUN_NOT_FOUND', 'That run is no longer in runs.json.');
+    }
+
+    const updated = {
+      ...runs[index],
+      ...(status === undefined ? {} : { status }),
+      ...(Number.isFinite(Number(patch.stepsDone)) ? { stepsDone: Math.max(0, Math.floor(Number(patch.stepsDone))) } : {}),
+      ...(typeof patch.needsAttention === 'boolean' ? { needsAttention: patch.needsAttention } : {}),
+      ...(typeof patch.resultPath === 'string' ? { resultPath: patch.resultPath } : {}),
+      ...(patch.error === null || typeof patch.error === 'string' ? { error: patch.error } : {}),
+      // An explicit end time is honoured so a run is stamped with the clock the
+      // tick started from; otherwise the log records the moment of this write.
+      finishedAt: normaliseAutomationAt(patch.finishedAt) ?? new Date(now).toISOString(),
+    };
+
+    runs[index] = updated;
+    const written = await writeStore('runs', [...runs].sort(compareRuns), options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: updated };
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   Notifications
+
+   notifications.json is the bell's history: one entry per reminder that fired.
+   `read` is what the unread count counts, so the file keeps every entry and the
+   badge stays a filter over them rather than a counter that has to be kept in
+   step with the list. An entry is `{ id, reminderId, title, body, read,
+   createdAt }`.
+   ------------------------------------------------------------------------- */
+
+export const NOTIFICATION_TITLE_MAX_LENGTH = 120;
+export const NOTIFICATION_BODY_MAX_LENGTH = 500;
+
+/**
+ * Serialises notification writes. The tick records one entry per due reminder in
+ * a loop, and each one is a read-modify-write of the same file.
+ * @type {Promise<void>}
+ */
+let notificationsChain = Promise.resolve();
+
+/**
+ * @param {() => Promise<T>} task
+ * @returns {Promise<T>}
+ * @template T
+ */
+function withNotificationsLock(task) {
+  const result = notificationsChain.then(task, task);
+  notificationsChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
+}
+
+/**
+ * @param {unknown} value
+ * @returns {boolean}
+ */
+function isNotificationEntry(value) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    typeof value.id === 'string' &&
+    typeof value.createdAt === 'string'
+  );
+}
+
+/**
+ * Newest first, with ISO strings compared directly. The id breaks a tie, so two
+ * reminders that fired in the same millisecond still have a stable order.
+ * @param {{ createdAt?: string, id?: string }} left
+ * @param {{ createdAt?: string, id?: string }} right
+ * @returns {number}
+ */
+function compareNotifications(left, right) {
+  const byNewest = String(right.createdAt ?? '').localeCompare(String(left.createdAt ?? ''));
+  if (byNewest !== 0) return byNewest;
+  return String(right.id ?? '').localeCompare(String(left.id ?? ''));
+}
+
+/**
+ * Add one notification and return it. `read: false` is set here, so the entry the
+ * tick raises is the entry the badge counts.
+ * @param {{ reminderId?: unknown, title?: unknown, body?: unknown }} entry
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function appendNotification(entry, options = {}) {
+  if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+    return failure('NOTIFICATION_INVALID_INPUT', 'Recording a notification expects a title and a body.');
+  }
+
+  const body = typeof entry.body === 'string' ? entry.body.trim().slice(0, NOTIFICATION_BODY_MAX_LENGTH) : '';
+  if (body === '') {
+    return failure('NOTIFICATION_BODY_REQUIRED', 'A notification needs something to say.');
+  }
+
+  const title =
+    typeof entry.title === 'string' && entry.title.trim() !== ''
+      ? entry.title.trim().slice(0, NOTIFICATION_TITLE_MAX_LENGTH)
+      : 'Zuri';
+
+  return withNotificationsLock(async () => {
+    const read = await readStore('notifications', options);
+    if (!read.ok) return read;
+
+    const notification = {
+      id: randomUUID(),
+      reminderId: typeof entry.reminderId === 'string' && entry.reminderId !== '' ? entry.reminderId : null,
+      title,
+      body,
+      read: false,
+      createdAt: new Date().toISOString(),
+    };
+    const written = await writeStore(
+      'notifications',
+      [...read.data.filter(isNotificationEntry), notification],
+      options,
+    );
+    if (!written.ok) return written;
+
+    return { ok: true, data: notification };
+  });
+}
+
+/**
+ * The bell's history, newest first, with the unread count beside it. `limit` caps
+ * the list only: the count is taken before it is applied, so a caller asking for
+ * one row cannot understate the badge.
+ * @param {{ root?: string, limit?: number }} [options]
+ * @returns {Promise<{ ok: true, data: { items: object[], unread: number } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function listNotifications(options = {}) {
+  const read = await readStore('notifications', options);
+  if (!read.ok) return read;
+
+  const entries = read.data.filter(isNotificationEntry);
+  const unread = entries.filter((entry) => entry.read !== true).length;
+  const newestFirst = [...entries].sort(compareNotifications);
+  const limit = Number.isFinite(options.limit) ? Math.max(0, Math.trunc(options.limit)) : null;
+
+  return {
+    ok: true,
+    data: { items: limit === null ? newestFirst : newestFirst.slice(0, limit), unread },
+  };
 }
 
 /**

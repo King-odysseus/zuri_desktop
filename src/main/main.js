@@ -1,34 +1,68 @@
-import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell, Tray } from 'electron';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { CHAT_STREAM_CHANNEL, sendChatMessage, summarizeText } from './providers/chat.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
 import { runOnboardingSetup } from './onboarding.js';
+import {
+  closeOverlay,
+  hideOverlay,
+  isOverlayOpen,
+  openOverlay,
+  setOverlayEnabled,
+  startOverlayFromSettings,
+} from './overlay.js';
+import { startReminderTicker, stopReminderTicker } from './reminders.js';
+import { startScheduler, stopScheduler } from './scheduler.js';
+import {
+  TRAY_ITEM_IDS,
+  TRAY_TOOLTIP,
+  backgroundBalloon,
+  balloonContent,
+  earliestDueAt,
+  trayMenuTemplate,
+} from './tray-menu.js';
+import { bringToFront } from './second-launch.js';
 import { clearKey, keyStatus, setKey } from './secrets.js';
 import {
   appendMessage,
+  completeReminder,
+  createAutomation,
+  createReminder,
   createTask,
   createThread,
+  deleteAutomation,
   deleteTask,
   getStoreRoot,
+  listNotifications,
+  listReminders,
   listTasks,
   listThreads,
   readSettings,
+  readStore,
   saveSettings,
+  updateAutomation,
   updateTask,
 } from './store.js';
-import { ensureWorkspace, listWorkspaceFiles, resolveWorkspaceFile, runTool } from './tools/index.js';
+import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, resolveWorkspaceFile, runTool, toolCatalogue } from './tools/index.js';
 
 // ESM main process (package.json sets "type": "module"), so __dirname is built here.
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
-const RENDERER_ENTRY = path.join(moduleDir, '..', 'renderer', 'index.html');
+// The React build is generated before tests and packaging. Keeping one entry here
+// prevents the installed app from silently falling back to a retired renderer.
+const RENDERER_ENTRY = path.join(moduleDir, '..', '..', 'dist-react', 'index.html');
 const PRELOAD_ENTRY = path.join(moduleDir, 'preload.js');
 // The window and taskbar icon. Electron cannot read an SVG here, so this is the PNG
 // rasterised from renderer/assets/zuri-logo.svg by scripts/make-icon.js, which keeps
-// the icon and the logo in the app one drawing rather than two that can drift.
+// the window and the logo in the app one drawing rather than two that can drift.
 export const ICON_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.png');
+// Windows draws the taskbar and Alt-Tab buttons from a real ICO and picks the frame
+// that matches the size it is drawing; the PNG above stays the source the other
+// platforms and the smoke check read. Both come from the same capture.
+export const ICO_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.ico');
 const CANVAS_DARK = '#0B0B0F'; // matches --zuri-bg-canvas dark, so the window does not flash white before first paint
 
 /**
@@ -38,10 +72,78 @@ const CANVAS_DARK = '#0B0B0F'; // matches --zuri-bg-canvas dark, so the window d
  */
 const activeReplies = new Map();
 
+/**
+ * The notification-area icon, or null when it could not be created. Created once the
+ * app is ready, because a Tray cannot exist before then.
+ * @type {Tray | null}
+ */
+let tray = null;
+
+/**
+ * True from the moment the person asks to quit. The window's close handler hides
+ * the window instead of closing it, so quitting has to be able to say "for real".
+ */
+let quitting = false;
+
+/** Whether the "running in the background" balloon has been shown this session. */
+let balloonShown = false;
+
+/**
+ * What the tray reports: the rows follow the overlay, and the status line counts the
+ * same unread reminders the bell does (set by the ten-second tick).
+ * @type {{ overlayOpen: boolean, remindersDue: number }}
+ */
+const trayState = { overlayOpen: false, remindersDue: 0 };
+
 // Pin the name before anything reads userData. A script launched as
 // `electron scripts/x.js` would otherwise resolve userData to AppData/Roaming/Electron,
 // which is not where the shipped app keeps its data.
 app.setName('Zuri');
+
+/** The id Windows groups this app's taskbar buttons under. */
+const APP_USER_MODEL_ID = 'com.zuri.desktop';
+
+/**
+ * Give the app a taskbar identity that carries the Zuri mark.
+ *
+ * Windows draws a grouped taskbar button from the Start Menu shortcut registered
+ * for the window's AppUserModelID, not from the window's own icon. Running from
+ * source there is no such shortcut, so the id resolves to nothing and Windows
+ * falls back to electron.exe: the atom stays on the taskbar no matter what the
+ * window draws. Writing the shortcut once fixes that, and a packaged build already
+ * has its own, which the existence check respects.
+ * @returns {void}
+ */
+function adoptTaskbarIdentity() {
+  if (process.platform !== 'win32') return;
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+  if (app.isPackaged) return;
+
+  // The shortcut must point at the app, so it is only written when this process
+  // really is the app: a check script launched as `electron scripts/x.js` reports
+  // that folder as its app path, and a shortcut to it would open nothing.
+  const appRoot = path.join(moduleDir, '..', '..');
+  if (path.resolve(app.getAppPath()) !== path.resolve(appRoot)) return;
+
+  const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Zuri.lnk');
+  if (existsSync(link)) return;
+  try {
+    const written = shell.writeShortcutLink(link, 'create', {
+      target: process.execPath,
+      args: `"${appRoot}"`,
+      icon: ICO_ENTRY,
+      iconIndex: 0,
+      description: 'Zuri',
+      appUserModelId: APP_USER_MODEL_ID,
+    });
+    if (!written) {
+      console.warn("[zuri:taskbar] Windows refused the shortcut, so the taskbar keeps Electron's icon");
+    }
+  } catch (error) {
+    // A read-only or redirected Start Menu must never stop the app from opening.
+    console.warn('[zuri:taskbar]', error.message);
+  }
+}
 
 /**
  * Create the single main window and load the renderer entry.
@@ -56,8 +158,9 @@ function createMainWindow() {
     minWidth: 940,
     minHeight: 600,
     title: 'Zuri',
-    // Without this the window and the taskbar show Electron's own logo.
-    icon: ICON_ENTRY,
+    // Without this the window and Alt-Tab show Electron's own logo. Windows reads
+    // an ICO here; the other platforms take the PNG.
+    icon: process.platform === 'win32' ? ICO_ENTRY : ICON_ENTRY,
     backgroundColor: CANVAS_DARK,
     webPreferences: {
       preload: PRELOAD_ENTRY,
@@ -69,6 +172,25 @@ function createMainWindow() {
   });
 
   window.loadFile(RENDERER_ENTRY);
+
+  // The icon is the way back in (0:13683), so closing the window hides Zuri instead
+  // of ending the session: reminders and scheduled runs keep going while it is out of
+  // sight. The Quit row of the tray menu, and quitting from anywhere else, sets
+  // `quitting`, which is what lets this close through.
+  window.on('close', (event) => {
+    if (quitting === true || tray === null) return;
+    event.preventDefault();
+    window.hide();
+    void showBackgroundBalloon();
+  });
+
+  // The overlay is a helper for the main window, not an app of its own. Letting it
+  // outlive the main window would keep the process alive on `window-all-closed`, so
+  // closing Zuri takes the floating card with it.
+  window.on('closed', () => {
+    closeOverlay();
+  });
+
   return window;
 }
 
@@ -96,11 +218,22 @@ const HANDLERS = new Map([
   ['zuri:tasks:create', handleTasksCreate],
   ['zuri:tasks:update', handleTasksUpdate],
   ['zuri:tasks:delete', handleTasksDelete],
+  ['zuri:automations:list', handleAutomationsList],
+  ['zuri:automations:create', handleAutomationsCreate],
+  ['zuri:automations:update', handleAutomationsUpdate],
+  ['zuri:automations:delete', handleAutomationsDelete],
+  ['zuri:reminders:list', handleRemindersList],
+  ['zuri:reminders:create', handleRemindersCreate],
+  ['zuri:reminders:complete', handleRemindersComplete],
+  ['zuri:notifications:list', handleNotificationsList],
   ['zuri:files:list', handleFilesList],
   ['zuri:files:open', handleFilesOpen],
   ['zuri:files:reveal', handleFilesReveal],
   ['zuri:files:choose', handleFilesChoose],
   ['zuri:files:summarize', handleFilesSummarize],
+  ['zuri:tools:list', handleToolsList],
+  ['zuri:tools:run', handleToolsRun],
+  ['zuri:tools:cancel', handleToolsCancel],
 ]);
 
 /**
@@ -129,6 +262,46 @@ function handleAppInfo() {
  */
 function handleChannelList() {
   return [...HANDLERS.keys()];
+}
+
+/**
+ * Every tool the app can run, so the agents page ticks boxes for tools that exist.
+ * Names and labels only: the handlers stay in the main process.
+ * @returns {{ ok: true, data: { name: string, label: string, description: string }[] }}
+ */
+function handleToolsList() {
+  return { ok: true, data: toolCatalogue() };
+}
+
+/**
+ * Run one Act step the renderer held back. The confirmed flag is the renderer's
+ * Confirm press and the only thing that lets a destructive tool through: the tool
+ * layer refuses one without it, so a stray call cannot write a file or start an
+ * app on its own. The step id is what lets a run that arrives after its Cancel be
+ * refused.
+ * @param {{ id?: string, name?: string, args?: Record<string, any>, confirmed?: boolean }} [payload]
+ * @returns {Promise<object>}
+ */
+function handleToolsRun(payload) {
+  const name = typeof payload?.name === 'string' ? payload.name.trim() : '';
+  if (name === '') {
+    return Promise.resolve({ ok: false, error: { code: 'TOOLS_NAME_REQUIRED', message: 'A step needs a tool name to run.' } });
+  }
+  const args = payload?.args && typeof payload.args === 'object' ? payload.args : {};
+  return runTool(name, args, {
+    confirmed: payload?.confirmed === true,
+    stepId: typeof payload?.id === 'string' ? payload.id : '',
+  });
+}
+
+/**
+ * Stop one Act step. On a pending step this is what keeps it from ever running;
+ * on a running one it records the id, so the run arriving late is refused.
+ * @param {{ id?: string }} [payload]
+ * @returns {object}
+ */
+function handleToolsCancel(payload) {
+  return cancelToolStep(payload?.id);
 }
 
 /**
@@ -168,13 +341,24 @@ function handleTasksList() {
 }
 
 /**
+ * Announce a task write so the Context panel and the Tasks page both re-read.
+ * Main owns the store, so a handler is the only place that knows a write landed.
+ * @param {{ ok?: boolean }} result The store's reply.
+ * @returns {{ ok?: boolean }} The same reply, so a handler can still return it.
+ */
+function afterTaskWrite(result) {
+  if (result?.ok === true) announceState({ area: 'tasks' });
+  return result;
+}
+
+/**
  * Save one task. The store sets the id, timestamps and done: false itself, so
  * the renderer only sends what the person typed.
  * @param {{ title?: string, notes?: string, due?: string|null, priority?: string }} [payload]
  * @returns {Promise<object>}
  */
-function handleTasksCreate(payload) {
-  return createTask(payload ?? {});
+async function handleTasksCreate(payload) {
+  return afterTaskWrite(await createTask(payload ?? {}));
 }
 
 /**
@@ -184,9 +368,9 @@ function handleTasksCreate(payload) {
  * @param {{ id?: string, title?: string, notes?: string, due?: string|null, priority?: string, done?: boolean }} [payload]
  * @returns {Promise<object>}
  */
-function handleTasksUpdate(payload) {
+async function handleTasksUpdate(payload) {
   const { id, ...patch } = payload ?? {};
-  return updateTask(id, patch);
+  return afterTaskWrite(await updateTask(id, patch));
 }
 
 /**
@@ -194,8 +378,69 @@ function handleTasksUpdate(payload) {
  * @param {{ id?: string }} [payload]
  * @returns {Promise<object>}
  */
-function handleTasksDelete(payload) {
-  return deleteTask(payload?.id);
+async function handleTasksDelete(payload) {
+  return afterTaskWrite(await deleteTask(payload?.id));
+}
+
+/**
+ * The automations the Context panel summarises: the stored schedules and the runs
+ * already recorded, so its card can say what is next and how far a run in flight
+ * has got. The scheduler owns the timer and the writing; this only reads.
+ * @returns {Promise<{ ok: true, data: { automations: object[], runs: object[] } } | { ok: false, error: object }>}
+ */
+async function handleAutomationsList() {
+  const schedules = await readStore('schedules');
+  if (schedules.ok !== true) return schedules;
+
+  const runs = await readStore('runs');
+  if (runs.ok !== true) return runs;
+
+  return {
+    ok: true,
+    data: {
+      automations: Array.isArray(schedules.data) ? schedules.data : [],
+      runs: Array.isArray(runs.data) ? runs.data : [],
+    },
+  }
+}
+/**
+ * Tell every open window that the schedules changed. The page is the writer and
+ * the Context panel is the reader, so a push is how the two stay on one list.
+ * @param {object} result What the store answered.
+ * @returns {object} The same answer, so a handler can return it unchanged.
+ */
+function afterAutomationWrite(result) {
+  if (result?.ok === true) announceState({ area: 'automations' });
+  return result;
+}
+
+/**
+ * Save a new automation from the Automations page.
+ * @param {object} [payload] prompt, mode, cadence, agentId and allowedTools.
+ * @returns {Promise<object>}
+ */
+async function handleAutomationsCreate(payload) {
+  return afterAutomationWrite(await createAutomation(payload));
+}
+
+/**
+ * Save an edit to one automation. The id travels separately from the fields so a
+ * payload without one cannot be read as a change to "the first schedule".
+ * @param {{ id?: string } & object} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleAutomationsUpdate(payload) {
+  const { id, ...patch } = payload ?? {};
+  return afterAutomationWrite(await updateAutomation(id, patch));
+}
+
+/**
+ * Remove one automation and answer with what went, so the view can name it.
+ * @param {{ id?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleAutomationsDelete(payload) {
+  return afterAutomationWrite(await deleteAutomation(payload?.id));
 }
 
 /**
@@ -224,6 +469,9 @@ function handleChatSend(payload, event) {
   };
 
   return sendChatMessage(threadId, {
+    // The composer sends the agent it has picked; without one the reply falls back to
+    // settings.activeAgentId, which is the same id in the normal case.
+    agentId: typeof payload?.agentId === 'string' ? payload.agentId : undefined,
     signal: controller.signal,
     emit: (streamEvent) => {
       // The window can close mid-stream; sending to a destroyed webContents throws.
@@ -267,8 +515,19 @@ function handleSettingsGet() {
  * @param {object} [payload]
  * @returns {Promise<object>}
  */
-function handleSettingsSave(payload) {
-  return saveSettings(payload ?? {});
+async function handleSettingsSave(payload) {
+  const saved = await saveSettings(payload ?? {});
+  // The overlay toggle has to act now, not after a restart: launch and this save both
+  // go through setOverlayEnabled(), so one flag turns into one window the same way
+  // wherever it is changed.
+  if (saved.ok === true && Object.hasOwn(payload ?? {}, 'overlayEnabled')) {
+    try {
+      setOverlayEnabled(saved.data?.overlayEnabled === true);
+    } catch (error) {
+      console.error('[zuri:overlay]', error);
+    }
+  }
+  return saved;
 }
 
 /**
@@ -415,26 +674,56 @@ async function handleFilesReveal(payload) {
 const STATE_CHANGED_CHANNEL = 'state:changed';
 
 /**
- * The native picker behind the Files view's Open action. Only the path is
- * returned; the renderer never gets the dialog's Electron object.
- * @param {unknown} _payload
+ * A chosen file's size in bytes, for the attachment chip's "2.4 MB" column. A file
+ * that cannot be measured is not a failed pick, so it comes back undefined and the
+ * chip simply has no size to show.
+ * @param {string} filePath
+ * @returns {Promise<number | undefined>}
+ */
+async function measureFile(filePath) {
+  try {
+    const stats = await stat(filePath);
+    return stats.isFile() ? stats.size : undefined;
+  } catch (error) {
+    console.warn('[zuri:files] size', error?.message ?? error);
+    return undefined;
+  }
+}
+
+/**
+ * The native picker behind the Files view's Open action and behind the composer's
+ * paperclip. Only the path, name and size are returned; the renderer never gets
+ * the dialog's Electron object.
+ * @param {{ purpose?: string }} [payload] 'attach' for the composer's dialog
  * @param {Electron.IpcMainInvokeEvent} [event]
  * @returns {Promise<object>}
  */
-async function handleFilesChoose(_payload, event) {
+async function handleFilesChoose(payload, event) {
   const owner = BrowserWindow.fromWebContents(event?.sender) ?? BrowserWindow.getFocusedWindow();
-  const options = {
-    title: 'Summarize a document',
-    buttonLabel: 'Summarize',
-    properties: ['openFile'],
-    filters: [
-      {
-        name: 'Documents',
-        extensions: ['md', 'markdown', 'txt', 'csv', 'json', 'html', 'htm', 'log', 'docx', 'xlsx', 'pptx'],
-      },
-      { name: 'All files', extensions: ['*'] },
-    ],
-  };
+  // One picker, two jobs: the composer asks for a file to attach to a message, the
+  // Files view for a document to summarize. The title and the filter list say which.
+  const options = payload?.purpose === 'attach'
+    ? {
+        title: 'Attach a file',
+        buttonLabel: 'Attach',
+        properties: ['openFile'],
+        filters: [
+          { name: 'Documents and text', extensions: ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv'] },
+          { name: 'All files', extensions: ['*'] },
+        ],
+      }
+    : {
+        title: 'Summarize a document',
+        buttonLabel: 'Summarize',
+        properties: ['openFile'],
+        filters: [
+          {
+            name: 'Documents',
+            extensions: ['md', 'markdown', 'txt', 'csv', 'json', 'html', 'htm', 'log', 'docx', 'xlsx', 'pptx'],
+          },
+          { name: 'All files', extensions: ['*'] },
+        ],
+      };
 
   try {
     const picked = owner === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(owner, options);
@@ -442,7 +731,10 @@ async function handleFilesChoose(_payload, event) {
     if (picked.canceled || typeof chosenPath !== 'string' || chosenPath === '') {
       return { ok: true, data: { cancelled: true } };
     }
-    return { ok: true, data: { cancelled: false, path: chosenPath, name: path.basename(chosenPath) } };
+    return {
+      ok: true,
+      data: { cancelled: false, path: chosenPath, name: path.basename(chosenPath), size: await measureFile(chosenPath) },
+    };
   } catch (error) {
     console.error('[zuri:files] choose', error);
     return filesFailure(error, 'FILES_CHOOSE_FAILED');
@@ -525,6 +817,270 @@ async function handleFilesSummarize(payload, event) {
   }
 }
 
+/* --------------------------------------------------------------- reminders */
+
+/**
+ * Tell every open window that the reminder list changed. The bell takes `unread`
+ * from this payload rather than counting for itself, so the badge, the Reminders
+ * page and the Context panel all read one number written by one process.
+ * @param {number} unread
+ * @returns {void}
+ */
+function announceReminders(unread) {
+  const count = Number.isFinite(unread) ? unread : 0;
+  announceState({ area: 'reminders', unread: count });
+}
+
+/**
+ * Tell every open window that stored state changed. One listener in the renderer
+ * serves every area, so a push is a reason to re-read rather than a diff.
+ * @param {object} change What changed: `area` plus whatever that area's views need.
+ * @returns {void}
+ */
+function announceState(change) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    window.webContents.send(STATE_CHANGED_CHANNEL, change);
+  }
+}
+
+/**
+ * Tell the renderer how many runs the launch catch-up replayed.
+ *
+ * The sweep starts while the page is still loading, and a push sent then would land
+ * before the renderer's listener exists, so a window that is still loading gets the
+ * push on `did-finish-load` instead. Nothing is sent when nothing was caught up: the
+ * toast only ever appears for a launch that owed a run.
+ * @param {{ caughtUp?: number }} report The scheduler's catch-up report.
+ * @returns {void}
+ */
+function announceCatchUp(report) {
+  const caughtUp = Number.isFinite(report?.caughtUp) ? report.caughtUp : 0;
+  if (caughtUp <= 0) return;
+
+  const change = { area: 'automations', caughtUp };
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (window.isDestroyed()) continue;
+    if (window.webContents.isLoading()) {
+      window.webContents.once('did-finish-load', () => {
+        if (!window.isDestroyed()) window.webContents.send(STATE_CHANGED_CHANNEL, change);
+      });
+      continue;
+    }
+    window.webContents.send(STATE_CHANGED_CHANNEL, change);
+  }
+}
+
+/**
+ * Bring Zuri forward on the Reminders page. This is what the toast's "Open
+ * reminders" button does (open-pencil 0:11015): the window is restored and focused,
+ * and the push names the route so the column lands where the button pointed.
+ * @returns {Promise<void>}
+ */
+async function showRemindersPage() {
+  const candidates = BrowserWindow.getAllWindows().filter((candidate) => !candidate.isDestroyed());
+  const window = candidates.find((candidate) => !candidate.webContents.getURL().includes('overlay=1')) ?? candidates[0];
+  if (window === undefined) return;
+
+  if (window.isMinimized()) window.restore();
+  window.show();
+  window.focus();
+
+  // The count travels with the route so the bell keeps the number it earned; a failed
+  // read sends the route alone rather than clearing it.
+  const push = { area: 'reminders', view: 'reminders' };
+  const history = await listNotifications({ limit: 1 });
+  if (history.ok === true) push.unread = history.data.unread;
+  window.webContents.send(STATE_CHANGED_CHANNEL, push);
+}
+
+/**
+ * Bring the main window back to the front. The tray's Open Zuri, its New chat and a
+ * left-click on the icon all land here. The overlay is deliberately not a candidate:
+ * it is a helper above other applications' windows, not the app's own screen.
+ * @returns {BrowserWindow | null}
+ */
+function bringMainWindowForward() {
+  const candidates = BrowserWindow.getAllWindows().filter((candidate) => !candidate.isDestroyed());
+  const window = candidates.find((candidate) => !candidate.webContents.getURL().includes('overlay=1')) ?? null;
+  if (window === null) return null;
+
+  bringToFront(window);
+  return window;
+}
+
+/**
+ * The tray's Open Zuri row (0:13581): show the window and ask it for nothing.
+ * @returns {void}
+ */
+function openZuriFromTray() {
+  bringMainWindowForward();
+}
+
+/**
+ * The tray's New chat row (0:13586). It does not create a thread in the main process:
+ * the page's own New chat button is the single place a chat is started, so the tray
+ * asks it to press that button rather than keeping a second copy of the behaviour.
+ * @returns {void}
+ */
+function newChatFromTray() {
+  const window = bringMainWindowForward();
+  if (window === null) return;
+  window.webContents.send(STATE_CHANGED_CHANNEL, { area: 'chats', view: 'chats', action: 'new-chat' });
+}
+
+/**
+ * The tray's overlay row (0:13591, 0:13658): show the floating card or hide it, then
+ * redraw the menu so the row names the action it will take next time.
+ * @returns {void}
+ */
+function toggleOverlayFromTray() {
+  if (isOverlayOpen()) hideOverlay();
+  else openOverlay();
+  refreshTray();
+}
+
+/**
+ * The tray's Quit row (0:13598): end the session rather than hide the window.
+ * @returns {void}
+ */
+function quitFromTray() {
+  quitting = true;
+  app.quit();
+}
+
+/**
+ * The handler for each row that does something, keyed by the id tray-menu.js gives
+ * it. A row the design draws but nothing answers is left out of the menu instead of
+ * being drawn as a dead click.
+ * @type {ReadonlyMap<string, Function>}
+ */
+const TRAY_HANDLERS = new Map([
+  [TRAY_ITEM_IDS.open, openZuriFromTray],
+  [TRAY_ITEM_IDS.newChat, newChatFromTray],
+  [TRAY_ITEM_IDS.overlay, toggleOverlayFromTray],
+  [TRAY_ITEM_IDS.quit, quitFromTray],
+]);
+
+/**
+ * Rebuild the tray's menu from the state the app is in. Rebuilt rather than mutated,
+ * so the overlay row and the status line always describe the app as it is now.
+ * @returns {void}
+ */
+function refreshTray() {
+  if (tray === null || tray.isDestroyed()) return;
+
+  trayState.overlayOpen = isOverlayOpen();
+  const template = trayMenuTemplate(trayState).map((item) => {
+    const handler = TRAY_HANDLERS.get(item.id);
+    return handler === undefined ? item : { ...item, click: handler };
+  });
+  tray.setContextMenu(Menu.buildFromTemplate(template));
+}
+
+/**
+ * The balloon Windows shows once the window is hidden (0:13684). Shown once per
+ * session: its job is to say where Zuri went the first time, not to interrupt every
+ * time the window is closed.
+ * @returns {Promise<void>}
+ */
+async function showBackgroundBalloon() {
+  if (tray === null || tray.isDestroyed() || balloonShown) return;
+  balloonShown = true;
+
+  // A failed read costs the balloon its third line and nothing else, so it is not
+  // worth holding the balloon back for.
+  const pending = await listReminders();
+  const balloon = backgroundBalloon({ nextReminderAt: pending.ok ? earliestDueAt(pending.data) : null });
+
+  try {
+    tray.displayBalloon({ title: balloon.title, content: balloonContent(balloon) });
+  } catch (error) {
+    console.error('[zuri:tray] balloon', error);
+  }
+}
+
+/**
+ * Put the icon in the notification area. A tray that cannot be created is logged and
+ * left null, and closing the window then quits as it always did, so a missing icon
+ * can never leave a hidden window with no way back to it.
+ * @returns {void}
+ */
+function createTray() {
+  try {
+    // Windows reads the ICO, which holds the small frames the notification area
+    // draws; the other platforms take the PNG.
+    tray = new Tray(process.platform === 'win32' ? ICO_ENTRY : ICON_ENTRY);
+  } catch (error) {
+    console.error('[zuri:tray] icon', error);
+    tray = null;
+    return;
+  }
+
+  tray.setToolTip(TRAY_TOOLTIP);
+  // Left-click brings the window back, which is what the design tells people to do
+  // (0:13568). The right-click menu is set by refreshTray below.
+  tray.on('click', openZuriFromTray);
+  refreshTray();
+}
+
+/**
+ * Re-read the unread count and push it. Called after a save, so the views follow
+ * the file instead of each keeping its own copy.
+ * @returns {Promise<void>}
+ */
+async function announceReminderChange() {
+  const history = await listNotifications({ limit: 1 });
+  if (!history.ok) {
+    // A failed read must not push a zero: that would clear a badge that is still
+    // earned. The next tick tries again.
+    console.error('[zuri:reminders] unread', history.error.message);
+    return;
+  }
+  announceReminders(history.data.unread);
+}
+
+/**
+ * The pending reminders, soonest first, for the Reminders page and the rail.
+ * @returns {Promise<object>}
+ */
+function handleRemindersList() {
+  return listReminders();
+}
+
+/**
+ * Save one reminder and push the new list. The store sets the id and the repeat
+ * bookkeeping, so the view only sends what the person filled in.
+ * @param {{ title?: string, repeat?: string, dueAt?: string, intervalMinutes?: number, timeOfDay?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleRemindersCreate(payload) {
+  const created = await createReminder(payload ?? {});
+  if (created.ok) await announceReminderChange();
+  return created;
+}
+
+/**
+ * Mark one reminder done, the Reminders page's Done button.
+ * @param {{ id?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleRemindersComplete(payload) {
+  const completed = await completeReminder(payload?.id);
+  if (completed.ok) await announceReminderChange();
+  return completed;
+}
+
+/**
+ * The bell's history plus its unread count. `limit` caps the list only, never the
+ * count, so a badge cannot be understated by asking for one row.
+ * @param {{ limit?: number }} [payload]
+ * @returns {Promise<object>}
+ */
+function handleNotificationsList(payload) {
+  return listNotifications(Number.isFinite(payload?.limit) ? { limit: payload.limit } : {});
+}
+
 /**
  * Register one handler. Only channels declared in HANDLERS may be registered,
  * and Electron itself rejects an invoke for any channel without a handler, so
@@ -555,7 +1111,42 @@ function registerIpc() {
   }
 }
 
+/**
+ * Whether this process really is Zuri, rather than a check script launched as
+ * `electron scripts/smoke.js`, which reports the scripts folder as its app path.
+ * @returns {boolean}
+ */
+function runsAsApp() {
+  // ZURI_PREVIEW marks the window `npm run dev` opens beside the preview server:
+  // a second window on purpose, so it must not take the single-instance lock.
+  // Taking it would make the preview quit on launch whenever Zuri is already
+  // open, and the server it runs under closes with it, leaving a screen check
+  // with nothing to load.
+  if (process.env.ZURI_PREVIEW === '1') return false;
+  const appRoot = path.join(moduleDir, '..', '..');
+  return path.resolve(app.getAppPath()) === path.resolve(appRoot);
+}
+
+// One Zuri at a time (0:13705). A second launch takes the single-instance lock, finds
+// it already held, hands its request over and leaves: there is never a second window
+// to focus, and no second ticker writing the same JSON files. The check scripts boot
+// this module as an Electron app of their own, so the lock is only taken when this
+// process really is Zuri (the test the taskbar shortcut uses); otherwise opening Zuri
+// would turn a running check away, and two overlapping checks would lock each other out.
+const ownsSingleInstance = runsAsApp() ? app.requestSingleInstanceLock() : true;
+if (!ownsSingleInstance) app.quit();
+
+// The instance that owns the window does the work: the window it already has comes back
+// to the front, restored and focused, and the overlay, if it is up, is left as it is
+// (0:13705, states 01 to 03). Deliberately no createMainWindow() here: a second launch
+// is never drawn, so there is no second window to focus.
+app.on('second-instance', () => {
+  bringMainWindowForward();
+});
+
 app.whenReady().then(async () => {
+  // A launch that arrived second has already quit above, and builds nothing.
+  if (!ownsSingleInstance) return;
   registerIpc();
   // First run: the folder exists before Act can write to it, and the Files view
   // can list an empty workspace instead of reporting a missing folder.
@@ -564,7 +1155,63 @@ app.whenReady().then(async () => {
   } catch (error) {
     console.error('[zuri:workspace]', error);
   }
+  // In development the dock icon comes from the Electron binary, so macOS is told
+  // about the Zuri logo here. A packaged build reads it from the app bundle.
+  if (process.platform === 'darwin' && app.dock) app.dock.setIcon(ICON_ENTRY);
+  // Must run before the first window is shown, or the window is already grouped.
+  if (process.env.ZURI_NO_AUMID !== '1') adoptTaskbarIdentity();
+
   createMainWindow();
+  // The icon in the notification area is how a hidden window is brought back, so it
+  // is created straight after the window it belongs to.
+  createTray();
+
+  // The overlay is opt-in, so it opens at launch only when the stored setting says so.
+  // A failed read leaves it closed, which is the safe half of the toggle.
+  try {
+    const settings = await readSettings();
+    if (settings.ok === true) startOverlayFromSettings(settings.data);
+    else console.error('[zuri:overlay]', settings.error?.message ?? 'settings could not be read');
+  } catch (error) {
+    console.error('[zuri:overlay]', error);
+  }
+
+  // Reminders tick every ten seconds for as long as Zuri is open. The ticker's
+  // first run is the catch-up sweep for anything that came due while it was shut,
+  // and each tick pushes the unread count so the bell needs no timer of its own.
+  startReminderTicker({
+    onTick: (report) => {
+      announceReminders(report?.unread);
+      // The tray's status line counts the same unread reminders the bell does.
+      if (Number.isFinite(report?.unread)) trayState.remindersDue = report.unread;
+      refreshTray();
+    },
+    // The reminder toast's buttons: snooze re-arms it (reminders.js owns the write),
+    // and "Open reminders" brings Zuri forward on the Reminders page.
+    onOpen: () => void showRemindersPage(),
+  });
+
+  // Scheduled automations tick every thirty seconds for as long as Zuri is open.
+  // The first thing the scheduler does is the catch-up sweep: every automation whose
+  // last run is a whole cadence behind the clock is replayed once, and that run writes
+  // its own lastRunAt, so opening Zuri again straight after does not replay it. The
+  // count goes to the window as the "caught up N runs" toast. Each run reports on the
+  // same push the rest of the app uses, so the Context panel and the runs page follow
+  // it without a timer of their own.
+  startScheduler({
+    onProgress: (change) => announceState(change),
+    onCatchUp: (report) => {
+      announceCatchUp(report);
+      if (report.ok !== true) {
+        console.error('[zuri:scheduler]', report.error?.message ?? 'the catch-up could not read schedules.json');
+      }
+    },
+    onTick: (report) => {
+      if (report.ok !== true) {
+        console.error('[zuri:scheduler]', report.error?.message ?? 'the tick could not read schedules.json');
+      }
+    },
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -573,6 +1220,28 @@ app.whenReady().then(async () => {
   });
 });
 
+// Quitting is the one thing the window's close handler must not swallow: the tray's
+// Quit row sets this too, and this catches every other route out (the OS, a crash
+// handler, a second instance handing over).
+app.on('before-quit', () => {
+  quitting = true;
+});
+
+// A pending tick must not write to a store that is already closing.
+app.on('will-quit', () => {
+  stopReminderTicker();
+  stopScheduler();
+  closeOverlay();
+  // An icon left behind in the notification area would outlive the process.
+  if (tray !== null) {
+    tray.destroy();
+    tray = null;
+  }
+});
+
+// A closed window is normally hidden rather than closed, so this is the path for a
+// window that was destroyed for real: a crash, or a build where the tray could not be
+// created. Quitting is the honest response, because nothing would be left to reopen.
 app.on('window-all-closed', () => {
   app.quit();
 });

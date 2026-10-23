@@ -25,7 +25,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readStore } from '../store.js';
+import { readStore, findAgent } from '../store.js';
 
 const WORKSPACE_DIR_NAME = 'workspace';
 const WORKSPACE_LIST_LIMIT = 500;
@@ -57,6 +57,16 @@ const SAFE_APP_NAME = /^[A-Za-z0-9][A-Za-z0-9 ._+-]*$/;
 
 /** Absolute workspace directory set by scripts; null in the app. */
 let workspaceOverride = null;
+
+/**
+ * Step ids the renderer cancelled, so a run that arrives for one of them is
+ * refused instead of writing anything. A Cancel press on a step that has already
+ * left the renderer cannot stop the write in flight (Node offers no way to
+ * interrupt fs), but it can stop the next call, and it is what makes a step's
+ * Cancel control mean something rather than only change a label on screen.
+ * @type {Set<string>}
+ */
+const cancelledSteps = new Set();
 
 /** Serial for temp file names, so two writes never share a scratch file. */
 let tempSerial = 0;
@@ -706,46 +716,55 @@ async function openAppTool(args, context) {
  * The tool list from the card. `requiresConfirmation` is true for anything that
  * changes something outside Zuri: the file system (writeFile) and the desktop
  * (openUrl, openApp). The main process holds the gate, per risks.md.
+ * `label` is the short human name the agents page shows beside a checkbox; it is
+ * kept here so the registry stays the one list of tools.
  */
 export const TOOLS = Object.freeze([
   Object.freeze({
     name: 'webSearch',
+    label: 'Search the web',
     description: 'Search the web and return a short list of results with title, URL and snippet.',
     requiresConfirmation: false,
     handler: webSearchTool,
   }),
   Object.freeze({
     name: 'webFetch',
+    label: 'Fetch a web page',
     description: 'Fetch one web page and return its title and readable text.',
     requiresConfirmation: false,
     handler: webFetchTool,
   }),
   Object.freeze({
     name: 'readFile',
+    label: 'Read a file or Office document',
     description: 'Read a text document, or the text inside a .docx, .xlsx or .pptx file.',
     requiresConfirmation: false,
     handler: readFileTool,
   }),
   Object.freeze({
     name: 'writeFile',
+    label: 'Save a file in the workspace',
     description: 'Save text or Markdown inside the Zuri workspace folder. Overwrites an existing file of the same name.',
     requiresConfirmation: true,
     handler: writeFileTool,
   }),
   Object.freeze({
     name: 'summarizeDocument',
+    label: 'Summarise a document',
     description: 'Read a document and ask the AI provider for a summary of it.',
     requiresConfirmation: false,
     handler: summarizeDocumentTool,
   }),
   Object.freeze({
     name: 'openUrl',
+    label: 'Open a link in the browser',
     description: 'Open a link in the default browser. Only URLs on the Settings allow-list are accepted.',
     requiresConfirmation: true,
     handler: openUrlTool,
   }),
   Object.freeze({
     name: 'openApp',
+    label: 'Start an allowed app',
     description: 'Start an application. Only app names on the Settings allow-list are accepted.',
     requiresConfirmation: true,
     handler: openAppTool,
@@ -881,6 +900,41 @@ export function listTools(options = {}) {
 }
 
 /**
+ * The short names the agents page and any picker show, without handlers.
+ * Separate from listTools because the settings page needs the label and the run
+ * path needs the description, and neither should carry the other.
+ * @returns {{ name: string, label: string, description: string }[]}
+ */
+export function toolCatalogue() {
+  return TOOLS.map((tool) => ({ name: tool.name, label: tool.label, description: tool.description }));
+}
+
+/**
+ * The tools the active agent may use, read from settings.json.
+ *
+ * This is where the agent's allow-list is turned into a tool list: the composer
+ * only sends the id, and the filter lives here so a renderer cannot widen its own
+ * tool set by claiming a different list.
+ * @param {object} settings
+ * @param {string} [agentId] Defaults to `settings.activeAgentId`.
+ * @returns {string[] | null} null means no agent, so every tool stays available.
+ */
+export function agentAllowedTools(settings, agentId) {
+  const agent = findAgent(settings, agentId);
+  return agent === null ? null : agent.allowedTools;
+}
+
+/**
+ * listTools narrowed to one agent's allow-list.
+ * @param {object} settings
+ * @param {string} [agentId]
+ * @returns {{ name: string, description: string, requiresConfirmation: boolean }[]}
+ */
+export function listToolsForAgent(settings, agentId) {
+  return listTools({ allowedTools: agentAllowedTools(settings, agentId) });
+}
+
+/**
  * Run one tool call. This is the only way in, and it holds every guard in order:
  * unknown name, the agent's allow-list, the confirmation gate, then the handler.
  * @param {string} name
@@ -894,6 +948,12 @@ export function listTools(options = {}) {
  * @returns {Promise<{ ok: true, data: any } | { ok: false, error: { code: string, message: string } }>}
  */
 export async function runTool(name, args = {}, options = {}) {
+  const stepId = typeof options.stepId === 'string' ? options.stepId.trim() : '';
+  if (stepId !== '' && cancelledSteps.has(stepId)) {
+    cancelledSteps.delete(stepId);
+    return failure('TOOL_CANCELLED', `${String(name)} was cancelled before it ran.`);
+  }
+
   const tool = getTool(name);
   if (!tool) {
     return failure('TOOL_UNKNOWN', `"${String(name)}" is not a Zuri tool. The tools are: ${TOOL_NAMES.join(', ')}.`);
@@ -919,4 +979,30 @@ export async function runTool(name, args = {}, options = {}) {
     console.error('[zuri:tools]', error);
     return failure('TOOL_FAILED', `${tool.name} failed: ${error?.message ?? 'unknown error'}`);
   }
+}
+
+/**
+ * Record a Cancel press from a step row. tools:cancel in main.js calls this.
+ * An unknown id is accepted rather than refused: cancel is idempotent, and a step
+ * that is already gone has nothing left to stop.
+ * @param {string} stepId
+ * @returns {{ ok: true, data: { id: string, cancelled: boolean } } | { ok: false, error: { code: string, message: string } }}
+ */
+export function cancelToolStep(stepId) {
+  const id = typeof stepId === 'string' ? stepId.trim() : '';
+  if (id === '') {
+    return failure('TOOLS_STEP_REQUIRED', 'Cancelling a step needs the step id shown on the row.');
+  }
+  cancelledSteps.add(id);
+  return ok({ id, cancelled: true });
+}
+
+/**
+ * Whether a step was cancelled before its run left the renderer. The selftest
+ * drives the guard through this, so it never has to wait for a rejected run.
+ * @param {string} stepId
+ * @returns {boolean}
+ */
+export function isToolStepCancelled(stepId) {
+  return cancelledSteps.has(String(stepId ?? '').trim());
 }

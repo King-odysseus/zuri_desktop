@@ -1,8 +1,7 @@
 /**
  * Firstrun: run the first-run setup step with no window and check what it stored.
  *
- * The setup card in src/renderer/views/onboarding.js asks for three answers - a
- * name, a theme and a provider key - and hands them over on
+ * The setup card asks for three answers - a name, a theme and a provider key - and hands them over on
  * `zuri:onboarding:complete`, which main answers with runOnboardingSetup
  * (src/main/onboarding.js). This script calls that same function, so what it checks
  * is the code the window runs, not a second copy of it.

@@ -9,3 +9,11 @@ release/
 secrets.json
 .env
 .env.*
+
+# Run output, not source. A redirected check (for example `npm run smoke >
+# .smoke-out.log`) used to land here and be committed by mistake, which leaves the
+# checkout changing under a passing check. Redirect into the temp folder instead.
+*.log
+
+# React/HeroUI migration build output
+dist-react/

@@ -21,8 +21,12 @@ import { getStoreRoot } from './store.js';
 /** Filename inside the store root. Listed in .gitignore. */
 export const SECRETS_FILE_NAME = 'secrets.json';
 
-/** Providers a key may be stored for. */
-export const PROVIDERS = Object.freeze(['openai', 'anthropic']);
+/**
+ * Providers a key may be stored for. DeepSeek is listed because its API is
+ * OpenAI-compatible, so it costs the adapter one table entry and no second code
+ * path; it is a provider people already pay for and ask Zuri to use.
+ */
+export const PROVIDERS = Object.freeze(['openai', 'anthropic', 'deepseek', 'moonshot', 'zai']);
 
 /** Provider assumed when a caller names none. */
 export const DEFAULT_PROVIDER = 'openai';
@@ -50,7 +54,7 @@ export function secretsPath(root = getStoreRoot()) {
 /**
  * Lower-case a caller's provider name, or null when it is not one we support.
  * @param {unknown} provider
- * @returns {'openai'|'anthropic'|null}
+ * @returns {'openai'|'anthropic'|'deepseek'|null}
  */
 function normaliseProvider(provider) {
   const name = typeof provider === 'string' ? provider.trim().toLowerCase() : DEFAULT_PROVIDER;
