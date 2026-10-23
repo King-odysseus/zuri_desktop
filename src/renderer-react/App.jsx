@@ -76,7 +76,7 @@ export default function App() {
       {route === 'settings' && <SettingsView />}
       {route === 'tasks' && <TasksView />}
       {route === 'reminders' && <RemindersView />}
-      {route === 'search' && <SearchView />}
+      {route === 'search' && <SearchView onSelectThread={openThread} />}
       {route === 'history' && <HistoryView onSelectThread={openThread} />}
     </div>
   );

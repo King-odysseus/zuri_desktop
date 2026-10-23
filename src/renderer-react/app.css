@@ -70,6 +70,26 @@ body {
   margin-inline: auto;
 }
 
+/* The shared field carries its own padding, so the magnifier sits outside the
+   input and the field makes room for it rather than overlapping the text. */
+.zuri-search-field {
+  position: relative;
+}
+
+.zuri-search-icon {
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  display: flex;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.zuri-search-field .zuri-field-wrap input {
+  padding-left: 2.75rem !important;
+}
+
 .zuri-form-row {
   display: flex;
   flex-wrap: wrap;
