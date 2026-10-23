@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Button, ComposerInput } from './ui.jsx';
+import { useEffect, useRef, useState } from 'react';
+import { Button, ComposerTextarea } from './ui.jsx';
 import { ArrowUpIcon, MicIcon, PlusIcon } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
 import SelectField from './SelectField.jsx';
@@ -30,6 +30,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [streamingText, setStreamingText] = useState('');
   const [replying, setReplying] = useState(false);
   const [error, setError] = useState('');
+  const composerRef = useRef(null);
 
   useEffect(() => {
     if (initialThreadId === '' || typeof api?.chats?.list !== 'function') return undefined;
@@ -52,6 +53,14 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       if (event.done === true) setReplying(false);
     });
   }, [api, threadId]);
+
+  useEffect(() => {
+    const composer = composerRef.current;
+    if (!composer) return;
+    composer.style.height = 'auto';
+    composer.style.height = `${Math.min(composer.scrollHeight, 192)}px`;
+    composer.style.overflowY = composer.scrollHeight > 192 ? 'auto' : 'hidden';
+  }, [draft]);
 
   async function sendMessage(event) {
     event.preventDefault();
@@ -175,16 +184,18 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
         <div className="w-full max-w-3xl">
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
-          <form onSubmit={sendMessage} className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 shadow-sm">
+          <form onSubmit={sendMessage} className="flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm">
             <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Attach a file">
               <PlusIcon />
             </Button>
-            <ComposerInput
+            <ComposerTextarea
+              ref={composerRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Ask Zuri"
               aria-label="Message Zuri"
-              className="min-w-0 flex-1 text-base outline-none"
+              rows={1}
+              className="min-h-10 min-w-0 flex-1 max-h-48 py-2 text-base outline-none"
               disabled={replying}
             />
             <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact className="w-24 shrink-0" />

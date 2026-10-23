@@ -6,7 +6,7 @@ import {
   BellIcon,
   ChatIcon,
   ChevronDownIcon,
-  ChevronRightIcon,
+  ChevronUpIcon,
   EditIcon,
   FolderIcon,
   SearchIcon,
@@ -72,7 +72,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           onPress={() => setCollapsed((value) => !value)}
         >
-          <ChevronRightIcon className={collapsed ? '' : 'rotate-180'} />
+          {collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
         </Button>
       </nav>
 

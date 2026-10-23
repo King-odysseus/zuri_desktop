@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { forwardRef, useId } from 'react';
 import { Badge, Button as FlowbiteButton, Checkbox as FlowbiteCheckbox, Label, Select as FlowbiteSelect, TextInput, Textarea as FlowbiteTextarea } from 'flowbite-react';
 
 const BUTTON_COLORS = {
@@ -71,9 +71,9 @@ export function Input({ label, id, isReadOnly = false, isDisabled = false, fullW
   );
 }
 
-export function ComposerInput({ className = '', ...props }) {
-  return <TextInput className={`border-0 bg-transparent text-foreground shadow-none placeholder:text-muted ${className}`} {...props} />;
-}
+export const ComposerTextarea = forwardRef(function ComposerTextarea({ className = '', ...props }, ref) {
+  return <FlowbiteTextarea ref={ref} className={`composer-textarea resize-none overflow-x-hidden border-0 bg-transparent text-foreground shadow-none placeholder:text-muted ${className}`} {...props} />;
+});
 
 export function Textarea({ label, id, isDisabled = false, className = '', ...props }) {
   const textareaId = fieldId(label, id, undefined);
