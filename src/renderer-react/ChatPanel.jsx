@@ -4,14 +4,18 @@ import {
   ArrowUpIcon,
   AutomationIcon,
   BellIcon,
+  CheckIcon,
   ChevronRightIcon,
+  CopyIcon,
   FolderIcon,
   MicIcon,
   PlusIcon,
+  StopIcon,
   TaskIcon,
 } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
 import SelectField from './SelectField.jsx';
+import { copyText } from './clipboard.js';
 
 const MODES = ['Ask', 'Act', 'Autopilot'].map((name) => ({ value: name, label: name }));
 const WORKSPACE_MODES = [
@@ -77,7 +81,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [error, setError] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [listening, setListening] = useState(false);
+  const [copiedIndex, setCopiedIndex] = useState(-1);
+  const [stopping, setStopping] = useState(false);
   const composerRef = useRef(null);
+  const scrollRef = useRef(null);
+  // Starts true so opening a thread lands on its newest message.
+  const stickToBottomRef = useRef(true);
   const recognitionRef = useRef(null);
   const voiceDraftRef = useRef('');
   const suggestions = useMemo(
@@ -119,6 +128,42 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     composer.style.height = `${Math.min(composer.scrollHeight, 192)}px`;
     composer.style.overflowY = composer.scrollHeight > 192 ? 'auto' : 'hidden';
   }, [draft]);
+
+  // Follow a reply as it streams, but only while the reader is already at the
+  // bottom. Scrolling up to reread an earlier answer must not be yanked back.
+  useEffect(() => {
+    const scroller = scrollRef.current;
+    if (!scroller || !stickToBottomRef.current) return;
+    scroller.scrollTop = scroller.scrollHeight;
+  }, [messages, streamingText, replying]);
+
+  function handleTranscriptScroll(event) {
+    const scroller = event.currentTarget;
+    stickToBottomRef.current = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 96;
+  }
+
+  async function copyMessage(message, index) {
+    const copied = await copyText(String(message?.content ?? ''));
+    if (!copied) {
+      setError('That reply could not be copied to the clipboard.');
+      return;
+    }
+    setCopiedIndex(index);
+    window.setTimeout(() => setCopiedIndex((current) => (current === index ? -1 : current)), 1500);
+  }
+
+  async function stopReply() {
+    if (stopping || threadId === '' || typeof api?.chat?.stop !== 'function') return;
+    setStopping(true);
+    try {
+      const result = await api.chat.stop({ threadId });
+      if (!result?.ok) setError(result?.error?.message ?? 'That reply could not be stopped.');
+    } catch {
+      setError('That reply could not be stopped.');
+    } finally {
+      setStopping(false);
+    }
+  }
 
   async function chooseAttachment() {
     if (replying) return;
@@ -260,7 +305,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
       const result = await api.chat.send({ threadId: activeThreadId });
       if (!result?.ok) {
-        setError(result?.error?.message ?? 'Zuri could not respond. Check Settings and try again.');
+        if (result?.error?.code === 'CHAT_STOPPED') {
+          // Stop intentionally discards the partial answer, so this is the
+          // outcome the person asked for and not an error worth a red line.
+          setStreamingText('');
+        } else {
+          setError(result?.error?.message ?? 'Zuri could not respond. Check Settings and try again.');
+        }
         setReplying(false);
         return;
       }
@@ -272,6 +323,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       setError(sendError?.message ?? 'Zuri could not respond.');
     } finally {
       setReplying(false);
+      setStopping(false);
     }
   }
 
@@ -310,11 +362,30 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         )}
 
         {hasConversation && (
-          <div className={`zuri-scrollbar-hidden mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto py-4`}>
+          <div ref={scrollRef} onScroll={handleTranscriptScroll} className={`zuri-scrollbar-hidden mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto py-4`}>
             {messages.map((message, index) => (
-              <div key={messageKey(message, index)} className={`min-w-0 max-w-[85%] break-words rounded-2xl px-4 py-3 text-sm ${message.role === 'user' ? 'self-end bg-accent text-accent-foreground' : 'self-start bg-surface-secondary text-foreground'}`}>
-                {message.role === 'user' ? message.content : <FormattedMessage content={message.content} />}
-              </div>
+              message.role === 'user' ? (
+                <div key={messageKey(message, index)} className="min-w-0 max-w-[85%] self-end break-words rounded-2xl bg-accent px-4 py-3 text-sm text-accent-foreground">
+                  {message.content}
+                </div>
+              ) : (
+                <div key={messageKey(message, index)} className="flex min-w-0 max-w-[85%] flex-col items-start gap-1 self-start">
+                  <div className="min-w-0 break-words rounded-2xl bg-surface-secondary px-4 py-3 text-sm text-foreground">
+                    <FormattedMessage content={message.content} />
+                  </div>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 rounded-lg text-muted"
+                    aria-label="Copy reply"
+                    title={copiedIndex === index ? 'Copied' : 'Copy reply'}
+                    onPress={() => void copyMessage(message, index)}
+                  >
+                    {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                  </Button>
+                </div>
+              )
             ))}
             {streamingText !== '' && <div className="max-w-[85%] self-start rounded-2xl bg-surface-secondary px-4 py-3 text-sm"><FormattedMessage content={streamingText} /></div>}
             {replying && streamingText === '' && <p className="self-start text-sm text-muted">Zuri is thinking...</p>}
@@ -372,9 +443,25 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             >
               <MicIcon />
             </Button>
-            <Button type="submit" isIconOnly size="sm" variant="primary" className="h-10 w-10 rounded-full bg-accent p-0 text-accent-foreground shadow-md hover:bg-accent/90 disabled:opacity-40" aria-label="Send" isDisabled={(draft.trim() === '' && !attachment) || replying}>
-              <ArrowUpIcon size={18} />
-            </Button>
+            {replying ? (
+              <Button
+                type="button"
+                isIconOnly
+                size="sm"
+                variant="secondary"
+                className="h-10 w-10 rounded-full p-0"
+                aria-label="Stop reply"
+                title="Stop reply"
+                onPress={() => void stopReply()}
+                isDisabled={stopping}
+              >
+                <StopIcon size={15} />
+              </Button>
+            ) : (
+              <Button type="submit" isIconOnly size="sm" variant="primary" className="h-10 w-10 rounded-full bg-accent p-0 text-accent-foreground shadow-md hover:bg-accent/90 disabled:opacity-40" aria-label="Send" isDisabled={draft.trim() === '' && !attachment}>
+                <ArrowUpIcon size={18} />
+              </Button>
+            )}
           </form>
 
           {!compact && attachment && (

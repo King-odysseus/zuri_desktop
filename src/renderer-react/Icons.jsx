@@ -23,4 +23,7 @@ export {
   ChevronDown as ChevronDownIcon,
   ChevronRight as ChevronRightIcon,
   ChevronUp as ChevronUpIcon,
+  Square as StopIcon,
+  Copy as CopyIcon,
+  Check as CheckIcon,
 } from 'lucide-react';
