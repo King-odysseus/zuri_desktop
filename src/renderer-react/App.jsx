@@ -55,7 +55,7 @@ export default function App() {
   return (
     <div className="flex h-dvh w-full bg-background text-foreground">
       <Sidebar current={route} onNavigate={setRoute} onNewChat={startNewChat} onSelectThread={openThread} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} />
-      {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} />}
+      {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} />}
       {route === 'agents' && <AgentsView />}
       {route === 'automations' && <AutomationsView />}
       {route === 'files' && <FilesView />}

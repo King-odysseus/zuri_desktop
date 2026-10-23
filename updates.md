@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Made Work mode a functional work hub with quick links to Tasks, Files, Reminders, and Automations while keeping the Zuri composer available.
+- Key files: `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/App.jsx`.
+- Other OS action: run `npm install && npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Connected the React composer to the existing Zuri chat bridge with persisted threads, streamed replies, visible errors, reopenable Recents, New chat reset, and a collapsible sidebar.
 - Key files: `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/Sidebar.jsx`, `src/renderer-react/App.jsx`, `src/renderer-react/Icons.jsx`.
 - Other OS action: run `npm install && npm run react:build` after syncing.

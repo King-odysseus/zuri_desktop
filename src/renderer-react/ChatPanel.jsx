@@ -19,7 +19,7 @@ function messageKey(message, index) {
   return message?.id ?? `${message?.role ?? 'message'}-${index}`;
 }
 
-export default function ChatPanel({ initialThreadId = '', onChatUpdated }) {
+export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [mode, setMode] = useState('Ask');
   const [workspaceMode, setWorkspaceMode] = useState('chat');
@@ -147,6 +147,29 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated }) {
             {streamingText !== '' && <div className="max-w-[85%] self-start rounded-2xl bg-surface-secondary px-4 py-3 text-sm">{streamingText}</div>}
             {replying && streamingText === '' && <p className="self-start text-sm text-muted">Zuri is thinking...</p>}
           </div>
+        )}
+
+        {workspaceMode === 'work' && !hasConversation && (
+          <section className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Work tools">
+            {[
+              ['Tasks', 'Plan and track work that needs doing.', 'tasks'],
+              ['Files', 'Open, review, and summarise workspace files.', 'files'],
+              ['Reminders', 'Keep important follow-ups on schedule.', 'reminders'],
+              ['Automations', 'Run recurring research and desktop tasks.', 'automations'],
+            ].map(([label, description, route]) => (
+              <Button
+                key={route}
+                variant="ghost"
+                className="h-auto justify-start rounded-2xl border border-border bg-surface-secondary p-4 text-left"
+                onPress={() => onNavigate?.(route)}
+              >
+                <span className="flex flex-col items-start gap-1">
+                  <span className="font-medium text-foreground">{label}</span>
+                  <span className="text-sm font-normal text-muted">{description}</span>
+                </span>
+              </Button>
+            ))}
+          </section>
         )}
 
         <div className="w-full max-w-3xl">
