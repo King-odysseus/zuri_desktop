@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Chip, Input } from '@heroui/react';
+import { Button, Checkbox, Chip, Input, Textarea } from './ui.jsx';
 
 const PREVIEW_TOOLS = [
   { name: 'webSearch', label: 'Search the web' },
@@ -195,16 +195,13 @@ export default function AgentsView() {
                     {selected.id === activeAgentId && <Chip color="primary">Active for chat</Chip>}
                   </div>
                   <Input label="Name" value={selected.name} maxLength={60} onChange={(event) => updateSelected({ name: event.target.value })} />
-                  <label className="flex flex-col gap-1 text-sm font-medium">
-                    System prompt
-                    <textarea
-                      value={selected.systemPrompt}
-                      onChange={(event) => updateSelected({ systemPrompt: event.target.value })}
-                      placeholder="You write short meeting briefs..."
-                      rows={5}
-                      className="w-full resize-y rounded-medium border border-border bg-surface-secondary px-3 py-2 text-sm font-normal text-foreground outline-none placeholder:text-muted focus:border-primary"
-                    />
-                  </label>
+                  <Textarea
+                    label="System prompt"
+                    value={selected.systemPrompt}
+                    onChange={(event) => updateSelected({ systemPrompt: event.target.value })}
+                    placeholder="You write short meeting briefs..."
+                    rows={5}
+                  />
                   <div>
                     <p className="mb-2 text-sm font-medium">Allowed tools</p>
                     <div className="grid gap-2 sm:grid-cols-2">

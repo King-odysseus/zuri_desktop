@@ -1,4 +1,4 @@
-import { ListBox, Select } from '@heroui/react';
+import { Label, Select } from './ui.jsx';
 
 const EMPTY_KEY = '__empty__';
 
@@ -7,32 +7,18 @@ function optionKey(value) {
 }
 
 export default function SelectField({ label, value, options, onChange, hideLabel = false, compact = false, className = '' }) {
-  const selectedKey = optionKey(String(value ?? ''));
-
   return (
     <div className={`flex ${compact ? 'min-w-0' : 'min-w-44'} flex-col gap-1 text-sm font-medium ${className}`}>
-      {!hideLabel && <span>{label}</span>}
+      {!hideLabel && <Label htmlFor={`select-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} value={label} />}
       <Select
-        aria-label={label}
-        selectedKey={selectedKey}
-        onSelectionChange={(key) => onChange(String(key) === EMPTY_KEY ? '' : String(key))}
-        fullWidth
+        id={`select-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
+        aria-label={hideLabel ? label : undefined}
+        value={String(value ?? '')}
+        onChange={(event) => onChange(event.target.value === EMPTY_KEY ? '' : event.target.value)}
+        sizing="md"
+        className={compact ? 'w-full border-0 bg-transparent px-2 text-foreground shadow-none' : 'w-full border-border bg-surface-secondary text-foreground'}
       >
-        <Select.Trigger className={compact
-          ? 'h-10 justify-between rounded-full border-0 bg-transparent px-2 font-normal text-foreground shadow-none'
-          : 'h-10 justify-between rounded-medium border border-border bg-surface-secondary px-3 font-normal text-foreground'}>
-          <Select.Value />
-          <Select.Indicator />
-        </Select.Trigger>
-        <Select.Popover className="z-50">
-          <ListBox>
-            {options.map((option) => (
-              <ListBox.Item key={optionKey(option.value)} textValue={option.label}>
-                {option.label}
-              </ListBox.Item>
-            ))}
-          </ListBox>
-        </Select.Popover>
+        {options.map((option) => <option key={optionKey(option.value)} value={optionKey(option.value)}>{option.label}</option>)}
       </Select>
     </div>
   );

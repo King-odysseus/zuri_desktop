@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Chip, Input } from '@heroui/react';
+import { Button, Checkbox, Chip, Input, Textarea } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 
 const MODES = [
@@ -220,10 +220,15 @@ export default function AutomationsView() {
             {editing && <Button variant="ghost" onPress={resetForm}>Cancel edit</Button>}
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
-            <label className="flex flex-col gap-1 text-sm font-medium lg:col-span-2">
-              What should it do
-              <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} maxLength={2000} placeholder="Summarise unread mail and list anything urgent" className="w-full resize-y rounded-medium border border-border bg-surface-secondary px-3 py-2 text-sm font-normal text-foreground outline-none placeholder:text-muted focus:border-primary" />
-            </label>
+            <Textarea
+              label="What should it do"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="Summarise unread mail and list anything urgent"
+              className="lg:col-span-2"
+            />
             <SelectField label="Mode" value={mode} options={MODES} onChange={setMode} />
             <SelectField label="How often" value={cadenceType} options={CADENCES} onChange={setCadenceType} />
             {cadenceType === 'once' && <Input type="datetime-local" label="Date and time" value={onceAt} onChange={(event) => setOnceAt(event.target.value)} />}

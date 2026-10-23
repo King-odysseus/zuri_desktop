@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, Chip, Input } from '@heroui/react';
+import { Button, Checkbox, Chip, Input } from './ui.jsx';
 
 const FILTERS = ['active', 'done', 'all'];
 

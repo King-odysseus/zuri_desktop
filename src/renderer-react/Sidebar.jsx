@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@heroui/react';
+import { Button } from './ui.jsx';
 import {
   AgentIcon,
   AutomationIcon,
@@ -82,13 +82,10 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         aria-hidden={collapsed}
       >
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
-          <button
-            type="button"
-            className="flex items-center gap-1 text-lg font-semibold tracking-tight"
-          >
+          <Button type="button" variant="ghost" className="flex items-center gap-1 text-lg font-semibold tracking-tight">
             Zuri
             <ChevronDownIcon size={14} />
-          </button>
+          </Button>
           <div className="flex items-center gap-1 text-muted">
             <Button isIconOnly size="sm" variant="ghost" aria-label="Notifications">
               <BellIcon size={16} />
@@ -125,14 +122,16 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         <div className="flex-1 overflow-y-auto px-3 text-sm text-muted">
           {threads.length === 0 && <p className="px-2">No conversations yet. Your threads will appear here, newest first.</p>}
           {threads.map((thread) => (
-            <button
+            <Button
               key={thread.id}
               type="button"
-              className={`mb-1 block w-full truncate rounded-lg px-2 py-2 text-left hover:bg-surface-tertiary ${thread.id === activeThreadId ? 'bg-surface-tertiary text-foreground' : 'text-muted'}`}
-              onClick={() => onSelectThread(thread.id)}
+              variant={thread.id === activeThreadId ? 'secondary' : 'ghost'}
+              fullWidth
+              className="mb-1 justify-start truncate rounded-lg px-2 py-2 text-left"
+              onPress={() => onSelectThread(thread.id)}
             >
               {thread.title || 'New chat'}
-            </button>
+            </Button>
           ))}
         </div>
       </aside>

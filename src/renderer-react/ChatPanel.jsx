@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '@heroui/react';
+import { Button, ComposerInput } from './ui.jsx';
 import { ArrowUpIcon, MicIcon, PlusIcon } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
 import SelectField from './SelectField.jsx';
@@ -179,12 +179,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Attach a file">
               <PlusIcon />
             </Button>
-            <input
+            <ComposerInput
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               placeholder="Ask Zuri"
               aria-label="Message Zuri"
-              className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted"
+              className="min-w-0 flex-1 text-base outline-none"
               disabled={replying}
             />
             <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact className="w-24 shrink-0" />

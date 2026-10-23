@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Chip, Input } from '@heroui/react';
+import { Button, Chip, Input } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 
 const REPEAT_OPTIONS = [

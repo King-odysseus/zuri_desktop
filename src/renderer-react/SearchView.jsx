@@ -1,4 +1,4 @@
-import { Input } from '@heroui/react';
+import { Input } from './ui.jsx';
 import { SearchIcon } from './Icons.jsx';
 
 export default function SearchView() {

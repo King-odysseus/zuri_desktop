@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Chip, Input } from '@heroui/react';
+import { Button, Chip, Input } from './ui.jsx';
 
 function formatSize(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return '';

@@ -1,12 +1,12 @@
 /*
- * HeroUI v3 ships its own Tailwind v4 entry: @heroui/styles pulls in tailwindcss,
- * the base layer, every component's structure and the default theme (which carries
- * the .dark / [data-theme="dark"] variable blocks the legacy app already toggles on
- * <html>). @source tells Tailwind v4 which of our own files to scan for utility
- * classes, since the renderer root only holds the mount point.
+ * Flowbite React supplies the component classes while Tailwind v4 generates the
+ * layout utilities used by the renderer. Scanning both our JSX and Flowbite's
+ * published class list keeps page controls styled without a second CSS system.
  */
-@import "@heroui/styles";
+@import "tailwindcss";
+@import "flowbite-react/plugin/tailwindcss";
 @source "./**/*.{jsx,js}";
+@source "../node_modules/flowbite-react/dist";
 
 /*
  * Maps the legacy app's navy/dark palette (src/renderer/styles/tokens.css)
