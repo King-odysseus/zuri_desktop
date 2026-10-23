@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Registered the custom Tailwind theme colors so the dark renderer has readable contrast, and replaced local SVG navigation icons with Lucide React icons.
+- Key files: `src/renderer-react/app.css`, `src/renderer-react/Icons.jsx`, `package.json`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Replaced nested Flowbite field boxes with compact, borderless pill controls and regenerated the Windows ICO from the current blue Zuri bubble asset.
 - Key files: `src/renderer-react/ui.jsx`, `src/renderer-react/SelectField.jsx`, `src/renderer-react/app.css`, `src/main/assets/zuri-icon.ico`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.

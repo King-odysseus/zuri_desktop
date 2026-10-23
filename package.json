@@ -66,6 +66,7 @@
   "dependencies": {
     "flowbite-react": "^0.12.17",
     "framer-motion": "^14.6.0",
+    "lucide-react": "^0.468.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   }
