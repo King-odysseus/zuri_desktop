@@ -2196,7 +2196,7 @@ check('the Sidebar conversation list page is drawn from node 0:1075', () => {
   const panel = lastRule('.shell-column-sidebar');
   const panelDrawn = [
     ['the 12 px gutter', /margin:\s*var\(--zuri-shell-gutter\) 0 var\(--zuri-shell-gutter\) var\(--zuri-shell-gutter\)/],
-    ['the glass fill', /background:\s*var\(--zuri-glass-card-surface\)/],
+    ['the navy sidebar fill', /background:\s*var\(--zuri-sidebar-surface\)/],
     ['the glass hairline', /border:\s*1px solid var\(--zuri-glass-card-border\)/],
     ['the card radius', /border-radius:\s*var\(--zuri-glass-card-radius\)/],
     ['the raised shadow', /box-shadow:\s*var\(--zuri-shadow-raised\)/],
@@ -2219,14 +2219,14 @@ check('the Sidebar conversation list page is drawn from node 0:1075', () => {
   const listMissing = listDrawn.filter(([, body, pattern]) => !pattern.test(body)).map(([label]) => label);
   if (listMissing.length > 0) throw new Error(`the conversation list is missing ${listMissing.join(', ')}`);
 
-  // Navigation (0:1142): eight 34 px rows 4 px apart, headed by the New chat action
+  // Navigation (0:1142): eight 34 px rows 8 px apart, headed by the New chat action
   // (0:1146) and carrying the count badge the node draws on the Chats row (0:1151).
   const row = ruleBody('.nav-sidebar-row');
   const nav = ruleBody('.sidebar-nav');
   const badge = ruleBody('.nav-row-count');
   const navDrawn = [
     ['the 34 px row', row, /height:\s*34px/],
-    ['4 px between rows', nav, /gap:\s*var\(--zuri-space-1\)/],
+    ['8 px between rows', nav, /gap:\s*var\(--zuri-space-2\)/],
     ['the list 12 px inset', nav, /padding:\s*0 var\(--zuri-space-3\) var\(--zuri-space-3\)/],
     ['the 40 px New chat action', ruleBody('.sidebar-new-chat'), /height:\s*40px/],
     ['the 22 px badge width', badge, /min-width:\s*22px/],

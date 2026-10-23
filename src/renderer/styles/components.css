@@ -1097,7 +1097,7 @@ body {
   margin: var(--zuri-shell-gutter) 0 var(--zuri-shell-gutter) var(--zuri-shell-gutter);
   border: 1px solid var(--zuri-glass-card-border);
   border-radius: var(--zuri-glass-card-radius);
-  background: var(--zuri-glass-card-surface);
+  background: var(--zuri-sidebar-surface);
   box-shadow: var(--zuri-shadow-raised);
   backdrop-filter: var(--zuri-backdrop-glass);
   overflow: hidden;
@@ -1449,14 +1449,14 @@ body {
   margin: var(--zuri-space-2) var(--zuri-space-3);
 }
 
-/* Navigation (design "Nav List", 0:1142: 236x300, eight 34 px rows on a 4 px gap):
+/* Navigation (design "Nav List", 0:1142: eight 34 px rows on an 8 px gap):
    the destinations the central column can show, one row each. The gutter is the
    sidebar's, so the rows line up with the New chat button above them. */
 .sidebar-nav {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: var(--zuri-space-1); /* the node draws its rows 34 tall, 38 apart */
+  gap: var(--zuri-space-2); /* breathing room keeps adjacent destinations distinct */
   /* The last row keeps the card's 12 px bottom inset, so Settings does not sit on
      the card edge. */
   padding: 0 var(--zuri-space-3) var(--zuri-space-3);
