@@ -594,15 +594,15 @@ label {
    icon tile and a chevron that answers the pointer rather than a flat panel. */
 .zuri-tool-card {
   display: flex;
-  align-items: flex-start;
-  gap: 0.875rem;
+  align-items: center;
+  gap: 0.75rem;
   width: 100%;
-  min-height: 0;
-  height: 100%;
+  min-height: 0 !important;
+  height: auto !important;
   border: 1px solid color-mix(in srgb, var(--control-border) 82%, transparent) !important;
-  border-radius: 1rem !important;
+  border-radius: 0.875rem !important;
   background: var(--surface) !important;
-  padding: 1.125rem 1.25rem;
+  padding: 0.5rem 0.75rem !important;
   text-align: left;
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
 }
@@ -617,10 +617,10 @@ label {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  width: 1.875rem;
+  height: 1.875rem;
   flex: 0 0 auto;
-  border-radius: 0.625rem;
+  border-radius: 0.5rem;
   background: var(--selected);
   color: var(--selected-foreground);
 }

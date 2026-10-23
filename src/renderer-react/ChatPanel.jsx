@@ -398,15 +398,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         {!compact && !hasConversation && (
           <section className={`mb-6 grid w-full ${contentWidth} grid-cols-1 gap-3 lg:grid-cols-2`} aria-label="Work tools">
             {WORK_TOOLS.map(({ route, label, description, Icon }) => (
-              <Button key={route} className="zuri-tool-card h-full items-start text-left" onPress={() => onNavigate?.(route)}>
+              <Button key={route} className="zuri-tool-card text-left" onPress={() => onNavigate?.(route)}>
                 <span className="zuri-tool-icon">
-                  <Icon size={18} />
+                  <Icon size={16} />
                 </span>
-                <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                  <span className="font-medium text-foreground">{label}</span>
-                  <span className="text-sm font-normal text-muted">{description}</span>
+                <span className="flex min-w-0 flex-1 flex-col items-start">
+                  <span className="text-sm font-medium leading-tight text-foreground">{label}</span>
+                  <span className="w-full truncate text-xs font-normal text-muted">{description}</span>
                 </span>
-                <ChevronRightIcon size={18} className="shrink-0 self-center text-muted" />
+                <ChevronRightIcon size={16} className="shrink-0 self-center text-muted" />
               </Button>
             ))}
           </section>
