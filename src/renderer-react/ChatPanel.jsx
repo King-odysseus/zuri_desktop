@@ -252,7 +252,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   }
 
   const hasConversation = messages.length > 0 || streamingText !== '';
-  const contentWidth = workspaceMode === 'work' ? 'max-w-4xl' : 'max-w-3xl';
+  const contentWidth = 'max-w-none';
 
   return (
     <main className="relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
@@ -274,7 +274,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-10 sm:px-6 sm:pb-24">
+      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${hasConversation ? 'justify-end pb-4 sm:pb-6' : 'justify-center pb-10 sm:pb-24'}`}>
         {!hasConversation && (
           <h1 className="mb-6 text-center text-3xl font-medium tracking-tight">
             {workspaceMode === 'work' ? 'What should we work on?' : "What's on the agenda today?"}
@@ -282,9 +282,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         )}
 
         {hasConversation && (
-          <div className={`mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4`}>
+          <div className={`zuri-scrollbar-hidden mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto py-4`}>
             {messages.map((message, index) => (
-              <div key={messageKey(message, index)} className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${message.role === 'user' ? 'self-end bg-accent text-accent-foreground' : 'self-start bg-surface-secondary text-foreground'}`}>
+              <div key={messageKey(message, index)} className={`min-w-0 max-w-[85%] break-words rounded-2xl px-4 py-3 text-sm ${message.role === 'user' ? 'self-end bg-accent text-accent-foreground' : 'self-start bg-surface-secondary text-foreground'}`}>
                 {message.role === 'user' ? message.content : <FormattedMessage content={message.content} />}
               </div>
             ))}

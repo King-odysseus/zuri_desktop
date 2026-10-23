@@ -52,6 +52,16 @@ body {
   display: none;
 }
 
+/* Preserve wheel and keyboard scrolling without showing a second visual rail. */
+.zuri-scrollbar-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.zuri-scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
 /* Flowbite wraps text inputs in a positioning element. Keep that wrapper
    transparent so the control reads as one light pill instead of two stacked
    white boxes. */
