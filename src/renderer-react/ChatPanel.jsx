@@ -15,9 +15,17 @@ const SUGGESTIONS = [
   'Schedule a Monday inbox brief',
   "Find last month's unpaid invoices",
 ];
+const ATTACHMENT_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv', 'md', 'json'];
 
 function messageKey(message, index) {
   return message?.id ?? `${message?.role ?? 'message'}-${index}`;
+}
+
+function formatAttachmentSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate }) {
@@ -30,6 +38,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [streamingText, setStreamingText] = useState('');
   const [replying, setReplying] = useState(false);
   const [error, setError] = useState('');
+  const [attachment, setAttachment] = useState(null);
   const composerRef = useRef(null);
 
   useEffect(() => {
@@ -62,10 +71,32 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     composer.style.overflowY = composer.scrollHeight > 192 ? 'auto' : 'hidden';
   }, [draft]);
 
+  async function chooseAttachment() {
+    if (replying) return;
+    if (typeof api?.files?.choose !== 'function') {
+      setError('File attachments are only available inside the Zuri app.');
+      return;
+    }
+    const picked = await api.files.choose({ purpose: 'attach' });
+    if (!picked?.ok || picked.data?.cancelled) return;
+    const name = typeof picked.data?.name === 'string' ? picked.data.name : '';
+    const extension = name.includes('.') ? name.split('.').pop()?.toLowerCase() : '';
+    if (!ATTACHMENT_EXTENSIONS.includes(extension)) {
+      setError('Attach a PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON file.');
+      return;
+    }
+    setAttachment({
+      name,
+      path: picked.data?.path,
+      size: picked.data?.size,
+    });
+    setError('');
+  }
+
   async function sendMessage(event) {
     event.preventDefault();
-    const content = draft.trim();
-    if (content === '' || replying) return;
+    const prompt = draft.trim();
+    if ((prompt === '' && !attachment) || replying) return;
     if (typeof api?.chats?.create !== 'function' || typeof api?.chats?.appendMessage !== 'function' || typeof api?.chat?.send !== 'function') {
       setError('Chat is only available when this page runs inside the Zuri app.');
       return;
@@ -77,9 +108,23 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setReplying(true);
 
     try {
+      let content = prompt || 'Please analyze the attached file.';
+      if (attachment) {
+        if (typeof api?.tools?.run !== 'function' || typeof attachment.path !== 'string' || attachment.path === '') {
+          setError('This file could not be read. Choose it again or use the Files page.');
+          return;
+        }
+        const read = await api.tools.run({ name: 'readFile', args: { path: attachment.path } });
+        const attachmentText = read?.ok && typeof read.data?.text === 'string' ? read.data.text.trim() : '';
+        if (attachmentText === '') {
+          setError(read?.error?.message ?? 'That file could not be read. Try a text or Office document.');
+          return;
+        }
+        content = `${content}\n\nAttached file: ${attachment.name}\n\n${attachmentText}`;
+      }
       let activeThreadId = threadId;
       if (activeThreadId === '') {
-        const created = await api.chats.create({ title: content.slice(0, 60) });
+        const created = await api.chats.create({ title: prompt.slice(0, 60) || attachment?.name || 'New chat' });
         if (!created?.ok || typeof created.data?.id !== 'string') {
           setError(created?.error?.message ?? 'A new chat could not be created.');
           setReplying(false);
@@ -111,6 +156,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       setMessages(Array.isArray(result.data?.thread?.messages) ? result.data.thread.messages : []);
       onChatUpdated?.();
       setStreamingText('');
+      setAttachment(null);
     } catch (sendError) {
       setError(sendError?.message ?? 'Zuri could not respond.');
     } finally {
@@ -186,7 +232,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         <div className={`w-full ${contentWidth}`}>
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
           <form onSubmit={sendMessage} className="flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm">
-            <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Attach a file">
+            <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Attach a file" title="Attach PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON" onPress={() => void chooseAttachment()}>
               <PlusIcon />
             </Button>
             <ComposerTextarea
@@ -203,10 +249,22 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Dictate">
               <MicIcon />
             </Button>
-            <Button type="submit" isIconOnly size="sm" variant="primary" className="rounded-full" aria-label="Send" isDisabled={draft.trim() === '' || replying}>
+            <Button type="submit" isIconOnly size="sm" variant="primary" className="rounded-full" aria-label="Send" isDisabled={(draft.trim() === '' && !attachment) || replying}>
               <ArrowUpIcon />
             </Button>
           </form>
+
+          <div className="mt-2 flex min-h-6 items-center justify-between gap-3 px-2 text-xs text-muted">
+            {attachment ? (
+              <span className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-foreground">Attached: {attachment.name}</span>
+                {formatAttachmentSize(attachment.size) && <span className="shrink-0">{formatAttachmentSize(attachment.size)}</span>}
+                <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onPress={() => setAttachment(null)} isDisabled={replying}>Remove</Button>
+              </span>
+            ) : (
+              <span>Attach PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON files</span>
+            )}
+          </div>
 
           {!hasConversation && (
             <div className="mt-3 rounded-2xl border border-border bg-surface-secondary p-2">
