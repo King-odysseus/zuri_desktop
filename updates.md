@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Moved the sidebar collapse control into the top conversation header and replaced the bottom chevron with Lucide panel close/open icons.
+- Key files: `src/renderer-react/Sidebar.jsx`, `src/renderer-react/Icons.jsx`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Replaced remaining hairline panel borders with transparent separation and soft theme-aware shadows, refreshed the light and dark surface tokens, and made Flowbite dark variants follow the app theme toggle.
 - Key files: `src/renderer-react/app.css`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.

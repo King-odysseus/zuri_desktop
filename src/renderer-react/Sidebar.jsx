@@ -6,9 +6,10 @@ import {
   BellIcon,
   ChatIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   EditIcon,
   FolderIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   SearchIcon,
   SettingsIcon,
   MoonIcon,
@@ -48,6 +49,19 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         className="flex w-14 flex-col items-center gap-2 border-r border-border bg-background py-4"
         aria-label="Destinations"
       >
+        {collapsed && (
+          <Button
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            className="text-muted"
+            aria-label="Expand sidebar"
+            title="Expand sidebar"
+            onPress={() => setCollapsed(false)}
+          >
+            <PanelLeftOpenIcon />
+          </Button>
+        )}
         {NAV_ITEMS.map(({ key, label, Icon }) => (
           <Button
             key={key}
@@ -63,17 +77,6 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             <Icon />
           </Button>
         ))}
-        <Button
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          className="mt-auto text-muted"
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          onPress={() => setCollapsed((value) => !value)}
-        >
-          {collapsed ? <ChevronDownIcon /> : <ChevronUpIcon />}
-        </Button>
       </nav>
 
       <aside
@@ -87,6 +90,16 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             <ChevronDownIcon size={14} />
           </Button>
           <div className="flex items-center gap-1 text-muted">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+              onPress={() => setCollapsed(true)}
+            >
+              <PanelLeftCloseIcon size={17} />
+            </Button>
             <Button isIconOnly size="sm" variant="ghost" aria-label="Notifications">
               <BellIcon size={16} />
             </Button>

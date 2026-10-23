@@ -15,6 +15,8 @@ export {
   Plus as PlusIcon,
   Mic as MicIcon,
   ArrowUp as ArrowUpIcon,
+  PanelLeftClose as PanelLeftCloseIcon,
+  PanelLeftOpen as PanelLeftOpenIcon,
   ChevronDown as ChevronDownIcon,
   ChevronRight as ChevronRightIcon,
   ChevronUp as ChevronUpIcon,
