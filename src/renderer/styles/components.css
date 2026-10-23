@@ -4844,8 +4844,9 @@ body {
      and the draft starts at the button's right edge, 36 px in, as drawn. */
   padding: 0 var(--zuri-space-3) 0 var(--zuri-space-1);
   border: 0;
-  border-radius: 14px;
-  background: var(--zuri-surface-secondary);
+  border-radius: var(--zuri-radius-2xl);
+  background: var(--zuri-composer-surface);
+  border: 1px solid var(--zuri-border-hairline);
   box-shadow: var(--zuri-shadow-soft);
 }
 
@@ -5010,10 +5011,11 @@ body {
   align-items: center;
   gap: 0;
   height: 28px;
-  padding: 3px;
+  padding: 3px 6px 3px 3px;
   margin-right: var(--zuri-space-1);
   border-radius: var(--zuri-radius-pill);
-  background: var(--zuri-surface-tertiary);
+  background: var(--zuri-surface-secondary);
+  border: 1px solid var(--zuri-border-hairline);
 }
 
 .composer-mode {
@@ -5027,6 +5029,24 @@ body {
   font-size: var(--zuri-font-size-label-md);
   line-height: var(--zuri-line-height-label-md);
   cursor: pointer;
+}
+
+/* Keep the mode choice as one quiet control. The full explanation remains in the
+   accessible menu opened by the selected mode. */
+.composer-mode:not([aria-pressed='true']) {
+  display: none;
+}
+
+.composer-modes::after {
+  content: '';
+  width: 7px;
+  height: 7px;
+  margin: 0 3px 3px 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--zuri-text-secondary);
+  transform: rotate(45deg);
+  pointer-events: none;
 }
 
 .composer-mode:hover {

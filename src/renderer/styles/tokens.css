@@ -43,6 +43,7 @@
   --zuri-glass-card-border: rgba(255, 255, 255, 0.1216); /* design node 0:105 glass-border, dark #FFFFFF1F */
   --zuri-surface: #16161c; /* heroUI default ramp, dark surface */
   --zuri-surface-raised: #1e1e26; /* heroUI default ramp, one step above surface */
+  --zuri-composer-surface: #0d1b2d; /* Navy composer surface */
   --zuri-surface-sunken: #101214; /* design node 0:113 color/sunken, the dark step below surface */
   /* The two steps the current design's panels and controls are drawn on
      (tokens.json Dark --color-surface-secondary / --color-surface-tertiary):
@@ -75,6 +76,14 @@
   --zuri-transcript-danger: #f05252; /* Failed badge and error glyph */
   --zuri-transcript-failed-soft: rgba(240, 82, 82, 0.22); /* Failed badge and error avatar fill */
   --zuri-transcript-skeleton: rgba(255, 255, 255, 0.14); /* loading bars */
+  /* The transcript page (design node 0:1625) names collection variables for its
+     three surfaces; each alias below carries this block's value for that variable. */
+  --zuri-transcript-bubble: var(--zuri-surface-raised); /* reply card fill */
+  --zuri-transcript-bubble-user: var(--zuri-primary-soft); /* reader bubble fill */
+  --zuri-transcript-bubble-radius: 20px; /* radius-xl: both bubbles share the node's corner */
+  --zuri-transcript-chip-accent-soft: var(--zuri-primary-soft); /* mode chip beside the thread name */
+  --zuri-transcript-strip: var(--zuri-surface-secondary); /* Act steps strip fill */
+  --zuri-transcript-strip-radius: 12px; /* the strip's own corner */
 
   /* Autopilot right rail (design node 0:6978). The node is drawn in the light
      collection; each value below is the same collection variable's dark twin, so
@@ -98,16 +107,19 @@
   --zuri-text-subtle: #a1a1aa; /* tokens.json Dark --color-text-subtle, design node 0:105 Body */
   --zuri-text-on-accent: #ffffff; /* heroUI primary ramp, contrast foreground */
   --zuri-text-mark: #c28a1d; /* design node 0:105 mark gold; the node gives one value, so both themes share it */
-  --zuri-text-panel-header: #8e9196; /* design node 0:73 Label and Count fill; unbound to a mode, so both themes share it */
 
-  /* Nav / Top Bar (design node 0:78). The node binds its surface and its hairline
-     to color/background and color/border, and paints its title, model and glyphs
-     with the light collection's color/text and color/muted, so each value below
-     is that variable's dark collection twin rather than a derived colour. */
-  --zuri-nav-top-bar-surface: #0e1012; /* design node 0:78 color/background, dark collection */
-  --zuri-nav-top-bar-title: #edeff2; /* design node 0:78 title fill: #1f2328 is color/text, so this is color/text, dark collection */
-  --zuri-nav-top-bar-muted: #9aa0a6; /* design node 0:78 model and glyph fill: #8e9196 is color/muted, so this is color/muted, dark collection */
-  --zuri-nav-top-bar-hairline: rgba(255, 255, 255, 0.08); /* design node 0:78 color/border, dark collection: white at 7.84% */
+  /* Nav / Top Bar (design "Navigation / Top Bar", node 0:189 after the redraw;
+     the card still calls it 0:78). The node binds its surface to color/surface, its
+     name and its glyphs to color/text, and its two square controls to
+     color/surface-secondary, so each value below is that variable's dark
+     collection twin. Its corners are the radii it binds: radius-lg on the bar,
+     radius-md on every child. */
+  --zuri-nav-top-bar-surface: #18181b; /* tokens.json Dark --color-surface: the node's own surface fill */
+  --zuri-nav-top-bar-title: #ecedee; /* tokens.json Dark --color-text: the node's title fill */
+  --zuri-nav-top-bar-icon: #ecedee; /* tokens.json Dark --color-text: the node's glyph stroke on both controls */
+  --zuri-nav-top-bar-control-surface: #27272a; /* tokens.json Dark --color-surface-secondary: the node's control fill */
+  --zuri-nav-top-bar-radius: 14px; /* the node's cornerRadius, bound radius-lg (tokens.json radius-lg 14) */
+  --zuri-nav-top-bar-control-radius: 12px; /* the node's child cornerRadius, bound radius-md (tokens.json radius-md 12) */
 
   /* Accent and semantic: HeroUI primary / success / warning / danger ramps. */
   --zuri-accent: #006fee; /* tokens.json Dark --color-primary, the design's blue */
@@ -115,14 +127,51 @@
   --zuri-accent-subtle: rgba(0, 111, 238, 0.16); /* tokens.json Dark --color-primary-soft (#001731) as a tint */
   --zuri-primary-soft: #001731; /* tokens.json Dark --color-primary-soft at full strength: the active mode chip fill */
   --zuri-primary-soft-foreground: #338ef7; /* tokens.json Dark --color-primary-soft-foreground: that chip's label */
+  --zuri-secondary: #7828c8; /* tokens.json Dark --color-secondary: the Act mode badge glyph */
+  --zuri-secondary-soft: #2a0e45; /* tokens.json Dark --color-secondary-soft: the Act mode badge fill */
   --zuri-success: #3ddc84; /* heroUI success ramp, dark step */
   --zuri-success-subtle: rgba(61, 220, 132, 0.16); /* heroUI success ramp at 16% alpha */
+  --zuri-success-soft: #052814; /* tokens.json Dark --color-success-soft: the card status pill fill */
+  --zuri-success-soft-foreground: #4ade80; /* tokens.json Dark --color-success-soft-foreground: that pill's label */
   --zuri-warning: #f5a623; /* heroUI warning ramp, dark step */
   --zuri-warning-subtle: rgba(245, 166, 35, 0.16); /* heroUI warning ramp at 16% alpha */
   --zuri-danger: #f05252; /* heroUI danger ramp, dark step */
   --zuri-danger-subtle: rgba(240, 82, 82, 0.16); /* heroUI danger ramp at 16% alpha */
   --zuri-danger-tint: rgba(240, 82, 82, 0.0588); /* design node 0:121 card fill: danger ramp at the node's 5.88% alpha */
   --zuri-danger-line: rgba(240, 82, 82, 0.32); /* design node 0:121 card border: danger ramp at the node's 32% alpha */
+  /* Button / Danger (node 0:24) fills with its bound variable "danger", not with a
+     tint of the page. tokens.json spells danger as #F31260 in both modes, which is
+     the value the node resolves to, so the destructive control keeps its own token
+     instead of borrowing the HeroUI ramp above. */
+  --zuri-danger-button-fill: #f31260; /* design node 0:24 fill, bound variable danger (tokens.json --color-danger) */
+  /* Button / Secondary (node 0:20), the component the "Spec Bordered" label in the
+     Buttons Row names. The node binds three variables, so each one gets its own
+     token: surface-raised fill, border-subtle outline and text label. tokens.json
+     Dark holds them at #17171A, white at 8% and #ECEDEE. */
+  --zuri-bordered-button-surface: #17171a; /* design node 0:20 fill, bound surface-raised (tokens.json Dark --color-surface-raised) */
+  --zuri-bordered-button-border: rgba(255, 255, 255, 0.08); /* design node 0:20 stroke, bound border-subtle: white at 7.84% in the dark collection */
+  --zuri-bordered-button-label: #ecedee; /* design node 0:20 label, bound text (tokens.json Dark --color-text) */
+
+  /* Error block (design node 0:287, "State / Error"). The node paints itself with
+     semantic variables, not derived tints, so each value below is that variable's
+     dark twin: color/danger-soft fill, color/surface on the icon disc and the
+     action, color/danger on the mark, color/text on the title and color/text-subtle
+     on the body. */
+  --zuri-error-block-fill: #310413; /* tokens.json Dark --color-danger-soft */
+  --zuri-error-block-surface: #18181b; /* tokens.json Dark --color-surface: the icon disc and the action */
+  --zuri-error-block-icon: #f31260; /* tokens.json Dark --color-danger */
+  --zuri-error-block-title: #ecedee; /* tokens.json Dark --color-text */
+  --zuri-error-block-text: #a1a1aa; /* tokens.json Dark --color-text-subtle */
+
+  /* Model picker (design node 0:3624). The panel is drawn in one colour
+     collection, so the radii and the danger title travel with the node; the
+     shadow is the node's 0/16, 40 blur at 7.8%, given a dark value the way the
+     shadow scale above does. */
+  --zuri-model-menu-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  --zuri-model-menu-danger: #ff8fb0; /* tokens.json Dark --color-danger-soft-foreground */
+  --zuri-model-menu-radius-badge: 12px; /* tokens.json Dark radius-md */
+  --zuri-model-menu-radius-control: 14px; /* tokens.json Dark radius-lg */
+  --zuri-model-menu-radius-panel: 20px; /* tokens.json Dark radius-xl */
 
   /* Shadows: HeroUI shadow scale, dark values (style guide shadow rows). */
   /* heroUI soft shadow, dark */
@@ -157,13 +206,24 @@
   /* Role names from the design tool's export (tokens.json "Mode 1"), so the
      design file and the CSS speak the same language. Same values, same theme. */
   --zuri-radius-row: 8px; /* tokens.json radius-row */
+  --zuri-radius-nav-row: 12px; /* the sidebar nav row's cornerRadius, bound radius-md in tokens.json (node 0:1147) */
   --zuri-radius-card: 10px; /* tokens.json radius-card */
   --zuri-radius-modal: 12px; /* tokens.json radius-modal */
   --zuri-radius-overlay: 12px; /* tokens.json radius-overlay */
+  --zuri-radius-field: 12px; /* the input family's cornerRadius, bound radius-md (tokens.json radius-md 12; the HeroUI ramp above spells radius-md 10) */
   /* The card's 20 px corners are the node's own binding, radius-xl. The HeroUI
      scale above spells radius-xl as 16 px, so the card carries the design's
      value rather than borrowing the ramp's. */
   --zuri-glass-card-radius: 20px; /* design node 0:105 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-error-block-radius: 20px; /* design node 0:287 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-error-block-action-radius: 12px; /* design node 0:294 (Error Action) cornerRadius, bound radius-md (tokens.json radius-md 12) */
+  --zuri-base-card-radius: 20px; /* design node 0:84 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-base-card-icon-radius: 12px; /* design node 0:86 cornerRadius, bound radius-md (tokens.json radius-md 12) */
+  /* The file card binds radius-lg on the card and radius-md on its type badge.
+     tokens.json spells those 14 and 12, so the card carries the design's values
+     rather than the HeroUI ramp above, which spells them 12 and 10. */
+  --zuri-card-file-radius: 14px; /* design node 0:108 cornerRadius, bound radius-lg (tokens.json radius-lg 14) */
+  --zuri-card-file-badge-radius: 12px; /* design node 0:108 File Type Badge cornerRadius, bound radius-md (tokens.json radius-md 12) */
 
   /* Typography: HeroUI type scale, system UI stack with Segoe UI first on
      Windows (style guide text styles). */
@@ -198,15 +258,14 @@
   --zuri-font-size-caption: 12px; /* design node 0:105 Description text size */
   --zuri-line-height-caption: 16px; /* design node 0:105 Description line height */
   --zuri-line-height-field-label: 18px; /* design node 0:24 Label line height */
-  --zuri-line-height-panel-header: 18px; /* design node 0:73 Label line height */
-  --zuri-line-height-nav-row: 18px; /* design node 0:63 Label line height */
+  --zuri-line-height-nav-row: 20px; /* the nav row's 14 px label on a 20 px line, node 0:1147 */
   --zuri-line-height-select-option: 18px; /* design node 0:46 Option label line height */
 
   /* Layout: style guide layout variables. */
   --zuri-sidebar-width: 260px; /* style guide sidebar expanded */
   --zuri-sidebar-width-collapsed: 64px; /* style guide sidebar collapsed */
   --zuri-right-panel-width: 320px; /* style guide right panel */
-  --zuri-topbar-height: 52px; /* design node 0:78: a 51 px row plus its 1 px hairline, and size/topbar-height is 52; the node overrides the style guide's 48 */
+  --zuri-topbar-height: 56px; /* design node 0:189 (the card's 0:78): the bar's own 56 px frame, taller than the style guide's 48 */
   /* The shell's own geometry, from the App Shell frame 0:466. Kept apart from the
      topbar/panel tokens above because the standalone view pages still draw the
      older 52 px bar and 320 px panel. */
@@ -215,10 +274,10 @@
   --zuri-shell-gutter: 12px; /* design "Rail Left" (0:538) / "Rail Right" (0:632): 12 px */
   --zuri-radius-brand: 10px; /* design "Brand Mark" (0:470) and New chat (0:478): radius 10 */
   --zuri-radius-search: 9px; /* design search field (0:543), bell (0:546) and theme (0:556): radius 9 */
-  --zuri-chat-max-width: 732px; /* design node 0:1221: the transcript content column, 860 wide less its 64 px inset each side */
+  --zuri-chat-max-width: 720px; /* design node 0:1642: the transcript content column, 1120 wide less its 200 px inset each side */
   --zuri-modal-width: 480px; /* design node 0:96 dialog width */
   --zuri-floating-assistant-width: 360px; /* style guide floating assistant */
-  --zuri-rail-width: 12px; /* pages.md "12 px rails": a collapsed chat or context panel */
+  --zuri-rail-width: 44px; /* the rail a collapsed panel leaves: it is the only way back, so it is a 44 px target */
 
   /* Motion: style guide durations; reduced motion is handled at the end. */
   --zuri-motion-fast: 150ms; /* style guide hover and press */
@@ -243,6 +302,7 @@
   --zuri-glass-card-border: rgba(255, 255, 255, 0.4); /* design node 0:105 glass-border, light #FFFFFF66 */
   --zuri-surface: #ffffff; /* heroUI default ramp, light surface */
   --zuri-surface-raised: #ffffff; /* heroUI default ramp, raised light surface */
+  --zuri-composer-surface: #ffffff; /* Light composer surface */
   --zuri-surface-sunken: #f0f1f3; /* design node 0:113 color/sunken, the light step below surface */
   /* The two steps the current design's panels and controls are drawn on
      (tokens.json Light --color-surface-secondary / --color-surface-tertiary):
@@ -261,7 +321,7 @@
   /* Text: HeroUI default ramp foreground steps. */
   --zuri-text-primary: #111114; /* heroUI default ramp, primary foreground */
 
-  /* Conversation transcript (design node 0:1221): the node's own values. */
+  /* Conversation transcript (design node 0:1625): the node's own values. */
   --zuri-transcript-accent: #2f6bff; /* Act/Autopilot badge, Zuri mark, streaming caret */
   --zuri-transcript-accent-soft: #eaf0ff; /* accent badge and mark tile fill */
   --zuri-transcript-avatar: #6b4eff; /* the reader's avatar fill */
@@ -274,6 +334,14 @@
   --zuri-transcript-danger: #d14343; /* Failed badge and error glyph */
   --zuri-transcript-failed-soft: rgba(209, 67, 67, 0.18); /* Failed badge and error avatar fill */
   --zuri-transcript-skeleton: #e8eaed; /* loading bars */
+  /* The transcript page (design node 0:1625) names collection variables for its
+     three surfaces; each alias below carries this block's value for that variable. */
+  --zuri-transcript-bubble: var(--zuri-surface-raised); /* reply card fill */
+  --zuri-transcript-bubble-user: var(--zuri-primary-soft); /* reader bubble fill */
+  --zuri-transcript-bubble-radius: 20px; /* radius-xl: both bubbles share the node's corner */
+  --zuri-transcript-chip-accent-soft: var(--zuri-primary-soft); /* mode chip beside the thread name */
+  --zuri-transcript-strip: var(--zuri-surface-secondary); /* Act steps strip fill */
+  --zuri-transcript-strip-radius: 12px; /* the strip's own corner */
 
   /* Autopilot right rail (design node 0:6978). The node's colours are the light
      collection's own values, so each token names the collection variable it came
@@ -297,15 +365,17 @@
   --zuri-text-subtle: #6b6b75; /* tokens.json Light --color-text-subtle, design node 0:105 Body */
   --zuri-text-on-accent: #ffffff; /* heroUI primary ramp, contrast foreground */
   --zuri-text-mark: #c28a1d; /* design node 0:105 mark gold; the node gives one value, so both themes share it */
-  --zuri-text-panel-header: #8e9196; /* design node 0:73 Label and Count fill; unbound to a mode, so both themes share it */
 
-  /* Nav / Top Bar (design node 0:78): the values the node itself holds, bound to
-     color/background and color/border and drawn as the light collection's
-     color/text and color/muted. */
-  --zuri-nav-top-bar-surface: #ffffff; /* design node 0:78 color/background, light collection */
-  --zuri-nav-top-bar-title: #1f2328; /* design node 0:78 title fill, color/text in the light collection */
-  --zuri-nav-top-bar-muted: #8e9196; /* design node 0:78 model and glyph fill, color/muted in the light collection */
-  --zuri-nav-top-bar-hairline: #e8eaed; /* design node 0:78 color/border, light collection */
+  /* Nav / Top Bar (design "Navigation / Top Bar", node 0:189 after the redraw;
+     the card still calls it 0:78). The values the node itself holds, bound to
+     color/surface, color/text and color/surface-secondary, with its two corners
+     bound to radius-lg and radius-md. */
+  --zuri-nav-top-bar-surface: #ffffff; /* tokens.json Light --color-surface: the node's own surface fill */
+  --zuri-nav-top-bar-title: #11181c; /* tokens.json Light --color-text: the node's title fill */
+  --zuri-nav-top-bar-icon: #11181c; /* tokens.json Light --color-text: the node's glyph stroke on both controls */
+  --zuri-nav-top-bar-control-surface: #f4f4f5; /* tokens.json Light --color-surface-secondary: the node's control fill */
+  --zuri-nav-top-bar-radius: 14px; /* the node's cornerRadius, bound radius-lg (tokens.json radius-lg 14) */
+  --zuri-nav-top-bar-control-radius: 12px; /* the node's child cornerRadius, bound radius-md (tokens.json radius-md 12) */
 
   /* Accent and semantic: HeroUI primary / success / warning / danger ramps. */
   --zuri-accent: #006fee; /* tokens.json Light --color-primary, the design's blue */
@@ -313,14 +383,43 @@
   --zuri-accent-subtle: rgba(0, 111, 238, 0.1); /* tokens.json Light --color-primary-soft (#E6F1FE) as a tint */
   --zuri-primary-soft: #e6f1fe; /* tokens.json Light --color-primary-soft at full strength: the active mode chip fill */
   --zuri-primary-soft-foreground: #005bc4; /* tokens.json Light --color-primary-soft-foreground: that chip's label */
+  --zuri-secondary: #7828c8; /* tokens.json Light --color-secondary: the Act mode badge glyph */
+  --zuri-secondary-soft: #f2eafa; /* tokens.json Light --color-secondary-soft: the Act mode badge fill */
   --zuri-success: #17a34a; /* heroUI success ramp, light step */
   --zuri-success-subtle: rgba(23, 163, 74, 0.1); /* heroUI success ramp at 10% alpha */
+  --zuri-success-soft: #d3f7e3; /* tokens.json Light --color-success-soft: the card status pill fill */
+  --zuri-success-soft-foreground: #0a7a3d; /* tokens.json Light --color-success-soft-foreground: that pill's label */
   --zuri-warning: #d97706; /* heroUI warning ramp, light step */
   --zuri-warning-subtle: rgba(217, 119, 6, 0.12); /* heroUI warning ramp at 12% alpha */
   --zuri-danger: #dc2626; /* heroUI danger ramp, light step */
   --zuri-danger-subtle: rgba(220, 38, 38, 0.1); /* heroUI danger ramp at 10% alpha */
   --zuri-danger-tint: rgba(220, 38, 38, 0.0588); /* design node 0:121 card fill: danger ramp at the node's 5.88% alpha */
   --zuri-danger-line: rgba(220, 38, 38, 0.32); /* design node 0:121 card border: danger ramp at the node's 32% alpha */
+  /* Button / Danger (node 0:24) fills with its bound variable "danger", the same
+     #F31260 in this mode: the design's danger is one value across themes. */
+  --zuri-danger-button-fill: #f31260; /* design node 0:24 fill, bound variable danger (tokens.json --color-danger) */
+  /* Button / Secondary (node 0:20), the component the "Spec Bordered" label in the
+     Buttons Row names: the light collection's values for the three variables the
+     node binds, straight from tokens.json. */
+  --zuri-bordered-button-surface: #ffffff; /* design node 0:20 fill, bound surface-raised (tokens.json Light --color-surface-raised) */
+  --zuri-bordered-button-border: rgba(17, 17, 17, 0.08); /* design node 0:20 stroke #11111114, bound border-subtle at 7.84% */
+  --zuri-bordered-button-label: #11181c; /* design node 0:20 label, bound text (tokens.json Light --color-text) */
+
+  /* Error block (design node 0:287, "State / Error"): the light collection's own
+     values, straight from tokens.json. */
+  --zuri-error-block-fill: #fdd8e5; /* tokens.json Light --color-danger-soft */
+  --zuri-error-block-surface: #ffffff; /* tokens.json Light --color-surface: the icon disc and the action */
+  --zuri-error-block-icon: #f31260; /* tokens.json Light --color-danger */
+  --zuri-error-block-title: #11181c; /* tokens.json Light --color-text */
+  --zuri-error-block-text: #6b6b75; /* tokens.json Light --color-text-subtle */
+
+  /* Model picker (design node 0:3624): the node's own 0/16, 40 blur, 7.8% shadow
+     and the radii the panel, its rows and its badge are bound to. */
+  --zuri-model-menu-shadow: 0 16px 40px rgba(15, 23, 42, 0.078);
+  --zuri-model-menu-danger: #b80e4d; /* tokens.json Light --color-danger-soft-foreground */
+  --zuri-model-menu-radius-badge: 12px; /* tokens.json Light radius-md */
+  --zuri-model-menu-radius-control: 14px; /* tokens.json Light radius-lg */
+  --zuri-model-menu-radius-panel: 20px; /* tokens.json Light radius-xl */
 
   /* Shadows: HeroUI shadow scale, light values (style guide shadow rows). */
   /* heroUI soft shadow, light */
@@ -355,13 +454,24 @@
   /* Role names from the design tool's export (tokens.json "Mode 1"), so the
      design file and the CSS speak the same language. Same values, same theme. */
   --zuri-radius-row: 8px; /* tokens.json radius-row */
+  --zuri-radius-nav-row: 12px; /* the sidebar nav row's cornerRadius, bound radius-md in tokens.json (node 0:1147) */
   --zuri-radius-card: 10px; /* tokens.json radius-card */
   --zuri-radius-modal: 12px; /* tokens.json radius-modal */
   --zuri-radius-overlay: 12px; /* tokens.json radius-overlay */
+  --zuri-radius-field: 12px; /* the input family's cornerRadius, bound radius-md (tokens.json radius-md 12; the HeroUI ramp above spells radius-md 10) */
   /* The card's 20 px corners are the node's own binding, radius-xl. The HeroUI
      scale above spells radius-xl as 16 px, so the card carries the design's
      value rather than borrowing the ramp's. */
   --zuri-glass-card-radius: 20px; /* design node 0:105 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-error-block-radius: 20px; /* design node 0:287 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-error-block-action-radius: 12px; /* design node 0:294 (Error Action) cornerRadius, bound radius-md (tokens.json radius-md 12) */
+  --zuri-base-card-radius: 20px; /* design node 0:84 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-base-card-icon-radius: 12px; /* design node 0:86 cornerRadius, bound radius-md (tokens.json radius-md 12) */
+  /* The file card binds radius-lg on the card and radius-md on its type badge.
+     tokens.json spells those 14 and 12, so the card carries the design's values
+     rather than the HeroUI ramp above, which spells them 12 and 10. */
+  --zuri-card-file-radius: 14px; /* design node 0:108 cornerRadius, bound radius-lg (tokens.json radius-lg 14) */
+  --zuri-card-file-badge-radius: 12px; /* design node 0:108 File Type Badge cornerRadius, bound radius-md (tokens.json radius-md 12) */
 
   /* Typography: HeroUI type scale, system UI stack with Segoe UI first on
      Windows (style guide text styles). */
@@ -396,15 +506,14 @@
   --zuri-font-size-caption: 12px; /* design node 0:105 Description text size */
   --zuri-line-height-caption: 16px; /* design node 0:105 Description line height */
   --zuri-line-height-field-label: 18px; /* design node 0:24 Label line height */
-  --zuri-line-height-panel-header: 18px; /* design node 0:73 Label line height */
-  --zuri-line-height-nav-row: 18px; /* design node 0:63 Label line height */
+  --zuri-line-height-nav-row: 20px; /* the nav row's 14 px label on a 20 px line, node 0:1147 */
   --zuri-line-height-select-option: 18px; /* design node 0:46 Option label line height */
 
   /* Layout: style guide layout variables. */
   --zuri-sidebar-width: 260px; /* style guide sidebar expanded */
   --zuri-sidebar-width-collapsed: 64px; /* style guide sidebar collapsed */
   --zuri-right-panel-width: 320px; /* style guide right panel */
-  --zuri-topbar-height: 52px; /* design node 0:78: a 51 px row plus its 1 px hairline, and size/topbar-height is 52; the node overrides the style guide's 48 */
+  --zuri-topbar-height: 56px; /* design node 0:189 (the card's 0:78): the bar's own 56 px frame, taller than the style guide's 48 */
   /* The shell's own geometry, from the App Shell frame 0:466. Kept apart from the
      topbar/panel tokens above because the standalone view pages still draw the
      older 52 px bar and 320 px panel. */
@@ -413,10 +522,10 @@
   --zuri-shell-gutter: 12px; /* design "Rail Left" (0:538) / "Rail Right" (0:632): 12 px */
   --zuri-radius-brand: 10px; /* design "Brand Mark" (0:470) and New chat (0:478): radius 10 */
   --zuri-radius-search: 9px; /* design search field (0:543), bell (0:546) and theme (0:556): radius 9 */
-  --zuri-chat-max-width: 732px; /* design node 0:1221: the transcript content column, 860 wide less its 64 px inset each side */
+  --zuri-chat-max-width: 720px; /* design node 0:1642: the transcript content column, 1120 wide less its 200 px inset each side */
   --zuri-modal-width: 480px; /* design node 0:96 dialog width */
   --zuri-floating-assistant-width: 360px; /* style guide floating assistant */
-  --zuri-rail-width: 12px; /* pages.md "12 px rails": a collapsed chat or context panel */
+  --zuri-rail-width: 44px; /* the rail a collapsed panel leaves: it is the only way back, so it is a 44 px target */
 
   /* Motion: style guide durations; reduced motion is handled at the end. */
   --zuri-motion-fast: 150ms; /* style guide hover and press */
@@ -456,29 +565,80 @@
 }
 
 /* ------------------------------------------------------------------------ */
-/* First-run setup page (design node 0:1008)                                */
+/* First-run welcome / provider setup (design node 0:2328)                  */
 /* ------------------------------------------------------------------------ */
-/* The node is drawn once, in the light colour collection, so its values sit in a
-   page-scoped block instead of the two theme blocks above: the screen keeps the
-   node's colours whichever app theme is active, and the theme blocks stay
-   name-for-name identical for the parity check in scripts/selftest.js. */
+/* The node draws one 520 px card nine times inside a 1200 x 800 window, and it
+   draws that window in both colour collections: frame 01 (0:2329) is the light
+   card, frame 02 (0:2423) is the same card after the theme step has switched to
+   dark. So this page holds a block per theme rather than the single page-scoped
+   block the light-only pages use. Every name below is the collection variable the
+   node binds, and the dark block renames nothing, so a node edit is one value. */
 .onboarding-page {
-  --zuri-onboarding-canvas: #f7f8f9; /* node 0:1009 canvas fill */
-  --zuri-onboarding-surface: #ffffff; /* card, provider row, field, top bar */
-  --zuri-onboarding-border: #e8eaed; /* card rows, fields and top bar hairline */
-  --zuri-onboarding-border-strong: #cbd2da; /* unselected radio outline */
-  --zuri-onboarding-text: #1f2328; /* title, provider name, field value */
-  --zuri-onboarding-text-secondary: #6b7280; /* subtitle, privacy note, window glyphs */
-  --zuri-onboarding-text-muted: #8e9196; /* labels, hints, help line, skip note */
-  --zuri-onboarding-accent: #2f6bff; /* mark, selected row, link, enabled button */
-  --zuri-onboarding-accent-tint: #f5f8ff; /* selected provider row fill */
-  --zuri-onboarding-fill: #f0f1f3; /* disabled save button fill */
-  --zuri-onboarding-fill-sunken: #f7f8f9; /* privacy note and reveal button fill */
-  --zuri-onboarding-danger: #d14343; /* rejected-key field outline and help line */
-  --zuri-onboarding-success: #1f9d6b; /* shield-check glyph */
-  --zuri-onboarding-glow-accent: #2f6bff; /* top-left glow, painted at 6% */
-  --zuri-onboarding-glow-secondary: #6b4eff; /* bottom-right glow, painted at 5% */
-  --zuri-onboarding-radius-control: 6px; /* reveal key button radius */
+  --zuri-onboarding-canvas: #fafafa; /* frame fill (bound: canvas) */
+  --zuri-onboarding-surface: #ffffff; /* the card, top bar and sidebar (bound: surface) */
+  --zuri-onboarding-surface-secondary: #f4f4f5; /* name and key inputs, theme cards (bound: surface-secondary) */
+  --zuri-onboarding-surface-tertiary: #e4e4e7; /* step bar ahead of the current one (bound: surface-tertiary) */
+  --zuri-onboarding-surface-quaternary: #d4d4d8; /* unselected theme radio ring (bound: surface-quaternary) */
+  --zuri-onboarding-text: #11181c; /* title, step label, field label (bound: text) */
+  --zuri-onboarding-text-subtle: #6b6b75; /* subtitle, note, skip label, privacy (bound: text-subtle) */
+  --zuri-onboarding-primary: #006fee; /* current step bar, primary button, selected radio (bound: primary) */
+  --zuri-onboarding-primary-foreground: #ffffff; /* primary button label (bound: primary-foreground) */
+  --zuri-onboarding-primary-soft: #e6f1fe; /* 44 px badge behind the mark (bound: primary-soft) */
+  --zuri-onboarding-primary-soft-foreground: #005bc4; /* the mark inside it (bound: primary-soft-foreground) */
+  --zuri-onboarding-danger: #f31260; /* input outline on a refused frame (bound: danger) */
+  --zuri-onboarding-danger-soft: #fdd8e5; /* key-rejected alert block (bound: danger-soft) */
+  --zuri-onboarding-danger-soft-foreground: #b80e4d; /* current step label on a refused frame (bound: danger-soft-foreground) */
+  --zuri-onboarding-success-soft: #d3f7e3; /* 64 px success badge (bound: success-soft) */
+  --zuri-onboarding-success-soft-foreground: #0a7a3d; /* the tick inside it (bound: success-soft-foreground) */
+  --zuri-onboarding-divider: rgba(17, 17, 17, 0.08); /* 456 x 1 card divider (bound: border-subtle) */
+  --zuri-onboarding-scrim: rgba(0, 0, 0, 0.14); /* full-window scrim at the node's 14% */
+  --zuri-onboarding-focus-ring: #006fee; /* focus outline (bound: focus-ring) */
+  --zuri-onboarding-wash-primary: #e6f1fe; /* 720 x 540 top-left wash (bound: primary-soft) */
+  --zuri-onboarding-wash-secondary: #f2eafa; /* 600 x 440 bottom-right wash (bound: secondary-soft) */
+  --zuri-onboarding-preview-light-canvas: #fafafa; /* Light theme preview fill */
+  --zuri-onboarding-preview-light-sidebar: #f4f4f5; /* Light preview sidebar */
+  --zuri-onboarding-preview-light-line: #e4e4e7; /* Light preview bars 2 and 3 */
+  --zuri-onboarding-preview-light-line-strong: #d4d4d8; /* Light preview bar 1 */
+  --zuri-onboarding-preview-dark-canvas: #0a0a0b; /* Dark theme preview fill */
+  --zuri-onboarding-preview-dark-sidebar: #18181b; /* Dark preview sidebar */
+  --zuri-onboarding-preview-dark-line: #3f3f46; /* Dark preview bars 2 and 3 */
+  --zuri-onboarding-preview-dark-line-strong: #52525b; /* Dark preview bar 1 */
+  --zuri-onboarding-card-shadow: 0 8px 32px rgba(15, 23, 42, 0.08); /* the card's drop shadow, 32 blur at 8% */
+}
+
+/* The dark collection, as frame 02 (0:2423) draws it: the card follows the theme
+   the user has just picked, so the page keeps these names and swaps the values. */
+:root[data-theme='dark'] .onboarding-page {
+  --zuri-onboarding-canvas: #0a0a0b; /* Dark collection */
+  --zuri-onboarding-surface: #18181b; /* Dark collection */
+  --zuri-onboarding-surface-secondary: #27272a; /* Dark collection */
+  --zuri-onboarding-surface-tertiary: #3f3f46; /* Dark collection */
+  --zuri-onboarding-surface-quaternary: #52525b; /* Dark collection */
+  --zuri-onboarding-text: #ecedee; /* Dark collection */
+  --zuri-onboarding-text-subtle: #a1a1aa; /* Dark collection */
+  --zuri-onboarding-primary: #006fee; /* Dark collection */
+  --zuri-onboarding-primary-foreground: #ffffff; /* Dark collection */
+  --zuri-onboarding-primary-soft: #001731; /* Dark collection */
+  --zuri-onboarding-primary-soft-foreground: #338ef7; /* Dark collection */
+  --zuri-onboarding-danger: #f31260; /* Dark collection */
+  --zuri-onboarding-danger-soft: #310413; /* Dark collection */
+  --zuri-onboarding-danger-soft-foreground: #ff8fb0; /* Dark collection */
+  --zuri-onboarding-success-soft: #052814; /* Dark collection */
+  --zuri-onboarding-success-soft-foreground: #4ade80; /* Dark collection */
+  --zuri-onboarding-divider: rgba(255, 255, 255, 0.08); /* Dark collection */
+  --zuri-onboarding-scrim: rgba(0, 0, 0, 0.14); /* Dark collection */
+  --zuri-onboarding-focus-ring: #338ef7; /* Dark collection */
+  --zuri-onboarding-wash-primary: #001731; /* Dark collection */
+  --zuri-onboarding-wash-secondary: #2a0e45; /* Dark collection */
+  --zuri-onboarding-preview-light-canvas: #fafafa; /* Dark collection */
+  --zuri-onboarding-preview-light-sidebar: #f4f4f5; /* Dark collection */
+  --zuri-onboarding-preview-light-line: #e4e4e7; /* Dark collection */
+  --zuri-onboarding-preview-light-line-strong: #d4d4d8; /* Dark collection */
+  --zuri-onboarding-preview-dark-canvas: #0a0a0b; /* Dark collection */
+  --zuri-onboarding-preview-dark-sidebar: #18181b; /* Dark collection */
+  --zuri-onboarding-preview-dark-line: #3f3f46; /* Dark collection */
+  --zuri-onboarding-preview-dark-line-strong: #52525b; /* Dark collection */
+  --zuri-onboarding-card-shadow: 0 8px 32px rgba(15, 23, 42, 0.08); /* Dark collection */
 }
 
 /* ------------------------------------------------------------------------ */
@@ -503,42 +663,74 @@
 }
 
 /* ------------------------------------------------------------------------ */
-/* Automations list page (design node 0:7686)                               */
+/* Automations list page (design node 0:11359)                              */
 /* ------------------------------------------------------------------------ */
-/* The node draws the list six times (main, empty, loading, error, running and
-   caught-up), all in the light colour collection. Its colours therefore sit in
-   this page-scoped block, named after the collection variables they came from,
-   so the screen keeps the node's palette whichever app theme is active and the
-   two theme blocks above stay name-for-name identical for the parity check in
-   scripts/selftest.js. */
+/* The node draws one page (sidebar + main) and five state cards beside it:
+   empty, loading, running row, failed badge and delete confirmation. Every
+   colour below is a variable the node binds from tokens.json, so each name
+   carries the token it came from and the dark block after it re-points them at
+   the Dark collection. The tracks and the two heights that give a row its
+   84 px are the node's own numbers, so they live here once and the view sheet
+   reads them by name. */
 .automations-page {
-  --zuri-automations-canvas: #f7f8f9; /* color/surface: page and table header fill */
-  --zuri-automations-surface: #ffffff; /* color/inverse: top bar, card, switch knob */
-  --zuri-automations-sunken: #f0f1f3; /* color/sunken: schedule chip, footer, skeleton bar */
-  --zuri-automations-hover: #edeef0; /* color/hover: row hairline */
-  --zuri-automations-active: #e6e8eb; /* color/active: skeleton name bar, rail fill */
-  --zuri-automations-border: #e8eaed; /* color/border: active filter outline */
-  --zuri-automations-border-strong: #d5d8dc; /* color/border-strong: switch off track */
-  --zuri-automations-text: #1f2328; /* color/text: title, name, value, button label */
-  --zuri-automations-text-secondary: #6b7280; /* color/subtle: subtitle, description, meta */
-  --zuri-automations-text-muted: #8e9196; /* color/muted: column label, hint, secondary line */
-  --zuri-automations-primary: #2f6bff; /* color/primary: mark, new automation, links, switch on */
-  --zuri-automations-primary-soft: #eaf0ff; /* color/primary-soft: empty icon disc, lock banner */
-  --zuri-automations-accent: #6b4eff; /* color/accent: avatar chip */
-  --zuri-automations-success: #1f9d6b; /* color/success: caught-up badge and banner glyph */
-  --zuri-automations-success-wash: #e9f6f0; /* caught-up banner fill */
-  --zuri-automations-success-tint: rgba(31, 157, 107, 0.2); /* caught-up badge fill, success at 20% */
-  --zuri-automations-success-text: #166534; /* caught-up badge label */
-  --zuri-automations-caught-row: #f4fbf7; /* the caught-up row's highlight fill */
-  --zuri-automations-danger: #d14343; /* color/danger: error glyph */
-  --zuri-automations-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card drop shadow */
-  --zuri-automations-row-height: 72px; /* row / locked row / caught-up row */
-  --zuri-automations-head-height: 38px; /* table header */
-  --zuri-automations-topbar-height: 52px; /* top bar */
-  --zuri-automations-body-sm-line: 18px; /* the node's 18 px line on 13 px row text */
-  --zuri-automations-label-line: 14px; /* the node's 14 px line on 11 px column labels */
-  --zuri-automations-label-tracking: 0.4px; /* letterSpacing on the upper-case column label */
-  --zuri-automations-grid: 516fr 250fr 236fr 186fr 96fr 44px; /* column tracks, from the node's x positions */
+  --zuri-automations-canvas: #fafafa; /* Light --color-canvas: the page ground behind the two panels */
+  --zuri-automations-surface: #ffffff; /* Light --color-surface: sidebar, main, table, dialog, quiet button */
+  --zuri-automations-surface-raised: #ffffff; /* Light --color-surface-raised: the user block inside the sidebar */
+  --zuri-automations-sunken: #f4f4f5; /* Light --color-surface-secondary: mode track, live strip, filter track, panels, next-run row, cancel button */
+  --zuri-automations-active: #e4e4e7; /* Light --color-surface-tertiary: active nav item, Ask pill, skeleton bars, icon tile */
+  --zuri-automations-track: #d4d4d8; /* Light --color-surface-quaternary: the progress track behind the fill */
+  --zuri-automations-text: #11181c; /* Light --color-text: title, row prompt, values, labels on filled buttons */
+  --zuri-automations-text-subtle: #6b6b75; /* Light --color-text-subtle: subtitle, meta, column labels, notes */
+  --zuri-automations-divider: #111111; /* Light --color-divider: the table head rule and the row rules */
+  --zuri-automations-primary: #006fee; /* Light --color-primary: brand mark, New automation, live dot, progress fill, RUNNING pill */
+  --zuri-automations-primary-hover: #005bc4; /* Light --color-primary-hover: the primary button under the pointer */
+  --zuri-automations-primary-soft: #e6f1fe; /* Light --color-primary-soft: live dot halo, running row, RUNNING state chip */
+  --zuri-automations-primary-soft-foreground: #005bc4; /* Light --color-primary-soft-foreground: AUTOPILOT RUNNING, Autopilot pill, RUNNING chip label */
+  --zuri-automations-secondary: #7828c8; /* Light --color-secondary: Act pill label */
+  --zuri-automations-secondary-soft: #f2eafa; /* Light --color-secondary-soft: Act pill fill */
+  --zuri-automations-success: #17c964; /* Light --color-success: the done dot on a recent run */
+  --zuri-automations-danger: #f31260; /* Light --color-danger: failed dot, Delete button, alert accent bar */
+  --zuri-automations-danger-soft: #fdd8e5; /* Light --color-danger-soft: failed badge, error alert, FAILED RUN chip, dialog icon tile */
+  --zuri-automations-danger-soft-foreground: #b80e4d; /* Light --color-danger-soft-foreground: the failed badge and alert words */
+  --zuri-automations-scrim: #000000; /* Light --color-overlay-scrim: the delete dialog's backdrop */
+  --zuri-automations-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); /* the node's 0 8 24 #0F172A14 on both panels */
+  --zuri-automations-table-shadow: 0 2px 8px rgba(15, 23, 42, 0.08); /* the node's 0 2 8 #0F172914 on the table and the dialog */
+  --zuri-automations-sidebar-width: 248px; /* the node's sidebar frame */
+  --zuri-automations-shell-max: 1440px; /* stops the two panels stretching thin on a 1920 px screen */
+  --zuri-automations-panel-radius: 14px; /* radius-lg: sidebar, main, live strip, table, mode track */
+  --zuri-automations-card-radius: 12px; /* radius-md: buttons, panels, rows, alerts, small pills */
+  --zuri-automations-dialog-radius: 24px; /* radius-2xl: the delete dialog */
+  --zuri-automations-row-height: 84px; /* one table row, its progress bar included */
+  --zuri-automations-head-height: 36px; /* the column labels plus the rule under them */
+  --zuri-automations-label-tracking: 0.66px; /* letterSpacing on every upper-case label and chip */
+  --zuri-automations-grid: minmax(0, 1fr) 96px 166px 142px 44px; /* column tracks: prompt, mode, cadence, last run, actions */
+}
+
+/* The Dark collection. Only the colours move; the tracks and radii above are the
+   node's own numbers and stay put in either theme. */
+:root[data-theme='dark'] .automations-page {
+  --zuri-automations-canvas: #0a0a0b; /* Dark --color-canvas */
+  --zuri-automations-surface: #18181b; /* Dark --color-surface */
+  --zuri-automations-surface-raised: #17171a; /* Dark --color-surface-raised */
+  --zuri-automations-sunken: #27272a; /* Dark --color-surface-secondary */
+  --zuri-automations-active: #3f3f46; /* Dark --color-surface-tertiary */
+  --zuri-automations-track: #52525b; /* Dark --color-surface-quaternary */
+  --zuri-automations-text: #ecedee; /* Dark --color-text */
+  --zuri-automations-text-subtle: #a1a1aa; /* Dark --color-text-subtle */
+  --zuri-automations-divider: #ffffff; /* Dark --color-divider */
+  --zuri-automations-primary: #006fee; /* Dark --color-primary */
+  --zuri-automations-primary-hover: #338ef7; /* Dark --color-primary-hover */
+  --zuri-automations-primary-soft: #001731; /* Dark --color-primary-soft */
+  --zuri-automations-primary-soft-foreground: #338ef7; /* Dark --color-primary-soft-foreground */
+  --zuri-automations-secondary: #7828c8; /* Dark --color-secondary */
+  --zuri-automations-secondary-soft: #2a0e45; /* Dark --color-secondary-soft */
+  --zuri-automations-success: #17c964; /* Dark --color-success */
+  --zuri-automations-danger: #f31260; /* Dark --color-danger */
+  --zuri-automations-danger-soft: #310413; /* Dark --color-danger-soft */
+  --zuri-automations-danger-soft-foreground: #ff8fb0; /* Dark --color-danger-soft-foreground */
+  --zuri-automations-scrim: #000000; /* Dark --color-overlay-scrim */
+  --zuri-automations-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); /* the light shadow is invisible on a black ground */
+  --zuri-automations-table-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
 }
 
 /* ------------------------------------------------------------------------ */
@@ -690,10 +882,11 @@
   --zuri-overlay-meta-leading: 14px; /* the taskbar clock line */
 }
 
-/* Error / not-found view (design node 0:11074) */
+/* Error / not-found view (design node 0:104020) */
 /*
- * The node draws the window in the light collection only, so 404.html pins
- * data-theme="light" and every value below is the binding the node holds.
+ * The node draws the window in its light collection, and every value below is the
+ * binding it holds. The dark block after this one is the same page in the app's
+ * dark collection, because one token layer drives both themes (decision 3).
  * A colour changed in open-pencil is a single edit here, not a sweep of the page.
  */
 .error-page {
@@ -717,6 +910,7 @@
   /* Window chrome: the node's own measurements */
   --zuri-error-titlebar-height: 32px; /* the node's 32 px title bar */
   --zuri-error-topbar-height: 52px; /* the node's 52 px top bar */
+  --zuri-error-tabbar-height: 56px; /* the phone bar, the shell's own 56 px item */
   --zuri-error-sidebar-width: 260px; /* the node's recent-chat column */
   --zuri-error-rail-width: 320px; /* the node's task rail */
   --zuri-error-chrome-fade: 0.5; /* the node halves the theme toggle and the avatar */
@@ -742,6 +936,32 @@
   --zuri-error-hint-leading: 16px; /* the node's 16 px hint line */
   --zuri-error-section-size: 11px; /* the Today and Tasks section labels */
   --zuri-error-section-leading: 14px; /* the node's 14 px section line */
+}
+
+/*
+ * The same page in the dark collection. The node has no dark frame, and decision 3
+ * makes one token layer drive both themes, so these are the dark bindings of the
+ * same roles: the window is color/canvas, the panel and side columns are
+ * color/surface, the 1 px rules are color/surface-secondary, the sunken fills are
+ * color/surface-secondary, and the accents are the dark collection's own.
+ */
+:root[data-theme="dark"] .error-page {
+  /* Surfaces */
+  --zuri-error-window: #0a0a0b; /* tokens.json Dark --color-canvas */
+  --zuri-error-panel: #18181b; /* Dark --color-surface */
+  --zuri-error-hairline: #27272a; /* Dark --color-surface-secondary */
+  --zuri-error-panel-shadow: 0 4px 16px rgba(0, 0, 0, 0.55); /* the node's light shadow, deepened so the panel still lifts */
+  --zuri-error-sunken: #27272a; /* Dark --color-surface-secondary */
+  --zuri-error-surface: #18181b; /* Dark --color-surface */
+
+  /* Text and accent */
+  --zuri-error-text: #ecedee; /* Dark --color-text */
+  --zuri-error-text-subtle: #a1a1aa; /* Dark --color-text-subtle */
+  --zuri-error-text-muted: #52525b; /* Dark --color-surface-quaternary */
+  --zuri-error-primary: #006fee; /* Dark --color-primary */
+  --zuri-error-on-primary: #ffffff; /* Dark --color-primary-foreground */
+  --zuri-error-alert: #f31260; /* Dark --color-danger */
+  --zuri-error-avatar: #7828c8; /* Dark --color-secondary */
 }
 
 /* Sign-in page (design node 0:11371) */
@@ -1485,68 +1705,105 @@
 }
 
 /* ----------------------------------------------------- demo runner page --- */
-/* Automations demo runner (design node 0:14959). It sits in the automations
-   collection beside the automations list (0:7686) and the run result page
-   (0:8574), so it takes the same light palette and only adds what a runner
-   needs: a step row height, a status chip inset and the log panel. Radii are
-   the tokens.json values this node binds: card 10 = radius-card, row and
-   button 8 = radius-row, chip 999 = radius-pill. */
+/* Automations demo runner (design node 0:12711). The node draws the runner in
+   the automations collection: a 248 px sidebar card and a 912 px main card on
+   a canvas, then four more frames of the panel alone (running, all pass,
+   failing check, restarting). Values are the node's own: radii are tokens.json
+   radius-lg 14 for cards, radius-md 12 for controls and rows, radius-sm 10 for
+   the brand mark, radius-full for chips, dots and tracks; type is the node's
+   20 / 16 / 13 / 12 / 11 ramp with its 0.66 px label tracking. */
 .demo-page {
-  --zuri-demo-canvas: #f7f8f9; /* color/surface: page canvas */
-  --zuri-demo-surface: #ffffff; /* color/inverse: top bar and the two cards */
-  --zuri-demo-sunken: #f0f1f3; /* color/sunken: nav strip, log panel, chip */
-  --zuri-demo-hairline: #edeef0; /* color/hover: step rules */
-  --zuri-demo-border: #e8eaed; /* color/border: card edge, quiet button */
-  --zuri-demo-text: #1f2328; /* color/text: title, step name */
-  --zuri-demo-text-secondary: #6b7280; /* color/subtle: subtitle, step detail */
-  --zuri-demo-text-muted: #8e9196; /* color/muted: crumb, timestamp, meta */
-  --zuri-demo-primary: #2f6bff; /* color/primary: Run demo, active step */
-  --zuri-demo-primary-strong: #245be0; /* primary at hover */
-  --zuri-demo-primary-soft: #eaf0ff; /* color/primary-soft: active and restart wash */
-  --zuri-demo-on-primary: #ffffff; /* primary ramp contrast foreground */
-  --zuri-demo-accent: #6b4eff; /* color/accent: mark and avatar */
-  --zuri-demo-success: #1f9d6b; /* color/success: passed chip */
-  --zuri-demo-success-soft: #e9f6f0; /* success at its chip wash */
-  --zuri-demo-warning: #a15c00; /* color/warning: skipped chip */
-  --zuri-demo-warning-soft: #fdf3e3; /* warning at its chip wash */
-  --zuri-demo-danger: #d14343; /* color/danger: failed chip and log error */
-  --zuri-demo-danger-soft: #fdeeee; /* danger chip fill */
-  --zuri-demo-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 */
-  --zuri-demo-tab-shadow: 0 1px 2px rgba(15, 23, 42, 0.08); /* the lit tab in the nav strip */
+  --zuri-demo-canvas: #fafafa; /* tokens.json Light canvas: the shell's field */
+  --zuri-demo-surface: #ffffff; /* Light surface: sidebar, main, console, highlight row */
+  --zuri-demo-sunken: #f4f4f5; /* Light surface-secondary: strip, cards, mode switcher, user card */
+  --zuri-demo-track: #e4e4e7; /* Light surface-tertiary: dividers, badges, progress and restart tracks */
+  --zuri-demo-text: #11181c; /* Light text: titles, row names, values */
+  --zuri-demo-text-subtle: #6b6b75; /* Light text-subtle: captions, notes, pending status */
+  --zuri-demo-primary: #006fee; /* Light primary: brand mark, New chat, Run demo, progress fill */
+  --zuri-demo-primary-hover: #005bc4; /* Light primary-hover: the drawn label colour on the soft wash */
+  --zuri-demo-primary-soft: #e6f1fe; /* Light primary-soft: active nav row, running chip */
+  --zuri-demo-primary-soft-foreground: #005bc4; /* Light primary-soft-foreground */
+  --zuri-demo-on-primary: #ffffff; /* primary-foreground: text on the primary fill */
+  --zuri-demo-success: #17c964; /* Light success: pass dots, success mark */
+  --zuri-demo-success-soft: #d3f7e3; /* Light success-soft: the all-pass banner */
+  --zuri-demo-success-soft-foreground: #0a7a3d; /* Light success-soft-foreground */
+  --zuri-demo-danger: #f31260; /* Light danger: fail dots */
+  --zuri-demo-danger-soft: #fdd8e5; /* Light danger-soft: the failure banner */
+  --zuri-demo-danger-soft-foreground: #b80e4d; /* Light danger-soft-foreground */
+  --zuri-demo-border: #e4e4e7; /* quiet button stroke, the node's #E4E4E7 */
+  --zuri-demo-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); /* sidebar and main card, the node's 0 8 24 #0F172A14 */
+  --zuri-demo-shadow-card: 0 4px 12px rgba(15, 23, 42, 0.1); /* restart prompt card, the node's 0 4 12 #0F172A1A */
 
-  /* Geometry */
-  --zuri-demo-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
-  --zuri-demo-gutter: 40px; /* page gutter left and right */
-  --zuri-demo-gutter-top: 28px; /* crumbs and column top */
-  --zuri-demo-rail-width: 320px; /* scenario rail beside the step column */
-  --zuri-demo-column-gap: 24px; /* step column -> rail */
-  --zuri-demo-card-radius: var(--zuri-radius-card); /* tokens.json radius-card 10 */
-  --zuri-demo-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
-  --zuri-demo-chip-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
-  --zuri-demo-header-gap: 8px; /* title -> subtitle */
-  --zuri-demo-section-gap: 16px; /* header -> cards, card -> card */
-  --zuri-demo-step-padding: 14px 16px; /* one step row */
+  /* Frame and grid */
+  --zuri-demo-shell-padding: 12px; /* canvas inset: the cards sit 12 px in from the frame edge */
+  --zuri-demo-shell-gap: 12px; /* sidebar -> main */
+  --zuri-demo-shell-max: 1440px; /* the shell stops growing here on a wide screen */
+  --zuri-demo-sidebar-width: 248px; /* the node's 248 x 776 sidebar */
+  --zuri-demo-gutter: 24px; /* main card's left and right padding */
+  --zuri-demo-gutter-top: 20px; /* crumbs' distance from the card's top edge */
+  --zuri-demo-crumb-gap: 12px; /* crumbs -> title row */
+  --zuri-demo-title-gap: 4px; /* title -> subtitle */
+  --zuri-demo-head-gap: 28px; /* title row -> the state body */
+  --zuri-demo-card-gap: 16px; /* checklist card -> log card, card -> card */
+  --zuri-demo-card-padding: 16px; /* one card's inset */
+  --zuri-demo-state-gap: 16px; /* frames 03, 04 and 05 stack their blocks 16 px apart */
+  --zuri-demo-run-gap: 12px; /* frame 02 stacks its four blocks 12 px apart */
+  --zuri-demo-nav-row-height: 36px; /* one sidebar nav row, New chat and the frame-03 buttons */
+  --zuri-demo-nav-row-gap: 4px; /* the node's 40 px row pitch */
+  --zuri-demo-mode-height: 40px; /* the Ask / Act / Autopilot switcher */
+  --zuri-demo-check-row-height: 60px; /* one idle checklist row */
+  --zuri-demo-live-row-height: 44px; /* one live checklist row */
+  --zuri-demo-radius-card: 14px; /* radius-lg: sidebar, main, every card and banner */
+  --zuri-demo-radius-control: 12px; /* radius-md: buttons, mode, highlight row, console */
+  --zuri-demo-radius-mark: 10px; /* radius-sm: the brand mark */
+  --zuri-demo-radius-pill: 999px; /* radius-full: chips, dots, tracks, avatar */
+  --zuri-demo-dot-size: 10px; /* live checklist dot */
+  --zuri-demo-badge-size: 20px; /* idle checklist number disc */
+  --zuri-demo-tabbar-height: 56px; /* the phone bar the sidebar becomes */
 
-  /* Controls */
-  --zuri-demo-control-height: 36px; /* Run demo and Restart */
-  --zuri-demo-chip-padding: 3px 8px; /* status chip inset */
-  --zuri-demo-chip-gap: 6px; /* glyph -> word inside a chip */
-  --zuri-demo-step-number: 24px; /* the step's numbered disc */
-  --zuri-demo-log-max-height: 268px; /* the log panel's scroll box */
-
-  /* Type */
-  --zuri-demo-wordmark-size: 13px; /* app name in the top bar */
-  --zuri-demo-title-size: 28px; /* page title */
-  --zuri-demo-title-leading: 36px; /* its 36 px line */
-  --zuri-demo-body-size: 13px; /* subtitle, nav row, step name */
+  /* Type: the node's 20 / 16 / 13 / 12 / 11 ramp */
+  --zuri-demo-title-size: 20px; /* Demo Title */
+  --zuri-demo-title-leading: 28px; /* its 28 px line */
+  --zuri-demo-title-tracking: -0.2px; /* its -0.2 px tracking */
+  --zuri-demo-heading-size: 16px; /* run header and restart titles */
+  --zuri-demo-heading-leading: 24px; /* their 24 px line */
+  --zuri-demo-body-size: 14px; /* sidebar rows, mode labels, banners */
   --zuri-demo-body-leading: 20px; /* the 20 px body line */
-  --zuri-demo-small-size: 12px; /* step detail, chip, rail value */
-  --zuri-demo-small-leading: 16px; /* its 16 px line */
-  --zuri-demo-label-size: 11px; /* upper-case label and rail key */
-  --zuri-demo-label-leading: 14px; /* its 14 px line */
-  --zuri-demo-label-tracking: 0.4px; /* letterSpacing on the label */
-  --zuri-demo-mono-size: 12px; /* one log line */
-  --zuri-demo-mono-leading: 18px; /* its 18 px line */
+  --zuri-demo-small-size: 13px; /* subtitle, check names, crumbs, buttons */
+  --zuri-demo-small-leading: 20px; /* their 20 px line */
+  --zuri-demo-caption-size: 12px; /* statuses, meta lines, notes */
+  --zuri-demo-caption-leading: 16px; /* their 16 px line */
+  --zuri-demo-note-leading: 18px; /* the 18 px meta and evidence line */
+  --zuri-demo-label-size: 11px; /* upper-case label */
+  --zuri-demo-label-leading: 16px; /* its 16 px line */
+  --zuri-demo-label-tracking: 0.66px; /* the node's letterSpacing on every label */
+  --zuri-demo-mono-size: 11px; /* one log line, one row detail */
+  --zuri-demo-mono-leading: 16px; /* its 16 px line */
+}
+
+/* The node is drawn in the light collection only; dark takes the tokens.json
+   Dark values for the same roles so the page works in either app theme. */
+:root[data-theme="dark"] .demo-page {
+  --zuri-demo-canvas: #0a0a0b; /* tokens.json Dark canvas */
+  --zuri-demo-surface: #18181b; /* Dark surface: sidebar, main, console, highlight row */
+  --zuri-demo-sunken: #27272a; /* Dark surface-secondary: strip, cards, mode switcher, user card */
+  --zuri-demo-track: #3f3f46; /* Dark surface-tertiary: dividers, badges, tracks */
+  --zuri-demo-text: #ecedee; /* Dark text */
+  --zuri-demo-text-subtle: #a1a1aa; /* Dark text-subtle */
+  --zuri-demo-primary: #006fee; /* Dark primary */
+  --zuri-demo-primary-hover: #338ef7; /* Dark primary-hover */
+  --zuri-demo-primary-soft: #001731; /* Dark primary-soft: active nav row, running chip */
+  --zuri-demo-primary-soft-foreground: #338ef7; /* Dark primary-soft-foreground */
+  --zuri-demo-on-primary: #ffffff; /* Dark primary-foreground */
+  --zuri-demo-success: #17c964; /* Dark success: pass dots, success mark */
+  --zuri-demo-success-soft: #052814; /* Dark success-soft: the all-pass banner */
+  --zuri-demo-success-soft-foreground: #4ade80; /* Dark success-soft-foreground */
+  --zuri-demo-danger: #f31260; /* Dark danger: fail dots */
+  --zuri-demo-danger-soft: #310413; /* Dark danger-soft: the failure banner */
+  --zuri-demo-danger-soft-foreground: #ff8fb0; /* Dark danger-soft-foreground */
+  --zuri-demo-border: #3f3f46; /* Dark quiet button stroke */
+  --zuri-demo-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); /* Dark lift for sidebar and main card */
+  --zuri-demo-shadow-card: 0 4px 12px rgba(0, 0, 0, 0.55); /* Dark lift for the restart prompt card */
 }
 
 /* -------------------------------------------------------- handoff queue --- */
@@ -1645,94 +1902,135 @@
 }
 
 /* ------------------------------------------------- self-test results page --- */
-/* Self-test results (design node 0:15423). It is the last screen of the settings
-   family, drawn beside the audit log (0:14163) and the cloud handoff queue
-   (0:14565), so it takes their palette roles rather than inventing new ones:
-   color/surface is the canvas, color/inverse the cards, color/sunken the nav
-   track and the assertion block. Radii are the tokens.json bindings this node
-   uses: cards on radius-card 10, check rows and buttons on radius-row 8, status
-   pills on radius-pill 999. */
+/* Self-test results (design node 0:15177). The node draws the whole window: a
+   sidebar beside one main panel on a canvas ground, in the Shared UI light
+   collection. The colours are tokens.json's own roles rather than a second
+   palette - canvas is the ground, surface the three panels, surface-secondary
+   the mode track, the user block and the suite rule, primary-soft the current
+   nav row and the avatar, success-soft the passing summary and pill. The dark
+   values are the same roles from the Dark collection, so a theme swap moves
+   nothing else. Radii are the node's numbers: panels 14, controls and tracks
+   12, rows 8, pills 999 (bound to the project radius tokens where they match). */
 .selftest-page {
-  --zuri-selftest-canvas: #f7f8f9; /* color/surface: page canvas */
-  --zuri-selftest-surface: #ffffff; /* color/inverse: top bar, summary, cards, rail */
-  --zuri-selftest-sunken: #f0f1f3; /* color/sunken: nav hover, assertion block, pending rows */
-  --zuri-selftest-hairline: #edeef0; /* color/hover: row rules, card and nav rules */
-  --zuri-selftest-border: #e8eaed; /* color/border: card edge, quiet button */
-  --zuri-selftest-text: #1f2328; /* color/text: title, suite name, check name */
-  --zuri-selftest-text-secondary: #6b7280; /* color/subtle: subtitle, suite file, nav row */
-  --zuri-selftest-text-muted: #8e9196; /* color/muted: label, duration, rail key */
-  --zuri-selftest-primary: #2f6bff; /* color/primary: current nav row, Run again */
-  --zuri-selftest-primary-strong: #245be0; /* primary at hover */
-  --zuri-selftest-primary-soft: #eaf0ff; /* color/primary-soft: active nav wash, running wash */
-  --zuri-selftest-text-on-primary: #ffffff; /* primary ramp contrast foreground */
-  --zuri-selftest-accent: #6b4eff; /* color/accent: mark and avatar */
-  --zuri-selftest-success: #1f9d6b; /* color/success: passed checks, the green summary */
-  --zuri-selftest-success-soft: #e9f6f0; /* success at its summary and pill wash */
-  --zuri-selftest-danger: #d14343; /* color/danger: a failed check, the red summary */
-  --zuri-selftest-danger-soft: #fdeeee; /* danger summary and pill wash */
-  --zuri-selftest-danger-line: rgba(209, 67, 67, 0.32); /* danger block outline, node's 32% */
-  --zuri-selftest-skeleton: #eef0f3; /* loading rows, node's placeholder fill */
-  --zuri-selftest-shadow: 0 4px 16px rgba(15, 23, 42, 0.08); /* card, node's 0 4 16 #0F172A14 */
+  /* Light --color collection */
+  --zuri-selftest-canvas: #fafafa; /* Light --color-canvas: the ground the panels sit on */
+  --zuri-selftest-surface: #ffffff; /* Light --color-surface: sidebar, main, checks card */
+  --zuri-selftest-sunken: #f4f4f5; /* Light --color-surface-secondary: mode track, user block, suite rule, progress track */
+  --zuri-selftest-active: #e4e4e7; /* Light --color-surface-tertiary: quiet button edge */
+  --zuri-selftest-track: #d4d4d8; /* Light --color-surface-quaternary: loading bars */
+  --zuri-selftest-text: #11181c; /* Light --color-text: title, suite name, check name, mode label */
+  --zuri-selftest-text-subtle: #6b6b75; /* Light --color-text-subtle: subtitle, nav label, path, duration, pill word */
+  --zuri-selftest-primary: #006fee; /* Light --color-primary: brand mark, Run again, running fill */
+  --zuri-selftest-primary-hover: #005bc4; /* Light --color-primary-hover: a primary control under the pointer */
+  --zuri-selftest-primary-soft: #e6f1fe; /* Light --color-primary-soft: current nav row, avatar, running chip */
+  --zuri-selftest-primary-soft-foreground: #005bc4; /* Light --color-primary-soft-foreground: current nav label, running chip word */
+  --zuri-selftest-on-primary: #ffffff; /* Light --color-primary-foreground: the words on a primary control */
+  --zuri-selftest-success: #17c964; /* Light --color-success: the passing summary mark */
+  --zuri-selftest-success-soft: #d3f7e3; /* Light --color-success-soft: summary card and per-suite pill */
+  --zuri-selftest-success-soft-foreground: #0a7a3d; /* Light --color-success-soft-foreground: summary sentence, pill word */
+  --zuri-selftest-danger-soft: #fdd8e5; /* Light --color-danger-soft: failed chip and assertion block */
+  --zuri-selftest-danger-soft-foreground: #b80e4d; /* Light --color-danger-soft-foreground: failed word, assertion text */
+  --zuri-selftest-glyph: #111827; /* the tick and cross sit on a coloured disc, so they keep the node's near-black */
+  --zuri-selftest-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); /* the node's 0 8 24 #0F172A14 on the sidebar and the main panel */
+  --zuri-selftest-card-shadow: 0 4px 12px rgba(15, 23, 42, 0.04); /* the node's 0 4 12 #0F172A0A on the checks card */
 
   /* Frame and grid */
-  --zuri-selftest-topbar-height: 52px; /* 51 px bar plus its 1 px hairline */
-  --zuri-selftest-tabbar-height: 56px; /* phone bottom bar, one 56 px row of destinations */
-  --zuri-selftest-gutter: 40px; /* page gutter left and right */
-  --zuri-selftest-gutter-top: 28px; /* nav and column top */
-  --zuri-selftest-nav-width: 208px; /* settings nav column */
-  --zuri-selftest-nav-gap: 24px; /* nav -> hairline -> column */
-  --zuri-selftest-nav-hairline-gap: 24px; /* hairline -> the page column */
-  --zuri-selftest-nav-label-gap: 8px; /* label -> first row */
-  --zuri-selftest-nav-row-height: 32px; /* one nav row */
-  --zuri-selftest-nav-row-padding: 10px; /* row side padding */
-  --zuri-selftest-nav-icon-gap: 8px; /* row glyph -> label */
-  --zuri-selftest-rail-width: 296px; /* run detail beside the suites */
-  --zuri-selftest-column-gap: 24px; /* suites -> rail */
-  --zuri-selftest-head-gap: 8px; /* title -> its supporting line */
-  --zuri-selftest-summary-gap: 20px; /* subtitle -> summary */
-  --zuri-selftest-card-gap: 16px; /* summary -> suite, suite -> suite */
-  --zuri-selftest-rail-gap: 16px; /* rail card -> rail card */
-  --zuri-selftest-foot-gap: 20px; /* last card -> the closing note */
+  --zuri-selftest-shell-max: 1440px; /* stops the two panels stretching thin on a 1920 px screen */
+  --zuri-selftest-gap: 12px; /* window padding and the sidebar -> main gap */
+  --zuri-selftest-sidebar-width: 248px; /* the node's sidebar frame */
+  --zuri-selftest-sidebar-padding: 16px; /* the sidebar inset on all four sides */
+  --zuri-selftest-main-padding: 24px; /* the main panel inset */
+  --zuri-selftest-head-gap: 16px; /* page header -> summary */
+  --zuri-selftest-stack-gap: 8px; /* summary -> checks, checks -> footer captions */
+  --zuri-selftest-page-head-height: 56px; /* title and subtitle block */
+  --zuri-selftest-summary-height: 92px; /* the summary card */
+  --zuri-selftest-summary-padding: 0 20px; /* its side inset */
+  --zuri-selftest-summary-mark: 44px; /* the disc and the idle mark */
+  --zuri-selftest-summary-gap: 16px; /* disc -> sentence -> duration */
+  --zuri-selftest-footer-height: 28px; /* the caption row */
+  --zuri-selftest-checks-padding: 16px 20px 12px; /* the checks card inset */
+  --zuri-selftest-suite-gap: 6px; /* suite -> suite */
+  --zuri-selftest-suite-height: 160px; /* one suite: a 32 px head, its rule and four 30 px rows */
+  --zuri-selftest-suite-head-height: 32px; /* the suite name row, rule included */
+  --zuri-selftest-row-height: 30px; /* one check row */
+  --zuri-selftest-row-gap: 10px; /* glyph -> name -> duration -> pill */
+  --zuri-selftest-name-gap: 24px; /* suite name -> its file path */
+  --zuri-selftest-time-width: 124px; /* the duration column, the same in the head and the rows */
+  --zuri-selftest-pill-width: 160px; /* the last column: the status pill sits at its start */
+  --zuri-selftest-pill-height: 22px; /* one status pill */
+  --zuri-selftest-pill-box: 144px; /* its width inside that column */
+  --zuri-selftest-control-height: 36px; /* Copy output and Run again */
+  --zuri-selftest-copy-width: 116px; /* Copy output */
+  --zuri-selftest-run-width: 128px; /* Run again */
+  --zuri-selftest-run-self-width: 112px; /* Run self-test, in the idle panel */
+  --zuri-selftest-glyph-column: 16px; /* the tick column in a check row */
+  --zuri-selftest-brand-height: 44px; /* the brand row */
+  --zuri-selftest-brand-size: 36px; /* the brand mark */
+  --zuri-selftest-avatar-size: 32px; /* the disc in the user block */
+  --zuri-selftest-mode-height: 36px; /* one mode tab */
+  --zuri-selftest-mode-padding: 4px; /* the mode track's inset */
+  --zuri-selftest-nav-height: 36px; /* one nav row */
+  --zuri-selftest-nav-inset: 16px; /* nav label side inset */
+  --zuri-selftest-active-dash: 3px; /* the current row's marker */
+  --zuri-selftest-user-height: 56px; /* the user block */
+  --zuri-selftest-state-panel-height: 204px; /* the panel inside a state frame */
+  --zuri-selftest-state-panel-padding: 24px 20px; /* its inset */
+  --zuri-selftest-state-mark: 44px; /* the idle disc */
+  --zuri-selftest-progress-width: 230px; /* the running track */
+  --zuri-selftest-progress-height: 6px; /* its thickness */
+  --zuri-selftest-tabbar-height: 56px; /* the phone bottom bar */
 
   /* Boxes */
-  --zuri-selftest-card-radius: var(--zuri-radius-card); /* tokens.json radius-card 10 */
-  --zuri-selftest-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8 */
-  --zuri-selftest-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999 */
-  --zuri-selftest-more-radius: calc(var(--radius-radius-row) * 1px); /* the More panel, off the raw design number */
-  --zuri-selftest-mark-size: 24px; /* app mark in the top bar */
-  --zuri-selftest-avatar-size: 28px; /* account chip in the top bar */
-  --zuri-selftest-summary-padding: 18px 20px; /* the summary card inset */
-  --zuri-selftest-summary-icon: 32px; /* the disc beside the summary line */
-  --zuri-selftest-summary-gap-inline: 14px; /* disc -> summary text -> actions */
-  --zuri-selftest-suite-head-padding: 13px 20px; /* one suite header */
-  --zuri-selftest-check-padding: 9px 20px; /* one check row */
-  --zuri-selftest-check-icon: 16px; /* the tick or cross before a check name */
-  --zuri-selftest-check-gap: 10px; /* glyph -> name -> duration */
-  --zuri-selftest-assert-padding: 10px 12px; /* the failing assertion block */
-  --zuri-selftest-assert-gap: 6px; /* the assertion block under its check */
-  --zuri-selftest-rail-padding: 16px 18px; /* a rail card inset */
-  --zuri-selftest-chip-gap: 6px; /* glyph -> word inside a pill */
-  --zuri-selftest-status-padding: 3px 8px; /* status pill inset */
-  --zuri-selftest-control-height: 34px; /* Run again and Copy output */
-  --zuri-selftest-control-padding: 14px; /* their side padding */
-  --zuri-selftest-spinner-size: 12px; /* the running ring */
-  --zuri-selftest-spinner-width: 1.6px; /* its stroke */
+  --zuri-selftest-panel-radius: 14px; /* radius-lg in tokens.json: sidebar, main, summary, checks card */
+  --zuri-selftest-control-radius: 12px; /* radius-md: buttons, mode track, mode tabs, user block */
+  --zuri-selftest-card-radius: var(--zuri-radius-card); /* tokens.json radius-card 10: the assertion block */
+  --zuri-selftest-row-radius: var(--zuri-radius-row); /* tokens.json radius-row 8: nav rows, the inner panel */
+  --zuri-selftest-pill-radius: var(--zuri-radius-pill); /* tokens.json radius-pill 999: chips, the track, the marker */
 
   /* Type */
-  --zuri-selftest-wordmark-size: 13px; /* app name in the top bar */
-  --zuri-selftest-title-size: 28px; /* page title */
-  --zuri-selftest-title-leading: 36px; /* its 36 px line */
-  --zuri-selftest-summary-size: 15px; /* the summary sentence */
-  --zuri-selftest-summary-leading: 20px; /* its 20 px line */
-  --zuri-selftest-card-title-size: 13px; /* suite name and rail title */
-  --zuri-selftest-card-title-leading: 18px; /* its 18 px line */
-  --zuri-selftest-meta-size: 13px; /* subtitle, nav row, check name, button label */
+  --zuri-selftest-title-size: 20px; /* page title */
+  --zuri-selftest-title-leading: 28px; /* the node's 28 px title line */
+  --zuri-selftest-title-tracking: -0.2px; /* its letterSpacing */
+  --zuri-selftest-summary-title-size: 16px; /* the summary sentence */
+  --zuri-selftest-summary-title-leading: 24px; /* its 24 px line */
+  --zuri-selftest-duration-size: 24px; /* the total duration figure */
+  --zuri-selftest-duration-leading: 32px; /* its 32 px line */
+  --zuri-selftest-suite-size: 12px; /* suite name, path and duration */
+  --zuri-selftest-suite-leading: 18px; /* its 18 px line */
+  --zuri-selftest-meta-size: 13px; /* subtitle, check name, button label, body copy */
   --zuri-selftest-meta-leading: 20px; /* the 20 px meta line */
-  --zuri-selftest-small-size: 12px; /* duration, note, pill, rail value */
+  --zuri-selftest-small-size: 12px; /* check duration, footer caption */
   --zuri-selftest-small-leading: 16px; /* its 16 px line */
-  --zuri-selftest-label-size: 11px; /* upper-case label */
-  --zuri-selftest-label-leading: 14px; /* its 14 px line */
-  --zuri-selftest-label-tracking: 0.4px; /* letterSpacing on the label */
+  --zuri-selftest-label-size: 11px; /* upper-case label, chip, pill word, assertion text */
+  --zuri-selftest-label-leading: 16px; /* its 16 px line */
+  --zuri-selftest-label-tracking: 0.66px; /* letterSpacing on every upper-case label */
+  --zuri-selftest-row-size: 15px; /* brand name, mode label, nav label, user name */
+  --zuri-selftest-row-leading: 22px; /* their 22 px line */
+}
+
+/* The Dark collection. Only the colours move; every track and number above is
+   the node's own and stays put in either theme. */
+:root[data-theme='dark'] .selftest-page {
+  --zuri-selftest-canvas: #0a0a0b; /* Dark --color-canvas */
+  --zuri-selftest-surface: #18181b; /* Dark --color-surface */
+  --zuri-selftest-sunken: #27272a; /* Dark --color-surface-secondary */
+  --zuri-selftest-active: #3f3f46; /* Dark --color-surface-tertiary */
+  --zuri-selftest-track: #52525b; /* Dark --color-surface-quaternary */
+  --zuri-selftest-text: #ecedee; /* Dark --color-text */
+  --zuri-selftest-text-subtle: #a1a1aa; /* Dark --color-text-subtle */
+  --zuri-selftest-primary: #006fee; /* Dark --color-primary */
+  --zuri-selftest-primary-hover: #338ef7; /* Dark --color-primary-hover */
+  --zuri-selftest-primary-soft: #001731; /* Dark --color-primary-soft */
+  --zuri-selftest-primary-soft-foreground: #338ef7; /* Dark --color-primary-soft-foreground */
+  --zuri-selftest-on-primary: #ffffff; /* Dark --color-primary-foreground */
+  --zuri-selftest-success: #17c964; /* Dark --color-success */
+  --zuri-selftest-success-soft: #052814; /* Dark --color-success-soft */
+  --zuri-selftest-success-soft-foreground: #4ade80; /* Dark --color-success-soft-foreground */
+  --zuri-selftest-danger-soft: #310413; /* Dark --color-danger-soft */
+  --zuri-selftest-danger-soft-foreground: #ff8fb0; /* Dark --color-danger-soft-foreground */
+  --zuri-selftest-glyph: #ecedee; /* a tick on a disc keeps the text colour in the dark collection */
+  --zuri-selftest-shadow: 0 8px 24px rgba(0, 0, 0, 0.5); /* the light shadow is invisible on a black ground */
+  --zuri-selftest-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 /* ------------------------------------------- smoke and first-run check --- */
@@ -1818,4 +2116,1505 @@
   --zuri-diagnostics-label-size: 11px; /* upper-case label */
   --zuri-diagnostics-label-leading: 14px; /* its 14 px line */
   --zuri-diagnostics-label-tracking: 0.4px; /* letterSpacing on the label */
+}
+
+/* ------------------------------------- open app confirmation dialog page --- */
+/* Confirm open app dialog (design node 0:4629) - route /open-app. The node draws
+   the whole window once - top bar, sidebar, an Act thread and the dialog over a
+   40% scrim - then redraws only the dialog for the running, rejected and
+   cancelled states. Every fill below is the semantic tokens.json token the
+   node's paint binds, named here after the role it plays on this page; the two
+   colour blocks are the light collection the node was drawn in and its dark
+   twin. Radii are the node's own cornerRadius values: dialog and composer 24
+   (radius-2xl), badge, buttons and a nav row 12 (radius-md), target card and
+   note blocks 14 (radius-lg), the drawn focus ring 16 (radius-md plus its 4 px
+   offset). */
+.open-app-page {
+  --zuri-openapp-font: var(--zuri-font-family); /* the node's Segoe UI is the app family */
+
+  /* Frame and grid */
+  --zuri-openapp-topbar-height: 48px; /* the node's Top Bar */
+  --zuri-openapp-sidebar-width: 260px; /* the sidebar column the node draws */
+  --zuri-openapp-gutter: 20px; /* top bar side gutter: the brand mark sits at x 20 */
+  --zuri-openapp-gutter-end: 32px; /* right gutter: the avatar ends 32 px from the edge */
+  --zuri-openapp-thread-width: 580px; /* bubble right edge 900 less the column's 320 */
+  --zuri-openapp-thread-gutter: 24px; /* column inset once the window narrows */
+  --zuri-openapp-thread-top: 32px; /* first line under the top bar */
+  --zuri-openapp-nav-height: 36px; /* one sidebar destination */
+  --zuri-openapp-nav-gap: 8px; /* the node's 44 px row pitch */
+  --zuri-openapp-sidebar-gap: 16px; /* New chat -> the destination list */
+  --zuri-openapp-recent-gap: 20px; /* last destination -> RECENT */
+  --zuri-openapp-recent-line-gap: 8px; /* the node's 28 px recent-chat pitch */
+  --zuri-openapp-tabbar-height: 56px; /* phone bottom bar, one 56 px row */
+
+  /* Dialog box */
+  --zuri-openapp-dialog-width: 480px; /* the node's dialog width */
+  --zuri-openapp-dialog-padding: 24px; /* its inset on all four sides */
+  --zuri-openapp-dialog-gap: 16px; /* header -> target -> note -> actions */
+  --zuri-openapp-dialog-actions-gap: 20px; /* the node draws 20 px before the buttons */
+  --zuri-openapp-dialog-radius: 24px; /* radius-2xl */
+  --zuri-openapp-head-gap: 12px; /* icon badge -> the title column */
+  --zuri-openapp-head-line-gap: 4px; /* title -> meta */
+
+  /* Blocks inside the dialog */
+  --zuri-openapp-badge-size: 40px; /* the icon badge */
+  --zuri-openapp-badge-radius: 12px; /* radius-md */
+  --zuri-openapp-icon-size: 20px; /* the badge glyph */
+  --zuri-openapp-note-icon: 16px; /* the shield/alert glyph in a note block */
+  --zuri-openapp-note-radius: 14px; /* radius-lg */
+  --zuri-openapp-note-padding: 12px 16px 10px; /* a note block's inset: the drawn block is 84 px, not 12 + copy + 12 */
+  --zuri-openapp-note-gap: 10px; /* glyph -> the note's words (x 16 -> 42) */
+  --zuri-openapp-note-line-gap: 2px; /* note title -> its body */
+  --zuri-openapp-note-rule: 3px; /* the rejected alert's left rule */
+  --zuri-openapp-note-danger-height: 88px; /* the rejected alert is drawn 88 px tall */
+  --zuri-openapp-card-radius: 14px; /* radius-lg, the target card */
+  --zuri-openapp-card-padding: 12px 16px 16px; /* its inset: the 88 px card starts its label 12 px down */
+  --zuri-openapp-card-line-gap: 2px; /* label -> name -> path */
+  --zuri-openapp-button-height: 36px; /* every dialog button */
+  --zuri-openapp-button-radius: 12px; /* radius-md */
+  --zuri-openapp-button-padding: 24px; /* label side padding: Cancel lands at 96 */
+  --zuri-openapp-button-min: 96px; /* the narrowest drawn button */
+  --zuri-openapp-button-gap: 12px; /* between two buttons */
+  --zuri-openapp-button-primary-min: 112px; /* Confirm and Close: 76 px label plus padding */
+  --zuri-openapp-button-settings-width: 124px; /* "Open Settings" in frame 03 */
+  --zuri-openapp-button-rerun-width: 122px; /* "Re-run step" in frame 04 */
+  --zuri-openapp-dialog-actions-gap-loose: 24px; /* frames 03 and 04 leave 24 px above the buttons */
+  --zuri-openapp-rejected-height: 488px; /* frame 03 draws its dialog at 488 px */
+  --zuri-openapp-focus-width: 2px; /* the drawn ring stroke */
+  --zuri-openapp-focus-offset: 2px; /* 2 + 2 puts the ring's outer edge 4 px out */
+  --zuri-openapp-spinner-size: 16px; /* the running ring */
+  --zuri-openapp-spinner-width: 2px; /* its stroke */
+  --zuri-openapp-foot-gap: 8px; /* actions -> the footer note */
+  --zuri-openapp-divider: 1px; /* the top bar and sidebar hairlines */
+
+  /* Shell */
+  --zuri-openapp-brand-size: 28px; /* brand mark in the top bar */
+  --zuri-openapp-brand-radius: 8px; /* radius-sm, the mark's corners */
+  --zuri-openapp-search-width: 182px; /* the top bar search field */
+  --zuri-openapp-search-offset: 160px; /* its left edge, pinned off the window, not the brand */
+  --zuri-openapp-search-height: 28px; /* its height */
+  --zuri-openapp-search-radius: 14px; /* its cornerRadius */
+  --zuri-openapp-search-padding: 14px; /* its label inset */
+  --zuri-openapp-chip-height: 28px; /* the Act mode chip */
+  --zuri-openapp-chip-min: 76px; /* its drawn width: "Act" is 26 px, the chip 76 */
+  --zuri-openapp-chip-end-gap: 16px; /* chip -> the bell glyph (x 1048 -> 1072); the glyph sits in a 32 px hit box */
+  --zuri-openapp-chip-padding: 12px; /* its label inset */
+  --zuri-openapp-chip-radius: 999px; /* radius-full */
+  --zuri-openapp-icon-button: 32px; /* bell and theme buttons */
+  --zuri-openapp-avatar-size: 28px; /* account chip in the top bar */
+  --zuri-openapp-avatar-gap: 12px; /* the theme glyph -> the avatar (x 1120 -> 1140), less its hit box's 8 px */
+  --zuri-openapp-nav-icon: 18px; /* a destination's glyph */
+  --zuri-openapp-nav-padding: 12px; /* its side inset */
+  --zuri-openapp-bubble-width: 340px; /* the reader's bubble at its widest */
+  --zuri-openapp-bubble-radius: 16px; /* its radius */
+  --zuri-openapp-bubble-padding: 11px 16px; /* its text inset */
+  --zuri-openapp-bubble-gap: 24px; /* bubble -> the reply under it */
+  --zuri-openapp-composer-height: 56px; /* the pill input */
+  --zuri-openapp-composer-radius: 24px; /* radius-2xl */
+  --zuri-openapp-composer-padding: 20px; /* its label inset */
+  --zuri-openapp-composer-gap: 24px; /* last line -> the input */
+  --zuri-openapp-composer-bottom: 84px; /* the pill's foot sits 84 px above the window edge */
+
+  /* Type */
+  --zuri-openapp-title-size: 16px; /* dialog title */
+  --zuri-openapp-title-leading: 24px; /* its 24 px line */
+  --zuri-openapp-meta-size: 13px; /* dialog meta, note body, placeholder */
+  --zuri-openapp-meta-leading: 20px; /* its 20 px line */
+  --zuri-openapp-label-size: 11px; /* TARGET, RECENT */
+  --zuri-openapp-label-leading: 16px; /* their 16 px line */
+  --zuri-openapp-label-tracking: 0.66px; /* the node's letterSpacing */
+  --zuri-openapp-name-size: 14px; /* target name, note title, button label, nav row */
+  --zuri-openapp-name-leading: 22px; /* the target name's 22 px line */
+  --zuri-openapp-note-leading: 20px; /* note title and button label line */
+  --zuri-openapp-path-size: 12px; /* target path */
+  --zuri-openapp-path-leading: 18px; /* its 18 px line */
+  --zuri-openapp-foot-size: 12px; /* the footer note under the actions */
+  --zuri-openapp-foot-leading: 16px; /* its 16 px line */
+  --zuri-openapp-wordmark-size: 14px; /* app name in the top bar */
+  --zuri-openapp-wordmark-leading: 18px; /* its 18 px line */
+  --zuri-openapp-reply-size: 15px; /* a reply line in the thread */
+  --zuri-openapp-reply-width: 420px; /* its drawn width: the copy breaks after "This step" */
+  --zuri-openapp-reply-leading: 24px; /* its 24 px line */
+  --zuri-openapp-bubble-size: 14px; /* the reader's bubble */
+  --zuri-openapp-bubble-leading: 22px; /* its 22 px line */
+}
+
+:root[data-theme="light"] .open-app-page {
+  --zuri-openapp-canvas: #fafafa; /* tokens.json Light --color-canvas: the thread's ground */
+  --zuri-openapp-surface: #ffffff; /* Light --color-surface: top bar, sidebar, dialog, composer */
+  --zuri-openapp-surface-secondary: #f4f4f5; /* Light --color-surface-secondary: target card, buttons, search, bubble */
+  --zuri-openapp-surface-tertiary: #e4e4e7; /* Light --color-surface-tertiary: button edge, hairlines */
+  --zuri-openapp-text: #11181c; /* Light --color-text */
+  --zuri-openapp-text-subtle: #6b6b75; /* Light --color-text-subtle */
+  --zuri-openapp-primary: #006fee; /* Light --color-primary: brand mark, Confirm, the running meta */
+  --zuri-openapp-primary-foreground: #ffffff; /* Light --color-primary-foreground */
+  --zuri-openapp-primary-soft: #e6f1fe; /* Light --color-primary-soft: icon badge, allow-list note, reader bubble */
+  --zuri-openapp-primary-soft-foreground: #005bc4; /* Light --color-primary-soft-foreground: the note's glyph and title */
+  --zuri-openapp-danger: #f31260; /* Light --color-danger: the rejected rule */
+  --zuri-openapp-danger-soft: #fdd8e5; /* Light --color-danger-soft: rejected badge and alert */
+  --zuri-openapp-danger-soft-foreground: #b80e4d; /* Light --color-danger-soft-foreground: the alert's glyph and words */
+  --zuri-openapp-scrim: rgba(0, 0, 0, 0.4); /* the node's Scrim: black at 40% */
+  --zuri-openapp-focus-ring: rgba(0, 111, 238, 0.4); /* the drawn ring: primary at 40% */
+}
+
+:root[data-theme="dark"] .open-app-page {
+  --zuri-openapp-canvas: #0a0a0b; /* tokens.json Dark --color-canvas */
+  --zuri-openapp-surface: #18181b; /* Dark --color-surface */
+  --zuri-openapp-surface-secondary: #27272a; /* Dark --color-surface-secondary */
+  --zuri-openapp-surface-tertiary: #3f3f46; /* Dark --color-surface-tertiary */
+  --zuri-openapp-text: #ecedee; /* Dark --color-text */
+  --zuri-openapp-text-subtle: #a1a1aa; /* Dark --color-text-subtle */
+  --zuri-openapp-primary: #006fee; /* Dark --color-primary */
+  --zuri-openapp-primary-foreground: #ffffff; /* Dark --color-primary-foreground */
+  --zuri-openapp-primary-soft: #001731; /* Dark --color-primary-soft */
+  --zuri-openapp-primary-soft-foreground: #338ef7; /* Dark --color-primary-soft-foreground */
+  --zuri-openapp-danger: #f31260; /* Dark --color-danger */
+  --zuri-openapp-danger-soft: #310413; /* Dark --color-danger-soft */
+  --zuri-openapp-danger-soft-foreground: #ff8fb0; /* Dark --color-danger-soft-foreground */
+  --zuri-openapp-scrim: rgba(0, 0, 0, 0.56); /* tokens.css --zuri-overlay: a dark page needs the heavier scrim */
+  --zuri-openapp-focus-ring: rgba(51, 142, 247, 0.4); /* Dark --color-focus-ring at the node's 40% */
+}
+
+/* ------------------------------------------------------------------------ */
+/* Attach file dialog and attachment chip (design node 0:3779)              */
+/* ------------------------------------------------------------------------ */
+/* The page's five frames (0:3780 idle, 0:3868 picking, 0:3988 refused,
+   0:4088 chip, 0:4109 chip removed) bind tokens.json colour roles only, so each
+   name below is the same role read through both collections. The dialog and the
+   chip sit in the main shell rather than on a page of their own, which is why
+   these are theme-scoped rather than scoped to a page class. */
+:root,
+:root[data-theme="dark"] {
+  --zuri-attach-surface: #18181b; /* Dark --color-surface: the dialog's face and the file row's remove button */
+  --zuri-attach-surface-secondary: #27272a; /* Dark --color-surface-secondary: drop zone, chip, file row, close button */
+  --zuri-attach-surface-tertiary: #3f3f46; /* Dark --color-surface-tertiary: Cancel and the disabled Attach */
+  --zuri-attach-surface-quaternary: #52525b; /* Dark --color-surface-quaternary: those buttons under the pointer */
+  --zuri-attach-text: #ecedee; /* Dark --color-text: the title, the chip's file name */
+  --zuri-attach-text-subtle: #a1a1aa; /* Dark --color-text-subtle: subtitle, hint, caption, empty note, chip glyph and size */
+  --zuri-attach-primary: #006fee; /* Dark --color-primary: Browse and Choose another file */
+  --zuri-attach-primary-hover: #338ef7; /* Dark --color-primary-hover */
+  --zuri-attach-primary-foreground: #ffffff; /* Dark --color-primary-foreground */
+  --zuri-attach-primary-soft: #001731; /* Dark --color-primary-soft: the selected row's badge */
+  --zuri-attach-primary-soft-foreground: #338ef7; /* Dark --color-primary-soft-foreground: that badge's glyph */
+  --zuri-attach-danger-soft: #310413; /* Dark --color-danger-soft: the refusal alert and its row badge */
+  --zuri-attach-danger-soft-foreground: #ff8fb0; /* Dark --color-danger-soft-foreground: the refusal's glyph and words */
+  --zuri-attach-divider: #ffffff; /* Dark --color-divider: the 1 px rule under the header */
+  --zuri-attach-button-text: #ecedee; /* the footer buttons' label; the node draws #111827 in its light collection, this is that role's dark twin */
+  --zuri-attach-scrim: rgba(0, 0, 0, 0.56); /* the node's scrim: black, drawn heavier on a dark page */
+  --zuri-attach-shadow: 0 8px 32px rgba(0, 0, 0, 0.45); /* the dialog's drop shadow: 8 down, 32 blur */
+  --zuri-attach-focus-ring: #338ef7; /* Dark --color-focus-ring */
+}
+
+:root[data-theme="light"] {
+  --zuri-attach-surface: #ffffff; /* Light --color-surface: the dialog's face and the file row's remove button */
+  --zuri-attach-surface-secondary: #f4f4f5; /* Light --color-surface-secondary: drop zone, chip, file row, close button */
+  --zuri-attach-surface-tertiary: #e4e4e7; /* Light --color-surface-tertiary: Cancel and the disabled Attach */
+  --zuri-attach-surface-quaternary: #d4d4d8; /* Light --color-surface-quaternary: those buttons under the pointer */
+  --zuri-attach-text: #11181c; /* Light --color-text: the title, the chip's file name */
+  --zuri-attach-text-subtle: #6b6b75; /* Light --color-text-subtle: subtitle, hint, caption, empty note, chip glyph and size */
+  --zuri-attach-primary: #006fee; /* Light --color-primary: Browse and Choose another file */
+  --zuri-attach-primary-hover: #005bc4; /* Light --color-primary-hover */
+  --zuri-attach-primary-foreground: #ffffff; /* Light --color-primary-foreground */
+  --zuri-attach-primary-soft: #e6f1fe; /* Light --color-primary-soft: the selected row's badge */
+  --zuri-attach-primary-soft-foreground: #005bc4; /* Light --color-primary-soft-foreground: that badge's glyph */
+  --zuri-attach-danger-soft: #fdd8e5; /* Light --color-danger-soft: the refusal alert and its row badge */
+  --zuri-attach-danger-soft-foreground: #b80e4d; /* Light --color-danger-soft-foreground: the refusal's glyph and words */
+  --zuri-attach-divider: #111111; /* Light --color-divider: the 1 px rule under the header */
+  --zuri-attach-button-text: #111827; /* the node's own label colour on Cancel and Attach (frame 0:3863) */
+  --zuri-attach-scrim: rgba(0, 0, 0, 0.14); /* the node's scrim: black at the drawn 14% */
+  --zuri-attach-shadow: 0 8px 32px rgba(15, 23, 42, 0.08); /* the node's dialog shadow, #0F172A14: 8 down, 32 blur at 8% */
+  --zuri-attach-focus-ring: #006fee; /* Light --color-focus-ring */
+}
+
+/* ------------------------------------------- notifications popover page --- */
+/* Notifications popover (design node 0:11184 - route /notifications). That page
+   draws the app window (node 0:11190) and its 56 px top bar with nothing else,
+   so the popover itself comes from the same document's "Popover / Notifications"
+   component (node 0:11215), with the one-unread, ring and cleared frames beside
+   it. Every value below is read off those nodes: the window is 1084 x 604 at
+   (58, 48) on a 1200 x 700 page, its bar is 1052 x 56 inside a 16 px inset and
+   36 px of window top, and the popover is 360 x 358 with its right edge on the
+   bell's right edge and its top 8 px under the bar. Colours are the semantic
+   tokens.json tokens the node's paints bind, one block per theme. */
+.notifications-page {
+  /* Stage and window */
+  --zuri-notify-stage-padding: 48px 58px; /* page margin: 58 side, 48 top and bottom */
+  --zuri-notify-window-width: 1084px; /* the node's App Window */
+  --zuri-notify-window-height: 604px; /* its height, above which it grows */
+  --zuri-notify-window-inset: 16px; /* the bar's inset inside the window */
+  --zuri-notify-window-padding-top: 36px; /* the title strip above the bar */
+
+  /* Top bar: title, then search field, bell, model chip and theme toggle */
+  --zuri-notify-bar-height: 56px; /* the node's Top Bar */
+  --zuri-notify-bar-gap: 12px; /* bell -> chip -> toggle (x 880, 924, 1004) */
+  --zuri-notify-search-width: 220px; /* the drawn search field */
+  --zuri-notify-search-gap: 88px; /* 100 px from the field to the bell, less the 12 px gap */
+  --zuri-notify-control-size: 32px; /* bell and theme buttons */
+
+  /* Popover */
+  --zuri-notify-popover-width: 360px; /* the drawn popover */
+  --zuri-notify-popover-top: 8px; /* bar bottom 92 -> popover top 100 */
+  --zuri-notify-head-height: 58px; /* title, summary and the rule under them */
+  --zuri-notify-row-height: 64px; /* one notification row; four fill the body */
+  --zuri-notify-footer-height: 43px; /* the rule above the footer plus its link */
+  --zuri-notify-time-width: 76px; /* the time column, right-aligned from x 268 */
+  --zuri-notify-thread-width: 420px; /* the widest drawn message behind the popover */
+  --zuri-notify-msg-leading: 22px; /* Message / User's drawn 22 px line */
+  --zuri-notify-popover-height: 358px; /* the sheet's fixed height: 58 px head + 257 px body + 43 px footer */
+
+  /* Row head: unread dot, source chip, title */
+  --zuri-notify-dot-size: 6px; /* the unread dot at (16, 26) */
+  --zuri-notify-dot-gap: 10px; /* dot 16 -> chip 32 */
+  --zuri-notify-chip-height: 18px; /* the drawn source chip */
+  --zuri-notify-chip-padding: 8px; /* its label inset */
+
+  /* Type */
+  --zuri-notify-title-size: 16px; /* popover title */
+  --zuri-notify-title-leading: 20px; /* its 20 px line */
+  --zuri-notify-meta-size: 13px; /* summary, Clear all and the footer link */
+  --zuri-notify-meta-leading: 16px; /* their 16 px line */
+  --zuri-notify-bar-title-size: 15px; /* the bar's page title */
+  --zuri-notify-bar-title-leading: 18px; /* its 18 px line */
+  --zuri-notify-row-title-size: 14px; /* a row's message */
+  --zuri-notify-row-title-leading: 17px; /* its 17 px line */
+  --zuri-notify-time-size: 12px; /* a row's time, the search field's label */
+  --zuri-notify-time-leading: 15px; /* the time's 15 px line */
+  --zuri-notify-chip-size: 11px; /* source chip, day label, model chip */
+  --zuri-notify-chip-leading: 14px; /* their 14 px line */
+  --zuri-notify-chip-tracking: 0.66px; /* the node's letterSpacing on the chip */
+  --zuri-notify-badge-size: 10px; /* the count pill on the bell */
+  --zuri-notify-badge-leading: 12px; /* its 12 px line */
+  --zuri-notify-empty-title-size: 15px; /* the cleared popover's title */
+  --zuri-notify-empty-title-leading: 18px; /* its 18 px line */
+  --zuri-notify-empty-body-leading: 20px; /* the cleared popover's body line */
+
+  /* Radii: the node's own cornerRadius values */
+  --zuri-notify-radius-window: 20px; /* the node's App Window cornerRadius; the HeroUI ramp's xl is 16, so this is its own value */
+  --zuri-notify-radius-bar: 14px; /* the node's Top Bar and search field, 14 (the ramp's lg is 12) */
+  --zuri-notify-radius-control: 12px; /* the node's bell and theme buttons, 12 (the ramp's md is 10) */
+  --zuri-notify-radius-popover: 20px; /* the node's popover cornerRadius, 20 like the window */
+  --zuri-notify-radius-pill: var(--zuri-radius-pill); /* 999 in the node: chips, count pill, model chip */
+}
+
+:root[data-theme="light"] .notifications-page {
+  --zuri-notify-stage: #f4f4f5; /* Light --color-surface-secondary: the page behind the window */
+  --zuri-notify-window: #fafafa; /* Light --color-canvas: the App Window */
+  --zuri-notify-surface: #ffffff; /* Light --color-surface: top bar, model chip */
+  --zuri-notify-raised: #ffffff; /* Light --color-surface-raised: popover and its rows */
+  --zuri-notify-surface-secondary: #f4f4f5; /* Light --color-surface-secondary: search, model chip, theme button */
+  --zuri-notify-surface-tertiary: #e4e4e7; /* Light --color-surface-tertiary: the bell button */
+  --zuri-notify-text: #11181c; /* Light --color-text */
+  --zuri-notify-text-subtle: #6b6b75; /* Light --color-text-subtle: summary, times, search label, messages */
+  --zuri-notify-primary: #006fee; /* Light --color-primary: unread dot, Clear all, footer link */
+  --zuri-notify-primary-hover: #005bc4; /* Light --color-primary-hover: those two under the pointer */
+  --zuri-notify-primary-soft: #e6f1fe; /* Light --color-primary-soft: reminder chip, highlighted row */
+  --zuri-notify-primary-soft-foreground: #005bc4; /* Light --color-primary-soft-foreground: that chip's label */
+  --zuri-notify-secondary: #7828c8; /* Light --color-secondary: automation chip label */
+  --zuri-notify-secondary-soft: #f2eafa; /* Light --color-secondary-soft: that chip's fill */
+  --zuri-notify-success: #17c964; /* Light --color-success: the model chip's dot */
+  --zuri-notify-danger: #f31260; /* Light --color-danger: the count pill on the bell */
+  --zuri-notify-danger-foreground: #11181c; /* the node draws the pill's 9+ in the text tone, not white */
+  --zuri-notify-border: rgba(17, 17, 17, 0.08); /* the phone bar's hairline, which is this page's own adaptation */
+  --zuri-notify-divider: #111111; /* the node's 1 px footer separator, bound border-subtle: solid, not a hairline */
+  --zuri-notify-shadow: 0 12px 32px rgba(15, 23, 42, 0.12); /* the node's popover shadow, #0F172A1F */
+  --zuri-notify-window-shadow: 0 8px 24px rgba(15, 23, 42, 0.08); /* the node's window shadow, #0F172A14 */
+}
+
+:root[data-theme="dark"] .notifications-page {
+  --zuri-notify-stage: #27272a; /* Dark --color-surface-secondary */
+  --zuri-notify-window: #0a0a0b; /* Dark --color-canvas */
+  --zuri-notify-surface: #18181b; /* Dark --color-surface */
+  --zuri-notify-raised: #17171a; /* Dark --color-surface-raised */
+  --zuri-notify-surface-secondary: #27272a; /* Dark --color-surface-secondary */
+  --zuri-notify-surface-tertiary: #3f3f46; /* Dark --color-surface-tertiary */
+  --zuri-notify-text: #ecedee; /* Dark --color-text */
+  --zuri-notify-text-subtle: #a1a1aa; /* Dark --color-text-subtle */
+  --zuri-notify-primary: #006fee; /* Dark --color-primary */
+  --zuri-notify-primary-hover: #338ef7; /* Dark --color-primary-hover */
+  --zuri-notify-primary-soft: #001731; /* Dark --color-primary-soft */
+  --zuri-notify-primary-soft-foreground: #338ef7; /* Dark --color-primary-soft-foreground */
+  --zuri-notify-secondary: #7828c8; /* Dark --color-secondary */
+  --zuri-notify-secondary-soft: #2a0e45; /* Dark --color-secondary-soft */
+  --zuri-notify-success: #17c964; /* Dark --color-success */
+  --zuri-notify-danger: #f31260; /* Dark --color-danger */
+  --zuri-notify-danger-foreground: #ecedee; /* the pill's label keeps the text tone, as in the light node */
+  --zuri-notify-border: rgba(255, 255, 255, 0.08); /* the phone bar's hairline in dark */
+  --zuri-notify-divider: #ffffff; /* Dark --color-border-subtle: the node's separator goes solid white */
+  --zuri-notify-shadow: 0 12px 32px rgba(0, 0, 0, 0.56); /* the same shadow, heavier on a dark page */
+  --zuri-notify-window-shadow: 0 8px 24px rgba(0, 0, 0, 0.45); /* likewise for the window */
+}
+
+/* ---------------------------------------------- document summary page ----
+ * Document summary card (design node 0:4121, route /document-summary).
+ * Values are read off the page's four frames: the saved card at 0:4180, the
+ * summarising card at 0:4217, the save-failed card at 0:4239 and the long
+ * excerpt card at 0:4267, inside the shell drawn once for all four (top bar
+ * 0:4125, sidebar 0:4141, chat area 0:4163).
+ */
+
+.document-summary-page {
+  --zuri-summary-font: "Segoe UI", "Segoe UI Variable Text", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif; /* the face every text node in 0:4122 names */
+  --zuri-summary-font-mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, monospace; /* 0:4196 saved path, drawn in Cascadia Mono at 12/18 */
+  --zuri-summary-title-size: 16px; /* 0:4183 file name and 0:4128 brand name, 16 px */
+  --zuri-summary-title-leading: 24px; /* 0:4183 file name line box, 24 px */
+  --zuri-summary-body-size: 15px; /* 0:4182 assistant line, 15 px */
+  --zuri-summary-body-leading: 24px; /* 0:4182 assistant line, 24 px */
+  --zuri-summary-meta-size: 13px; /* 0:4184 card meta and 0:4247 alert message, 13 px */
+  --zuri-summary-meta-leading: 20px; /* 0:4184 meta line box, 20 px */
+  --zuri-summary-read-size: 14px; /* 0:4170 user message and 0:4189 excerpt, 14 px */
+  --zuri-summary-read-leading: 22px; /* 0:4189 excerpt line box, 22 px */
+  --zuri-summary-copy-size: 14px; /* 0:4198 Open file and 0:4200 Reveal labels, 14 px */
+  --zuri-summary-copy-leading: 20px; /* 0:4198 button label line box, 20 px */
+  --zuri-summary-small-size: 12px; /* 0:4172 step label and 0:4197 Copy, 12 px */
+  --zuri-summary-small-leading: 18px; /* 0:4172 step label line box, 18 px */
+  --zuri-summary-label-size: 11px; /* 0:4186 SUMMARY caption, 11 px */
+  --zuri-summary-label-leading: 16px; /* 0:4186 caption line box, 16 px */
+  --zuri-summary-label-tracking: 0.66px; /* 0:4186 caption tracking, 6% of 11 px */
+  --zuri-summary-chip-size: 11px; /* 0:4191 SAVED chip label, 11 px */
+  --zuri-summary-chip-leading: 20px; /* 0:4191 chip label line box, 20 px */
+  --zuri-summary-medium: 600; /* 0:4183, 0:4186 and 0:4191 are semibold */
+
+  --zuri-summary-gutter: 16px; /* 0:4126 brand mark sits 16 px from the window edge */
+  --zuri-summary-topbar-height: 48px; /* 0:4125 top bar, 48 px tall */
+  --zuri-summary-search-width: 168px; /* 0:4127 search field, 168 px wide */
+  --zuri-summary-search-height: 32px; /* 0:4127 search field, 32 px tall */
+  --zuri-summary-model-chip-height: 32px; /* 0:4131 top bar model chip, 32 px tall */
+  --zuri-summary-icon-button: 32px; /* 0:4136 bell and 0:4138 theme squares, 32x32 */
+  --zuri-summary-icon-button-radius: 12px; /* 0:4136 bell square, 12 px corners */
+  --zuri-summary-avatar-size: 28px; /* 0:4140 avatar disc, 28 px */
+  --zuri-summary-sidebar-width: 260px; /* 0:4141 sidebar, 260 px wide */
+  --zuri-summary-nav-row-height: 36px; /* 0:4143 New chat and every 0:4155 nav row, 36 px */
+  --zuri-summary-nav-row-radius: 12px; /* 0:4143 New chat corners, 12 px */
+  --zuri-summary-nav-row-padding: 0 12px; /* 0:4157 row icon starts 12 px in */
+
+  --zuri-summary-thread-width: 720px; /* 0:4163 chat column, 720 px inside a 940 px area */
+  --zuri-summary-message-max: 360px; /* 0:4170 user bubble, 360 px wide */
+  --zuri-summary-message-radius: 14px; /* 0:4170 user bubble corners, 14 px */
+  --zuri-summary-message-padding: 10px 16px; /* 0:4170 text sits 10/16 px in, 64 px tall at two lines */
+  --zuri-summary-strip-radius: 14px; /* 0:4173 step strip corners, 14 px */
+  --zuri-summary-strip-padding: 13px 14px; /* 0:4173 strip is 44 px tall around an 18 px row */
+  --zuri-summary-strip-shadow: 0 4px 16px rgba(15, 23, 42, 0.078); /* 0:4173 drop shadow, 4/16 px at 7.8% */
+
+  --zuri-summary-card-padding: 20px; /* 0:4180 frame, 20 px inset on all four sides */
+  --zuri-summary-card-radius: 20px; /* 0:4180 card corners, 20 px */
+  --zuri-summary-card-shadow: 0 8px 32px rgba(15, 23, 42, 0.078); /* 0:4180 drop shadow, 8/32 px at 7.8% */
+  --zuri-summary-head-gap: 12px; /* 0:4181 badge ends at 64, 0:4183 name starts at 76 */
+  --zuri-summary-badge-size: 44px; /* 0:4181 source badge, 44x44 */
+  --zuri-summary-badge-radius: 12px; /* 0:4181 badge corners, 12 px */
+  --zuri-summary-chip-height: 26px; /* 0:4190 SAVED chip, 26 px tall */
+  --zuri-summary-chip-padding: 0 12px; /* 0:4191 chip label starts 12 px in */
+  --zuri-summary-alert-padding: 14px 37px 14px 43px; /* 0:4248 message starts at x43 and ends at x643 of 680, y14 */
+  --zuri-summary-alert-radius: 14px; /* 0:4248 error alert corners, 14 px */
+  --zuri-summary-alert-bar: 3px; /* 0:4249 accent bar, 3 px wide */
+  --zuri-summary-row-height: 44px; /* 0:4195 saved path row, 44 px tall */
+  --zuri-summary-row-padding: 0 14px; /* 0:4196 path text starts 14 px in */
+  --zuri-summary-row-radius: 12px; /* 0:4195 path row corners, 12 px */
+  --zuri-summary-control-height: 36px; /* 0:4198 Open file button, 36 px tall */
+  --zuri-summary-control-padding: 0 16px; /* 0:4199 button label sits 16 px in */
+  --zuri-summary-control-radius: 12px; /* 0:4198 button corners, 12 px */
+
+  --zuri-summary-composer-padding: 10px 12px 12px; /* 0:4202 well is 88 px tall around a 22 px line and a 32 px row */
+  --zuri-summary-composer-radius: 24px; /* 0:4202 composer corners, 24 px */
+  --zuri-summary-composer-shadow: 0 8px 24px rgba(15, 23, 42, 0.078); /* 0:4202 drop shadow, 8/24 px at 7.8% */
+  --zuri-summary-tabbar-height: 56px; /* phone nav bar height, 56 px in the 390 px frame */
+  --zuri-summary-sheet-radius: 20px; /* phone sheet corners, 20 px */
+
+  --zuri-summary-radius-sm: 8px; /* inner chips and the brand mark tile, 8 px */
+  --zuri-summary-radius-md: 12px; /* icon squares and rows, 12 px */
+  --zuri-summary-radius-pill: 999px; /* avatars, chips and the search field */
+  --zuri-summary-wash-opacity: 1; /* 0:4123 and 0:4124 draw both washes at full strength */
+}
+
+:root[data-theme="light"] .document-summary-page {
+  --zuri-summary-canvas: #FAFAFA; /* light canvas behind the chat area */
+  --zuri-summary-surface: #FFFFFF; /* 0:4180 card and 0:4125 top bar fill */
+  --zuri-summary-sunken: #F4F4F5; /* 0:4195 path row and 0:4127 search fill */
+  --zuri-summary-placeholder: #E4E4E7; /* hover fill and 0:4140 avatar disc */
+  --zuri-summary-text: #11181C; /* 0:4183 file name and body text */
+  --zuri-summary-text-subtle: #6B6B75; /* 0:4184 meta and 0:4186 caption text */
+  --zuri-summary-hairline: rgba(17, 17, 17, 0.078); /* 0:4194 divider and 0:4198 button border */
+  --zuri-summary-primary: #006FEE; /* 0:4143 New chat and 0:4211 send button */
+  --zuri-summary-primary-hover: #005BC4; /* pressed state for the primary fills */
+  --zuri-summary-primary-soft: #E6F1FE; /* 0:4123 wash and 0:4170 user bubble */
+  --zuri-summary-primary-soft-text: #005BC4; /* 0:4197 Copy link and 0:4189 expand link */
+  --zuri-summary-on-primary: #FFFFFF; /* 0:4144 New chat label on the blue fill */
+  --zuri-summary-secondary-soft: #F2EAFA; /* 0:4124 secondary wash */
+  --zuri-summary-success-soft: #D3F7E3; /* 0:4190 SAVED chip fill */
+  --zuri-summary-success-soft-text: #0A7A3D; /* 0:4191 SAVED label and 0:4174 ticks */
+  --zuri-summary-danger: #F31260; /* 0:4249 accent bar and 0:4135 unread dot */
+  --zuri-summary-danger-soft: #FDD8E5; /* 0:4242 not-saved badge fill */
+  --zuri-summary-danger-soft-text: #B80E4D; /* 0:4261 MISSING label */
+  --zuri-summary-danger-wash: rgba(243, 18, 96, 0.102); /* 0:4248 alert fill, danger at 10.2% */
+  --zuri-summary-focus: #006FEE; /* 2 px focus ring on every control */
+  --zuri-summary-scrim: rgba(0, 0, 0, 0.32); /* phone sheet backdrop */
+}
+
+:root[data-theme="dark"] .document-summary-page {
+  --zuri-summary-canvas: #0A0A0B; /* dark canvas behind the chat area */
+  --zuri-summary-surface: #18181B; /* dark card and top bar fill */
+  --zuri-summary-sunken: #27272A; /* dark path row and search fill */
+  --zuri-summary-placeholder: #3F3F46; /* dark hover fill and avatar disc */
+  --zuri-summary-text: #ECEDEE; /* dark file name and body text */
+  --zuri-summary-text-subtle: #A1A1AA; /* dark meta and caption text */
+ 
+  --zuri-summary-hairline: rgba(255, 255, 255, 0.078); /* dark divider and button border */
+  --zuri-summary-primary: #006FEE; /* primary fill holds its hue in the dark set */
+  --zuri-summary-primary-hover: #338EF7; /* dark pressed state, lifted one step */
+  --zuri-summary-primary-soft: #001731; /* dark wash and user bubble */
+  --zuri-summary-primary-soft-text: #338EF7; /* dark Copy and expand link */
+  --zuri-summary-on-primary: #FFFFFF; /* label on the blue fill */
+  --zuri-summary-secondary-soft: #2A0E45; /* dark secondary wash */
+  --zuri-summary-success-soft: #052814; /* dark SAVED chip fill */
+  --zuri-summary-success-soft-text: #4ADE80; /* dark SAVED label and ticks */
+  --zuri-summary-danger: #F31260; /* danger keeps its hue in the dark set */
+  --zuri-summary-danger-soft: #310413; /* dark not-saved badge fill */
+  --zuri-summary-danger-soft-text: #FF8FB0; /* dark MISSING label */
+  --zuri-summary-danger-wash: rgba(243, 18, 96, 0.16); /* dark alert fill, lifted so it reads on black */
+  --zuri-summary-focus: #338EF7; /* dark focus ring */
+  --zuri-summary-scrim: rgba(0, 0, 0, 0.6); /* dark sheet backdrop */
+}
+/* ------------------------------------------------------------------------ */
+/* Reminder create / edit dialog (design node 0:10485)                       */
+/* ------------------------------------------------------------------------ */
+/* The page draws this card twice over: frame 01 is a 1200 x 800 reminders
+   page with a 480 x 592 dialog over a black scrim, and frames 02 to 06 redraw
+   the dialog alone on a 560 x 700 specimen tile. Every value below is read off
+   "Dialog / Reminder" (0:10548) and its siblings, so the card in the app and the
+   stills on the page come from one set of numbers. */
+.reminder-dialog-page {
+  --zuri-reminder-dialog-width: 480px; /* 0:10548 dialog box, 480 x 592 */
+  --zuri-reminder-dialog-specimen-width: 560px; /* frames 02-06 state tiles, 560 x 700 */
+}
+
+:root[data-theme="light"] .reminder-dialog-page {
+  --zuri-reminder-dialog-canvas: #FAFAFA; /* 0:10487 reminders page behind the scrim */
+  --zuri-reminder-dialog-surface: #FFFFFF; /* 0:10548 dialog fill */
+  --zuri-reminder-dialog-surface-muted: #F4F4F5; /* 0:10559 field, 0:10560 type track, 0:10578 hint, 0:10551 close */
+  --zuri-reminder-dialog-surface-locked: #E4E4E7; /* 0:10735 disabled Save and the secondary hover */
+  --zuri-reminder-dialog-selected: #FFFFFF; /* 0:10568 selected type option, one step above the track */
+  --zuri-reminder-dialog-text: #11181C; /* 0:10554 title and field values */
+  --zuri-reminder-dialog-text-subtle: #6B6B75; /* 0:10553 eyebrow, 0:10552 subtitle, 0:10580 hint body */
+  --zuri-reminder-dialog-hairline: #111111; /* 0:10549 and 0:10582 1 px rules, drawn solid */
+  --zuri-reminder-dialog-accent: #006FEE; /* 0:10586 Save reminder fill */
+  --zuri-reminder-dialog-accent-hover: #005BC4; /* pressed Save */
+  --zuri-reminder-dialog-accent-soft: #E6F1FE; /* shell bar "3 new" chip behind the dialog */
+  --zuri-reminder-dialog-accent-soft-text: #005BC4; /* label on that chip */
+  --zuri-reminder-dialog-on-accent: #FFFFFF; /* 0:10587 Save label */
+  --zuri-reminder-dialog-danger: #F31260; /* 0:10556 required star and the invalid field rule */
+  --zuri-reminder-dialog-danger-soft: #FDD8E5; /* 0:10655 error banner fill */
+  --zuri-reminder-dialog-danger-soft-text: #B80E4D; /* 0:10657 error banner text */
+  --zuri-reminder-dialog-success: #17C964; /* 0:10785 saved tick tile */
+  --zuri-reminder-dialog-success-soft: #D3F7E3; /* 0:10784 saved banner fill */
+  --zuri-reminder-dialog-success-soft-text: #0A7A3D; /* 0:10786 saved banner text */
+  --zuri-reminder-dialog-switch-off: #D4D4D8; /* 0:10545 resting row toggle behind the dialog */
+  --zuri-reminder-dialog-focus-ring: #006FEE; /* 2 px ring on the field, the options and the buttons */
+  --zuri-reminder-dialog-shadow: 0 16px 48px rgba(15, 23, 42, 0.078); /* 0:10548 drop shadow, 16/48 px at 7.8% */
+  --zuri-reminder-dialog-scrim: rgba(0, 0, 0, 0.4); /* 0:10547 scrim, black at 40% over the page */
+}
+
+:root[data-theme="dark"] .reminder-dialog-page {
+  --zuri-reminder-dialog-canvas: #0A0A0B; /* dark page behind the scrim */
+  --zuri-reminder-dialog-surface: #18181B; /* dark dialog fill */
+  --zuri-reminder-dialog-surface-muted: #27272A; /* dark field, type track, hint and close button */
+  --zuri-reminder-dialog-surface-locked: #3F3F46; /* dark disabled Save and the secondary hover */
+  --zuri-reminder-dialog-selected: #3F3F46; /* selected option stays one step above the track */
+  --zuri-reminder-dialog-text: #ECEDEE; /* dark title and field values */
+  --zuri-reminder-dialog-text-subtle: #A1A1AA; /* dark eyebrow, subtitle and hint body */
+  --zuri-reminder-dialog-hairline: #FFFFFF; /* dark 1 px rules, the divider token's dark value */
+  --zuri-reminder-dialog-accent: #006FEE; /* primary holds its hue in the dark set */
+  --zuri-reminder-dialog-accent-hover: #338EF7; /* dark pressed Save, lifted one step */
+  --zuri-reminder-dialog-accent-soft: #001731; /* dark chip behind the dialog */
+  --zuri-reminder-dialog-accent-soft-text: #338EF7; /* dark label on that chip */
+  --zuri-reminder-dialog-on-accent: #FFFFFF; /* Save label on the blue fill */
+  --zuri-reminder-dialog-danger: #F31260; /* danger keeps its hue in the dark set */
+  --zuri-reminder-dialog-danger-soft: #310413; /* dark error banner fill */
+  --zuri-reminder-dialog-danger-soft-text: #FF8FB0; /* dark error banner text */
+  --zuri-reminder-dialog-success: #17C964; /* saved tick tile holds its green */
+  --zuri-reminder-dialog-success-soft: #052814; /* dark saved banner fill */
+  --zuri-reminder-dialog-success-soft-text: #4ADE80; /* dark saved banner text */
+  --zuri-reminder-dialog-switch-off: #52525B; /* dark resting row toggle */
+  --zuri-reminder-dialog-focus-ring: #338EF7; /* dark focus ring */
+  --zuri-reminder-dialog-shadow: 0 16px 48px rgba(0, 0, 0, 0.45); /* same 16/48 geometry, lifted for the dark page */
+  --zuri-reminder-dialog-scrim: rgba(0, 0, 0, 0.6); /* dark scrim, the overlay-scrim token's dark value */
+}
+
+/* ---------------------------------------------------------------------------
+   Installer welcome and install-directory screen (design node 0:15574)
+   ---------------------------------------------------------------------------
+   The node draws five frames of one 640 x 460 installer window: welcome, choose
+   install location, installing, finish, and a directory that cannot be used.
+   Every frame repeats the same 176 px brand rail, so the rail's geometry is a
+   token too and the five frames cannot drift apart.
+
+   The numbers are the node's own: the panel's content column starts at x 208
+   (176 rail + 32 inset) and is 400 wide, every block's y in the node becomes a
+   margin here, and the footer divider at y 372 spans the panel edge to edge.
+
+   Radii are the node's cornerRadius values bound to tokens.json: window 20
+   (radius-xl), logo mark and fields 14 (radius-lg), buttons 12 (radius-md),
+   checkbox 8 (radius-sm), chip, dots and track 999 (radius-full). */
+.installer-page {
+  --zuri-installer-font: var(--zuri-font-family); /* the node's Segoe UI is the app family */
+  --zuri-installer-font-mono: var(--zuri-font-family-mono); /* the node's Cascadia Mono */
+
+  /* The window */
+  --zuri-installer-width: 640px;
+  --zuri-installer-height: 460px; /* the node's window height */
+  --zuri-installer-radius: 20px; /* radius-xl */
+  --zuri-installer-border: 1px;
+
+  /* Brand rail */
+  --zuri-installer-rail-width: 176px;
+  --zuri-installer-rail-pad: 24px; /* logo mark and version sit at x 24 */
+  --zuri-installer-rail-top: 26px; /* logo mark y */
+  --zuri-installer-rail-meta-bottom: 28px; /* version 392 and platform 412 end at 432 */
+  --zuri-installer-rail-meta-size: 13px;
+  --zuri-installer-rail-meta-leading: 20px; /* 13/20 version and platform lines */
+  --zuri-installer-logo-size: 44px; /* the node's 44 px mark */
+  --zuri-installer-logo-radius: 14px; /* radius-lg */
+  --zuri-installer-logo-glyph: 24px;
+  --zuri-installer-logo-leading: 29px; /* the glyph's line inside the mark */
+  --zuri-installer-wordmark-gap: 12px; /* mark ends at 68, wordmark starts at 80 */
+  --zuri-installer-wordmark-offset: 4px; /* wordmark y 30 against the mark's 26 */
+  --zuri-installer-wordmark-size: 16px;
+  --zuri-installer-wordmark-leading: 24px; /* 16/24 wordmark */
+  --zuri-installer-caption-size: 11px; /* 11 px caps under the wordmark */
+  --zuri-installer-caption-leading: 16px; /* the caption's 16 px line */
+  --zuri-installer-caption-offset: -2px; /* caption y 52 under a 24 px wordmark line */
+  --zuri-installer-track-letter: 0.66px; /* the node's 0.66 letter spacing */
+
+  /* Panel: content column 400 wide at x 208 */
+  --zuri-installer-pad-top: 36px;
+  --zuri-installer-pad-side: 32px; /* the content column starts at the node's x 208 */
+  --zuri-installer-pad-bottom: 26px; /* buttons end 26 px above the window's foot */
+  --zuri-installer-chip-height: 24px;
+  --zuri-installer-chip-pad: 11px; /* the chip's label inset */
+  --zuri-installer-chip-radius: 999px; /* radius-full */
+  --zuri-installer-chip-size: 11px;
+  --zuri-installer-chip-leading: 16px; /* 11/16 caps on the chip */
+  --zuri-installer-title-gap: 16px; /* chip ends 60, title starts 76 */
+  --zuri-installer-title-size: 28px;
+  --zuri-installer-title-leading: 36px; /* 28/36 title */
+  --zuri-installer-title-track: -0.56px; /* the drawn title's letter spacing */
+  --zuri-installer-body-gap: 12px; /* title ends 112, body starts 124 */
+  --zuri-installer-body-size: 15px;
+  --zuri-installer-body-leading: 24px; /* 15/24 body */
+  --zuri-installer-body-width: 392px; /* the body's 392 px measure */
+  --zuri-installer-meta-size: 14px; /* every text node with no size is the 14/20 default */
+  --zuri-installer-meta-leading: 20px; /* its 20 px line */
+
+  /* The three feature rows of the welcome frame */
+  --zuri-installer-feature-gap: 24px; /* body ends 172, first row starts 196 */
+  --zuri-installer-feature-pitch: 12px; /* 40 px rows on the node's 52 px pitch */
+  --zuri-installer-feature-height: 40px;
+  --zuri-installer-feature-indent: 32px; /* label and detail at x 32 */
+  --zuri-installer-feature-dot: 8px;
+  --zuri-installer-feature-dot-inset: 8px; /* the dot sits at x 8 of the row */
+  --zuri-installer-feature-detail-size: 13px; /* 13/20 detail under the label */
+
+  /* Install-directory field and what follows it */
+  --zuri-installer-field-label-gap: 14px; /* body ends 172, label starts 186 */
+  --zuri-installer-label-size: 11px;
+  --zuri-installer-label-leading: 16px; /* 11/16 caps label */
+  --zuri-installer-field-gap: 8px; /* label ends 202, field starts 210 */
+  --zuri-installer-field-width: 300px;
+  --zuri-installer-field-height: 44px; /* the node's 44 px field */
+  --zuri-installer-field-radius: 14px; /* radius-lg */
+  --zuri-installer-field-pad: 3px 10px 3px 15px; /* the node's text box runs x 15 to 288 of a 300 px field */
+  --zuri-installer-path-size: 12px;
+  --zuri-installer-path-leading: 18px; /* 12/18 mono path */
+  --zuri-installer-browse-width: 88px;
+  --zuri-installer-browse-height: 44px; /* Browse is the field's height, not the buttons' */
+  --zuri-installer-field-row-gap: 12px; /* field ends 508, Browse starts 520 */
+  --zuri-installer-note-gap: 14px; /* field ends 254, validation and alert start 268 */
+  --zuri-installer-validation-size: 13px;
+  --zuri-installer-validation-leading: 20px; /* 13/20 available-folder line */
+  --zuri-installer-validation-dot: 6px; /* the node's 6 px dot */
+  --zuri-installer-validation-indent: 16px; /* the words start at x 16 */
+  --zuri-installer-checkbox-gap: 18px; /* validation ends 288, checkbox row starts 306 */
+  --zuri-installer-checkbox-size: 18px;
+  --zuri-installer-checkbox-radius: 8px; /* radius-sm */
+  --zuri-installer-checkbox-indent: 26px;
+  --zuri-installer-checkbox-leading: 22px; /* 14/22 checkbox label */
+  --zuri-installer-alert-height: 56px; /* the node's 56 px alert */
+  --zuri-installer-alert-radius: 14px; /* radius-lg */
+  --zuri-installer-alert-bar: 3px;
+  --zuri-installer-alert-pad: 9px 16px 3px; /* words start at y 9 of the node's 56 px alert */
+  --zuri-installer-alert-size: 14px;
+  --zuri-installer-alert-leading: 22px; /* 14/22 alert message */
+
+  /* The installing frame's progress block */
+  --zuri-installer-progress-gap: 16px; /* body ends 170, label starts 186 */
+  --zuri-installer-track-gap: 8px; /* label ends 206, track starts 214 */
+  --zuri-installer-track-height: 8px;
+  --zuri-installer-track-radius: 999px; /* radius-full */
+  --zuri-installer-progress-fill: 68%; /* 272 px of the node's 400 px track */
+  --zuri-installer-caption-gap: 12px; /* track ends 222, caption starts 234 */
+  --zuri-installer-caption-size: 13px;
+  --zuri-installer-step-gap: 22px; /* caption ends 254, first row starts 276 */
+  --zuri-installer-step-pitch: 6px; /* 22 px rows on the node's 28 px pitch */
+  --zuri-installer-step-height: 22px;
+  --zuri-installer-step-indent: 20px; /* the step name starts at x 20 */
+  --zuri-installer-step-dot: 8px; /* the node's 8 px step dot */
+
+  /* The finish frame's success block and its two checkbox rows */
+  --zuri-installer-success-height: 48px;
+  --zuri-installer-success-icon: 44px; /* the node's 44 px tick tile */
+  --zuri-installer-success-gap: 16px; /* icon ends 44, text starts at 60 */
+  --zuri-installer-success-title-size: 16px;
+  --zuri-installer-success-title-leading: 24px; /* 16/24 installed success line */
+  --zuri-installer-success-path-gap: 2px; /* title 24 tall, path at y 26 */
+  --zuri-installer-checkbox-block-gap: 32px; /* success block ends 244, launch row 276 */
+  --zuri-installer-checkbox-row-gap: 10px; /* launch row ends 300, folder row 310 */
+
+  /* Footer and buttons */
+  --zuri-installer-footer-gap: 16px; /* divider 372, footer note starts 388 */
+  --zuri-installer-footer-actions-gap: 12px;
+  --zuri-installer-button-height: 36px; /* the node's 36 px buttons */
+  --zuri-installer-button-radius: 12px; /* radius-md */
+  --zuri-installer-button-border: 1px;
+  --zuri-installer-button-pad: 12px; /* label inset inside a button */
+  --zuri-installer-focus-width: 2px; /* the drawn focus ring */
+  --zuri-installer-focus-offset: 2px; /* ring offset */
+
+  /* The phone keeps the same drawing with its own narrower inset */
+  --zuri-installer-phone-pad: 20px;
+  --zuri-installer-tap: 44px; /* the smallest tap target the phone layout allows */
+  --zuri-installer-phone-rail: 64px;
+}
+
+:root[data-theme="light"] .installer-page {
+  --zuri-installer-canvas: #FAFAFA; /* color/canvas, the desktop behind the window */
+  --zuri-installer-surface: #FFFFFF; /* color/surface, the window itself */
+  --zuri-installer-surface-secondary: #F4F4F5; /* color/surface-secondary, the brand rail */
+  --zuri-installer-surface-tertiary: #E4E4E7; /* color/surface-tertiary: hairlines and the progress track */
+  --zuri-installer-surface-quaternary: #D4D4D8; /* color/surface-quaternary, the waiting dot */
+  --zuri-installer-default: #D4D4D8; /* color/default, the secondary buttons */
+  --zuri-installer-default-foreground: #11181C; /* color/default-foreground */
+  --zuri-installer-text: #11181C; /* color/text */
+  --zuri-installer-text-subtle: #6B6B75; /* color/text-subtle */
+  --zuri-installer-primary: #006FEE; /* color/primary: chip, dots, primary buttons */
+  --zuri-installer-primary-hover: #005BC4; /* color/primary-hover */
+  --zuri-installer-primary-foreground: #FFFFFF; /* color/primary-foreground */
+  --zuri-installer-primary-soft-foreground: #005BC4; /* color/primary-soft-foreground, "Running" */
+  --zuri-installer-success: #17C964; /* color/success: the available-folder dot and line */
+  --zuri-installer-success-soft: #D3F7E3; /* color/success-soft, INSTALLED chip and tick tile */
+  --zuri-installer-success-soft-foreground: #0A7A3D; /* color/success-soft-foreground, "Done" */
+  --zuri-installer-danger: #F31260; /* color/danger, the refused field's border and alert bar */
+  --zuri-installer-danger-soft: #FDD8E5; /* color/danger-soft, the alert fill */
+  --zuri-installer-danger-soft-foreground: #B80E4D; /* color/danger-soft-foreground */
+}
+
+:root[data-theme="dark"] .installer-page {
+  --zuri-installer-canvas: #0A0A0B; /* dark color-canvas */
+  --zuri-installer-surface: #18181B; /* dark color-surface */
+  --zuri-installer-surface-secondary: #27272A; /* dark color-surface-secondary */
+  --zuri-installer-surface-tertiary: #3F3F46; /* dark color-surface-tertiary */
+  --zuri-installer-surface-quaternary: #52525B; /* dark color-surface-quaternary */
+  --zuri-installer-default: #3F3F46; /* dark color-default */
+  --zuri-installer-default-foreground: #ECEDEE; /* dark color-default-foreground */
+  --zuri-installer-text: #ECEDEE; /* dark color-text */
+  --zuri-installer-text-subtle: #A1A1AA; /* dark color-text-subtle */
+  --zuri-installer-primary: #006FEE; /* primary holds its hue in the dark set */
+  --zuri-installer-primary-hover: #338EF7; /* dark color-primary-hover */
+  --zuri-installer-primary-foreground: #FFFFFF; /* dark color-primary-foreground */
+  --zuri-installer-primary-soft-foreground: #338EF7; /* dark color-primary-soft-foreground */
+  --zuri-installer-success: #17C964; /* success holds its hue in the dark set */
+  --zuri-installer-success-soft: #052814; /* dark color-success-soft */
+  --zuri-installer-success-soft-foreground: #4ADE80; /* dark color-success-soft-foreground */
+  --zuri-installer-danger: #F31260; /* danger holds its hue in the dark set */
+  --zuri-installer-danger-soft: #310413; /* dark color-danger-soft */
+  --zuri-installer-danger-soft-foreground: #FF8FB0; /* dark color-danger-soft-foreground */
+}
+
+/* --------------------------------------------------------------------------
+   ZZ probe (design page "ZZ probe", node 0:142400; frame 0:142927).
+
+   The frame is a static verification drawing: one 1200 x 800 canvas holding a
+   header, a rule and two 520 x 356 cards. Every value below is a number read
+   off that frame or a token colour it is bound to, so the page carries no raw
+   colour and no raw radius of its own. The light column is tokens.json Light,
+   the dark column tokens.json Dark.
+   -------------------------------------------------------------------------- */
+
+.zz-probe-page {
+  --zuri-zz-probe-canvas: #FAFAFA; /* frame fill, bound color/canvas (tokens.json Light --color-canvas) */
+  --zuri-zz-probe-surface: #FFFFFF; /* card fill, bound color/surface */
+  --zuri-zz-probe-glass-surface: #FFFFFF; /* note fill, bound color/glass-surface */
+  --zuri-zz-probe-glass-border: #FFFFFF; /* note stroke, bound color/glass-border: invisible on the frame, as drawn */
+  --zuri-zz-probe-text: #11181C; /* bound color/text: title, card title, meta values, token lines */
+  --zuri-zz-probe-text-subtle: #6B6B75; /* bound color/text-subtle: eyebrow, subtitle, bodies, meta keys, note footer */
+  --zuri-zz-probe-divider: #111111; /* bound color/divider: the header rule and both card rules */
+  --zuri-zz-probe-card-border: rgba(17, 17, 17, 0.08); /* card stroke #11111114: color/border-subtle at 8% */
+  --zuri-zz-probe-primary-soft: #E6F1FE; /* probe label chip fill, bound color/primary-soft */
+  --zuri-zz-probe-primary-soft-foreground: #005BC4; /* chip label, bound color/primary-soft-foreground */
+  --zuri-zz-probe-shadow-card: 0 4px 12px rgba(15, 23, 42, 0.05); /* node 0:142932 shadow "0 4 12 #0F172A0D" */
+  --zuri-zz-probe-shadow-note: 0 8px 24px rgba(15, 23, 42, 0.08); /* node 0:142948 shadow "0 8 24 #0F172A14" */
+  --zuri-zz-probe-font: var(--zuri-font-family); /* the node sets Segoe UI, which is the app family */
+  --zuri-zz-probe-font-mono: var(--zuri-font-family-mono); /* the node's Cascadia Mono */
+  --zuri-zz-probe-frame-width: 1200px; /* frame 0:142927 width */
+  --zuri-zz-probe-frame-height: 800px; /* frame 0:142927 height */
+  --zuri-zz-probe-frame-radius: 20px; /* frame cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-zz-probe-pad: 64px; /* frame padding: eyebrow, card and rule all sit 64 in from the edge */
+  --zuri-zz-probe-pad-top: 56px; /* the eyebrow's own y, 8 above the 64 column */
+  --zuri-zz-probe-card-width: 520px; /* both cards: 0:142932 and 0:142948 width */
+  --zuri-zz-probe-card-height: 356px; /* both cards: 0:142932 and 0:142948 height */
+  --zuri-zz-probe-card-gap: 32px; /* 64 + 520 + 32 = 616, the note's x */
+  --zuri-zz-probe-card-radius: 20px; /* card cornerRadius, bound radius-xl */
+  --zuri-zz-probe-card-pad: 28px; /* card inner padding: every child starts at x 28 */
+  --zuri-zz-probe-chip-height: 24px; /* 0:142933 height */
+  --zuri-zz-probe-chip-min-width: 116px; /* 0:142933 width */
+  --zuri-zz-probe-chip-pad: 12px; /* chip label inset, 12 left and right of its 92 wide text */
+  --zuri-zz-probe-chip-radius: 999px; /* chip cornerRadius, bound radius-full (tokens.json radius-full 999) */
+  --zuri-zz-probe-meta-key-width: 92px; /* every meta key x 28 w 92; the value starts at 120 */
+  --zuri-zz-probe-meta-row-gap: 10px; /* meta rows step 30 with a 20 leading */
+  --zuri-zz-probe-token-col-gap: 20px; /* token column one ends at 248, column two starts at 268 */
+  --zuri-zz-probe-measured-gap-15: 15px; /* card rule 164 to first meta row 180 */
+  --zuri-zz-probe-measured-gap-17: 17px; /* note rule 93 to the first token line 110 */
+  --zuri-zz-probe-measured-gap-18: 18px; /* last token line 272 to the note footer rule 290 */
+  --zuri-zz-probe-measured-gap-13: 13px; /* note footer rule 291 to Note Footer 304 */
+  --zuri-zz-probe-measured-gap-38: 38px; /* card body 126 to card rule 164 */
+}
+
+:root[data-theme="dark"] .zz-probe-page {
+  --zuri-zz-probe-canvas: #0A0A0B; /* dark color-canvas */
+  --zuri-zz-probe-surface: #18181B; /* dark color-surface */
+  --zuri-zz-probe-glass-surface: #18181B; /* dark color-glass-surface */
+  --zuri-zz-probe-glass-border: rgba(255, 255, 255, 0.12); /* dark glass-border: white at 12%, as design node 0:105 carries it */
+  --zuri-zz-probe-text: #ECEDEE; /* dark color-text */
+  --zuri-zz-probe-text-subtle: #A1A1AA; /* dark color-text-subtle */
+  --zuri-zz-probe-divider: #FFFFFF; /* dark color-divider, solid, the same way the automations and attach rules go white */
+  --zuri-zz-probe-card-border: rgba(255, 255, 255, 0.08); /* dark color-border-subtle at 8% */
+  --zuri-zz-probe-primary-soft: #001731; /* dark color-primary-soft */
+  --zuri-zz-probe-primary-soft-foreground: #338EF7; /* dark color-primary-soft-foreground */
+}
+
+/* --------------------------------------------------------------------------
+   Floating overlay (design page "Floating overlay", node 0:13131; frames
+   0:13132 idle, 0:13170 sending, 0:13209 streaming, 0:13247 inline error,
+   0:13287 reply lands, 0:13325 hidden).
+
+   The light column is tokens.json Light, the dark column tokens.json Dark, and
+   every colour is the variable the frames bind rather than a value typed in the
+   page stylesheet. The sizes at the end are the node's own numbers in scene
+   pixels: the scene is drawn 720 x 520, so floating-overlay.css multiplies them
+   by one design pixel and the whole drawing scales with its column.
+   -------------------------------------------------------------------------- */
+
+.floating-overlay-page {
+  --zuri-floating-overlay-canvas: #FAFAFA; /* scene fill, bound color/canvas (tokens.json Light --color-canvas) */
+  --zuri-floating-overlay-surface: #FFFFFF; /* app window, taskbar and the hidden note, bound color/surface */
+  --zuri-floating-overlay-surface-secondary: #F4F4F5; /* skeleton sidebar, bars, input fill, bound color/surface-secondary */
+  --zuri-floating-overlay-surface-tertiary: #E4E4E7; /* skeleton lines and the idle send circle, bound color/surface-tertiary */
+  --zuri-floating-overlay-surface-quaternary: #D4D4D8; /* control dots and the typing indicator, bound color/surface-quaternary */
+  --zuri-floating-overlay-text: #11181C; /* thread title, answer text, note title, bound color/text */
+  --zuri-floating-overlay-text-subtle: #6B6B75; /* captions, hints, placeholders, close glyph, bound color/text-subtle */
+  --zuri-floating-overlay-divider: rgba(17, 17, 17, 0.18); /* every rule, bound color/divider at #1111112E */
+  --zuri-floating-overlay-input-border: rgba(17, 17, 17, 0.16); /* the input's inside stroke, bound color/border-strong at #11111129 */
+  --zuri-floating-overlay-glass-surface: rgba(255, 255, 255, 0.7); /* card fill, bound color/glass-surface at #FFFFFFB3 */
+  --zuri-floating-overlay-primary: #006FEE; /* the ready send circle, bound color/primary */
+  --zuri-floating-overlay-primary-foreground: #FFFFFF; /* the ready send arrow, bound color/primary-foreground */
+  --zuri-floating-overlay-primary-soft: #E6F1FE; /* the brand circle, bound color/primary-soft */
+  --zuri-floating-overlay-primary-soft-foreground: #005BC4; /* the brand mark and Focus Zuri, bound color/primary-soft-foreground */
+  --zuri-floating-overlay-danger: #F31260; /* the stop glyph, bound color/danger */
+  --zuri-floating-overlay-danger-soft: #FDD8E5; /* error panel and stop circle, bound color/danger-soft */
+  --zuri-floating-overlay-danger-soft-foreground: #B80E4D; /* error title and its link, bound color/danger-soft-foreground */
+  --zuri-floating-overlay-shadow-window: 0 8px 24px rgba(15, 23, 42, 0.08); /* app window shadow "0 8 24 #0F172A14" */
+  --zuri-floating-overlay-shadow-overlay: 0 12px 32px rgba(15, 23, 42, 0.12); /* card shadow "0 12 32 #0F172A1F" */
+  --zuri-floating-overlay-font: var(--zuri-font-family); /* the node sets Segoe UI, the app family */
+  --zuri-floating-overlay-scene-width: 720; /* every frame is 720 wide; the divisor that makes --fo-px */
+  --zuri-floating-overlay-scene-height: 520; /* every frame is 520 tall, so the scene's aspect-ratio */
+  --zuri-floating-overlay-window-x: 56; /* app window x, the caption's x too */
+  --zuri-floating-overlay-window-y: 56; /* app window y */
+  --zuri-floating-overlay-window-width: 608; /* app window width */
+  --zuri-floating-overlay-window-height: 384; /* app window height */
+  --zuri-floating-overlay-window-radius: 20; /* app window cornerRadius, bound radius-xl */
+  --zuri-floating-overlay-taskbar-y: 472; /* taskbar y; its rule sits on the same row */
+  --zuri-floating-overlay-taskbar-height: 48; /* taskbar height */
+  --zuri-floating-overlay-card-x: 344; /* the 360 wide card centres on the 720 scene at 180, but the node draws it here */
+  --zuri-floating-overlay-card-y: 256; /* card y, 16 px past the app window's 440 bottom */
+  --zuri-floating-overlay-card-width: 360; /* card width */
+  --zuri-floating-overlay-card-height: 200; /* card height */
+  --zuri-floating-overlay-card-radius: 24; /* card cornerRadius, bound radius-2xl */
+  --zuri-floating-overlay-note-height: 88; /* the hidden state's note replaces the card with a 360 x 88 panel */
+  --zuri-floating-overlay-note-radius: 20; /* note cornerRadius, bound radius-xl */
+}
+
+:root[data-theme="dark"] .floating-overlay-page {
+  --zuri-floating-overlay-canvas: #0A0A0B; /* dark color-canvas */
+  --zuri-floating-overlay-surface: #18181B; /* dark color-surface */
+  --zuri-floating-overlay-surface-secondary: #27272A; /* dark color-surface-secondary */
+  --zuri-floating-overlay-surface-tertiary: #3F3F46; /* dark color-surface-tertiary */
+  --zuri-floating-overlay-surface-quaternary: #52525B; /* dark color-surface-quaternary */
+  --zuri-floating-overlay-text: #ECEDEE; /* dark color-text */
+  --zuri-floating-overlay-text-subtle: #A1A1AA; /* dark color-text-subtle */
+  --zuri-floating-overlay-divider: rgba(255, 255, 255, 0.18); /* dark color-divider, #FFFFFF at the node's 18% */
+  --zuri-floating-overlay-input-border: rgba(255, 255, 255, 0.16); /* dark color-border-strong at the node's 16% */
+  --zuri-floating-overlay-glass-surface: rgba(24, 24, 27, 0.7); /* dark color-glass-surface at the node's 70% */
+  --zuri-floating-overlay-primary: #006FEE; /* dark color-primary, the same blue */
+  --zuri-floating-overlay-primary-foreground: #FFFFFF; /* dark color-primary-foreground */
+  --zuri-floating-overlay-primary-soft: #001731; /* dark color-primary-soft */
+  --zuri-floating-overlay-primary-soft-foreground: #338EF7; /* dark color-primary-soft-foreground */
+  --zuri-floating-overlay-danger: #F31260; /* dark color-danger */
+  --zuri-floating-overlay-danger-soft: #310413; /* dark color-danger-soft */
+  --zuri-floating-overlay-danger-soft-foreground: #FF8FB0; /* dark color-danger-soft-foreground */
+}
+
+/* ------------------------------------------------- action / icon group (0:410)
+
+   The node binds no variable: its fill is a literal #F7F7F7 and its glyphs are
+   stroked #5D5D5D, so both are held here as the component's own tokens instead
+   of borrowing a ramp step (surface-secondary is #F4F4F5, a shade off, and the
+   radius ramp's smallest step is 8 where the node draws 6). The dark collection
+   steps them to surface-secondary and text-subtle, so the group keeps its shape
+   when the theme swaps rather than freezing on one theme's pixels. */
+:root {
+  --zuri-action-icon-surface: #F7F7F7; /* design node 0:411 fill, the node's own tone */
+  --zuri-action-icon-mark: #5D5D5D; /* design node 0:413 glyph stroke, the node's own tone */
+}
+
+:root[data-theme="dark"] {
+  --zuri-action-icon-surface: #27272A; /* dark color-surface-secondary, the same subtle step */
+  --zuri-action-icon-mark: #A1A1AA; /* dark color-text-subtle, the same glyph tone */
+}
+
+/* ------------------------------------------ settings appearance page ----
+ * Settings, appearance and layout (design node 0:6499, route /settings).
+ * Only colours, shadows and the two static mini-chat samples live here; the
+ * geometry (496/440/196 and so on) is read straight off the node and sits in
+ * views/settings-appearance.css where it can be seen beside the rule that uses it.
+ */
+:root[data-theme="light"] .settings-appearance-page {
+  --zuri-sa-canvas: #FAFAFA; /* Light --color-canvas: the node's 01 frame fill, bound canvas */
+  --zuri-sa-surface: #FFFFFF; /* Light --color-surface: sidebar, top bar, every card */
+  --zuri-sa-surface-secondary: #F4F4F5; /* Light --color-surface-secondary: search field, segmented track, pills, switches' off state */
+  --zuri-sa-surface-tertiary: #E4E4E7; /* Light --color-surface-tertiary: avatars, the theme track, mini window chrome */
+  --zuri-sa-text: #11181C; /* Light --color-text */
+  --zuri-sa-text-subtle: #6B6B75; /* Light --color-text-subtle: eyebrows, helpers, captions, meta */
+  --zuri-sa-primary: #006FEE; /* Light --color-primary: Save, the live switch, the focus border on a dirty field */
+  --zuri-sa-primary-hover: #005BC4; /* Light --color-primary-hover */
+  --zuri-sa-on-primary: #FFFFFF; /* Light --color-primary-foreground */
+  --zuri-sa-primary-soft: #E6F1FE; /* Light --color-primary-soft: the selected settings sub-row */
+  --zuri-sa-primary-soft-foreground: #005BC4; /* Light --color-primary-soft-foreground: its label */
+  --zuri-sa-success-soft: #D3F7E3; /* Light --color-success-soft: the saved pill */
+  --zuri-sa-success-soft-foreground: #0A7A3D; /* Light --color-success-soft-foreground: that pill's tick and label */
+  --zuri-sa-success: #17C964; /* Light --color-success: the toast's tick, as the node draws it green on the dark toast */
+  --zuri-sa-warning: #F5A524; /* Light --color-warning: the dirty dot */
+  --zuri-sa-warning-soft: #FDEDD3; /* Light --color-warning-soft: the unsaved chip */
+  --zuri-sa-warning-soft-foreground: #11181C; /* the node draws that chip's label in the text tone */
+  --zuri-sa-danger: #F31260; /* Light --color-danger */
+  --zuri-sa-danger-soft: #FDD8E5; /* Light --color-danger-soft: the write-failed banner */
+  --zuri-sa-danger-soft-foreground: #B80E4D; /* Light --color-danger-soft-foreground: its text and Retry */
+  --zuri-sa-line: #E4E4E7; /* the node's 1 px dividers and field borders, surface-tertiary */
+  --zuri-sa-toast: #11181C; /* the drawn toast is the text tone, so it reads on both themes */
+  --zuri-sa-toast-text: #FFFFFF; /* Light --color-primary-foreground: the toast title */
+  --zuri-sa-toast-meta: #6B6B75; /* the node's toast meta line */
+  --zuri-sa-shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08); /* the node's card shadow, #0F172A14 */
+  --zuri-sa-shadow-soft: 0 2px 8px rgba(15, 23, 42, 0.08); /* the node's inner form shadow, #0F172914 */
+  /* The two mini chats are static pictures of the light and the dark app: their
+     colours are the samples, not the active theme, so they never swap. */
+  --zuri-sa-sample-light-bg: #FFFFFF; /* the node's Preview Light fill */
+  --zuri-sa-sample-light-soft: #F4F4F5; /* its mini sidebar, bubble and composer */
+  --zuri-sa-sample-light-line: #E4E4E7; /* its mini context panel and bubble bar */
+  --zuri-sa-sample-light-dot: #D4D4D8; /* its window dots and send dot */
+  --zuri-sa-sample-light-text: #6B6B75; /* its window title */
+  --zuri-sa-sample-dark-bg: #000000; /* the node's Preview Dark fill */
+  --zuri-sa-sample-dark-soft: #27272A; /* its mini sidebar, bubble and composer, Dark --color-surface-secondary */
+  --zuri-sa-sample-dark-line: #3F3F46; /* its mini context panel and bubble bar, Dark --color-surface-tertiary */
+  --zuri-sa-sample-dark-dot: #52525B; /* its window dots and send dot, Dark --color-surface-quaternary */
+  --zuri-sa-sample-dark-text: #A1A1AA; /* its window title, Dark --color-text-subtle */
+}
+
+:root[data-theme="dark"] .settings-appearance-page {
+  --zuri-sa-canvas: #0A0A0B; /* Dark --color-canvas */
+  --zuri-sa-surface: #18181B; /* Dark --color-surface */
+  --zuri-sa-surface-secondary: #27272A; /* Dark --color-surface-secondary */
+  --zuri-sa-surface-tertiary: #3F3F46; /* Dark --color-surface-tertiary */
+  --zuri-sa-text: #ECEDEE; /* Dark --color-text */
+  --zuri-sa-text-subtle: #A1A1AA; /* Dark --color-text-subtle */
+  --zuri-sa-primary: #006FEE; /* Dark --color-primary */
+  --zuri-sa-primary-hover: #338EF7; /* Dark --color-primary-hover */
+  --zuri-sa-on-primary: #FFFFFF; /* Dark --color-primary-foreground */
+  --zuri-sa-primary-soft: #001731; /* Dark --color-primary-soft */
+  --zuri-sa-primary-soft-foreground: #338EF7; /* Dark --color-primary-soft-foreground */
+  --zuri-sa-success-soft: #052814; /* Dark --color-success-soft */
+  --zuri-sa-success-soft-foreground: #4ADE80; /* Dark --color-success-soft-foreground */
+  --zuri-sa-success: #17C964; /* Dark --color-success */
+  --zuri-sa-warning: #F5A524; /* Dark --color-warning */
+  --zuri-sa-warning-soft: #2A1F00; /* Dark --color-warning-soft */
+  --zuri-sa-warning-soft-foreground: #ECEDEE; /* the chip label follows the text tone, as in light */
+  --zuri-sa-danger: #F31260; /* Dark --color-danger */
+  --zuri-sa-danger-soft: #310413; /* Dark --color-danger-soft */
+  --zuri-sa-danger-soft-foreground: #FF8FB0; /* Dark --color-danger-soft-foreground */
+  --zuri-sa-line: #3F3F46; /* the divider goes to the tertiary step, not solid white, so it stays a hairline */
+  --zuri-sa-toast: #27272A; /* a dark toast needs a step above the page, where light uses the text tone */
+  --zuri-sa-toast-text: #ECEDEE; /* Dark --color-text */
+  --zuri-sa-toast-meta: #A1A1AA; /* Dark --color-text-subtle */
+  --zuri-sa-shadow-card: 0 8px 24px rgba(0, 0, 0, 0.45); /* the same shadow, heavier on a dark page */
+  --zuri-sa-shadow-soft: 0 2px 8px rgba(0, 0, 0, 0.4); /* likewise for the inner form */
+  --zuri-sa-sample-light-bg: #FFFFFF; /* the light sample stays a picture of the light app */
+  --zuri-sa-sample-light-soft: #F4F4F5; /* the light sample keeps its own fills under the dark theme too */
+  --zuri-sa-sample-light-line: #E4E4E7; /* its mini context panel and bubble bar */
+  --zuri-sa-sample-light-dot: #D4D4D8; /* its window dots and send dot */
+  --zuri-sa-sample-light-text: #6B6B75; /* its window title */
+  --zuri-sa-sample-dark-bg: #000000; /* the node's Preview Dark fill */
+  --zuri-sa-sample-dark-soft: #27272A; /* its mini sidebar, bubble and composer, Dark --color-surface-secondary */
+  --zuri-sa-sample-dark-line: #3F3F46; /* its mini context panel and bubble bar, Dark --color-surface-tertiary */
+  --zuri-sa-sample-dark-dot: #52525B; /* its window dots and send dot, Dark --color-surface-quaternary */
+  --zuri-sa-sample-dark-text: #A1A1AA; /* its window title, Dark --color-text-subtle */
+}
+
+/* ---------------------------------------------------------------------------
+   Control / Radio On - open-pencil component 0:390, drawn in its row 0:389.
+
+   The node is the ring alone: 20 x 20 with a 2 px stroke drawn inside on
+   cornerRadius 999, ink #0D0D0D, and no fill and no inner dot, so the drawing
+   marks the chosen row with the ring itself rather than a disc. Its label
+   (0:391) starts at x 30 - the ring ends at 20, so a 10 px gap - at 14 over the
+   node's own 17, weight 400, the same ink.
+
+   Only the ink inverts with the theme: on a dark page the ring follows the
+   text tone, or a #0D0D0D ring would disappear into the surface.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-control-radio-size: 20px; /* node 0:390 width and height */
+  --zuri-control-radio-ring: 2px; /* node 0:390 stroke weight, align INSIDE */
+  --zuri-control-radio-radius: 999px; /* node 0:390 cornerRadius, radius-full */
+  --zuri-control-radio-gap: 10px; /* ring ends at 20, the label starts at 30 */
+  --zuri-control-radio-label-size: 14px; /* node 0:391, 14 px Inter */
+  --zuri-control-radio-label-leading: 17px; /* node 0:391 lineHeight; the ramp's label-md is 20 */
+  --zuri-control-radio-hit: 44px; /* the finger-sized row around the drawn 20 px ring */
+}
+
+/* The dark collection is the default in this file, so the dark ink is declared
+   with :root and the light value overrides it, exactly as the rest of the layer. */
+:root,
+:root[data-theme='dark'] {
+  --zuri-control-radio-ink: #ecedee; /* Dark --color-text: the ink on a dark page */
+}
+
+:root[data-theme='light'] {
+  --zuri-control-radio-ink: #0d0d0d; /* node 0:390 stroke: the design system's ink state */
+}
+
+/* ---------------------------------------------------------------------------
+   Navigation / Mode Tab - open-pencil components 0:104843 (at rest) and
+   0:104839 (the tab in use).
+
+   The node is one row of the sidebar: 220 x 36 on cornerRadius 12 (radius-md).
+   Its icon frame is 16 x 16 at x 12, so the row is inset 12 px; its label starts
+   at x 36, so 8 px of air follows the icon. The label is 14 over 20, weight 400,
+   truncated to one line. At rest the row has no fill and the ink is text-subtle;
+   in use it takes the surface fill and the text tone.
+
+   The sizes are theme-invariant, so they are declared once. Only the three inks
+   invert, because a #6B6B75 label would fade into a dark page.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-mode-tab-width: 220px; /* node 0:104843 width: the sidebar column */
+  --zuri-mode-tab-height: 36px; /* node 0:104843 height */
+  --zuri-mode-tab-radius: 12px; /* node cornerRadius 12, the radius-md variable */
+  --zuri-mode-tab-inset: 12px; /* node icon at x 12: the row's left and right inset */
+  --zuri-mode-tab-icon: 16px; /* node icon frame, 16 x 16 */
+  --zuri-mode-tab-gap: 8px; /* icon ends at 28, the label starts at 36; also the row pitch */
+}
+
+/* The dark collection is the default in this file, so the dark inks are declared
+   with :root and the light values override them, exactly as the rest of the layer. */
+:root,
+:root[data-theme='dark'] {
+  --zuri-mode-tab-ink: #a1a1aa; /* Dark --color-text-subtle: the label and icon at rest */
+  --zuri-mode-tab-active-ink: #ecedee; /* Dark --color-text, bound by node 0:104839 */
+  --zuri-mode-tab-active-fill: #18181b; /* Dark --color-surface, bound by node 0:104839 */
+}
+
+:root[data-theme='light'] {
+  --zuri-mode-tab-ink: #6b6b75; /* Light --color-text-subtle: node 0:104846's resolved ink */
+  --zuri-mode-tab-active-ink: #11181c; /* Light --color-text, node 0:104842's resolved ink */
+  --zuri-mode-tab-active-fill: #ffffff; /* Light --color-surface, node 0:104839's fill */
+}
+/* ---------------------------------------------------------------------------
+   Message / User - the open-pencil component 0:366, drawn as "Msg User"
+   (0:367) with its spec caption (0:372).
+
+   The row is one message the person sent: a 300 x 68 bubble on cornerRadius 18
+   whose text is inset 16 px across and 12 px down, 15 over 22 in ink #0D0D0D.
+   Then 12 px of air and a 44 x 44 avatar on cornerRadius 999, its initials 14
+   over 17 at weight 500 in #5D5D5D. The row measures 656 and the avatar ends on
+   that right edge, so the message hangs on the right margin and the empty
+   measure is on its left: the "right aligned, flat bubble" of the caption.
+
+   The lengths are theme-invariant, so each is declared once. The four colours
+   invert, because #F7F7F7 on a black page glares and #0D0D0D ink would vanish.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-msg-user-width: 656px; /* node 0:367 width: the whole row */
+  --zuri-msg-user-row-height: 68px; /* the row is as tall as the bubble it holds */
+  --zuri-msg-user-bubble-width: 300px; /* node 0:368 width */
+  --zuri-msg-user-bubble-radius: 18px; /* node 0:368 cornerRadius, a flat bubble corner */
+  --zuri-msg-user-bubble-inset-x: 16px; /* text x 16 inside 300: 16 px each side */
+  --zuri-msg-user-bubble-inset-y: 12px; /* text y 12 inside 68: 12 px top and bottom */
+  --zuri-msg-user-avatar: 44px; /* node 0:370 width and height */
+  --zuri-msg-user-avatar-radius: 999px; /* node 0:370 cornerRadius, radius-full */
+  --zuri-msg-user-gap: 12px; /* bubble ends at 600, the avatar starts at 612 */
+  --zuri-msg-user-text-size: 15px; /* node 0:369 fontSize */
+  --zuri-msg-user-text-leading: 22px; /* node 0:369 lineHeight: two lines fill the 44 drawn */
+  --zuri-msg-user-initials-size: 14px; /* node 0:371 fontSize */
+  --zuri-msg-user-initials-leading: 17px; /* node 0:371 lineHeight */
+  --zuri-msg-user-caption-gap: 54px; /* row bottom 68 -> caption top 122 */
+  --zuri-msg-user-caption-size: 12px; /* node 0:372 fontSize */
+  --zuri-msg-user-caption-leading: 15px; /* node 0:372 lineHeight */
+}
+
+/* The dark collection is the default in this file, so the dark colours are
+   declared with :root and the light values override them. */
+:root,
+:root[data-theme='dark'] {
+  --zuri-msg-user-bubble-fill: #27272a; /* Dark --color-surface-secondary: the bubble */
+  --zuri-msg-user-avatar-fill: #3f3f46; /* Dark --color-surface-tertiary: the avatar disc */
+  --zuri-msg-user-ink: #ecedee; /* Dark --color-text: the message */
+  --zuri-msg-user-subtle-ink: #a1a1aa; /* Dark --color-text-subtle: initials and caption */
+}
+
+:root[data-theme='light'] {
+  --zuri-msg-user-bubble-fill: #f7f7f7; /* node 0:368 fill, the drawn bubble grey */
+  --zuri-msg-user-avatar-fill: #e5e5e5; /* node 0:370 fill, the drawn avatar grey */
+  --zuri-msg-user-ink: #0d0d0d; /* node 0:369 fill: the design system's ink */
+  --zuri-msg-user-subtle-ink: #5d5d5d; /* node 0:370 and 0:372 fill: initials and caption */
+}
+
+
+/* ---------------------------------------------------------------------------
+   Navigation / Breadcrumb - open-pencil component 0:208.
+
+   The node is one 40 px row: its parent label sits 12 px down the row, so 8 px
+   of the row is left under the label's 20 px line box; a 14 x 14 chevron comes
+   10 px after the parent (58 -> 68) and the current label starts 8 px after the
+   chevron (82 -> 90). Both labels are 14 over 20, weight 400, one line.
+
+   The sizes are theme-invariant, so they are declared once. Only the two inks
+   invert, because a #6B6B75 trail would vanish on a dark page.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-breadcrumb-height: 40px; /* node 0:208 height */
+  --zuri-breadcrumb-inset: 12px; /* node label at y 12: the row's top inset */
+  --zuri-breadcrumb-foot: 8px; /* 40 - 12 - the label's 20: the row's foot */
+  --zuri-breadcrumb-icon: 14px; /* node 0:210 icon frame, 14 x 14 */
+  --zuri-breadcrumb-icon-drop: 2px; /* chevron at y 14, 2 px below the label's top */
+  --zuri-breadcrumb-gap: 10px; /* parent ends at 58, the chevron starts at 68 */
+  --zuri-breadcrumb-icon-gap: 8px; /* chevron ends at 82, the current label starts at 90 */
+  --zuri-breadcrumb-stroke: 2; /* node 0:211's 1.1667 at 14 px = 2 in a 24 unit box */
+}
+
+/* ---------------------------------------------------------------------------
+   Control / Checkbox On - open-pencil component 0:433.
+
+   The node is the box alone: 20 x 20 on cornerRadius 4, filled #0D0D0D. Its icon
+   frame 0:434 sits at x 4, y 4 and is 13 x 13, and the check inside it is one
+   open path (0:435) stroked #FFFFFF at 1.0833, cap NONE, join MITER:
+   M10.83 3.25 L4.88 9.21 L2.17 6.5 in the icon frame's own coordinates.
+
+   The node's 4 corner is its own value: the radius ramp above starts at
+   radius-sm 8, so this is not one of the named radii.
+
+   Only the two inks invert with the theme: the box takes the page's ink and the
+   check takes the surface tone, because a #0D0D0D box with a #FFFFFF check would
+   disappear into a dark page.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-control-checkbox-size: 20px; /* node 0:433 width and height */
+  --zuri-control-checkbox-radius: 4px; /* node 0:433 cornerRadius 4 */
+  --zuri-control-checkbox-mark-size: 13px; /* icon frame 0:434, 13 x 13 */
+  --zuri-control-checkbox-mark-inset: 4px; /* icon frame 0:434 at x 4, y 4 */
+  --zuri-control-checkbox-mark-stroke: 1.0833px; /* node 0:435 stroke weight, 1.0833 */
+  --zuri-control-checkbox-hit: 44px; /* the finger-sized row around the drawn 20 px box */
+}
+
+/* The dark collection is the default in this file, so the dark inks are declared
+   with :root and the light values override them, exactly as the rest of the layer. */
+:root,
+:root[data-theme='dark'] {
+  --zuri-breadcrumb-ink: #a1a1aa; /* Dark --color-text-subtle: node 0:209's variable */
+  --zuri-breadcrumb-current-ink: #ecedee; /* Dark --color-text: node 0:212's variable */
+}
+
+:root[data-theme='light'] {
+  --zuri-breadcrumb-ink: #6b6b75; /* Light --color-text-subtle: node 0:209's resolved ink */
+  --zuri-breadcrumb-current-ink: #11181c; /* Light --color-text: node 0:212's resolved ink */
+}
+
+/* ---------------------------------------------------------------------------
+   Navigation / Nav Item - the open-pencil component "Navigation / Nav Item"
+   (0:104862), the nav row at rest, and "Navigation / Nav Item Active"
+   (0:104855), the same row holding the page in view. The labels are 0:104866 and
+   0:104861.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-nav-item-height: 44px; /* node 0:104862 height */
+  --zuri-nav-item-radius: 12px; /* node cornerRadius 12, the radius-md variable */
+  --zuri-nav-item-inset: 12px; /* node icon at x 12: the row's left and right inset */
+  --zuri-nav-item-icon: 18px; /* node icon frame, 18 x 18 */
+  --zuri-nav-item-gap: 12px; /* icon ends at 30, the label starts at 42 */
+  --zuri-nav-item-row-gap: 4px; /* the sidebar's rows are 44 tall and 48 apart */
+  --zuri-nav-item-label-size: 14px; /* node 0:104866 fontSize */
+  --zuri-nav-item-label-line: 20px; /* node 0:104866 lineHeight */
+  /* 0:104862 draws no fill at rest: the row sits on whatever surface holds it. */
+  --zuri-nav-item-fill: transparent;
+}
+
+/* The dark collection is the default in this file, so the dark inks are declared
+   with :root and the light values override them, exactly as the rest of the layer. */
+:root,
+:root[data-theme='dark'] {
+  --zuri-nav-item-ink: #a1a1aa; /* Dark --color-text-subtle: node 0:104866's ink */
+  --zuri-nav-item-active-fill: #3f3f46; /* Dark --color-surface-tertiary: node 0:104855's fill */
+  --zuri-nav-item-active-ink: #ecedee; /* Dark --color-text: node 0:104861's ink */
+}
+
+:root[data-theme='light'] {
+  --zuri-nav-item-ink: #6b6b75; /* Light --color-text-subtle, node 0:104866's ink */
+  --zuri-nav-item-active-fill: #e4e4e7; /* Light --color-surface-tertiary, node 0:104855's fill */
+  --zuri-nav-item-active-ink: #11181c; /* Light --color-text, node 0:104861's ink */
+}
+
+:root,
+:root[data-theme='dark'] {
+  --zuri-control-checkbox-fill: #ecedee; /* Dark --color-text: the ink state on a dark page */
+  --zuri-control-checkbox-mark: #18181b; /* Dark --color-surface: the check inside the box */
+}
+
+:root[data-theme='light'] {
+  --zuri-control-checkbox-fill: #0d0d0d; /* node 0:433 fill: the design system's ink state */
+  --zuri-control-checkbox-mark: #ffffff; /* node 0:435 stroke */
+
+/* ----------------------------------------------------- overlay / compact (0:249)
+
+   The open-pencil component "Overlay / Compact": the floating assistant's running
+   strip. One 320 x 68 glass bar on cornerRadius 20 - 12 px of inset, then a 44 px
+   ring holding a 20 x 20 sparkles glyph, the 184 px text block 12 px after it and
+   the 44 px stop button 12 px after that, closing 12 px from the right edge.
+
+   The fill and the stroke are the node's variables, not tones: it binds
+   "glass-surface" (light #FFFFFFB3, dark #18181BCC) and "glass-border" (light
+   #FFFFFF66, dark #FFFFFF1F), the same pair the glass card 0:105 reads, so both are
+   restated here with the collection's own alpha under this component's name.
+
+   Every other colour in the node is a literal, so it is held here as the
+   component's own tone: the ring #F0F0F0, the ink #0D0D0D the title and both
+   glyphs are drawn in, the meta line #5D5D5D, and the stop's #FDE8E8 fill with its
+   #B42318 glyph. The dark collection steps those to surface-secondary, text,
+   text-subtle, danger-soft and danger-soft-foreground, so the bar keeps its shape
+   when the theme swaps instead of freezing on one theme's pixels. */
+:root {
+  --zuri-overlay-compact-width: 320px; /* node 0:249 width */
+  --zuri-overlay-compact-height: 68px; /* node 0:249 height: 12 + 44 + 12 */
+  --zuri-overlay-compact-radius: 20px; /* node 0:249 cornerRadius, bound radius-xl (tokens.json radius-xl 20) */
+  --zuri-overlay-compact-inset: 12px; /* the ring and the stop both sit at x 12 and y 12 */
+  --zuri-overlay-compact-gap: 12px; /* ring ends at 56, text starts at 68, stop at 264 */
+  --zuri-overlay-compact-avatar: 44px; /* node 0:250, 44 x 44 */
+  --zuri-overlay-compact-avatar-radius: 999px; /* node 0:250 cornerRadius 999, the pill */
+  --zuri-overlay-compact-avatar-glyph: 20px; /* node 0:251 glyph frame, 20 x 20, 12 px inside the 44 ring */
+  --zuri-overlay-compact-avatar-glyph-stroke: 1.6667px; /* node 0:251 stroke weight, 1.6667 */
+  --zuri-overlay-compact-text-gap: 2px; /* 0:255 is 17 tall at y 0 and 0:256 starts at y 19 */
+  --zuri-overlay-compact-title-size: 14px; /* node 0:255 fontSize */
+  --zuri-overlay-compact-title-line: 17px; /* node 0:255 lineHeight */
+  --zuri-overlay-compact-subtitle-size: 12px; /* node 0:256 fontSize */
+  --zuri-overlay-compact-subtitle-line: 15px; /* node 0:256 lineHeight */
+  --zuri-overlay-compact-stop: 44px; /* node 0:257, 44 x 44 */
+  --zuri-overlay-compact-stop-radius: 12px; /* node 0:257 cornerRadius, bound radius-md (tokens.json radius-md 12) */
+  --zuri-overlay-compact-stop-glyph: 16px; /* node 0:258 glyph frame, 16 x 16, 14 px inside the 44 button */
+  --zuri-overlay-compact-stop-glyph-stroke: 1.3333px; /* node 0:258 stroke weight, 1.3333 */
+}
+
+:root,
+:root[data-theme="dark"] {
+  --zuri-overlay-compact-surface: rgba(24, 24, 27, 0.8); /* Dark glass-surface, #18181BCC: the node's fill variable */
+  --zuri-overlay-compact-border: rgba(255, 255, 255, 0.1216); /* Dark glass-border, #FFFFFF1F: its 1 px inside stroke */
+  --zuri-overlay-compact-avatar-fill: #27272a; /* Dark --color-surface-secondary: the ring behind the glyph */
+  --zuri-overlay-compact-ink: #ecedee; /* Dark --color-text: the title and the ring's glyph */
+  --zuri-overlay-compact-subtitle-ink: #a1a1aa; /* Dark --color-text-subtle: the meta line */
+  --zuri-overlay-compact-stop-fill: #310413; /* Dark --color-danger-soft: the stop button reads as a stop in either theme */
+  --zuri-overlay-compact-stop-ink: #ff8fb0; /* Dark --color-danger-soft-foreground: its glyph */
+}
+
+:root[data-theme="light"] {
+  --zuri-overlay-compact-surface: rgba(255, 255, 255, 0.702); /* Light glass-surface, #FFFFFFB3: the node's fill variable */
+  --zuri-overlay-compact-border: rgba(255, 255, 255, 0.4); /* Light glass-border, #FFFFFF66: its 1 px inside stroke */
+  --zuri-overlay-compact-avatar-fill: #f0f0f0; /* node 0:250 fill, the node's own tone */
+  --zuri-overlay-compact-ink: #0d0d0d; /* nodes 0:255 and 0:251: the design system's ink */
+  --zuri-overlay-compact-subtitle-ink: #5d5d5d; /* node 0:256 fill, the node's own tone */
+  --zuri-overlay-compact-stop-fill: #fde8e8; /* node 0:257 fill, the node's own tone */
+  --zuri-overlay-compact-stop-ink: #b42318; /* node 0:259 glyph stroke, the node's own tone */
+}
+}
+
+/* -------------------------------------------------------------------------
+   Navigation / Sidebar - open-pencil component 0:129 on the Design System
+   page: the whole 260 x 560 column that holds the brand row, the mode
+   switcher, the four destinations and the account row.
+
+     panel          260 x 560, cornerRadius 20, surface-secondary
+     inset          16: the brand row, the switcher, the nav section and the
+                    account row all start at x 16 and end at 244
+     block gap      24: the brand row ends at 60 and the switcher opens at 84,
+                    the switcher ends at 208 and the section opens at 232, the
+                    section ends at 439 and the account row opens at 463
+     brand row      44 tall: a 44 x 44 mark on cornerRadius 12, the text column
+                    at x 56, the collapse glyph 18 x 18 flush to x 210..228
+     mode switcher  228 x 124 on cornerRadius 14 and surface-tertiary, 4 of
+                    padding and 4 between three 36 px rows (36 / 40 pitch)
+     nav section    228 x 207: an 11 / 16 label, 3 px, then four 44 px rows on
+                    the shared 4 px row gap (16 + 3 + 4 x 44 + 3 x 4 = 207)
+     account row    228 x 56 on cornerRadius 14 and surface-raised: a 32 px
+                    avatar at x 12, the text column at x 56, a 14 / 20 name
+                    over a 13 / 20 line, the settings glyph at x 198
+
+   The 20 and the 14 are the design's own radius-xl and radius-lg values as
+   tokens.json carries them, which differ from the heroUI ramp this layer uses
+   for the rest of the app (--zuri-radius-xl is 16, --zuri-radius-lg is 12), so
+   they are written here instead of borrowed.
+
+   Every number below is read by styles/nav-sidebar.css, so a change in the
+   node is one edit in this block and no rule there moves.
+   ------------------------------------------------------------------------- */
+
+:root[data-theme='dark'] .nav-sidebar-page {
+  --zuri-nav-sidebar-fill: #27272a; /* Dark --color-surface-secondary: the node's panel fill */
+  --zuri-nav-sidebar-modes-fill: #3f3f46; /* Dark --color-surface-tertiary: the switcher's trough */
+  --zuri-nav-sidebar-user-fill: #17171a; /* Dark --color-surface-raised: the account row */
+  --zuri-nav-sidebar-avatar-fill: #3f3f46; /* Dark --color-surface-tertiary: the node's avatar disc */
+  --zuri-nav-sidebar-ink: #ecedee; /* Dark --color-text: the name and the row in use */
+  --zuri-nav-sidebar-subtle: #a1a1aa; /* Dark --color-text-subtle: the sub line and the label */
+}
+
+:root[data-theme='light'] .nav-sidebar-page {
+  --zuri-nav-sidebar-fill: #f4f4f5; /* Light --color-surface-secondary: the node's panel fill */
+  --zuri-nav-sidebar-modes-fill: #e4e4e7; /* Light --color-surface-tertiary: the switcher's trough */
+  --zuri-nav-sidebar-user-fill: #ffffff; /* Light --color-surface-raised: the account row */
+  --zuri-nav-sidebar-avatar-fill: #e4e4e7; /* Light --color-surface-tertiary: the node's avatar disc */
+  --zuri-nav-sidebar-ink: #11181c; /* Light --color-text: the name and the row in use */
+  --zuri-nav-sidebar-subtle: #6b6b75; /* Light --color-text-subtle: the sub line and the label */
+}
+
+.nav-sidebar-page {
+  --zuri-nav-sidebar-width: 260px; /* node 0:129 width */
+  --zuri-nav-sidebar-height: 560px; /* node 0:129 height */
+  --zuri-nav-sidebar-content: 228px; /* the node's children: 260 - 2 x 16 */
+  --zuri-nav-sidebar-radius: 20px; /* node cornerRadius, bound radius-xl (tokens.json 20) */
+  --zuri-nav-sidebar-inset: 16px; /* node children at x 16 */
+  --zuri-nav-sidebar-block-gap: 24px; /* 84 - 60 and 232 - 208 and 463 - 439 */
+  --zuri-nav-sidebar-brand-height: 44px; /* node 0:130 height */
+  --zuri-nav-sidebar-mark: 44px; /* node 0:131, 44 x 44 */
+  --zuri-nav-sidebar-mark-radius: 12px; /* node 0:131 cornerRadius, bound radius-md */
+  --zuri-nav-sidebar-mark-icon: 18px; /* node 0:132 at (13, 13), so 13 + 18 + 13 = 44 */
+  --zuri-nav-sidebar-brand-gap: 12px; /* the mark ends at 44, the text starts at 56 */
+  --zuri-nav-sidebar-name-size: 16px; /* node 0:136 fontSize */
+  --zuri-nav-sidebar-name-line: 24px; /* node 0:136 lineHeight */
+  --zuri-nav-sidebar-sub-size: 13px; /* node 0:137 and 0:184 fontSize */
+  --zuri-nav-sidebar-sub-line: 20px; /* node 0:137 and 0:184 lineHeight */
+  --zuri-nav-sidebar-glyph: 18px; /* the brand, collapse and settings frames, 18 x 18 */
+  --zuri-nav-sidebar-glyph-stroke: 1.5; /* every one of those glyph paths */
+  --zuri-nav-sidebar-modes-height: 124px; /* node 0:141 height */
+  --zuri-nav-sidebar-modes-radius: 14px; /* node 0:141 cornerRadius, bound radius-lg */
+  --zuri-nav-sidebar-modes-padding: 4px; /* the rows sit at y 4 inside the trough */
+  --zuri-nav-sidebar-modes-gap: 4px; /* rows at y 4, 44 and 84: 36 tall, 40 pitch */
+  --zuri-nav-sidebar-label-size: 11px; /* node 0:157 fontSize */
+  --zuri-nav-sidebar-label-line: 16px; /* node 0:157 lineHeight */
+  --zuri-nav-sidebar-label-tracking: 0.66px; /* node 0:157 letterSpacing */
+  --zuri-nav-sidebar-label-gap: 3px; /* the 16 px line leaves 3 of the label's 19 to the rows */
+  --zuri-nav-sidebar-section-height: 207px; /* node 0:156 height */
+  --zuri-nav-sidebar-user-height: 56px; /* node 0:180 height */
+  --zuri-nav-sidebar-user-radius: 14px; /* node 0:180 cornerRadius, bound radius-lg */
+  --zuri-nav-sidebar-user-inset: 12px; /* avatar at x 12, settings glyph ending at 216 */
+  --zuri-nav-sidebar-avatar: 32px; /* node 0:181, 32 x 32 */
+  --zuri-nav-sidebar-user-gap: 12px; /* avatar ends at 44, text starts at 56, glyph at 198 */
+  --zuri-nav-sidebar-user-name-size: 14px; /* node 0:183 fontSize */
+  --zuri-nav-sidebar-user-name-line: 20px; /* node 0:183 lineHeight */
+}
+
+/* ---------------------------------------------------------------------------
+   Navigation / Tab Row - the open-pencil component 0:200.
+
+   The row that splits one surface into a few lists: 1052 x 44 on cornerRadius
+   14, holding three 98 px tabs 24 px apart, and the tab in use carrying a 2 px
+   primary rule under its label that runs 4 px past the label on each side.
+
+   The node binds radius-lg, which this file's --zuri-radius-lg spells 12, so the
+   design's 14 is written here rather than borrowed. Every number below is read
+   by .tab-row in styles/components.css, so a change in the node is one edit here
+   and no rule moves.
+   ------------------------------------------------------------------------- */
+
+:root[data-theme='dark'] .tab-row {
+  --zuri-tab-row-fill: #18181b; /* Dark --color-surface: the node's own fill */
+  --zuri-tab-row-ink: #a1a1aa; /* Dark --color-text-subtle: the tabs at rest */
+  --zuri-tab-row-active-ink: #ecedee; /* Dark --color-text: the tab in use */
+  --zuri-tab-row-rule-ink: #006fee; /* Dark --color-primary: the rule under it */
+}
+
+:root[data-theme='light'] .tab-row {
+  --zuri-tab-row-fill: #ffffff; /* Light --color-surface: the node's own fill */
+  --zuri-tab-row-ink: #6b6b75; /* Light --color-text-subtle: the tabs at rest */
+  --zuri-tab-row-active-ink: #11181c; /* Light --color-text: the tab in use */
+  --zuri-tab-row-rule-ink: #006fee; /* Light --color-primary: the rule under it */
+}
+
+.tab-row {
+  --zuri-tab-row-width: 1052px; /* node 0:200 width */
+  --zuri-tab-row-height: 44px; /* node 0:200 height, which is also each tab frame's */
+  --zuri-tab-row-radius: 14px; /* node cornerRadius, bound radius-lg (tokens.json 14) */
+  --zuri-tab-row-gap: 24px; /* tabs at x 0, 122 and 244: 98 wide plus 24 of air */
+  --zuri-tab-row-tab-width: 98px; /* each tab frame's width */
+  --zuri-tab-row-label-top: 14px; /* the label's line box starts at y 14 */
+  --zuri-tab-row-rule: 2px; /* 0:203 Tab Indicator height */
+  --zuri-tab-row-rule-bleed: 4px; /* 59 = the label's 51 plus 4 on each side */
+  /* The row paints on the light collection before a theme attribute lands. */
+  --zuri-tab-row-fill: #ffffff; /* Light --color-surface, so the row paints before a theme lands */
+  --zuri-tab-row-ink: #6b6b75; /* Light --color-text-subtle, the same fallback */
+  --zuri-tab-row-active-ink: #11181c; /* Light --color-text, the same fallback */
+  --zuri-tab-row-rule-ink: #006fee; /* Light --color-primary, the same fallback */
+}
+
+/* ---------------------------------------------------------------------------
+   Menu / Item - the open-pencil component "Menu / Item" (0:396), drawn inside
+   its row 0:395 and the menu surface 0:394 that holds three of them.
+
+   0:396 is the glyph alone: a 15 x 15 frame whose path 0:397 is stroked 1.25
+   with cap NONE and join MITER. The row around it is 0:395: 432 x 32 on
+   cornerRadius 8, filled #F7F7F7 where the pointer is on it and left unfilled at
+   rest (0:399, 0:404), the glyph frame at (10, 8) and the label 0:398 at (35, 8),
+   385 x 16, Inter 13 over 16 at weight 400, in the same ink as the glyph.
+   35 - (10 + 15) is the 10 px gap; 432 - (35 + 385) is the 12 px the label leaves
+   on the right.
+
+   The surface 0:394 is the menu those rows sit in: 432 x 108 on cornerRadius 12,
+   filled #FFFFFF, with a 0 / 2 / 8 shadow of #0F1729 at 8%, holding the rows 4 px
+   in from the sides and 6 px from the top and the foot.
+
+   Only the fills and the inks change with the theme. #F7F7F7 on a #18181B surface
+   would be a bright bar and the #0D0D0D ink would vanish, so Dark takes the
+   surface steps and keeps the same three inks in the same order: resting,
+   current, destructive.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-menu-item-height: 32px; /* row 0:395 height */
+  --zuri-menu-item-radius: 8px; /* row 0:395 cornerRadius 8 */
+  --zuri-menu-item-inset: 10px; /* glyph frame 0:396 sits at x 10 */
+  --zuri-menu-item-icon: 15px; /* glyph frame 0:396, 15 x 15 */
+  --zuri-menu-item-stroke: 1.25px; /* path 0:397 stroke weight */
+  --zuri-menu-item-gap: 10px; /* the glyph ends at 25 and label 0:398 starts at 35 */
+  --zuri-menu-item-label-inset-end: 12px; /* 432 - (35 + 385) */
+  --zuri-menu-item-label-size: 13px; /* node 0:398 fontSize */
+  --zuri-menu-item-label-line: 16px; /* node 0:398 lineHeight */
+  --zuri-menu-item-font: var(--zuri-font-family); /* the node's Inter is the app family */
+  --zuri-menu-item-hit: 44px; /* the finger target the drawn 32 px row is centred in */
+  --zuri-menu-item-surface-width: 432px; /* surface 0:394 width */
+  --zuri-menu-item-surface-radius: 12px; /* surface 0:394 cornerRadius 12 */
+  --zuri-menu-item-surface-inset: 4px; /* rows 0:395 at x 4 inside the surface */
+  --zuri-menu-item-surface-padding: 6px; /* row 0:395 at y 6, the last row ends 6 up */
+  --zuri-menu-item-surface-shadow: 0 2px 8px rgba(15, 23, 41, 0.08); /* 0:394's drop shadow */
+}
+
+/* The dark collection is the default in this file, so the dark values are declared
+   with :root and the light ones override them, exactly as the rest of the layer. */
+:root,
+:root[data-theme='dark'] {
+  --zuri-menu-item-surface-fill: #17171a; /* Dark --color-surface-raised */
+  --zuri-menu-item-current-fill: #27272a; /* Dark --color-surface-secondary */
+  --zuri-menu-item-current-ink: #ecedee; /* Dark --color-text */
+  --zuri-menu-item-ink: #a1a1aa; /* Dark --color-text-subtle */
+  --zuri-menu-item-danger-ink: #ff8fb0; /* Dark --color-danger-soft-foreground */
+}
+
+:root[data-theme='light'] {
+  --zuri-menu-item-surface-fill: #ffffff; /* surface 0:394 fill */
+  --zuri-menu-item-current-fill: #f7f7f7; /* row 0:395 fill */
+  --zuri-menu-item-current-ink: #0d0d0d; /* label 0:398 ink, path 0:397 stroke */
+  --zuri-menu-item-ink: #5d5d5d; /* label 0:403 ink, path 0:401 / 0:402 stroke */
+  --zuri-menu-item-danger-ink: #e02e2e; /* label 0:407 ink, path 0:406 stroke */
+}
+
+/* ------------------------------------------------------- toast / success (0:425)
+
+   The node binds no variable: its surface is a literal #0D0D0D, its check stroke
+   #10A37F, its message white and its close stroke a 60% white. Those four are
+   held here as the component's own tokens, because no ramp step is any of them
+   (surface is #FFFFFF light and #18181B dark, and success is #17C964, a different
+   green). Their home follows this layer's own rule: the node's values on :root so
+   a page that has not read its theme yet still gets the drawing, and the dark
+   collection as :root[data-theme="dark"], where the surface steps to
+   surface-secondary and the ink to text so the strip stands off the #000000 dark
+   canvas instead of vanishing into it. */
+:root,
+:root[data-theme="dark"] {
+  --zuri-toast-success-surface: #27272A; /* dark color-surface-secondary: a step above the #000000 canvas */
+  --zuri-toast-success-mark: #17C964; /* tokens.json Dark --color-success: the same tick on a dark surface */
+  --zuri-toast-success-text: #ECEDEE; /* tokens.json Dark --color-text */
+  --zuri-toast-success-close: #A1A1AA; /* tokens.json Dark --color-text-subtle */
+}
+
+:root[data-theme="light"] {
+  --zuri-toast-success-surface: #0D0D0D; /* design node 0:425 fill, the node's own tone */
+  --zuri-toast-success-mark: #10A37F; /* design node 0:427 stroke, the node's own green */
+  --zuri-toast-success-text: #FFFFFF; /* design node 0:428 fill, the node's message */
+  --zuri-toast-success-close: rgba(255, 255, 255, 0.6); /* design node 0:430 stroke, 60% white */
+}
+
+/* ---------------------------------------------------------------------------
+   Control / Switch On - open-pencil component 0:386.
+
+   The node is the switch and its label: a 44 x 24 trough on cornerRadius 999
+   (the variable "radius-full") filled with the design's ink #0D0D0D, a 20 x 20
+   white knob inset 2 px, and the label 12 px after the trough at 14 over 17,
+   weight 400. At rest the knob sits at the leading edge; the on state the node
+   draws has it against the trailing edge, so the knob's run is
+   44 - 2 - 2 - 20 = 20 px.
+
+   The sizes are theme-invariant, so they are declared once. The trough and the
+   knob are not: a #0D0D0D trough would vanish into a dark page, so the ink
+   inverts to the text tone there (as the radio ring does) and the knob turns
+   dark to stay legible against it.
+
+   The node draws the on state only. The off trough is the design's own
+   --color-default step, declared here so the two states read as one control
+   instead of being invented in the page.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --zuri-control-switch-width: 44px; /* node 0:386 trough width */
+  --zuri-control-switch-height: 24px; /* node 0:386 trough height */
+  --zuri-control-switch-pad: 2px; /* the knob's inset inside the trough */
+  --zuri-control-switch-knob: 20px; /* node 0:386 knob, 20 x 20 */
+  --zuri-control-switch-travel: 20px; /* 44 - 2 - 2 - 20, the knob's rest-to-on run */
+  --zuri-control-switch-radius: 999px; /* node 0:386 cornerRadius, radius-full */
+  --zuri-control-switch-gap: 12px; /* the trough ends at 44, the label starts at 56 */
+  --zuri-control-switch-label-size: 14px; /* the node's 14 px label */
+  --zuri-control-switch-label-leading: 17px; /* the node's 17 px line, not the ramp's 20 */
+  --zuri-control-switch-hit: 44px; /* the finger-sized row around the drawn 24 px trough */
+}
+
+/* The dark collection is the default in this file, so the dark inks are declared
+   with :root and the light values override them, exactly as the rest of the layer. */
+:root,
+:root[data-theme='dark'] {
+  --zuri-control-switch-trough: #ecedee; /* Dark --color-text: the ink on a dark page */
+  --zuri-control-switch-trough-off: #3f3f46; /* Dark --color-default: the resting trough */
+  --zuri-control-switch-knob-fill: #18181b; /* Dark --color-surface: the knob on the light trough */
+  --zuri-control-switch-knob-off: #ecedee; /* Dark --color-text: the knob on the resting trough */
+  --zuri-control-switch-ink: #ecedee; /* Dark --color-text: the label */
+}
+
+:root[data-theme='light'] {
+  --zuri-control-switch-trough: #0d0d0d; /* node 0:386 fill: the design system's ink state */
+  --zuri-control-switch-trough-off: #d4d4d8; /* Light --color-default: the resting trough */
+  --zuri-control-switch-knob-fill: #ffffff; /* the node's white knob on the ink trough */
+  --zuri-control-switch-knob-off: #ffffff; /* Light --color-surface: the knob on the resting trough */
+  --zuri-control-switch-ink: #0d0d0d; /* the node's label ink */
 }

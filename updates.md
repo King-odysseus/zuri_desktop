@@ -4,3 +4,10 @@
 - Key files: `src/renderer/ui/composer.js`, `src/renderer/styles/components.css`, `scripts/selftest.js`.
 - Other OS action: no build required; run `npm test` after syncing.
 - Done on: Windows
+
+## 2026-10-23 - Windows
+
+- Simplified the composer into a single expanding rounded field, moved mode selection behind one dropdown trigger, and added a navy composer surface for dark mode.
+- Key files: `src/renderer/styles/components.css`, `src/renderer/styles/tokens.css`.
+- Other OS action: no build required; run `npm test` after syncing.
+- Done on: Windows
