@@ -102,6 +102,7 @@ app.setName('Zuri');
 
 /** The id Windows groups this app's taskbar buttons under. */
 const APP_USER_MODEL_ID = 'com.zuri.desktop';
+if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
 
 /**
  * Give the app a taskbar identity that carries the Zuri mark.
@@ -109,14 +110,13 @@ const APP_USER_MODEL_ID = 'com.zuri.desktop';
  * Windows draws a grouped taskbar button from the Start Menu shortcut registered
  * for the window's AppUserModelID, not from the window's own icon. Running from
  * source there is no such shortcut, so the id resolves to nothing and Windows
- * falls back to electron.exe: the atom stays on the taskbar no matter what the
- * window draws. Writing the shortcut once fixes that, and a packaged build already
- * has its own, which the existence check respects.
+ * falls back to electron.exe: the Electron atom stays on the taskbar no matter what
+ * the window draws. Refreshing the shortcut also repairs installs created before
+ * the Zuri icon was configured.
  * @returns {void}
  */
 function adoptTaskbarIdentity() {
   if (process.platform !== 'win32') return;
-  app.setAppUserModelId(APP_USER_MODEL_ID);
   if (app.isPackaged) return;
 
   // The shortcut must point at the app, so it is only written when this process
@@ -126,9 +126,9 @@ function adoptTaskbarIdentity() {
   if (path.resolve(app.getAppPath()) !== path.resolve(appRoot)) return;
 
   const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Zuri.lnk');
-  if (existsSync(link)) return;
   try {
-    const written = shell.writeShortcutLink(link, 'create', {
+    const operation = existsSync(link) ? 'update' : 'create';
+    const written = shell.writeShortcutLink(link, operation, {
       target: process.execPath,
       args: `"${appRoot}"`,
       icon: ICO_ENTRY,

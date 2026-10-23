@@ -1,5 +1,12 @@
 ## 2026-10-24 - Windows
 
+- Fixed the Windows taskbar identity so the app sets its AUMID before launch and refreshes stale development shortcuts with the Zuri ICO instead of leaving Electron's icon cached.
+- Key files: `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run build` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Connected the composer attachment button to the native file picker, added supported-format guidance and a removable attachment chip, and included readable attachment text in the chat request.
 - Key files: `src/renderer-react/ChatPanel.jsx`.
 - Other OS action: run `npm install && npm run react:build` after syncing.

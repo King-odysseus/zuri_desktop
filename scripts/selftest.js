@@ -35,6 +35,20 @@ check('the app package points at the React main process', () => {
   return packageJson.main;
 });
 
+check('the Windows app identity uses the Zuri icon', () => {
+  const source = read('src/main/main.js');
+  if (!exists('src/main/assets/zuri-icon.ico') || !exists('src/main/assets/zuri-icon.png')) {
+    throw new Error('Zuri icon assets are missing');
+  }
+  for (const required of ["app.setAppUserModelId(APP_USER_MODEL_ID)", "icon: process.platform === 'win32' ? ICO_ENTRY : ICON_ENTRY", "shell.writeShortcutLink"]) {
+    if (!source.includes(required)) throw new Error(`missing ${required}`);
+  }
+  if (packageJson.build?.win?.icon !== 'src/main/assets/zuri-icon.ico') {
+    throw new Error('Windows packaging does not use zuri-icon.ico');
+  }
+  return 'Zuri icon assets and taskbar identity are configured';
+});
+
 check('main loads the React entry without a legacy fallback', () => {
   const source = read('src/main/main.js');
   if (!source.includes("path.join(moduleDir, '..', '..', 'dist-react', 'index.html')")) {
