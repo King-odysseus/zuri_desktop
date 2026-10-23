@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@heroui/react';
 import { ArrowUpIcon, MicIcon, PlusIcon } from './Icons.jsx';
+import FormattedMessage from './FormattedMessage.jsx';
 import SelectField from './SelectField.jsx';
 
 const MODES = ['Ask', 'Act', 'Autopilot'].map((name) => ({ value: name, label: name }));
@@ -133,7 +134,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center px-4 pb-10 sm:px-6 sm:pb-24">
         {!hasConversation && (
           <h1 className="mb-6 text-center text-3xl font-medium tracking-tight">
-            {workspaceMode === 'work' ? 'What should we work on?' : 'What&rsquo;s on the agenda today?'}
+            {workspaceMode === 'work' ? 'What should we work on?' : "What's on the agenda today?"}
           </h1>
         )}
 
@@ -141,10 +142,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           <div className="mb-4 flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4">
             {messages.map((message, index) => (
               <div key={messageKey(message, index)} className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${message.role === 'user' ? 'self-end bg-accent text-accent-foreground' : 'self-start bg-surface-secondary text-foreground'}`}>
-                {message.content}
+                {message.role === 'user' ? message.content : <FormattedMessage content={message.content} />}
               </div>
             ))}
-            {streamingText !== '' && <div className="max-w-[85%] self-start rounded-2xl bg-surface-secondary px-4 py-3 text-sm">{streamingText}</div>}
+            {streamingText !== '' && <div className="max-w-[85%] self-start rounded-2xl bg-surface-secondary px-4 py-3 text-sm"><FormattedMessage content={streamingText} /></div>}
             {replying && streamingText === '' && <p className="self-start text-sm text-muted">Zuri is thinking...</p>}
           </div>
         )}
@@ -181,12 +182,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             <input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder={workspaceMode === 'work' ? 'Work with Zuri' : 'Ask Zuri'}
+              placeholder="Ask Zuri"
               aria-label="Message Zuri"
               className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted"
               disabled={replying}
             />
-            <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel className="min-w-0 w-28 shrink-0" />
+            <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact className="w-24 shrink-0" />
             <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Dictate">
               <MicIcon />
             </Button>

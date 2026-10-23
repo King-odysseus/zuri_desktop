@@ -6,11 +6,11 @@ function optionKey(value) {
   return value === '' ? EMPTY_KEY : value;
 }
 
-export default function SelectField({ label, value, options, onChange, hideLabel = false, className = '' }) {
+export default function SelectField({ label, value, options, onChange, hideLabel = false, compact = false, className = '' }) {
   const selectedKey = optionKey(String(value ?? ''));
 
   return (
-    <div className={`flex min-w-44 flex-col gap-1 text-sm font-medium ${className}`}>
+    <div className={`flex ${compact ? 'min-w-0' : 'min-w-44'} flex-col gap-1 text-sm font-medium ${className}`}>
       {!hideLabel && <span>{label}</span>}
       <Select
         aria-label={label}
@@ -18,7 +18,9 @@ export default function SelectField({ label, value, options, onChange, hideLabel
         onSelectionChange={(key) => onChange(String(key) === EMPTY_KEY ? '' : String(key))}
         fullWidth
       >
-        <Select.Trigger className="h-10 justify-between rounded-medium border border-border bg-surface-secondary px-3 font-normal text-foreground">
+        <Select.Trigger className={compact
+          ? 'h-10 justify-between rounded-full border-0 bg-transparent px-2 font-normal text-foreground shadow-none'
+          : 'h-10 justify-between rounded-medium border border-border bg-surface-secondary px-3 font-normal text-foreground'}>
           <Select.Value />
           <Select.Indicator />
         </Select.Trigger>
