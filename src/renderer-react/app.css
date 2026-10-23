@@ -143,6 +143,19 @@ body {
   color: var(--selected-foreground) !important;
 }
 
+/* New chat is an action, not a selected destination, so its hover state needs
+   its own lift without competing with the persistent selected-pill treatment. */
+.zuri-new-chat {
+  transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.zuri-new-chat:hover,
+.zuri-new-chat:focus-visible {
+  background: color-mix(in srgb, var(--selected) 62%, var(--surface-secondary)) !important;
+  color: var(--selected-foreground) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 28%, transparent) !important;
+}
+
 .zuri-dropdown-trigger {
   background: var(--field-background) !important;
   box-shadow: 0 3px 10px color-mix(in srgb, var(--foreground) 8%, transparent);

@@ -123,7 +123,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           <Button
             variant="ghost"
             fullWidth
-            className="justify-start gap-2 font-normal"
+            className="zuri-new-chat min-h-11 justify-start gap-2 rounded-xl px-3 font-normal"
             onPress={onNewChat}
           >
             <EditIcon size={16} />
