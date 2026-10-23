@@ -313,6 +313,9 @@ body {
 }
 
 .zuri-dropdown-menu {
+  /* Suggestions render after the composer in the document, so the open menu
+     needs an explicit stacking level or its lower options disappear behind them. */
+  z-index: 50 !important;
   width: max-content !important;
   min-width: 8rem !important;
   max-width: min(18rem, calc(100vw - 2rem));

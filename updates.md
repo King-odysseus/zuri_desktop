@@ -269,3 +269,10 @@
 - Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`, `src/renderer-react/SelectField.jsx`, `src/renderer-react/RemindersView.jsx`.
 - Other OS action: run `npm run react:build` after syncing.
 - Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Raised the shared Flowbite dropdown menu above the chat suggestions so all mode options remain visible when the menu is open.
+- Key files: `src/renderer-react/app.css`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows
