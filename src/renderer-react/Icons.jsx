@@ -12,6 +12,8 @@ export {
   Sun as SunIcon,
   Moon as MoonIcon,
   Pencil as EditIcon,
+  History as HistoryIcon,
+  Trash2 as DeleteIcon,
   Plus as PlusIcon,
   Mic as MicIcon,
   ArrowUp as ArrowUpIcon,

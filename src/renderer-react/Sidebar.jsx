@@ -7,6 +7,7 @@ import {
   ChatIcon,
   ChevronDownIcon,
   EditIcon,
+  HistoryIcon,
   FolderIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
@@ -68,7 +69,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             isIconOnly
             size="sm"
             variant="ghost"
-            className={current === key ? 'zuri-selected-pill' : 'text-muted'}
+            className={current === key || (key === 'chats' && current === 'history') ? 'zuri-selected-pill' : 'text-muted'}
             aria-label={label}
             title={label}
             aria-current={current === key ? 'page' : undefined}
@@ -131,7 +132,20 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           </Button>
         </div>
 
-        <p className="px-5 pb-2 pt-6 text-xs font-medium uppercase tracking-wide text-muted">Recents</p>
+        <div className="flex items-center justify-between px-5 pb-2 pt-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Recents</p>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 rounded-lg text-muted"
+            aria-label="Open chat history"
+            title="Chat history"
+            onPress={() => onNavigate('history')}
+          >
+            <HistoryIcon size={16} />
+          </Button>
+        </div>
         <div className="flex-1 overflow-y-auto px-3 text-sm text-muted">
           {threads.length === 0 && <p className="px-2">No conversations yet. Your threads will appear here, newest first.</p>}
           {threads.map((thread) => (

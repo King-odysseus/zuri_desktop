@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Added a dedicated Chat history view with continue and confirmed permanent delete actions for every saved conversation.
+- Key files: `src/renderer-react/HistoryView.jsx`, `src/renderer-react/App.jsx`, `src/renderer-react/Sidebar.jsx`, `src/main/preload.js`, `src/main/main.js`, `src/main/store.js`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Increased Settings input and dropdown heights and replaced nearly invisible hairlines with clearer theme-aware borders and focus rings.
 - Key files: `src/renderer-react/app.css`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.

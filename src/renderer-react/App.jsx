@@ -8,6 +8,7 @@ import SettingsView from './SettingsView.jsx';
 import TasksView from './TasksView.jsx';
 import RemindersView from './RemindersView.jsx';
 import SearchView from './SearchView.jsx';
+import HistoryView from './HistoryView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const [route, setRoute] = useState('chats');
@@ -67,6 +68,7 @@ export default function App() {
       {route === 'tasks' && <TasksView />}
       {route === 'reminders' && <RemindersView />}
       {route === 'search' && <SearchView />}
+      {route === 'history' && <HistoryView onSelectThread={openThread} />}
     </div>
   );
 }

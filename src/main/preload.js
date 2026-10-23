@@ -28,6 +28,7 @@ const CHANNELS = Object.freeze([
   'zuri:app:channels',
   'zuri:chats:list',
   'zuri:chats:create',
+  'zuri:chats:delete',
   'zuri:chats:append-message',
   'zuri:chat:send',
   'zuri:chat:stop',

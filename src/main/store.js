@@ -679,6 +679,32 @@ export async function createThread(input = {}, options = {}) {
 }
 
 /**
+ * Permanently remove one chat thread and its inline messages.
+ * @param {string} threadId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { id: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function deleteThread(threadId, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'deleting a chat needs a thread id');
+  }
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const index = read.data.findIndex((entry) => entry?.id === threadId);
+    if (index === -1) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+
+    read.data.splice(index, 1);
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { id: threadId } };
+  });
+}
+
+/**
  * The modes a turn can be sent in. Kept here as well as in the renderer because a
  * stored turn keeps the mode it was sent in, and an unknown one is dropped rather
  * than written into chats.json.

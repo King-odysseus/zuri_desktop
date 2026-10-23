@@ -34,6 +34,7 @@ import {
   createReminder,
   createTask,
   createThread,
+  deleteThread,
   deleteAutomation,
   deleteTask,
   getStoreRoot,
@@ -204,6 +205,7 @@ const HANDLERS = new Map([
   ['zuri:app:channels', handleChannelList],
   ['zuri:chats:list', handleChatList],
   ['zuri:chats:create', handleChatCreate],
+  ['zuri:chats:delete', handleChatDelete],
   ['zuri:chats:append-message', handleChatAppendMessage],
   ['zuri:chat:send', handleChatSend],
   ['zuri:chat:stop', handleChatStop],
@@ -320,6 +322,18 @@ function handleChatList() {
  */
 function handleChatCreate(payload) {
   return createThread({ title: payload?.title });
+}
+
+/**
+ * Permanently remove one stored thread. The renderer must send the id explicitly
+ * so an accidental empty action can never delete the first history row.
+ * @param {{ threadId?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleChatDelete(payload) {
+  const result = await deleteThread(payload?.threadId);
+  if (result?.ok === true) announceState({ area: 'chats' });
+  return result;
 }
 
 /**
