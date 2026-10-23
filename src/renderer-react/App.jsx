@@ -11,6 +11,9 @@ import SearchView from './SearchView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const [route, setRoute] = useState('chats');
+  const [chatSessionKey, setChatSessionKey] = useState(0);
+  const [activeThreadId, setActiveThreadId] = useState('');
+  const [chatRefreshKey, setChatRefreshKey] = useState(0);
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 
   useEffect(() => {
@@ -33,10 +36,26 @@ export default function App() {
     void window.zuri?.settings?.save?.({ theme: next });
   }
 
+  function startNewChat() {
+    setRoute('chats');
+    setActiveThreadId('');
+    setChatSessionKey((key) => key + 1);
+  }
+
+  function openThread(threadId) {
+    setRoute('chats');
+    setActiveThreadId(threadId);
+    setChatSessionKey((key) => key + 1);
+  }
+
+  function refreshChats() {
+    setChatRefreshKey((key) => key + 1);
+  }
+
   return (
     <div className="flex h-dvh w-full bg-background text-foreground">
-      <Sidebar current={route} onNavigate={setRoute} theme={theme} onToggleTheme={toggleTheme} />
-      {route === 'chats' && <ChatPanel />}
+      <Sidebar current={route} onNavigate={setRoute} onNewChat={startNewChat} onSelectThread={openThread} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} />
+      {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} />}
       {route === 'agents' && <AgentsView />}
       {route === 'automations' && <AutomationsView />}
       {route === 'files' && <FilesView />}

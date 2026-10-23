@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Button } from '@heroui/react';
 import {
   AgentIcon,
@@ -5,6 +6,7 @@ import {
   BellIcon,
   ChatIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   EditIcon,
   FolderIcon,
   SearchIcon,
@@ -27,7 +29,19 @@ export const NAV_ITEMS = [
 // The reference app pairs a narrow icon rail (where you are) with a list panel
 // (what you have). The rail carries the seven destinations; the panel is the
 // conversation list, which routing in App.jsx keeps in step with the rail.
-export default function Sidebar({ current, onNavigate, theme, onToggleTheme }) {
+export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, activeThreadId, refreshKey, theme, onToggleTheme }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [threads, setThreads] = useState([]);
+
+  useEffect(() => {
+    let active = true;
+    const loadThreads = async () => {
+      const result = await window.zuri?.chats?.list?.();
+      if (active && result?.ok) setThreads(Array.isArray(result.data) ? result.data : []);
+    };
+    void loadThreads();
+    return () => { active = false; };
+  }, [refreshKey]);
   return (
     <div className="flex h-full shrink-0">
       <nav
@@ -49,11 +63,23 @@ export default function Sidebar({ current, onNavigate, theme, onToggleTheme }) {
             <Icon />
           </Button>
         ))}
+        <Button
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          className="mt-auto text-muted"
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onPress={() => setCollapsed((value) => !value)}
+        >
+          <ChevronRightIcon className={collapsed ? '' : 'rotate-180'} />
+        </Button>
       </nav>
 
       <aside
-        className="flex w-72 flex-col bg-surface-secondary text-foreground"
+        className={`flex flex-col bg-surface-secondary text-foreground transition-[width] duration-200 ${collapsed ? 'w-0 overflow-hidden' : 'w-72'}`}
         aria-label="Conversations"
+        aria-hidden={collapsed}
       >
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
           <button
@@ -88,7 +114,7 @@ export default function Sidebar({ current, onNavigate, theme, onToggleTheme }) {
             variant="ghost"
             fullWidth
             className="justify-start gap-2 font-normal"
-            onPress={() => onNavigate('chats')}
+            onPress={onNewChat}
           >
             <EditIcon size={16} />
             New chat
@@ -96,8 +122,18 @@ export default function Sidebar({ current, onNavigate, theme, onToggleTheme }) {
         </div>
 
         <p className="px-5 pb-2 pt-6 text-xs font-medium uppercase tracking-wide text-muted">Recents</p>
-        <div className="flex-1 overflow-y-auto px-5 text-sm text-muted">
-          No conversations yet. Your threads will appear here, newest first.
+        <div className="flex-1 overflow-y-auto px-3 text-sm text-muted">
+          {threads.length === 0 && <p className="px-2">No conversations yet. Your threads will appear here, newest first.</p>}
+          {threads.map((thread) => (
+            <button
+              key={thread.id}
+              type="button"
+              className={`mb-1 block w-full truncate rounded-lg px-2 py-2 text-left hover:bg-surface-tertiary ${thread.id === activeThreadId ? 'bg-surface-tertiary text-foreground' : 'text-muted'}`}
+              onClick={() => onSelectThread(thread.id)}
+            >
+              {thread.title || 'New chat'}
+            </button>
+          ))}
         </div>
       </aside>
     </div>
