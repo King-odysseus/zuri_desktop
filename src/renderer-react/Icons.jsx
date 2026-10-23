@@ -17,6 +17,7 @@ export {
   ArrowUp as ArrowUpIcon,
   PanelLeftClose as PanelLeftCloseIcon,
   PanelLeftOpen as PanelLeftOpenIcon,
+  X as CloseIcon,
   ChevronDown as ChevronDownIcon,
   ChevronRight as ChevronRightIcon,
   ChevronUp as ChevronUpIcon,

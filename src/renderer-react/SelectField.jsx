@@ -1,4 +1,6 @@
-import { Label, Select } from './ui.jsx';
+import { Dropdown, DropdownItem } from 'flowbite-react';
+import { ChevronDownIcon } from './Icons.jsx';
+import { Label } from './ui.jsx';
 
 const EMPTY_KEY = '__empty__';
 
@@ -7,21 +9,38 @@ function optionKey(value) {
 }
 
 export default function SelectField({ label, value, options, onChange, hideLabel = false, compact = false, className = '' }) {
+  const selectedOption = options.find((option) => String(option.value ?? '') === String(value ?? '')) ?? options[0];
+  const fieldId = `select-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+
   return (
     <div className={`flex ${compact ? 'min-w-0' : 'min-w-44'} flex-col gap-1 text-sm font-medium ${className}`}>
-      {!hideLabel && <Label htmlFor={`select-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`} value={label} />}
-      <Select
-        id={`select-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`}
-        aria-label={hideLabel ? label : undefined}
-        value={String(value ?? '')}
-        onChange={(event) => onChange(event.target.value === EMPTY_KEY ? '' : event.target.value)}
-        sizing="md"
-        className={compact
-          ? 'w-full rounded-lg border-0 bg-transparent px-2 text-foreground shadow-none focus:ring-0'
-          : 'zuri-field rounded-full border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted'}
+      {!hideLabel && <Label htmlFor={fieldId} value={label} />}
+      <Dropdown
+        inline
+        arrowIcon={false}
+        placement="bottom-start"
+        className="w-full"
+        renderTrigger={() => (
+          <button
+            id={fieldId}
+            type="button"
+            aria-label={hideLabel ? label : undefined}
+            className="zuri-dropdown-trigger flex min-h-10 w-full items-center justify-between gap-1 rounded-full border-0 bg-transparent px-2 text-sm font-medium text-foreground outline-none focus:ring-2 focus:ring-accent/30"
+          >
+            <span className="truncate">{selectedOption?.label ?? ''}</span>
+            <ChevronDownIcon size={14} />
+          </button>
+        )}
       >
-        {options.map((option) => <option key={optionKey(option.value)} value={optionKey(option.value)}>{option.label}</option>)}
-      </Select>
+        {options.map((option) => (
+          <DropdownItem
+            key={optionKey(option.value)}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </DropdownItem>
+        ))}
+      </Dropdown>
     </div>
   );
 }

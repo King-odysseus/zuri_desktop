@@ -249,8 +249,8 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Dictate">
               <MicIcon />
             </Button>
-            <Button type="submit" isIconOnly size="sm" variant="primary" className="rounded-full" aria-label="Send" isDisabled={(draft.trim() === '' && !attachment) || replying}>
-              <ArrowUpIcon />
+            <Button type="submit" isIconOnly size="sm" variant="primary" className="h-10 w-10 rounded-full bg-accent p-0 text-accent-foreground shadow-md hover:bg-accent/90 disabled:opacity-40" aria-label="Send" isDisabled={(draft.trim() === '' && !attachment) || replying}>
+              <ArrowUpIcon size={18} />
             </Button>
           </form>
 

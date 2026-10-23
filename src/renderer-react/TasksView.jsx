@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Checkbox, Chip, Input } from './ui.jsx';
+import { CloseIcon } from './Icons.jsx';
 
 const FILTERS = ['active', 'done', 'all'];
 
@@ -137,7 +138,7 @@ export default function TasksView() {
                   aria-label={`Delete ${task.title}`}
                   onPress={() => removeTask(task)}
                 >
-                  &times;
+                  <CloseIcon size={16} />
                 </Button>
               </li>
             ))}

@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Replaced shared native-looking select fields with Flowbite Dropdown menus, changed task deletion to a Lucide close icon, and made the composer send action a circular accent button.
+- Key files: `src/renderer-react/SelectField.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/TasksView.jsx`, `src/renderer-react/Icons.jsx`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Moved the sidebar collapse control into the top conversation header and replaced the bottom chevron with Lucide panel close/open icons.
 - Key files: `src/renderer-react/Sidebar.jsx`, `src/renderer-react/Icons.jsx`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
