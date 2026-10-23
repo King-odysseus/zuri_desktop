@@ -311,3 +311,10 @@
 - Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`, `src/renderer-react/RemindersView.jsx`, `src/renderer-react/TasksView.jsx`, `src/renderer-react/AgentsView.jsx`, `src/main/overlay.js`.
 - Other OS action: run `npm run react:build` after syncing.
 - Done on: Windows
+
+## 2026-10-23 - Windows
+
+- Added the zero-cost chat improvements without a new package or provider call: a Stop button replaces Send while a reply streams, every assistant message has a Copy button, and the transcript follows the newest message unless the reader has scrolled up. Search now reads the full text of every saved conversation and shows the matching snippet with the hit highlighted, and Enter opens the first result. Answers render http(s) links (bare or Markdown style) in the default browser, simple pipe tables, and fenced code blocks with a language label and Copy button; ordered and unordered lists show their numbers and bullets again.
+- Key files: `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/SearchView.jsx`, `src/renderer-react/FormattedMessage.jsx`, `src/renderer-react/clipboard.js`, `src/renderer-react/Icons.jsx`, `src/renderer-react/App.jsx`, `src/renderer-react/app.css`, `src/main/main.js`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows

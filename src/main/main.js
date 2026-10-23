@@ -174,6 +174,18 @@ function createMainWindow() {
 
   window.loadFile(RENDERER_ENTRY);
 
+  // Answers can contain links. Electron would otherwise open one in a new
+  // BrowserWindow, which looks like a second Zuri with none of the app around it.
+  // Send http(s) links to the default browser instead and refuse everything else.
+  window.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url);
+    return { action: 'deny' };
+  });
+  // A link without target=_blank must not replace Zuri's own window either.
+  window.webContents.on('will-navigate', (event, url) => {
+    if (url !== window.webContents.getURL()) event.preventDefault();
+  });
+
   // The icon is the way back in (0:13683), so closing the window hides Zuri instead
   // of ending the session: reminders and scheduled runs keep going while it is out of
   // sight. The Quit row of the tray menu, and quitting from anywhere else, sets
