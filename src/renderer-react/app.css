@@ -7,6 +7,7 @@
 @import "flowbite-react/plugin/tailwindcss";
 @source "./**/*.{jsx,js}";
 @source "../node_modules/flowbite-react/dist";
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
   --color-background: var(--background);
@@ -80,41 +81,62 @@ body {
   /* Light is the default look, matching the reference screen: white page, a
      barely-grey list panel, near-black text and a single blue accent. */
   [data-theme="light"] {
-    --background: #ffffff;
-    --foreground: #0d0d0d;
+    --background: #f6f8fc;
+    --foreground: #142033;
     --surface: #ffffff;
-    --surface-foreground: #0d0d0d;
-    --surface-secondary: #f9f9f9;
-    --surface-secondary-foreground: #0d0d0d;
-    --surface-tertiary: #f3f3f3;
-    --surface-tertiary-foreground: #0d0d0d;
-    --default: #f0f0f0;
-    --default-foreground: #0d0d0d;
-    --muted: #8f8f8f;
-    --accent: #3b82f6;
+    --surface-foreground: #142033;
+    --surface-secondary: #f9fbff;
+    --surface-secondary-foreground: #142033;
+    --surface-tertiary: #eef3f9;
+    --surface-tertiary-foreground: #142033;
+    --default: #e9eff7;
+    --default-foreground: #142033;
+    --muted: #6f7e95;
+    --accent: #3478e5;
     --accent-foreground: #ffffff;
-    --border: #ececec;
-    --separator: #ececec;
+    --border: transparent;
+    --separator: transparent;
     --field-background: #ffffff;
   }
 
   [data-theme="dark"] {
     /* Keep the canvas close to the navy reference while lifting each layer just enough to separate panels. */
-    --background: #0d1633;
-    --foreground: #f5f7ff;
-    --surface: #121e40;
-    --surface-foreground: #f5f7ff;
-    --surface-secondary: #17274b;
-    --surface-secondary-foreground: #f5f7ff;
-    --surface-tertiary: #20345e;
-    --surface-tertiary-foreground: #f5f7ff;
-    --default: #243a68;
-    --default-foreground: #f5f7ff;
-    --muted: #a9b7d3;
-    --accent: #76a9ff;
-    --accent-foreground: #09142d;
-    --border: rgba(176, 196, 235, 0.18);
-    --separator: rgba(176, 196, 235, 0.14);
-    --field-background: #152548;
+    --background: #0a1222;
+    --foreground: #edf4ff;
+    --surface: #111b2e;
+    --surface-foreground: #edf4ff;
+    --surface-secondary: #15233b;
+    --surface-secondary-foreground: #edf4ff;
+    --surface-tertiary: #1c2e4d;
+    --surface-tertiary-foreground: #edf4ff;
+    --default: #21385c;
+    --default-foreground: #edf4ff;
+    --muted: #9eafd0;
+    --accent: #82b4ff;
+    --accent-foreground: #081225;
+    --border: transparent;
+    --separator: transparent;
+    --field-background: #172740;
   }
+}
+
+/* Keep panels clean and let elevation, not gray hairlines, define grouping. */
+.border-border {
+  border-color: transparent !important;
+}
+
+.border-border.bg-surface {
+  box-shadow: 0 10px 30px rgba(25, 42, 70, 0.08), 0 2px 8px rgba(25, 42, 70, 0.04);
+}
+
+.border-border.bg-surface-secondary {
+  box-shadow: 0 8px 24px rgba(25, 42, 70, 0.06), 0 1px 4px rgba(25, 42, 70, 0.04);
+}
+
+.dark .border-border.bg-surface {
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.dark .border-border.bg-surface-secondary {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.16);
 }
