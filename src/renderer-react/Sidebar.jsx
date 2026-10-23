@@ -146,7 +146,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             <HistoryIcon size={16} />
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto px-3 text-sm text-muted">
+        <div className="zuri-scrollbar-hidden flex-1 overflow-y-auto px-3 text-sm text-muted">
           {threads.length === 0 && <p className="px-2">No conversations yet. Your threads will appear here, newest first.</p>}
           {threads.map((thread) => (
             <Button

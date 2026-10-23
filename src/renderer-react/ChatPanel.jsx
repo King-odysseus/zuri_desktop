@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ComposerTextarea } from './ui.jsx';
 import { ArrowUpIcon, MicIcon, PlusIcon } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
@@ -9,11 +9,16 @@ const WORKSPACE_MODES = [
   { value: 'chat', label: 'Chat' },
   { value: 'work', label: 'Work' },
 ];
-const SUGGESTIONS = [
+const COMMON_SUGGESTIONS = [
   'Which lines are over budget?',
   'Add a variance column to Budget.xlsx',
   'Schedule a Monday inbox brief',
   "Find last month's unpaid invoices",
+  'Summarize the most important files in my workspace',
+  'What needs my attention today?',
+  'Create a task to follow up with the client',
+  'Set a reminder for tomorrow morning',
+  'Draft a concise reply to this email',
 ];
 const ATTACHMENT_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv', 'md', 'json'];
 
@@ -60,6 +65,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const composerRef = useRef(null);
   const recognitionRef = useRef(null);
   const voiceDraftRef = useRef('');
+  const suggestions = useMemo(
+    () => [...COMMON_SUGGESTIONS].sort(() => Math.random() - 0.5).slice(0, 3),
+    [],
+  );
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
@@ -252,7 +261,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   }
 
   const hasConversation = messages.length > 0 || streamingText !== '';
-  const contentWidth = 'max-w-none';
+  const contentWidth = 'max-w-4xl';
 
   return (
     <main className="relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
@@ -333,7 +342,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               className="min-h-10 min-w-0 flex-1 max-h-48 py-2 text-base outline-none"
               disabled={replying}
             />
-            <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact iconOnly className="shrink-0" />
+            <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact plainTrigger className="shrink-0" />
             <Button
               type="button"
               isIconOnly
@@ -365,11 +374,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </div>
 
           {!hasConversation && (
-            <div className="mt-4 rounded-2xl border border-border bg-surface-secondary p-3 sm:p-4">
-              <p className="px-3 pb-2 pt-1 text-sm text-muted">Try one of these</p>
+            <div className="mt-4 px-1 sm:px-2">
+              <p className="pb-2 pt-1 text-sm text-muted">Try one of these</p>
               <div className="space-y-1">
-                {SUGGESTIONS.map((suggestion) => (
-                  <Button key={suggestion} variant="ghost" fullWidth className="min-h-10 justify-start rounded-xl px-3 py-2.5 text-left font-normal leading-5" onPress={() => setDraft(suggestion)}>
+                {suggestions.map((suggestion) => (
+                  <Button key={suggestion} variant="ghost" fullWidth className="min-h-10 justify-start rounded-lg px-2 py-2.5 text-left font-normal leading-5" onPress={() => setDraft(suggestion)}>
                   {suggestion}
                   </Button>
                 ))}

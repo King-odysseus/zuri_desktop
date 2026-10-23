@@ -227,6 +227,22 @@ body {
   background: color-mix(in srgb, var(--selected) 42%, transparent) !important;
 }
 
+/* The composer shows the active mode beside its chevron. It is a text control,
+   not a second pill, so the menu remains visible without adding another capsule. */
+.zuri-dropdown-trigger.zuri-dropdown-plain-trigger {
+  width: auto;
+  min-height: 40px;
+  border: 0 !important;
+  border-radius: 0;
+  background: transparent !important;
+  padding-inline: 2px;
+  box-shadow: none !important;
+}
+
+.zuri-dropdown-trigger.zuri-dropdown-plain-trigger:hover {
+  background: transparent !important;
+}
+
 .zuri-dropdown-menu {
   width: max-content !important;
   min-width: 8rem !important;
