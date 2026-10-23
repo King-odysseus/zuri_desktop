@@ -141,26 +141,26 @@ export default function RemindersView() {
       <div className="zuri-page-content zuri-scrollbar-hidden">
         <h1 className="mb-6 text-3xl font-medium tracking-tight">Reminders</h1>
 
-        <form onSubmit={addReminder} className="zuri-form-row mb-2">
+        <form onSubmit={addReminder} className="mb-2 grid w-full items-end gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.5fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(11rem,1fr)_auto]">
           <Input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="Call the bank"
             aria-label="What is it for"
-            className="min-w-64 flex-1"
+            className="min-w-0"
           />
           <DateField
             label="Date"
             value={when.slice(0, 10)}
             onChange={(date) => setWhen(combineDateTime(date, when.slice(11, 16)))}
-            className="min-w-56"
+            className="min-w-0"
           />
           <Input
             type="time"
             label="Time"
             value={when.slice(11, 16)}
             onChange={(event) => setWhen(combineDateTime(when.slice(0, 10), event.target.value))}
-            className="w-40"
+            className="w-full"
           />
           <SelectField label="How often" value={repeat} options={REPEAT_OPTIONS} onChange={setRepeat} />
           {repeat === 'interval' && (
@@ -174,7 +174,7 @@ export default function RemindersView() {
               className="w-32"
             />
           )}
-          <Button type="submit" variant="primary" isDisabled={!api || saving}>
+          <Button type="submit" variant="primary" className="w-full sm:w-auto" isDisabled={!api || saving}>
             Add
           </Button>
         </form>

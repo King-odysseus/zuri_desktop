@@ -15,7 +15,7 @@ const BADGE_COLORS = {
   warning: 'warning',
 };
 
-const FIELD_CLASSES = 'zuri-field w-full rounded-full border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted';
+const FIELD_CLASSES = 'zuri-field w-full rounded-xl border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted';
 const FIELD_LABEL_CLASSES = 'mb-1 block text-sm font-medium text-gray-900 dark:text-white';
 
 function fieldId(label, id, fallback) {
@@ -119,7 +119,7 @@ export function Textarea({ label, id, isDisabled = false, className = '', ...pro
 }
 
 export function Select({ className = '', ...props }) {
-  return <FlowbiteSelect className={`zuri-select rounded-full ${className}`.trim()} {...props} />;
+  return <FlowbiteSelect className={`zuri-select rounded-xl ${className}`.trim()} {...props} />;
 }
 
 export { Label };
