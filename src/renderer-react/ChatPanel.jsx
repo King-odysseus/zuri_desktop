@@ -170,6 +170,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     }
   }
 
+  function handleComposerKeyDown(event) {
+    // Keep Shift+Enter available for multiline prompts while plain Enter follows
+    // the same submit path as the send button. IME composition must not submit
+    // before the candidate text has been committed.
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) return;
+    event.preventDefault();
+    void sendMessage(event);
+  }
+
   async function sendMessage(event) {
     event.preventDefault();
     const prompt = draft.trim();
@@ -317,6 +326,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               ref={composerRef}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={handleComposerKeyDown}
               placeholder="Ask Zuri"
               aria-label="Message Zuri"
               rows={1}
