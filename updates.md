@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Added an English-first response policy to chat and document provider prompts, allowing other languages only after an explicit user request and preventing accidental mixed-language replies.
+- Key files: `src/main/providers/chat.js`.
+- Other OS action: run `npm run build` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Replaced shared native-looking select fields with Flowbite Dropdown menus, changed task deletion to a Lucide close icon, and made the composer send action a circular accent button.
 - Key files: `src/renderer-react/SelectField.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/TasksView.jsx`, `src/renderer-react/Icons.jsx`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.

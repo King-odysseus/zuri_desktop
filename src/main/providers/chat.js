@@ -48,7 +48,21 @@ const SUMMARY_SYSTEM_PROMPT = [
   'Then give 3 to 6 short bullet points of the key facts, decisions or figures.',
   'Then a short "Action items" list, or state that there are none.',
   'Quote concrete names, numbers and dates from the document; never invent details.',
+  'Write in English by default. Use another language only when the extra instruction explicitly requests it.',
   'Answer in Markdown with no preamble.',
+].join(' ');
+
+/**
+ * This policy is appended after stored and agent prompts so a custom agent can
+ * shape the answer without accidentally making the API switch languages.
+ * Another language is allowed only when the person explicitly asks for it.
+ */
+const RESPONSE_LANGUAGE_POLICY = [
+  'Language policy:',
+  'Respond in clear English by default.',
+  'Use another language only when the user explicitly asks you to respond, translate, or continue in that language.',
+  'Do not mix languages unless the user explicitly requests a bilingual answer or the original text must be quoted.',
+  'Keep names, code, file names, and quoted source text unchanged when they are not English.',
 ].join(' ');
 
 /** Provider error bodies are trimmed to this before they reach a bubble. */
@@ -533,6 +547,9 @@ export async function sendChatMessage(threadId, options = {}) {
       .filter((part) => part !== '')
       .join('\n\n');
   }
+  conversation.system = [conversation.system, RESPONSE_LANGUAGE_POLICY]
+    .filter((part) => part !== '')
+    .join('\n\n');
 
   const key = getKey(provider);
   if (key === null) {
