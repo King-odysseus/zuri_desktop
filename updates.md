@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Increased Settings input and dropdown heights and replaced nearly invisible hairlines with clearer theme-aware borders and focus rings.
+- Key files: `src/renderer-react/app.css`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Strengthened the New chat sidebar hover state with a dedicated tinted surface, clearer contrast, and a larger hit area.
 - Key files: `src/renderer-react/Sidebar.jsx`, `src/renderer-react/app.css`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.

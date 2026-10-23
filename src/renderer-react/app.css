@@ -27,6 +27,7 @@
   --color-separator: var(--separator);
   --color-selected: var(--selected);
   --color-selected-foreground: var(--selected-foreground);
+  --color-control-border: var(--control-border);
   --color-danger: #ef6b7a;
 }
 
@@ -61,8 +62,8 @@ body {
 }
 
 .zuri-field {
-  min-height: 48px;
-  border-color: transparent !important;
+  min-height: 52px;
+  border: 1px solid var(--control-border) !important;
   border-radius: 9999px !important;
   background: var(--field-background) !important;
   color: var(--foreground) !important;
@@ -70,7 +71,7 @@ body {
 }
 
 .zuri-field:focus {
-  border-color: transparent !important;
+  border-color: var(--accent) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
 }
 
@@ -101,6 +102,7 @@ body {
     --field-background: #ffffff;
     --selected: #d4e5ff;
     --selected-foreground: #174b91;
+    --control-border: #b8c7da;
   }
 
   [data-theme="dark"] {
@@ -123,12 +125,13 @@ body {
     --field-background: #172740;
     --selected: #2a507f;
     --selected-foreground: #f2f7ff;
+    --control-border: #385274;
   }
 }
 
 /* Keep panels clean and let elevation, not gray hairlines, define grouping. */
 .border-border {
-  border-color: transparent !important;
+  border-color: var(--control-border) !important;
 }
 
 /* Selected controls need a visible state even when borders are intentionally absent. */
@@ -157,8 +160,17 @@ body {
 }
 
 .zuri-dropdown-trigger {
+  min-height: 52px;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 9999px;
   background: var(--field-background) !important;
+  padding-inline: 14px;
   box-shadow: 0 3px 10px color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+.zuri-dropdown-trigger:focus-visible {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
 }
 
 .border-border.bg-surface {
