@@ -50,7 +50,7 @@ function voiceErrorMessage(code) {
   return 'Voice typing stopped unexpectedly. Try again.';
 }
 
-export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate }) {
+export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [mode, setMode] = useState('Ask');
   const [workspaceMode, setWorkspaceMode] = useState('chat');
@@ -264,8 +264,8 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const contentWidth = 'max-w-4xl';
 
   return (
-    <main className="relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
-      <div className="flex justify-center px-4 pt-6">
+    <main className={`relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground ${compact ? 'zuri-overlay-panel' : ''}`}>
+      {!compact && <div className="flex justify-center px-4 pt-6">
         <div role="tablist" aria-label="Workspace mode" className="inline-flex rounded-full border border-border bg-surface-secondary p-1 shadow-sm">
           {WORKSPACE_MODES.map(({ value, label }) => (
             <Button
@@ -281,10 +281,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             </Button>
           ))}
         </div>
-      </div>
+      </div>}
 
-      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${hasConversation ? 'justify-end pb-4 sm:pb-6' : 'justify-center pb-10 sm:pb-24'}`}>
-        {!hasConversation && (
+      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 sm:pb-6' : 'justify-center pb-10 sm:pb-24'}`}>
+        {!compact && !hasConversation && (
           <h1 className="mb-6 text-center text-3xl font-medium tracking-tight">
             {workspaceMode === 'work' ? 'What should we work on?' : "What's on the agenda today?"}
           </h1>
@@ -302,7 +302,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </div>
         )}
 
-        {workspaceMode === 'work' && !hasConversation && (
+        {!compact && workspaceMode === 'work' && !hasConversation && (
           <section className={`mb-6 grid w-full ${contentWidth} grid-cols-1 gap-4 sm:grid-cols-2`} aria-label="Work tools">
             {[
               ['Tasks', 'Plan and track work that needs doing.', 'tasks'],
@@ -325,9 +325,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </section>
         )}
 
-        <div className={`w-full ${contentWidth}`}>
+        <div className={`w-full ${contentWidth} ${compact ? 'zuri-overlay-composer-wrap' : ''}`}>
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
-          <form onSubmit={sendMessage} className="flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm">
+          <form onSubmit={sendMessage} className={`flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>
             <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Attach a file" title="Attach PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON" onPress={() => void chooseAttachment()}>
               <PlusIcon />
             </Button>
@@ -361,7 +361,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             </Button>
           </form>
 
-          <div className="mt-2 flex min-h-6 items-center justify-between gap-3 px-2 text-xs text-muted">
+          {!compact && <div className="mt-2 flex min-h-6 items-center justify-between gap-3 px-2 text-xs text-muted">
             {attachment ? (
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-foreground">Attached: {attachment.name}</span>
@@ -371,9 +371,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             ) : (
               <span>Attach PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON files</span>
             )}
-          </div>
+          </div>}
 
-          {!hasConversation && (
+          {!compact && !hasConversation && (
             <div className="mt-4 px-1 sm:px-2">
               <p className="pb-2 pt-1 text-sm text-muted">Try one of these</p>
               <div className="space-y-1">

@@ -283,3 +283,10 @@
 - Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`.
 - Other OS action: run `npm run react:build` after syncing.
 - Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Added a dedicated compact React render for the floating overlay and constrained its transparent window, composer, transcript, and document overflow so it no longer renders the full desktop shell or native scrollbars.
+- Key files: `src/renderer-react/App.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows

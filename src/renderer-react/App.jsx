@@ -11,6 +11,7 @@ import SearchView from './SearchView.jsx';
 import HistoryView from './HistoryView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
+  const isOverlay = new URLSearchParams(window.location.search).has('overlay');
   const [route, setRoute] = useState('chats');
   const [chatSessionKey, setChatSessionKey] = useState(0);
   const [activeThreadId, setActiveThreadId] = useState('');
@@ -55,6 +56,14 @@ export default function App() {
 
   function refreshChats() {
     setChatRefreshKey((key) => key + 1);
+  }
+
+  if (isOverlay) {
+    return (
+      <div className="zuri-overlay-root">
+        <ChatPanel compact onChatUpdated={refreshChats} />
+      </div>
+    );
   }
 
   return (
