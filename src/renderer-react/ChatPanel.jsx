@@ -119,6 +119,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   }
 
   const hasConversation = messages.length > 0 || streamingText !== '';
+  const contentWidth = workspaceMode === 'work' ? 'max-w-4xl' : 'max-w-3xl';
 
   return (
     <main className="relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
@@ -148,7 +149,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         )}
 
         {hasConversation && (
-          <div className="mb-4 flex w-full max-w-3xl min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4">
+          <div className={`mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-y-auto py-4`}>
             {messages.map((message, index) => (
               <div key={messageKey(message, index)} className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${message.role === 'user' ? 'self-end bg-accent text-accent-foreground' : 'self-start bg-surface-secondary text-foreground'}`}>
                 {message.role === 'user' ? message.content : <FormattedMessage content={message.content} />}
@@ -160,7 +161,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         )}
 
         {workspaceMode === 'work' && !hasConversation && (
-          <section className="mb-6 grid w-full max-w-3xl grid-cols-1 gap-3 sm:grid-cols-2" aria-label="Work tools">
+          <section className={`mb-6 grid w-full ${contentWidth} grid-cols-1 gap-4 sm:grid-cols-2`} aria-label="Work tools">
             {[
               ['Tasks', 'Plan and track work that needs doing.', 'tasks'],
               ['Files', 'Open, review, and summarise workspace files.', 'files'],
@@ -170,7 +171,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               <Button
                 key={route}
                 variant="ghost"
-                className="h-auto justify-start rounded-2xl border border-border bg-surface-secondary p-4 text-left"
+                className="h-full min-h-24 w-full justify-start rounded-2xl border border-border bg-surface-secondary p-5 text-left"
                 onPress={() => onNavigate?.(route)}
               >
                 <span className="flex flex-col items-start gap-1">
@@ -182,7 +183,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </section>
         )}
 
-        <div className="w-full max-w-3xl">
+        <div className={`w-full ${contentWidth}`}>
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
           <form onSubmit={sendMessage} className="flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm">
             <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Attach a file">

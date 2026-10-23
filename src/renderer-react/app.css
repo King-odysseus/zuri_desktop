@@ -17,12 +17,9 @@
 }
 
 /*
- * Maps the legacy app's navy/dark palette (src/renderer/styles/tokens.css)
- * onto HeroUI's own variable names, in the layer HeroUI's theme already
- * declares them in so this overrides rather than competes with it. Hex, not
- * oklch, because these values are copied straight from tokens.css rather than
- * recomputed - keeping the same numbers in both places is what keeps them
- * from drifting apart again later.
+ * Maps the app's navy/dark palette onto semantic variables used by Flowbite
+ * controls and the surrounding page surfaces. Hex values stay explicit so the
+ * renderer theme remains easy to compare with the design tokens.
  */
 @layer base {
   /* Light is the default look, matching the reference screen: white page, a
