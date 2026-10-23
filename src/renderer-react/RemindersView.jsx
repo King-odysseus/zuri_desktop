@@ -8,6 +8,12 @@ const REPEAT_OPTIONS = [
   { value: 'daily', label: 'Every day' },
 ];
 
+const GROUPS = [
+  { key: 'overdue', label: 'Overdue' },
+  { key: 'today', label: 'Today' },
+  { key: 'upcoming', label: 'Upcoming' },
+];
+
 // Defaults to five minutes out, matching the legacy form (views/reminders.js).
 function defaultWhen() {
   const date = new Date(Date.now() + 5 * 60_000);
@@ -15,8 +21,16 @@ function defaultWhen() {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
-function describeDue(iso) {
-  return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+function formatDue(iso, timeOnly = false) {
+  const due = new Date(iso);
+  if (Number.isNaN(due.getTime())) return null;
+  return due.toLocaleString([], timeOnly ? { timeStyle: 'short' } : { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function describeRowDue(iso, groupKey) {
+  const due = formatDue(iso, groupKey === 'today');
+  if (!due) return 'Due time unknown';
+  return groupKey === 'overdue' ? `Was due ${due}` : `Due ${due}`;
 }
 
 function describeRepeat(reminder) {
@@ -29,6 +43,28 @@ function describeRepeat(reminder) {
 
 function combineDateTime(date, time) {
   return `${date}T${time}`;
+}
+
+// Every reminder lands in exactly one time frame so the page can show them in a
+// fixed order. A due date that cannot be parsed stays visible under Upcoming
+// instead of disappearing from the list.
+function groupByDueTime(reminders) {
+  const now = Date.now();
+  const startOfTomorrow = new Date();
+  startOfTomorrow.setHours(24, 0, 0, 0);
+
+  const buckets = { overdue: [], today: [], upcoming: [] };
+  for (const reminder of reminders) {
+    const dueMs = Date.parse(reminder.dueAt);
+    if (!Number.isFinite(dueMs)) buckets.upcoming.push(reminder);
+    else if (dueMs <= now) buckets.overdue.push(reminder);
+    else if (dueMs < startOfTomorrow.getTime()) buckets.today.push(reminder);
+    else buckets.upcoming.push(reminder);
+  }
+
+  return GROUPS.map((group) => ({ ...group, items: buckets[group.key] })).filter(
+    (group) => group.items.length > 0,
+  );
 }
 
 // Port of the legacy Reminders destination on the same window.zuri.reminders
@@ -136,97 +172,122 @@ export default function RemindersView() {
     .filter((reminder) => !reminder.completedAt && reminder.status !== 'done')
     .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
 
-  return (
-    <main className="flex h-full flex-1 flex-col bg-background text-foreground">
-      <div className="zuri-page-content zuri-scrollbar-hidden">
-        <h1 className="mb-6 text-3xl font-medium tracking-tight">Reminders</h1>
+  const groups = groupByDueTime(upcoming);
 
-        <form onSubmit={addReminder} className="zuri-reminders-form mb-2 grid w-full items-end gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.5fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(11rem,1fr)_auto]">
-          <Input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Call the bank"
-            aria-label="What is it for"
-            className="min-w-0"
-          />
-          <DateField
-            label="Date"
-            value={when.slice(0, 10)}
-            onChange={(date) => setWhen(combineDateTime(date, when.slice(11, 16)))}
-            className="min-w-0"
-          />
-          <Input
-            type="time"
-            label="Time"
-            value={when.slice(11, 16)}
-            onChange={(event) => setWhen(combineDateTime(when.slice(0, 10), event.target.value))}
-            className="w-full"
-          />
-          <SelectField label="How often" value={repeat} options={REPEAT_OPTIONS} onChange={setRepeat} />
-          {repeat === 'interval' && (
+  return (
+    <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
+      <div className="zuri-page-content zuri-scrollbar-hidden">
+        <header className="mb-6">
+          <h1 className="text-3xl font-medium tracking-tight">Reminders</h1>
+          <p className="mt-2 text-sm text-muted">Follow-ups that come back when they are due.</p>
+        </header>
+
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <form
+            onSubmit={addReminder}
+            className="zuri-reminders-form grid w-full items-end gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.5fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(11rem,1fr)_auto]"
+          >
             <Input
-              type="number"
-              min="1"
-              step="1"
-              value={intervalMinutes}
-              onChange={(event) => setIntervalMinutes(event.target.value)}
-              aria-label="Minutes between reminders"
-              className="w-32"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Call the bank"
+              aria-label="What is it for"
+              className="min-w-0"
             />
+            <DateField
+              label="Date"
+              value={when.slice(0, 10)}
+              onChange={(date) => setWhen(combineDateTime(date, when.slice(11, 16)))}
+              className="min-w-0"
+            />
+            <Input
+              type="time"
+              label="Time"
+              value={when.slice(11, 16)}
+              onChange={(event) => setWhen(combineDateTime(when.slice(0, 10), event.target.value))}
+              className="w-full"
+            />
+            <SelectField label="How often" value={repeat} options={REPEAT_OPTIONS} onChange={setRepeat} />
+            {repeat === 'interval' && (
+              <Input
+                type="number"
+                min="1"
+                step="1"
+                value={intervalMinutes}
+                onChange={(event) => setIntervalMinutes(event.target.value)}
+                aria-label="Minutes between reminders"
+                className="w-32"
+              />
+            )}
+            <Button
+              type="submit"
+              variant="primary"
+              className="w-full justify-self-start sm:w-auto"
+              isDisabled={!api || saving}
+            >
+              Add
+            </Button>
+          </form>
+
+          {message !== '' && (
+            <p role="status" className="mt-3 text-sm text-muted">
+              {message}
+            </p>
           )}
-          <Button type="submit" variant="primary" className="w-full sm:w-auto" isDisabled={!api || saving}>
-            Add
-          </Button>
-        </form>
-        <p role="status" className="mb-6 min-h-5 text-sm text-muted">
-          {message}
-        </p>
+        </section>
 
         {status === 'loading' && <p className="text-sm text-muted">Loading reminders...</p>}
+
         {status === 'error' && (
           <p className="text-sm text-muted">
-            Reminder data is only available when this page runs inside the Zuri app, not the
-            browser preview.
+            Your reminders only appear in the Zuri app, not in this preview.
           </p>
         )}
-        {status === 'ready' && upcoming.length === 0 && (
-          <p className="zuri-empty-state text-sm text-muted">Nothing coming up.</p>
+
+        {status === 'ready' && groups.length === 0 && (
+          <div className="zuri-empty-state">
+            <strong>Nothing coming up</strong>
+            <p>Add a reminder above and Zuri will bring it back when it is due.</p>
+          </div>
         )}
-        {status === 'ready' && (
-          <ul className="zuri-reminder-list flex flex-col gap-2">
-            {upcoming.map((reminder) => {
-              const overdue = Date.parse(reminder.dueAt) <= Date.now();
-              return (
-                <li
-                  key={reminder.id}
-                  className="flex items-center gap-3 rounded-xl border border-border px-4 py-3"
-                >
-                  <div className="flex min-w-0 flex-1 flex-col">
-                    <span className="truncate text-sm">{reminder.title}</span>
-                    <span className="text-xs text-muted">
-                      {overdue ? `Overdue - was due ${describeDue(reminder.dueAt)}` : `Due ${describeDue(reminder.dueAt)}`}
-                      {' - '}
-                      {describeRepeat(reminder)}
-                    </span>
-                  </div>
-                  {overdue && (
-                    <Chip size="sm" color="danger">
-                      Overdue
-                    </Chip>
-                  )}
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    aria-label={`Mark ${reminder.title} done`}
-                    onPress={() => complete(reminder)}
+
+        {status === 'ready' &&
+          groups.map((group) => (
+            <section key={group.key} className="rounded-xl border border-border bg-surface p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <h2 className="text-lg font-medium">{group.label}</h2>
+                <Chip size="sm">{group.items.length}</Chip>
+              </div>
+              <ul className="zuri-reminder-list flex flex-col gap-2">
+                {group.items.map((reminder) => (
+                  <li
+                    key={reminder.id}
+                    className="flex items-center gap-3 rounded-xl border border-border px-4 py-3"
                   >
-                    Done
-                  </Button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
+                    <div className="flex min-w-0 flex-1 flex-col">
+                      <span className="truncate text-sm">{reminder.title}</span>
+                      <span className="text-xs text-muted">
+                        {describeRowDue(reminder.dueAt, group.key)} - {describeRepeat(reminder)}
+                      </span>
+                    </div>
+                    {group.key === 'overdue' && (
+                      <Chip size="sm" color="danger">
+                        Overdue
+                      </Chip>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Mark ${reminder.title} done`}
+                      onPress={() => complete(reminder)}
+                    >
+                      Done
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ))}
       </div>
     </main>
   );

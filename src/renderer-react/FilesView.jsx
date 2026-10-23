@@ -24,6 +24,18 @@ function fileType(name) {
   return extension && extension !== name.toUpperCase() ? extension : 'FILE';
 }
 
+// The renderer is sandboxed and cannot import node:path, so the workspace folder
+// is joined with the separator app.info reports for this platform.
+function workspaceFolderPath(userData, platform) {
+  if (typeof userData !== 'string' || userData.trim() === '') return '';
+  const base = userData.replace(/[\\/]+$/, '');
+  return `${base}${platform === 'win32' ? '\\' : '/'}workspace`;
+}
+
+function fileMeta(file) {
+  return [formatSize(file?.bytes), formatModified(file?.modifiedAt)].filter(Boolean).join(' - ');
+}
+
 export default function FilesView() {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [files, setFiles] = useState([]);
@@ -62,7 +74,7 @@ export default function FilesView() {
     void reload();
     if (typeof api?.app?.info === 'function') {
       void api.app.info().then((result) => {
-        if (result?.userData) setWorkspacePath(`${result.userData}\\workspace`);
+        setWorkspacePath(workspaceFolderPath(result?.userData, result?.platform));
       });
     }
     const unsubscribe = api?.state?.onChanged?.((change) => {
@@ -79,7 +91,7 @@ export default function FilesView() {
     setBusyPath(path);
     const result = await method({ path });
     setBusyPath('');
-    setMessage(result?.ok ? (action === 'open' ? `Opened ${path}.` : `Showing ${path} in Explorer.`) : result?.error?.message ?? `Could not ${action} ${path}.`);
+    setMessage(result?.ok ? (action === 'open' ? `Opened ${path}.` : `Showing ${path} in your file manager.`) : result?.error?.message ?? `Could not ${action} ${path}.`);
   }
 
   async function revealFolder() {
@@ -110,37 +122,78 @@ export default function FilesView() {
   }
 
   const totalBytes = files.reduce((sum, file) => sum + (Number(file?.bytes) || 0), 0);
+  const countLine = `${files.length} file${files.length === 1 ? '' : 's'}${totalBytes > 0 ? `, ${formatSize(totalBytes)}` : ''}`;
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-medium tracking-tight">Office files</h1>
-            <p className="mt-2 max-w-2xl text-sm text-muted">Everything in your workspace folder. Open a document or reveal it in Explorer.</p>
+            <h1>Office files</h1>
+            <p>Documents in your workspace folder. Open one, or show it in your file manager.</p>
           </div>
-          <Button variant="primary" onPress={() => void reload()} isDisabled={status === 'loading'}>Refresh</Button>
+          <Button variant="ghost" className="ml-auto" onPress={() => void revealFolder()} isDisabled={busyPath !== ''}>Reveal folder</Button>
         </header>
 
-        <section className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-surface-secondary px-4 py-3">
-          <div className="min-w-0"><p className="text-xs font-medium uppercase tracking-wide text-muted">Workspace folder</p><p className="truncate text-sm">{workspacePath || 'Zuri workspace'}</p></div>
-          <Button size="sm" variant="ghost" onPress={() => void revealFolder()} isDisabled={busyPath !== ''}>Reveal folder</Button>
-        </section>
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <div className="mb-4 flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl border border-border bg-surface-secondary px-4 py-3">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted">Workspace folder</span>
+            <p className="min-w-0 flex-1 truncate font-mono text-sm" title={workspacePath || undefined}>{workspacePath || 'Zuri workspace'}</p>
+          </div>
 
-        <section className="rounded-xl border border-border bg-surface p-5" aria-label="Files in the workspace folder">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-medium">Workspace files</h2><span className="text-sm text-muted">{files.length} file{files.length === 1 ? '' : 's'}{totalBytes > 0 ? ` - ${formatSize(totalBytes)}` : ''}</span></div>
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-medium">Files</h2>
+            {status === 'ready' && <span className="text-sm text-muted">{countLine}</span>}
+          </div>
+
           {status === 'loading' && <p className="text-sm text-muted">Reading the workspace folder...</p>}
           {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
-          {status === 'ready' && files.length === 0 && <p className="text-sm text-muted">No files in your workspace yet. Anything Act saves appears here.</p>}
-          {status === 'ready' && files.length > 0 && <ul className="flex flex-col gap-2">{files.map((file) => <li key={file.path} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3"><Chip size="sm">{fileType(file.name)}</Chip><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{file.name}</p><p className="text-xs text-muted">{formatSize(file.bytes)}{formatModified(file.modifiedAt) ? ` - ${formatModified(file.modifiedAt)}` : ''}</p></div><Button size="sm" variant="ghost" onPress={() => void act(file.path, 'open')} isDisabled={busyPath !== ''}>Open</Button><Button size="sm" variant="ghost" onPress={() => void act(file.path, 'reveal')} isDisabled={busyPath !== ''}>Reveal</Button></li>)}</ul>}
+
+          {status === 'ready' && files.length === 0 && (
+            <div className="zuri-empty-state">
+              <strong>No files yet</strong>
+              <p>Anything Zuri saves appears here.</p>
+              <Button variant="ghost" onPress={() => void revealFolder()} isDisabled={busyPath !== ''}>Reveal folder</Button>
+            </div>
+          )}
+
+          {status === 'ready' && files.length > 0 && (
+            <ul className="flex flex-col gap-2">
+              {files.map((file) => (
+                <li key={file.path} className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-3 border border-border md:grid-cols-[auto_minmax(0,1fr)_auto]">
+                  <Chip size="sm">{fileType(file.name)}</Chip>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{file.name}</p>
+                    <p className="text-xs text-muted">{fileMeta(file)}</p>
+                  </div>
+                  <div className="col-span-2 flex items-center justify-end gap-2 md:col-span-1">
+                    <Button size="sm" variant="ghost" onPress={() => void act(file.path, 'open')} isDisabled={busyPath !== ''}>Open</Button>
+                    <Button size="sm" variant="ghost" onPress={() => void act(file.path, 'reveal')} isDisabled={busyPath !== ''}>Reveal</Button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
           {truncated && <p className="mt-3 text-xs text-muted">The list is limited to the first workspace files.</p>}
-          {message && status === 'ready' && <p role="status" className="mt-4 text-sm text-muted">{message}</p>}
+          {status === 'ready' && message !== '' && <p role="status" className="mt-4 text-sm text-muted">{message}</p>}
         </section>
 
-        <section className="mt-5 rounded-xl border border-border bg-surface p-5">
-          <div className="mb-3"><h2 className="text-lg font-medium">Summarize a document</h2><p className="mt-1 text-sm text-muted">Choose a document and save its summary back into the workspace.</p></div>
-          <div className="flex flex-wrap items-end gap-2"><Button variant="secondary" onPress={() => void chooseSummary()} isDisabled={busyPath !== ''}>Choose document</Button>{summaryPath && <span className="max-w-sm truncate text-sm text-muted">{summaryPath}</span>}</div>
-          {summaryPath && <div className="mt-3 flex flex-wrap items-end gap-2"><Input label="Optional instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} className="min-w-64 flex-1" /><Button variant="primary" onPress={() => void summarize()} isDisabled={busyPath !== ''}>Summarize</Button></div>}
+        <section className="rounded-xl border border-border bg-surface p-5">
+          <div className="mb-3">
+            <h2 className="text-lg font-medium">Summarise a document</h2>
+            <p className="mt-1 text-sm text-muted">Choose a document and save its summary back into the workspace.</p>
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <Button variant="secondary" onPress={() => void chooseSummary()} isDisabled={busyPath !== ''}>Choose document</Button>
+            {summaryPath && <span className="max-w-sm truncate text-sm text-muted">{summaryPath}</span>}
+          </div>
+          {summaryPath && (
+            <div className="mt-3 flex flex-wrap items-end gap-2">
+              <Input label="Optional instruction" value={instruction} onChange={(event) => setInstruction(event.target.value)} className="min-w-64 flex-1" />
+              <Button variant="primary" onPress={() => void summarize()} isDisabled={busyPath !== ''}>Summarise</Button>
+            </div>
+          )}
         </section>
       </div>
     </main>

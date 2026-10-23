@@ -143,59 +143,69 @@ export default function AgentsView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-6 flex items-start justify-between gap-4">
+        <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-medium tracking-tight">AI agents</h1>
-            <p className="mt-2 max-w-xl text-sm text-muted">Name the agents, describe how they write, and choose the tools each one may use.</p>
+            <h1>AI agents</h1>
+            <p>Give a chat a name, a way of writing, and the tools it may use.</p>
           </div>
-          <Button variant="primary" onPress={addAgent}>New agent</Button>
+          <Button variant="primary" className="ml-auto" onPress={addAgent}>New agent</Button>
         </header>
 
         {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
-        {status === 'error' && <p className="text-sm text-danger">{message}</p>}
+        {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
         {status === 'ready' && (
-          <div className="zuri-agents-layout grid min-h-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="zuri-agents-layout grid min-h-0 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
             <section className="rounded-xl border border-border bg-surface-secondary p-3" aria-label="Agents">
               <div className="mb-2 flex items-center justify-between px-2">
                 <span className="text-sm font-medium">Agents</span>
                 <Chip size="sm">{agents.length}</Chip>
               </div>
               <div className="flex flex-col gap-1">
-                {agents.map((agent) => (
-                  <Button
-                    key={agent.id}
-                    variant={agent.id === selectedId ? 'secondary' : 'ghost'}
-                    aria-pressed={agent.id === selectedId}
-                    className={`h-auto w-full justify-start rounded-lg px-3 py-2 text-left ${agent.id === selectedId ? 'font-semibold' : ''}`}
-                    onPress={() => setSelectedId(agent.id)}
-                  >
-                    <span className="flex min-w-0 flex-1 flex-col items-start">
-                      <span className="w-full truncate text-sm">{agent.name || 'Untitled agent'}</span>
-                      <span className="text-xs text-muted">{agent.allowedTools.length} tools</span>
-                    </span>
-                  </Button>
-                ))}
+                {agents.map((agent) => {
+                  const isSelected = agent.id === selectedId;
+                  return (
+                    <Button
+                      key={agent.id}
+                      variant={isSelected ? 'secondary' : 'ghost'}
+                      aria-pressed={isSelected}
+                      className={`relative h-auto w-full justify-start rounded-lg px-3 py-2 text-left ${isSelected ? 'font-semibold' : ''}`}
+                      onPress={() => setSelectedId(agent.id)}
+                    >
+                      {isSelected && <span aria-hidden="true" className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent" />}
+                      <span className="flex min-w-0 flex-1 flex-col items-start">
+                        <span className="w-full truncate text-sm">{agent.name || 'Untitled agent'}</span>
+                        <span className="text-xs text-muted">
+                          {agent.allowedTools.length} {agent.allowedTools.length === 1 ? 'tool' : 'tools'}
+                        </span>
+                      </span>
+                    </Button>
+                  );
+                })}
                 {agents.length === 0 && <p className="px-2 py-4 text-xs text-muted">No agents yet.</p>}
               </div>
             </section>
 
             <section className="zuri-agents-editor rounded-xl border border-border bg-surface p-5">
               {!selected ? (
-                <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-center">
-                  <h2 className="text-lg font-medium">No agent selected</h2>
-                  <p className="text-sm text-muted">Create an agent to give a chat a name and a tool set.</p>
+                <div className="zuri-empty-state">
+                  <strong>No agent selected</strong>
+                  <p>Create an agent to give a chat a name and a set of tools.</p>
                   <Button variant="secondary" onPress={addAgent}>New agent</Button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-5">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2 className="text-xl font-medium">{selected.name || 'Untitled agent'}</h2>
-                      <p className="mt-1 text-sm text-muted">{selected.allowedTools.length} of {tools.length} tools allowed</p>
-                    </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-xl font-medium">{selected.name || 'Untitled agent'}</h2>
                     {selected.id === activeAgentId && <Chip color="primary">Active for chat</Chip>}
                   </div>
-                  <Input label="Name" value={selected.name} maxLength={60} onChange={(event) => updateSelected({ name: event.target.value })} />
+
+                  <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                    <Input label="Name" value={selected.name} maxLength={60} onChange={(event) => updateSelected({ name: event.target.value })} />
+                    <Checkbox className="lg:mb-3" isSelected={selected.id === activeAgentId} onChange={(checked) => setActiveAgentId(checked ? selected.id : '')}>
+                      Use this agent in chat
+                    </Checkbox>
+                  </div>
+
                   <Textarea
                     label="System prompt"
                     value={selected.systemPrompt}
@@ -203,9 +213,13 @@ export default function AgentsView() {
                     placeholder="You write short meeting briefs..."
                     rows={5}
                   />
+
                   <div>
-                    <p className="mb-2 text-sm font-medium">Allowed tools</p>
-                    <div className="grid gap-2 sm:grid-cols-2">
+                    <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                      <p className="text-sm font-medium">Allowed tools</p>
+                      <span className="text-xs text-muted">{selected.allowedTools.length} of {tools.length} tools allowed</span>
+                    </div>
+                    <div className="grid gap-2 rounded-xl border border-border bg-surface-secondary p-4 lg:grid-cols-2">
                       {tools.map((tool) => (
                         <Checkbox
                           key={tool.name}
@@ -217,13 +231,11 @@ export default function AgentsView() {
                       ))}
                     </div>
                   </div>
-                  <Checkbox isSelected={selected.id === activeAgentId} onChange={(checked) => setActiveAgentId(checked ? selected.id : '')}>
-                    Use this agent in chat
-                  </Checkbox>
-                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-                    <Button variant="danger" onPress={removeSelected}>Delete agent</Button>
-                    <div className="flex items-center gap-2">
-                      <span role="status" className="text-sm text-muted">{message || 'Saved to settings.json'}</span>
+
+                  <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                    <Button variant="ghost" className="zuri-danger-quiet" onPress={removeSelected}>Delete agent</Button>
+                    {message !== '' && <span role="status" className="min-w-0 flex-1 text-sm text-muted">{message}</span>}
+                    <div className="ml-auto flex items-center gap-2">
                       <Button variant="ghost" onPress={() => void load()}>Revert</Button>
                       <Button variant="primary" onPress={() => void save()}>Save agent</Button>
                     </div>

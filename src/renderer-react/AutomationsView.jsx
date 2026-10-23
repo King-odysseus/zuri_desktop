@@ -51,6 +51,9 @@ export default function AutomationsView() {
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
   const [editingId, setEditingId] = useState('');
+  // The editor is a card that only exists while someone is adding or editing,
+  // so the saved automations stay the page's main content.
+  const [showEditor, setShowEditor] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [mode, setMode] = useState('ask');
   const [cadenceType, setCadenceType] = useState('daily');
@@ -75,7 +78,7 @@ export default function AutomationsView() {
       const result = await automationsApi.list();
       if (!result?.ok) {
         setStatus('error');
-        setMessage(result?.error?.message ?? 'schedules.json could not be read.');
+        setMessage(result?.error?.message ?? 'Your automations could not be loaded.');
         return;
       }
       setAutomations(Array.isArray(result.data?.automations) ? result.data.automations : []);
@@ -83,7 +86,7 @@ export default function AutomationsView() {
       setStatus('ready');
     } catch (error) {
       setStatus('error');
-      setMessage(error?.message ?? 'schedules.json could not be read.');
+      setMessage(error?.message ?? 'Your automations could not be loaded.');
     }
   }
 
@@ -147,6 +150,23 @@ export default function AutomationsView() {
     setMessage('Editing this automation. Save changes or cancel.');
   }
 
+  function openCreate() {
+    resetForm();
+    setMessage('');
+    setShowEditor(true);
+  }
+
+  function openEdit(automation) {
+    startEdit(automation);
+    setShowEditor(true);
+  }
+
+  function closeEditor() {
+    resetForm();
+    setShowEditor(false);
+    setMessage('');
+  }
+
   function cadencePayload() {
     if (cadenceType === 'once') return { type: 'once', at: new Date(onceAt).toISOString() };
     if (cadenceType === 'interval') return { type: 'interval', minutes: Number(intervalMinutes) };
@@ -186,15 +206,26 @@ export default function AutomationsView() {
       return;
     }
     resetForm();
-    setMessage(wasEditing ? 'Changes saved to schedules.json.' : 'Automation saved to schedules.json.');
+    setShowEditor(false);
+    setMessage(wasEditing ? 'Changes saved.' : 'Automation saved.');
     await reload();
   }
 
   async function remove(automation) {
     if (typeof automationsApi?.delete !== 'function') return;
     const result = await automationsApi.delete({ id: automation.id });
-    setMessage(result?.ok ? 'Automation deleted from schedules.json.' : result?.error?.message ?? 'The automation was not deleted.');
-    if (result?.ok) await reload();
+    if (!result?.ok) {
+      setMessage(result?.error?.message ?? 'The automation was not deleted.');
+      return;
+    }
+    // Deleting the automation being edited would leave the editor on a record
+    // that no longer exists.
+    if (editingId === automation.id) {
+      resetForm();
+      setShowEditor(false);
+    }
+    setMessage('Automation deleted.');
+    await reload();
   }
 
   async function toggleEnabled(automation) {
@@ -206,50 +237,88 @@ export default function AutomationsView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-6">
-          <h1 className="text-3xl font-medium tracking-tight">Automations</h1>
-          <p className="mt-2 text-sm text-muted">Schedule Zuri runs while the app is open, and catch up on the next start.</p>
+        <header className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-medium tracking-tight">Automations</h1>
+            <p className="mt-2 text-sm text-muted">Runs Zuri does on a schedule while the app is open.</p>
+          </div>
+          {/* Hidden while the editor is open so the page keeps one primary action. */}
+          {!showEditor && <Button variant="primary" onPress={openCreate}>New automation</Button>}
         </header>
 
-        <section className="mb-5 rounded-xl border border-border bg-surface p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
+        {status === 'loading' && <p className="text-sm text-muted">Loading automations...</p>}
+        {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+
+        {status === 'ready' && message !== '' && <p role="status" className="text-sm text-muted">{message}</p>}
+
+        {/* The editor sits above the list: the person just pressed a button in
+            the header, so the form must open where their eye already is. */}
+        {showEditor && (
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-medium">{editing ? 'Edit automation' : 'New automation'}</h2>
-              <p className="mt-1 text-sm text-muted">Saved to schedules.json.</p>
+              <Button variant="ghost" onPress={closeEditor}>Cancel</Button>
             </div>
-            {editing && <Button variant="ghost" onPress={resetForm}>Cancel edit</Button>}
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Textarea
-              label="What should it do"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              rows={3}
-              maxLength={2000}
-              placeholder="Summarise unread mail and list anything urgent"
-              className="lg:col-span-2"
-            />
-            <SelectField label="Mode" value={mode} options={MODES} onChange={setMode} />
-            <SelectField label="How often" value={cadenceType} options={CADENCES} onChange={setCadenceType} />
-            {cadenceType === 'once' && (
-              <>
-                <DateField label="Date" value={onceAt.slice(0, 10)} onChange={(date) => setOnceAt(`${date}T${onceAt.slice(11, 16)}`)} />
-                <Input type="time" label="Time" value={onceAt.slice(11, 16)} onChange={(event) => setOnceAt(`${onceAt.slice(0, 10)}T${event.target.value}`)} />
-              </>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Textarea
+                label="What should it do"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                rows={3}
+                maxLength={2000}
+                placeholder="Summarise unread mail and list anything urgent"
+                className="lg:col-span-2"
+              />
+              <SelectField label="Mode" value={mode} options={MODES} onChange={setMode} />
+              <SelectField label="How often" value={cadenceType} options={CADENCES} onChange={setCadenceType} />
+              {cadenceType === 'once' && (
+                <>
+                  <DateField label="Date" value={onceAt.slice(0, 10)} onChange={(date) => setOnceAt(`${date}T${onceAt.slice(11, 16)}`)} />
+                  <Input type="time" label="Time" value={onceAt.slice(11, 16)} onChange={(event) => setOnceAt(`${onceAt.slice(0, 10)}T${event.target.value}`)} />
+                </>
+              )}
+              {cadenceType === 'interval' && <Input type="number" min="1" step="1" label="Minutes between runs" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} />}
+              {cadenceType === 'daily' && <Input type="time" label="Time of day" value={timeOfDay} onChange={(event) => setTimeOfDay(event.target.value)} />}
+              <SelectField label="Agent" value={agentId} options={[{ value: '', label: 'Whoever is active' }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={setAgentId} />
+            </div>
+            {tools.length > 0 && <div className="mt-4"><p className="mb-2 text-sm font-medium">Tools it may use</p><div className="grid gap-2 sm:grid-cols-2">{tools.map((tool) => <Checkbox key={tool.name} isSelected={allowedTools.includes(tool.name)} onChange={(checked) => setAllowedTools((current) => checked ? [...new Set([...current, tool.name])] : current.filter((name) => name !== tool.name))}>{tool.label}</Checkbox>)}</div></div>}
+            <div className="mt-5 flex justify-end border-t border-border pt-4">
+              <Button variant="primary" onPress={() => void save()}>{editing ? 'Save changes' : 'Add automation'}</Button>
+            </div>
+          </section>
+        )}
+
+        {status === 'ready' && (
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-medium">Scheduled</h2>
+              <Chip size="sm">{automations.length}</Chip>
+            </div>
+            {automations.length === 0 ? (
+              <div className="zuri-empty-state">
+                <strong>No automations yet</strong>
+                <p>Choose New automation to have Zuri run a prompt on a schedule.</p>
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {automations.map((automation) => (
+                  <li key={automation.id} className="flex flex-wrap items-center gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{automation.prompt}</p>
+                      <p className="mt-1 text-xs text-muted">{describeCadence(automation.cadence)} - {describeNextRun(automation.nextRunAt)}</p>
+                    </div>
+                    <Chip size="sm" color={automation.enabled === false ? 'default' : 'primary'}>{automation.enabled === false ? 'Paused' : 'Enabled'}</Chip>
+                    <Checkbox aria-label={`Enable ${automation.prompt}`} isSelected={automation.enabled !== false} onChange={() => void toggleEnabled(automation)}>Enabled</Checkbox>
+                    <Button size="sm" variant="ghost" onPress={() => openEdit(automation)}>Edit</Button>
+                    <Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void remove(automation)}>Delete</Button>
+                  </li>
+                ))}
+              </ul>
             )}
-            {cadenceType === 'interval' && <Input type="number" min="1" step="1" label="Minutes between runs" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} />}
-            {cadenceType === 'daily' && <Input type="time" label="Time of day" value={timeOfDay} onChange={(event) => setTimeOfDay(event.target.value)} />}
-            <SelectField label="Agent" value={agentId} options={[{ value: '', label: 'Whoever is active' }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={setAgentId} />
-          </div>
-          {tools.length > 0 && <div className="mt-4"><p className="mb-2 text-sm font-medium">Tools it may use</p><div className="grid gap-2 sm:grid-cols-2">{tools.map((tool) => <Checkbox key={tool.name} isSelected={allowedTools.includes(tool.name)} onChange={(checked) => setAllowedTools((current) => checked ? [...new Set([...current, tool.name])] : current.filter((name) => name !== tool.name))}>{tool.label}</Checkbox>)}</div></div>}
-          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span role="status" className="text-sm text-muted">{message}</span><Button variant="primary" onPress={() => void save()}>{editing ? 'Save changes' : 'Add automation'}</Button></div>
-        </section>
+          </section>
+        )}
 
-        {status === 'loading' && <p className="text-sm text-muted">Loading schedules...</p>}
-        {status === 'error' && <p className="text-sm text-danger">{message}</p>}
-        {status === 'ready' && <section className="rounded-xl border border-border bg-surface p-5"><div className="mb-4 flex items-center justify-between"><h2 className="text-lg font-medium">Scheduled</h2><Chip size="sm">{automations.length}</Chip></div>{automations.length === 0 ? <p className="text-sm text-muted">No automations yet. The first one you add appears here.</p> : <ul className="flex flex-col gap-2">{automations.map((automation) => <li key={automation.id} className="flex flex-wrap items-center gap-3 rounded-xl border border-border px-4 py-3"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{automation.prompt}</p><p className="mt-1 text-xs text-muted">{describeCadence(automation.cadence)} - {describeNextRun(automation.nextRunAt)}</p></div><Chip size="sm" color={automation.enabled === false ? 'default' : 'primary'}>{automation.enabled === false ? 'Paused' : automation.mode ?? 'Ask'}</Chip><Checkbox aria-label={`Enable ${automation.prompt}`} isSelected={automation.enabled !== false} onChange={() => void toggleEnabled(automation)}>Enabled</Checkbox><Button size="sm" variant="ghost" onPress={() => startEdit(automation)}>Edit</Button><Button size="sm" variant="danger" onPress={() => void remove(automation)}>Delete</Button></li>)}</ul>}</section>}
-
-        {status === 'ready' && runs.length > 0 && <section className="mt-5 rounded-xl border border-border bg-surface p-5"><h2 className="mb-3 text-lg font-medium">Recent runs</h2><ul className="flex flex-col gap-2">{runs.slice(0, 5).map((run) => <li key={run.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"><span className="truncate">{run.prompt ?? run.automationId ?? 'Automation run'}</span><Chip size="sm" color={run.status === 'failed' ? 'danger' : 'default'}>{run.status ?? 'unknown'}</Chip></li>)}</ul></section>}
+        {status === 'ready' && runs.length > 0 && <section className="rounded-xl border border-border bg-surface p-5"><h2 className="mb-3 text-lg font-medium">Recent runs</h2><ul className="flex flex-col gap-2">{runs.slice(0, 5).map((run) => <li key={run.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"><span className="truncate">{run.prompt ?? run.automationId ?? 'Automation run'}</span><Chip size="sm" color={run.status === 'failed' ? 'danger' : 'default'}>{run.status ?? 'unknown'}</Chip></li>)}</ul></section>}
       </div>
     </main>
   );

@@ -27,7 +27,7 @@ export function Button({ variant = 'default', size, isIconOnly = false, fullWidt
   const color = BUTTON_COLORS[variant] ?? 'gray';
   const classes = [
     'zuri-button rounded-xl',
-    isIconOnly ? 'p-2' : '',
+    isIconOnly ? 'is-icon-only p-2' : '',
     fullWidth ? 'w-full' : '',
     variant === 'primary' ? 'zuri-button-primary' : '',
     variant === 'danger' ? 'zuri-button-danger' : '',

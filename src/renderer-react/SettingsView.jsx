@@ -10,6 +10,14 @@ const PROVIDERS = [
   ['zai', 'Z.ai (GLM)'],
 ];
 
+const KEY_STATE_LABELS = {
+  checking: 'Checking...',
+  saved: 'Key saved',
+  missing: 'No key saved',
+  unavailable: 'Status unavailable',
+  error: 'Status unavailable',
+};
+
 function applyTheme(theme) {
   const next = theme === 'light' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
@@ -174,19 +182,76 @@ export default function SettingsView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-6"><h1 className="text-3xl font-medium tracking-tight">Settings</h1><p className="mt-2 text-sm text-muted">Appearance, provider keys, desktop control, and the app allow-lists.</p></header>
+        <header>
+          <h1 className="text-3xl font-medium tracking-tight">Settings</h1>
+          <p className="mt-2 text-sm text-muted">Appearance, provider keys, and what Zuri is allowed to open.</p>
+        </header>
+
         {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
         {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+        {status === 'ready' && message !== '' && <p role="status" className="text-sm text-muted">{message}</p>}
+
         {status === 'ready' && <div className="grid gap-5 lg:grid-cols-2">
-          <section className="rounded-xl border border-border bg-surface p-5"><h2 className="mb-4 text-lg font-medium">Appearance</h2><div className="flex flex-wrap items-end gap-3"><SelectField label="Theme" value={current.theme === 'light' ? 'light' : 'dark'} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} onChange={(value) => void savePatch({ theme: value }, `Theme is now ${value}.`)} /><p className="text-sm text-muted">The choice is restored after restart.</p></div></section>
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <h2 className="text-lg font-medium">Appearance</h2>
+            <p className="mt-1 text-sm text-muted">Pick how Zuri looks. Applied straight away.</p>
+            <div className="mt-4">
+              <SelectField label="Theme" value={current.theme === 'light' ? 'light' : 'dark'} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} onChange={(value) => void savePatch({ theme: value }, `Theme is now ${value}.`)} />
+            </div>
+          </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5"><h2 className="mb-4 text-lg font-medium">Model and overlay</h2><Input label="Default model" value={String(current.model ?? 'gpt-4o')} isReadOnly /><Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox></section>
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <h2 className="text-lg font-medium">Model and overlay</h2>
+            <p className="mt-1 text-sm text-muted">The model Zuri answers with, and the floating quick-ask window.</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="text-sm text-muted">Default model</span>
+              <Chip>{String(current.model ?? 'gpt-4o')}</Chip>
+            </div>
+            <p className="mt-1 text-sm text-muted">Chosen during setup. To change it, open the Zuri data folder.</p>
+            <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
+          </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2"><h2 className="mb-2 text-lg font-medium">Providers and keys</h2><p className="mb-4 text-sm text-muted">Keys are stored by the main process. The renderer only knows whether one exists.</p><form onSubmit={submitKey} className="flex flex-wrap items-end gap-3"><SelectField label="Provider" value={provider} options={PROVIDERS.map(([value, label]) => ({ value, label }))} onChange={(value) => { setProvider(value); void refreshKeyStatus(value); }} /><Input type="password" label="API key" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your key" autoComplete="off" className="min-w-64 flex-1" /><Button type="submit" variant="primary" isDisabled={busy}>Save key</Button><Button type="button" variant="danger" onPress={() => void removeKey()} isDisabled={busy || keyState !== 'saved'}>Remove key</Button><Chip color={keyState === 'saved' ? 'primary' : 'default'}>{keyState === 'saved' ? 'Key saved' : keyState === 'checking' ? 'Checking...' : keyState === 'error' ? 'Status unavailable' : 'No key saved'}</Chip></form></section>
+          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+            <h2 className="text-lg font-medium">Providers and keys</h2>
+            <p className="mt-1 text-sm text-muted">Keys are stored on this computer. Zuri only knows whether one is saved.</p>
+            <form onSubmit={submitKey} className="mt-4 flex flex-col gap-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <SelectField label="Provider" value={provider} options={PROVIDERS.map(([value, label]) => ({ value, label }))} onChange={(value) => { setProvider(value); void refreshKeyStatus(value); }} />
+                <Chip className="mb-2" color={keyState === 'saved' ? 'primary' : 'default'}>{KEY_STATE_LABELS[keyState] ?? 'Status unavailable'}</Chip>
+                <Input type="password" label="API key" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your key" autoComplete="off" className="min-w-64 flex-1" />
+                <Button type="submit" variant="primary" isDisabled={busy}>Save key</Button>
+              </div>
+              <div>
+                <Button type="button" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeKey()} isDisabled={busy || keyState !== 'saved'}>Remove key</Button>
+              </div>
+            </form>
+          </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2"><div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-medium">Allowed apps and sites</h2><p className="mt-1 text-sm text-muted">Act mode can only open entries listed here. Empty lists deny by default.</p></div><Button variant="ghost" onPress={() => void openDataFolder()}>Open data folder</Button></div><form onSubmit={addAllowed} className="mb-4 flex flex-wrap items-end gap-2"><SelectField label="Allow-list type" value={allowKind} options={[{ value: 'apps', label: 'App' }, { value: 'urls', label: 'Site' }]} onChange={setAllowKind} className="min-w-32" /><Input value={allowValue} onChange={(event) => setAllowValue(event.target.value)} placeholder={allowKind === 'apps' ? 'notepad.exe' : 'https://example.com'} aria-label={allowKind === 'apps' ? 'App name' : 'Site URL'} className="min-w-64 flex-1" /><Button type="submit" variant="secondary">Add</Button></form><div className="grid gap-4 md:grid-cols-2"><div><p className="mb-2 text-sm font-medium">Apps</p>{listFor('apps').length === 0 ? <p className="text-sm text-muted">No apps allowed.</p> : <ul className="flex flex-col gap-2">{listFor('apps').map((value) => <li key={value} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" onPress={() => void removeAllowed('apps', value)}>Remove</Button></li>)}</ul>}</div><div><p className="mb-2 text-sm font-medium">Sites</p>{listFor('urls').length === 0 ? <p className="text-sm text-muted">No sites allowed.</p> : <ul className="flex flex-col gap-2">{listFor('urls').map((value) => <li key={value} className="flex items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" onPress={() => void removeAllowed('urls', value)}>Remove</Button></li>)}</ul>}</div></div></section>
+          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-medium">Allowed apps and sites</h2>
+                <p className="mt-1 text-sm text-muted">Act mode can only open apps and sites listed here. Empty lists block everything.</p>
+              </div>
+              <Button variant="ghost" onPress={() => void openDataFolder()}>Open data folder</Button>
+            </div>
+            <form onSubmit={addAllowed} className="mt-4 flex flex-wrap items-end gap-2">
+              <SelectField label="Type" value={allowKind} options={[{ value: 'apps', label: 'App' }, { value: 'urls', label: 'Site' }]} onChange={setAllowKind} className="min-w-32" />
+              <Input label="App or site" value={allowValue} onChange={(event) => setAllowValue(event.target.value)} placeholder={allowKind === 'apps' ? 'notepad.exe' : 'https://example.com'} className="min-w-64 flex-1" />
+              <Button type="submit" variant="secondary">Add</Button>
+            </form>
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div>
+                <p className="mb-2 text-sm font-medium">Apps</p>
+                {listFor('apps').length === 0 ? <p className="text-sm text-muted">No apps added yet.</p> : <ul className="flex flex-col gap-2">{listFor('apps').map((value) => <li key={value} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeAllowed('apps', value)}>Remove</Button></li>)}</ul>}
+              </div>
+              <div>
+                <p className="mb-2 text-sm font-medium">Sites</p>
+                {listFor('urls').length === 0 ? <p className="text-sm text-muted">No sites added yet.</p> : <ul className="flex flex-col gap-2">{listFor('urls').map((value) => <li key={value} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeAllowed('urls', value)}>Remove</Button></li>)}</ul>}
+              </div>
+            </div>
+          </section>
         </div>}
-        {message && status === 'ready' && <p role="status" className="mt-5 text-sm text-muted">{message}</p>}
       </div>
     </main>
   );

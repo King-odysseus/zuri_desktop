@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ComposerTextarea } from './ui.jsx';
-import { ArrowUpIcon, MicIcon, PlusIcon } from './Icons.jsx';
+import {
+  ArrowUpIcon,
+  AutomationIcon,
+  BellIcon,
+  ChevronRightIcon,
+  FolderIcon,
+  MicIcon,
+  PlusIcon,
+  TaskIcon,
+} from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
 import SelectField from './SelectField.jsx';
 
@@ -10,15 +19,21 @@ const WORKSPACE_MODES = [
   { value: 'work', label: 'Work' },
 ];
 const COMMON_SUGGESTIONS = [
-  'Which lines are over budget?',
-  'Add a variance column to Budget.xlsx',
-  'Schedule a Monday inbox brief',
-  "Find last month's unpaid invoices",
-  'Summarize the most important files in my workspace',
-  'What needs my attention today?',
-  'Create a task to follow up with the client',
-  'Set a reminder for tomorrow morning',
-  'Draft a concise reply to this email',
+  'Over-budget lines',
+  'Add a variance column',
+  'Monday inbox brief',
+  'Unpaid invoices',
+  'Summarise my files',
+  'What needs attention',
+  'Create a follow-up task',
+  'Tomorrow reminder',
+  'Draft a reply',
+];
+const WORK_TOOLS = [
+  { route: 'tasks', label: 'Tasks', description: 'Plan and track work that needs doing.', Icon: TaskIcon },
+  { route: 'files', label: 'Files', description: 'Open, review, and summarise workspace files.', Icon: FolderIcon },
+  { route: 'reminders', label: 'Reminders', description: 'Keep important follow-ups on schedule.', Icon: BellIcon },
+  { route: 'automations', label: 'Automations', description: 'Run recurring research and desktop tasks.', Icon: AutomationIcon },
 ];
 const ATTACHMENT_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv', 'md', 'json'];
 
@@ -262,32 +277,36 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
   const hasConversation = messages.length > 0 || streamingText !== '';
   const contentWidth = 'max-w-4xl';
+  const workspaceSwitch = (
+    <div role="tablist" aria-label="Workspace mode" className="inline-flex rounded-full border border-border bg-surface-secondary p-1 shadow-sm">
+      {WORKSPACE_MODES.map(({ value, label }) => (
+        <Button
+          key={value}
+          role="tab"
+          size="sm"
+          variant={workspaceMode === value ? 'secondary' : 'ghost'}
+          aria-selected={workspaceMode === value}
+          className="min-w-20 rounded-full px-4"
+          onPress={() => setWorkspaceMode(value)}
+        >
+          {label}
+        </Button>
+      ))}
+    </div>
+  );
 
   return (
     <main className={`relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground ${compact ? 'zuri-overlay-panel' : ''}`}>
-      {!compact && <div className="flex justify-center px-4 pt-6">
-        <div role="tablist" aria-label="Workspace mode" className="inline-flex rounded-full border border-border bg-surface-secondary p-1 shadow-sm">
-          {WORKSPACE_MODES.map(({ value, label }) => (
-            <Button
-              key={value}
-              role="tab"
-              size="sm"
-              variant={workspaceMode === value ? 'secondary' : 'ghost'}
-              aria-selected={workspaceMode === value}
-              className="min-w-20 rounded-full px-4"
-              onPress={() => setWorkspaceMode(value)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
-      </div>}
+      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
+        {!compact && hasConversation && <div className="pb-3">{workspaceSwitch}</div>}
 
-      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 sm:pb-6' : 'justify-center pb-10 sm:pb-24'}`}>
         {!compact && !hasConversation && (
-          <h1 className="mb-6 text-center text-3xl font-medium tracking-tight">
-            {workspaceMode === 'work' ? 'What should we work on?' : "What's on the agenda today?"}
-          </h1>
+          <div className={`mb-6 flex w-full ${contentWidth} flex-col items-center`}>
+            {workspaceSwitch}
+            <h1 className="mt-6 text-center text-3xl font-medium tracking-tight">
+              {workspaceMode === 'work' ? 'What should we work on?' : "What's on the agenda today?"}
+            </h1>
+          </div>
         )}
 
         {hasConversation && (
@@ -302,24 +321,21 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </div>
         )}
 
-        {!compact && workspaceMode === 'work' && !hasConversation && (
-          <section className={`mb-6 grid w-full ${contentWidth} grid-cols-1 gap-4 sm:grid-cols-2`} aria-label="Work tools">
-            {[
-              ['Tasks', 'Plan and track work that needs doing.', 'tasks'],
-              ['Files', 'Open, review, and summarise workspace files.', 'files'],
-              ['Reminders', 'Keep important follow-ups on schedule.', 'reminders'],
-              ['Automations', 'Run recurring research and desktop tasks.', 'automations'],
-            ].map(([label, description, route]) => (
-              <Button
-                key={route}
-                variant="ghost"
-                className="h-full min-h-24 w-full justify-start rounded-2xl border border-border bg-surface-secondary p-5 text-left"
-                onPress={() => onNavigate?.(route)}
-              >
-                <span className="flex flex-col items-start gap-1">
+        {/* Two columns only once the shell sidebar has left room for them. At
+            sm each card is about 200px and the description wraps one word per
+            line, so single column holds until lg. */}
+        {!compact && !hasConversation && (
+          <section className={`mb-6 grid w-full ${contentWidth} grid-cols-1 gap-3 lg:grid-cols-2`} aria-label="Work tools">
+            {WORK_TOOLS.map(({ route, label, description, Icon }) => (
+              <Button key={route} className="zuri-tool-card h-full items-start text-left" onPress={() => onNavigate?.(route)}>
+                <span className="zuri-tool-icon">
+                  <Icon size={18} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col items-start gap-1">
                   <span className="font-medium text-foreground">{label}</span>
                   <span className="text-sm font-normal text-muted">{description}</span>
                 </span>
+                <ChevronRightIcon size={18} className="shrink-0 self-center text-muted" />
               </Button>
             ))}
           </section>
@@ -361,25 +377,23 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             </Button>
           </form>
 
-          {!compact && <div className="mt-2 flex min-h-6 items-center justify-between gap-3 px-2 text-xs text-muted">
-            {attachment ? (
+          {!compact && attachment && (
+            <div className="mt-2 flex min-h-6 items-center gap-3 px-2 text-xs text-muted">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-foreground">Attached: {attachment.name}</span>
                 {formatAttachmentSize(attachment.size) && <span className="shrink-0">{formatAttachmentSize(attachment.size)}</span>}
                 <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onPress={() => setAttachment(null)} isDisabled={replying}>Remove</Button>
               </span>
-            ) : (
-              <span>Attach PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON files</span>
-            )}
-          </div>}
+            </div>
+          )}
 
           {!compact && !hasConversation && (
             <div className="mt-4 px-1 sm:px-2">
               <p className="pb-2 pt-1 text-sm text-muted">Try one of these</p>
-              <div className="space-y-1">
+              <div className="flex flex-wrap gap-2">
                 {suggestions.map((suggestion) => (
-                  <Button key={suggestion} variant="ghost" fullWidth className="min-h-10 justify-start rounded-lg px-2 py-2.5 text-left font-normal leading-5" onPress={() => setDraft(suggestion)}>
-                  {suggestion}
+                  <Button key={suggestion} size="sm" variant="ghost" className="zuri-suggestion-chip font-normal" onPress={() => setDraft(suggestion)}>
+                    {suggestion}
                   </Button>
                 ))}
               </div>
