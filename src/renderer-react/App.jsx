@@ -17,6 +17,10 @@ export default function App() {
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
 
   useEffect(() => {
+    document.documentElement.classList.toggle('dark', theme === 'dark');
+  }, [theme]);
+
+  useEffect(() => {
     let active = true;
     const loadTheme = async () => {
       const result = await window.zuri?.settings?.get?.();
