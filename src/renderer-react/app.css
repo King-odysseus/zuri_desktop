@@ -185,6 +185,98 @@ body {
   box-shadow: 0 12px 28px color-mix(in srgb, var(--foreground) 16%, transparent) !important;
 }
 
+/* Flowbite's defaults are intentionally generic. These shared overrides keep
+   every app control on the same semantic palette while page-specific cards can
+   still opt into their own radius through the caller's className. */
+.zuri-button {
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
+}
+
+.zuri-button-primary {
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+
+.zuri-button-primary:hover,
+.zuri-button-primary:focus-visible {
+  background: color-mix(in srgb, var(--accent) 86%, var(--foreground)) !important;
+}
+
+.zuri-button-danger {
+  background: color-mix(in srgb, var(--color-danger) 88%, var(--surface)) !important;
+  color: #ffffff !important;
+}
+
+.zuri-button-danger:hover,
+.zuri-button-danger:focus-visible {
+  background: var(--color-danger) !important;
+}
+
+.zuri-button-secondary {
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--control-border)) !important;
+}
+
+.zuri-chip {
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent) !important;
+  line-height: 1.2;
+}
+
+.zuri-chip-primary {
+  background: var(--selected) !important;
+  color: var(--selected-foreground) !important;
+}
+
+.zuri-chip-danger {
+  background: color-mix(in srgb, var(--color-danger) 16%, var(--surface)) !important;
+  color: var(--color-danger) !important;
+}
+
+.zuri-chip-default,
+.zuri-chip-warning {
+  background: var(--surface-tertiary) !important;
+  color: var(--foreground) !important;
+}
+
+.zuri-dropdown-item {
+  border-radius: 9999px !important;
+  color: var(--foreground) !important;
+  padding: 0.55rem 0.8rem !important;
+}
+
+.zuri-dropdown-item:hover,
+.zuri-dropdown-item:focus-visible {
+  background: var(--selected) !important;
+  color: var(--selected-foreground) !important;
+}
+
+.zuri-checkbox {
+  border-color: var(--control-border) !important;
+  color: var(--accent) !important;
+  accent-color: var(--accent);
+}
+
+.zuri-field-wrap label {
+  color: var(--foreground) !important;
+}
+
+.zuri-input,
+.zuri-select {
+  min-height: 52px;
+  height: 52px;
+}
+
+.zuri-input[type='date'],
+.zuri-input[type='datetime-local'],
+.zuri-input[type='time'] {
+  color-scheme: light;
+}
+
+[data-theme='dark'] .zuri-input[type='date'],
+[data-theme='dark'] .zuri-input[type='datetime-local'],
+[data-theme='dark'] .zuri-input[type='time'] {
+  color-scheme: dark;
+}
+
 .border-border.bg-surface {
   box-shadow: 0 10px 30px rgba(25, 42, 70, 0.08), 0 2px 8px rgba(25, 42, 70, 0.04);
 }

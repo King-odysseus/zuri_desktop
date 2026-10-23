@@ -34,6 +34,7 @@ export default function SelectField({ label, value, options, onChange, hideLabel
       >
         {options.map((option) => (
           <DropdownItem
+            className="zuri-dropdown-item"
             key={optionKey(option.value)}
             onClick={() => onChange(option.value)}
           >

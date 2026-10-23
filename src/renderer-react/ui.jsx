@@ -26,8 +26,12 @@ function fieldId(label, id, fallback) {
 export function Button({ variant = 'default', size, isIconOnly = false, fullWidth = false, isDisabled = false, onPress, className = '', children, ...props }) {
   const color = BUTTON_COLORS[variant] ?? 'gray';
   const classes = [
+    'zuri-button rounded-full',
     isIconOnly ? 'p-2' : '',
     fullWidth ? 'w-full' : '',
+    variant === 'primary' ? 'zuri-button-primary' : '',
+    variant === 'danger' ? 'zuri-button-danger' : '',
+    variant === 'secondary' ? 'zuri-button-secondary' : '',
     variant === 'secondary' ? 'zuri-selected-pill' : '',
     variant === 'ghost' ? 'border-0 bg-transparent shadow-none hover:bg-gray-100 dark:hover:bg-gray-800' : '',
     className,
@@ -51,6 +55,7 @@ export function Checkbox({ isSelected = false, onChange, isDisabled = false, cla
   return (
     <label className={`flex items-center gap-2 text-sm text-gray-900 dark:text-gray-300 ${className}`}>
       <FlowbiteCheckbox
+        className="zuri-checkbox"
         checked={isSelected}
         disabled={isDisabled}
         onChange={(event) => onChange?.(event.target.checked)}
@@ -62,7 +67,7 @@ export function Checkbox({ isSelected = false, onChange, isDisabled = false, cla
 }
 
 export function Chip({ color = 'default', size, className = '', children, ...props }) {
-  return <Badge color={BADGE_COLORS[color] ?? 'gray'} size={size} className={className} {...props}>{children}</Badge>;
+  return <Badge color={BADGE_COLORS[color] ?? 'gray'} size={size} className={`zuri-chip zuri-chip-${color} rounded-full ${className}`.trim()} {...props}>{children}</Badge>;
 }
 
 export function Input({ label, id, isReadOnly = false, isDisabled = false, fullWidth = false, className = '', ...props }) {
@@ -70,7 +75,7 @@ export function Input({ label, id, isReadOnly = false, isDisabled = false, fullW
   return (
     <div className={`zuri-field-wrap ${fullWidth ? 'w-full' : ''} ${className}`.trim()}>
       {label && <Label htmlFor={inputId} value={label} className={FIELD_LABEL_CLASSES} />}
-      <TextInput id={inputId} readOnly={isReadOnly} disabled={isDisabled} sizing="md" className={FIELD_CLASSES} {...props} />
+      <TextInput id={inputId} readOnly={isReadOnly} disabled={isDisabled} sizing="md" className={`${FIELD_CLASSES} zuri-input`} {...props} />
     </div>
   );
 }
@@ -84,9 +89,13 @@ export function Textarea({ label, id, isDisabled = false, className = '', ...pro
   return (
     <div className={`zuri-field-wrap ${className}`.trim()}>
       {label && <Label htmlFor={textareaId} value={label} className={FIELD_LABEL_CLASSES} />}
-      <FlowbiteTextarea id={textareaId} disabled={isDisabled} className={FIELD_CLASSES} {...props} />
+      <FlowbiteTextarea id={textareaId} disabled={isDisabled} className={`${FIELD_CLASSES} zuri-textarea`} {...props} />
     </div>
   );
 }
 
-export { FlowbiteSelect as Select, Label };
+export function Select({ className = '', ...props }) {
+  return <FlowbiteSelect className={`zuri-select rounded-full ${className}`.trim()} {...props} />;
+}
+
+export { Label };
