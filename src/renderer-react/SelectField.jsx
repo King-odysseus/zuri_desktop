@@ -19,7 +19,7 @@ export default function SelectField({ label, value, options, onChange, hideLabel
         inline
         arrowIcon={false}
         placement="bottom-start"
-        className="w-full"
+        className="zuri-dropdown-menu min-w-32"
         renderTrigger={() => (
           <button
             id={fieldId}

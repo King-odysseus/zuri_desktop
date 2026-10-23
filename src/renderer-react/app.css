@@ -173,6 +173,18 @@ body {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
 }
 
+.zuri-dropdown-menu {
+  width: max-content !important;
+  min-width: 8rem !important;
+  max-width: min(18rem, calc(100vw - 2rem));
+  overflow: hidden;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 0.75rem !important;
+  background: var(--surface) !important;
+  padding: 0.35rem !important;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--foreground) 16%, transparent) !important;
+}
+
 .border-border.bg-surface {
   box-shadow: 0 10px 30px rgba(25, 42, 70, 0.08), 0 2px 8px rgba(25, 42, 70, 0.04);
 }

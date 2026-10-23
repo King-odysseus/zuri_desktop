@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Constrained Flowbite dropdown menus to compact content-sized panels instead of stretching across the composer.
+- Key files: `src/renderer-react/SelectField.jsx`, `src/renderer-react/app.css`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Added a dedicated Chat history view with continue and confirmed permanent delete actions for every saved conversation.
 - Key files: `src/renderer-react/HistoryView.jsx`, `src/renderer-react/App.jsx`, `src/renderer-react/Sidebar.jsx`, `src/main/preload.js`, `src/main/main.js`, `src/main/store.js`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
