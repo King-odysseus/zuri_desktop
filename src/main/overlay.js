@@ -23,11 +23,12 @@ export const OVERLAY_ENTRY = path.join(moduleDir, '..', '..', 'dist-react', 'ind
 const PRELOAD_ENTRY = path.join(moduleDir, 'preload.js');
 const ICON_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.png');
 
-// The design draws the card at 520x148 (views/overlay.html, node 0:9961), so the
-// window is that plus the margin around it: a transparent window clips its own
-// box-shadow, and the glow around the card is what lifts it off the document behind.
-const CARD_WIDTH = 520;
-const CARD_HEIGHT = 148;
+// The overlay opens large enough to show a short exchange, then remains freely
+// resizable so people can keep the conversation visible while they work.
+const CARD_WIDTH = 620;
+const CARD_HEIGHT = 280;
+const MIN_CARD_WIDTH = 420;
+const MIN_CARD_HEIGHT = 180;
 
 // Space around the card inside the window, and the same inset overlay.css gives the
 // card, so the shadow has room and the card keeps the design size.
@@ -83,6 +84,8 @@ function createOverlayWindow() {
   const window = new BrowserWindow({
     width: WIDTH,
     height: HEIGHT,
+    minWidth: MIN_CARD_WIDTH + MARGIN * 2,
+    minHeight: MIN_CARD_HEIGHT + MARGIN * 2,
     x,
     y,
     show: false,
@@ -91,7 +94,7 @@ function createOverlayWindow() {
     transparent: true,
     backgroundColor: '#00000000',
     hasShadow: true,
-    resizable: false,
+    resizable: true,
     maximizable: false,
     minimizable: false,
     fullscreenable: false,

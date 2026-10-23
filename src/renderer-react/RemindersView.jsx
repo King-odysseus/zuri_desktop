@@ -141,7 +141,7 @@ export default function RemindersView() {
       <div className="zuri-page-content zuri-scrollbar-hidden">
         <h1 className="mb-6 text-3xl font-medium tracking-tight">Reminders</h1>
 
-        <form onSubmit={addReminder} className="mb-2 grid w-full items-end gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.5fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(11rem,1fr)_auto]">
+        <form onSubmit={addReminder} className="zuri-reminders-form mb-2 grid w-full items-end gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.5fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(11rem,1fr)_auto]">
           <Input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -190,10 +190,10 @@ export default function RemindersView() {
           </p>
         )}
         {status === 'ready' && upcoming.length === 0 && (
-          <p className="text-sm text-muted">Nothing coming up.</p>
+          <p className="zuri-empty-state text-sm text-muted">Nothing coming up.</p>
         )}
         {status === 'ready' && (
-          <ul className="flex flex-col gap-2">
+          <ul className="zuri-reminder-list flex flex-col gap-2">
             {upcoming.map((reminder) => {
               const overdue = Date.parse(reminder.dueAt) <= Date.now();
               return (

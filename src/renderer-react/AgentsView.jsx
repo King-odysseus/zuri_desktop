@@ -154,7 +154,7 @@ export default function AgentsView() {
         {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
         {status === 'error' && <p className="text-sm text-danger">{message}</p>}
         {status === 'ready' && (
-          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="zuri-agents-layout grid min-h-0 gap-4 lg:grid-cols-[240px_minmax(0,1fr)]">
             <section className="rounded-xl border border-border bg-surface-secondary p-3" aria-label="Agents">
               <div className="mb-2 flex items-center justify-between px-2">
                 <span className="text-sm font-medium">Agents</span>
@@ -179,7 +179,7 @@ export default function AgentsView() {
               </div>
             </section>
 
-            <section className="rounded-xl border border-border bg-surface p-5">
+            <section className="zuri-agents-editor rounded-xl border border-border bg-surface p-5">
               {!selected ? (
                 <div className="flex h-full min-h-64 flex-col items-center justify-center gap-3 text-center">
                   <h2 className="text-lg font-medium">No agent selected</h2>

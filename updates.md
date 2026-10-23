@@ -290,3 +290,10 @@
 - Key files: `src/renderer-react/App.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`.
 - Other OS action: run `npm run react:build` after syncing.
 - Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Fixed the Flowbite calendar grid, tightened page form and list widths, improved empty states and agent editor alignment, and made the floating assistant open larger and resize freely with the transcript using the available height.
+- Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`, `src/renderer-react/RemindersView.jsx`, `src/renderer-react/TasksView.jsx`, `src/renderer-react/AgentsView.jsx`, `src/main/overlay.js`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows

@@ -91,7 +91,7 @@ export default function TasksView() {
       </div>
 
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <form onSubmit={addTask} className="mb-6 flex gap-2">
+        <form onSubmit={addTask} className="zuri-task-form mb-6 flex gap-2">
           <Input
             value={newTitle}
             onChange={(event) => setNewTitle(event.target.value)}
@@ -114,11 +114,11 @@ export default function TasksView() {
         )}
 
         {status === 'ready' && visible.length === 0 && (
-          <p className="text-sm text-muted">No {filter === 'all' ? '' : filter} tasks.</p>
+          <p className="zuri-empty-state text-sm text-muted">No {filter === 'all' ? '' : filter} tasks.</p>
         )}
 
         {status === 'ready' && (
-          <ul className="flex flex-col gap-2">
+          <ul className="zuri-task-list flex flex-col gap-2">
             {visible.map((task) => (
               <li
                 key={task.id}

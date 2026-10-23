@@ -98,7 +98,7 @@ export function DateField({ label, value, onChange, className = '', ...props }) 
       label={label}
       value={dateValue(value)}
       onChange={(next) => onChange?.(localDateValue(next))}
-      className={`zuri-datepicker ${className}`.trim()}
+      className={`zuri-datepicker zuri-calendar-field ${className}`.trim()}
       {...props}
     />
   );
