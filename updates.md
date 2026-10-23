@@ -276,3 +276,10 @@
 - Key files: `src/renderer-react/app.css`.
 - Other OS action: run `npm run react:build` after syncing.
 - Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Refreshed the shared Flowbite page language with consistent rounded cards, form surfaces, field labels, list rows, responsive gutters, hover states, and lighter elevation across the remaining destinations.
+- Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows

@@ -16,7 +16,7 @@ const BADGE_COLORS = {
 };
 
 const FIELD_CLASSES = 'zuri-field w-full rounded-xl border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted';
-const FIELD_LABEL_CLASSES = 'mb-1 block text-sm font-medium text-gray-900 dark:text-white';
+const FIELD_LABEL_CLASSES = 'zuri-field-label mb-2 block text-sm font-medium text-foreground';
 
 function fieldId(label, id, fallback) {
   const generatedId = useId();
@@ -26,7 +26,7 @@ function fieldId(label, id, fallback) {
 export function Button({ variant = 'default', size, isIconOnly = false, fullWidth = false, isDisabled = false, onPress, className = '', children, ...props }) {
   const color = BUTTON_COLORS[variant] ?? 'gray';
   const classes = [
-    'zuri-button rounded-full',
+    'zuri-button rounded-xl',
     isIconOnly ? 'p-2' : '',
     fullWidth ? 'w-full' : '',
     variant === 'primary' ? 'zuri-button-primary' : '',

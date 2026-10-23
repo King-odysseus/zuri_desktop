@@ -379,6 +379,123 @@ body {
   color: var(--foreground) !important;
 }
 
+/* Shared page language. These selectors deliberately style the existing
+   Flowbite-backed markup, so every destination gets the same spacing and
+   elevation without duplicating a page-specific component library. */
+.zuri-page-content {
+  gap: 1.25rem;
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 34rem),
+    var(--background);
+}
+
+.zuri-page-content > header {
+  margin-bottom: 0 !important;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.zuri-page-content > header h1,
+.zuri-page-content > h1 {
+  color: var(--foreground);
+  font-size: clamp(1.5rem, 2vw, 1.875rem);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
+
+.zuri-page-content > header p,
+.zuri-page-content > header + p {
+  max-width: 48rem;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.zuri-page-content > section {
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent) !important;
+  border-radius: 1rem !important;
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%) !important;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--foreground) 5%, transparent) !important;
+}
+
+.zuri-page-content > section h2 {
+  color: var(--foreground);
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.zuri-page-content > form {
+  align-items: flex-end;
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 4%, transparent);
+  padding: 1rem;
+}
+
+.zuri-page-content > ul,
+.zuri-page-content > section ul {
+  margin: 0;
+}
+
+.zuri-page-content > ul > li,
+.zuri-page-content > section li {
+  min-height: 3.5rem;
+  border-color: color-mix(in srgb, var(--control-border) 72%, transparent) !important;
+  border-radius: 0.875rem !important;
+  background: color-mix(in srgb, var(--surface) 88%, var(--surface-secondary) 12%);
+  padding: 0.75rem 1rem;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+
+.zuri-page-content > ul > li:hover,
+.zuri-page-content > section li:hover {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--control-border)) !important;
+  background: color-mix(in srgb, var(--selected) 22%, var(--surface));
+  box-shadow: 0 5px 16px color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+
+.zuri-page-content .zuri-field-label {
+  color: var(--foreground) !important;
+  letter-spacing: 0.01em;
+}
+
+.zuri-page-content .text-muted {
+  color: var(--muted) !important;
+}
+
+.zuri-page-content .border-t {
+  border-color: color-mix(in srgb, var(--control-border) 72%, transparent) !important;
+}
+
+.zuri-page-content .zuri-button {
+  min-height: 2.5rem;
+  font-weight: 500;
+}
+
+.zuri-page-content .zuri-button.is-icon-only,
+.zuri-page-content button[aria-label] {
+  min-width: 2.5rem;
+}
+
+.zuri-page-content input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+@media (max-width: 639px) {
+  .zuri-page-content {
+    gap: 1rem;
+    padding: 1rem 0.875rem 1.5rem;
+  }
+
+  .zuri-page-content > form {
+    padding: 0.875rem;
+  }
+
+  .zuri-page-content > section {
+    padding: 1rem !important;
+  }
+}
+
 .zuri-dropdown-item {
   border-radius: 9999px !important;
   color: var(--foreground) !important;
