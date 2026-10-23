@@ -77,16 +77,35 @@ body {
 }
 
 .zuri-datepicker {
+  position: relative;
   min-width: 0;
 }
 
-.zuri-datepicker input {
+.zuri-datepicker > div,
+.zuri-datepicker > div > div {
+  width: 100%;
+}
+
+/* Flowbite positions the calendar icon with utilities that this build does not
+   emit, so the icon stacked above the field instead of sitting inside it. */
+.zuri-datepicker [class*='pointer-events-none'] {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 0.875rem;
+  pointer-events: none;
+}
+
+.zuri-field-wrap .zuri-datepicker input {
   min-height: 52px;
   border: 1px solid var(--control-border) !important;
   border-radius: 14px !important;
   background: var(--field-background) !important;
   color: var(--foreground) !important;
-  padding: 0.75rem 2.75rem 0.75rem 1rem !important;
+  padding: 0.75rem 2.75rem 0.75rem 2.75rem !important;
   box-shadow: none !important;
 }
 
@@ -265,26 +284,27 @@ body {
   }
 
   [data-theme="dark"] {
-    /* Keep the canvas close to the navy reference while lifting each layer just enough to separate panels. */
-    --background: #0a1222;
-    --foreground: #edf4ff;
-    --surface: #111b2e;
-    --surface-foreground: #edf4ff;
-    --surface-secondary: #15233b;
-    --surface-secondary-foreground: #edf4ff;
-    --surface-tertiary: #1c2e4d;
-    --surface-tertiary-foreground: #edf4ff;
-    --default: #21385c;
-    --default-foreground: #edf4ff;
-    --muted: #9eafd0;
-    --accent: #82b4ff;
-    --accent-foreground: #081225;
+    /* Deep navy rather than black, with each layer a clear step lighter so a
+       card, a field and the canvas stay separable without any border glow. */
+    --background: #0a1930;
+    --foreground: #e9f1fc;
+    --surface: #122742;
+    --surface-foreground: #e9f1fc;
+    --surface-secondary: #16304f;
+    --surface-secondary-foreground: #e9f1fc;
+    --surface-tertiary: #1d3a5f;
+    --surface-tertiary-foreground: #e9f1fc;
+    --default: #24476f;
+    --default-foreground: #e9f1fc;
+    --muted: #a3b8d4;
+    --accent: #7fb0ff;
+    --accent-foreground: #08172b;
     --border: transparent;
     --separator: transparent;
-    --field-background: #172740;
-    --selected: #2a507f;
-    --selected-foreground: #f2f7ff;
-    --control-border: #385274;
+    --field-background: #0f2138;
+    --selected: #24487a;
+    --selected-foreground: #eef5ff;
+    --control-border: #2f4f78;
   }
 }
 
@@ -385,6 +405,22 @@ body {
    still opt into their own radius through the caller's className. */
 .zuri-button {
   transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
+  /* Flowbite's own color themes carry dark: text variants that this renderer
+     never emits, so the light-theme gray-900 text survived into dark mode and
+     every ghost button read as dark-on-navy. Take the colour from our tokens. */
+  color: var(--foreground);
+}
+
+.zuri-button-ghost:hover,
+.zuri-button-ghost:focus-visible {
+  background: color-mix(in srgb, var(--selected) 46%, transparent) !important;
+  color: var(--selected-foreground) !important;
+}
+
+/* Flowbite Labels default to gray-900 for the same reason, which hid every
+   field label in dark mode. */
+label {
+  color: var(--foreground);
 }
 
 .zuri-button-primary {
@@ -596,6 +632,17 @@ body {
   border-color: var(--control-border) !important;
   color: var(--accent) !important;
   accent-color: var(--accent);
+}
+
+/* Tailwind's appearance-none utility is not emitted for this renderer, so the
+   boxes stay native controls: accent-color draws the tick, and color-scheme is
+   what stops an unchecked box from painting as a white square on navy. */
+.zuri-checkbox {
+  color-scheme: light;
+}
+
+[data-theme='dark'] .zuri-checkbox {
+  color-scheme: dark;
 }
 
 .zuri-field-wrap label {

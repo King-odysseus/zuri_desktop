@@ -13,6 +13,9 @@ const PROVIDERS = [
 function applyTheme(theme) {
   const next = theme === 'light' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
+  // The tokens follow data-theme, but Flowbite utilities follow the .dark
+  // class. Keep both in step so a theme saved here reaches the whole window.
+  document.documentElement.classList.toggle('dark', next === 'dark');
   return next;
 }
 

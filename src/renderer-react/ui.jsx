@@ -33,7 +33,7 @@ export function Button({ variant = 'default', size, isIconOnly = false, fullWidt
     variant === 'danger' ? 'zuri-button-danger' : '',
     variant === 'secondary' ? 'zuri-button-secondary' : '',
     variant === 'secondary' ? 'zuri-selected-pill' : '',
-    variant === 'ghost' ? 'border-0 bg-transparent shadow-none hover:bg-gray-100 dark:hover:bg-gray-800' : '',
+    variant === 'ghost' ? 'zuri-button-ghost border-0 bg-transparent shadow-none' : '',
     className,
   ].filter(Boolean).join(' ');
 
@@ -53,7 +53,7 @@ export function Button({ variant = 'default', size, isIconOnly = false, fullWidt
 
 export function Checkbox({ isSelected = false, onChange, isDisabled = false, className = '', children, ...props }) {
   return (
-    <label className={`flex items-center gap-2 text-sm text-gray-900 dark:text-gray-300 ${className}`}>
+    <label className={`flex items-center gap-2 text-sm text-foreground ${className}`}>
       <FlowbiteCheckbox
         className="zuri-checkbox"
         checked={isSelected}
@@ -74,7 +74,7 @@ export function Input({ label, id, isReadOnly = false, isDisabled = false, fullW
   const inputId = fieldId(label, id, undefined);
   return (
     <div className={`zuri-field-wrap ${fullWidth ? 'w-full' : ''} ${className}`.trim()}>
-      {label && <Label htmlFor={inputId} value={label} className={FIELD_LABEL_CLASSES} />}
+      {label && <Label htmlFor={inputId} className={FIELD_LABEL_CLASSES}>{label}</Label>}
       <TextInput id={inputId} readOnly={isReadOnly} disabled={isDisabled} sizing="md" className={`${FIELD_CLASSES} zuri-input`} {...props} />
     </div>
   );
@@ -92,15 +92,22 @@ function localDateValue(value) {
   return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
 }
 
+// Datepicker's own `label` prop is only placeholder text, so the visible label
+// comes from the same Label the other fields use.
 export function DateField({ label, value, onChange, className = '', ...props }) {
+  const dateInputId = fieldId(label, undefined, undefined);
   return (
-    <Datepicker
-      label={label}
-      value={dateValue(value)}
-      onChange={(next) => onChange?.(localDateValue(next))}
-      className={`zuri-datepicker zuri-calendar-field ${className}`.trim()}
-      {...props}
-    />
+    <div className={`zuri-field-wrap ${className}`.trim()}>
+      {label && <Label htmlFor={dateInputId} className={FIELD_LABEL_CLASSES}>{label}</Label>}
+      <Datepicker
+        id={dateInputId}
+        placeholder={label}
+        value={dateValue(value)}
+        onChange={(next) => onChange?.(localDateValue(next))}
+        className="zuri-datepicker zuri-calendar-field"
+        {...props}
+      />
+    </div>
   );
 }
 
@@ -112,7 +119,7 @@ export function Textarea({ label, id, isDisabled = false, className = '', ...pro
   const textareaId = fieldId(label, id, undefined);
   return (
     <div className={`zuri-field-wrap ${className}`.trim()}>
-      {label && <Label htmlFor={textareaId} value={label} className={FIELD_LABEL_CLASSES} />}
+      {label && <Label htmlFor={textareaId} className={FIELD_LABEL_CLASSES}>{label}</Label>}
       <FlowbiteTextarea id={textareaId} disabled={isDisabled} className={`${FIELD_CLASSES} zuri-textarea`} {...props} />
     </div>
   );

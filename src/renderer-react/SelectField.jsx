@@ -14,7 +14,7 @@ export default function SelectField({ label, value, options, onChange, hideLabel
 
   return (
     <div className={`flex ${compact ? 'min-w-0' : 'min-w-44'} flex-col gap-1 text-sm font-medium ${className}`}>
-      {!hideLabel && <Label htmlFor={fieldId} value={label} />}
+      {!hideLabel && <Label htmlFor={fieldId}>{label}</Label>}
       <Dropdown
         inline
         arrowIcon={false}

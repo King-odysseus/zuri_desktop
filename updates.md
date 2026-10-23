@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Reworked dark mode into a navy palette and made every text element readable: Ghost buttons, field labels, checkbox labels, and the selected agent row now take their colour from the shared theme tokens instead of Flowbite dark variants that this build never generates. Field labels render again (Flowbite's Label ignores the `value` prop), unchecked checkboxes follow the theme colour scheme, and the calendar icon sits inside its date field.
+- Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`, `src/renderer-react/SelectField.jsx`, `src/renderer-react/AgentsView.jsx`, `src/renderer-react/SettingsView.jsx`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Made the composer assistant-mode control icon-only, removing its visible oval while preserving the accessible label, tooltip, and dropdown options.
 - Key files: `src/renderer-react/SelectField.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.
