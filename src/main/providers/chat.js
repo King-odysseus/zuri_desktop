@@ -69,6 +69,24 @@ const RESPONSE_LANGUAGE_POLICY = [
 const MAX_ERROR_DETAIL = 240;
 
 /**
+ * These models have no clock of their own, so without this they refuse questions
+ * like "what day is it" even though the desktop knows. The date is read per
+ * request rather than at module load so a long-running window stays correct.
+ * @param {Date} [now]
+ * @returns {string}
+ */
+function currentTimeContext(now = new Date()) {
+  const date = now.toLocaleDateString('en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  return `Current local date and time where the user is: ${date}, ${time} (${Intl.DateTimeFormat().resolvedOptions().timeZone}). Use this whenever the user asks about today, the date, the day or the time. You still cannot see live websites or page contents unless a tool gives them to you.`;
+}
+
+/**
  * Everything that differs between providers. One entry per provider in
  * secrets.PROVIDERS, so a new provider is a table entry, plus a delta reader only
  * when the provider does not speak the OpenAI dialect.
@@ -547,7 +565,7 @@ export async function sendChatMessage(threadId, options = {}) {
       .filter((part) => part !== '')
       .join('\n\n');
   }
-  conversation.system = [conversation.system, RESPONSE_LANGUAGE_POLICY]
+  conversation.system = [conversation.system, currentTimeContext(), RESPONSE_LANGUAGE_POLICY]
     .filter((part) => part !== '')
     .join('\n\n');
 
