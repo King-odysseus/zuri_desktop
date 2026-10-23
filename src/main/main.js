@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, session, shell, Tray } from 'electron';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { mkdir, stat } from 'node:fs/promises';
@@ -193,6 +193,28 @@ function createMainWindow() {
   });
 
   return window;
+}
+
+/**
+ * SpeechRecognition asks Chromium for audio permission even though the renderer
+ * does not call getUserMedia directly. Allow only audio from Zuri's local file
+ * renderer, never camera access or requests from another origin.
+ * @returns {void}
+ */
+function configureMediaPermissions() {
+  const isTrustedRenderer = (webContents) => webContents?.getURL?.().startsWith('file://') === true;
+  const isAudioOnly = (details) => (
+    Array.isArray(details?.mediaTypes) &&
+    details.mediaTypes.includes('audio') &&
+    !details.mediaTypes.includes('video')
+  );
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, _requestingOrigin, details) => (
+    permission === 'media' && isTrustedRenderer(webContents) && isAudioOnly(details)
+  ));
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    callback(permission === 'media' && isTrustedRenderer(webContents) && isAudioOnly(details));
+  });
 }
 
 /**
@@ -1161,6 +1183,7 @@ app.on('second-instance', () => {
 app.whenReady().then(async () => {
   // A launch that arrived second has already quit above, and builds nothing.
   if (!ownsSingleInstance) return;
+  configureMediaPermissions();
   registerIpc();
   // First run: the folder exists before Act can write to it, and the Files view
   // can list an empty workspace instead of reporting a missing folder.

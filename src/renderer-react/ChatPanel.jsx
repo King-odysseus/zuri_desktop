@@ -28,6 +28,23 @@ function formatAttachmentSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function appendVoiceText(existing, transcript) {
+  const next = transcript.trim();
+  if (next === '') return existing;
+  const prefix = existing.trimEnd();
+  return prefix === '' ? next : `${prefix} ${next}`;
+}
+
+function voiceErrorMessage(code) {
+  if (code === 'not-allowed' || code === 'service-not-allowed') {
+    return 'Microphone access was blocked. Allow microphone access for Zuri, then try again.';
+  }
+  if (code === 'no-speech') return 'No speech was detected. Try speaking again.';
+  if (code === 'audio-capture') return 'No microphone was found. Connect a microphone, then try again.';
+  if (code === 'network') return 'Voice typing could not reach the speech service. Check your connection and try again.';
+  return 'Voice typing stopped unexpectedly. Try again.';
+}
+
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [mode, setMode] = useState('Ask');
@@ -39,7 +56,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [replying, setReplying] = useState(false);
   const [error, setError] = useState('');
   const [attachment, setAttachment] = useState(null);
+  const [listening, setListening] = useState(false);
   const composerRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const voiceDraftRef = useRef('');
+
+  useEffect(() => () => {
+    recognitionRef.current?.abort();
+    recognitionRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (initialThreadId === '' || typeof api?.chats?.list !== 'function') return undefined;
@@ -93,6 +118,58 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setError('');
   }
 
+  function toggleVoiceInput() {
+    if (replying) return;
+    if (listening) {
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    const Recognition = typeof window !== 'undefined'
+      ? window.SpeechRecognition ?? window.webkitSpeechRecognition
+      : undefined;
+    if (typeof Recognition !== 'function') {
+      setError('Voice typing is not available in this build. You can type your message instead.');
+      return;
+    }
+
+    const recognition = new Recognition();
+    voiceDraftRef.current = draft;
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    recognition.lang = typeof navigator !== 'undefined' && typeof navigator.language === 'string' && navigator.language !== ''
+      ? navigator.language
+      : 'en-US';
+    recognition.onstart = () => {
+      setListening(true);
+      setError('');
+    };
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        transcript += event.results[index][0]?.transcript ?? '';
+      }
+      setDraft(appendVoiceText(voiceDraftRef.current, transcript));
+    };
+    recognition.onerror = (event) => {
+      if (event.error !== 'aborted') setError(voiceErrorMessage(event.error));
+    };
+    recognition.onend = () => {
+      setListening(false);
+      if (recognitionRef.current === recognition) recognitionRef.current = null;
+    };
+    recognitionRef.current = recognition;
+
+    try {
+      recognition.start();
+    } catch (startError) {
+      recognitionRef.current = null;
+      setListening(false);
+      setError(startError?.message ?? 'Voice typing could not start. Try again.');
+    }
+  }
+
   async function sendMessage(event) {
     event.preventDefault();
     const prompt = draft.trim();
@@ -106,6 +183,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setError('');
     setStreamingText('');
     setReplying(true);
+    if (listening) recognitionRef.current?.stop();
 
     try {
       let content = prompt || 'Please analyze the attached file.';
@@ -246,7 +324,17 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               disabled={replying}
             />
             <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact className="w-24 shrink-0" />
-            <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Dictate">
+            <Button
+              type="button"
+              isIconOnly
+              size="sm"
+              variant={listening ? 'secondary' : 'ghost'}
+              aria-label={listening ? 'Stop voice typing' : 'Start voice typing'}
+              aria-pressed={listening}
+              title={listening ? 'Stop voice typing' : 'Voice to text'}
+              onPress={toggleVoiceInput}
+              isDisabled={replying}
+            >
               <MicIcon />
             </Button>
             <Button type="submit" isIconOnly size="sm" variant="primary" className="h-10 w-10 rounded-full bg-accent p-0 text-accent-foreground shadow-md hover:bg-accent/90 disabled:opacity-40" aria-label="Send" isDisabled={(draft.trim() === '' && !attachment) || replying}>
