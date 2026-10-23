@@ -45,6 +45,7 @@
   --zuri-surface-raised: #1e1e26; /* heroUI default ramp, one step above surface */
   --zuri-composer-surface: #0d1b2d; /* Navy composer surface */
   --zuri-sidebar-surface: #10243b; /* Navy sidebar card surface */
+  --zuri-sidebar-toggle-surface: #183552; /* Sidebar collapse control surface */
   --zuri-surface-sunken: #101214; /* design node 0:113 color/sunken, the dark step below surface */
   /* The two steps the current design's panels and controls are drawn on
      (tokens.json Dark --color-surface-secondary / --color-surface-tertiary):
@@ -305,6 +306,7 @@
   --zuri-surface-raised: #ffffff; /* heroUI default ramp, raised light surface */
   --zuri-composer-surface: #ffffff; /* Light composer surface */
   --zuri-sidebar-surface: #ffffff; /* Light sidebar card surface */
+  --zuri-sidebar-toggle-surface: #f4f4f5; /* Sidebar collapse control surface */
   --zuri-surface-sunken: #f0f1f3; /* design node 0:113 color/sunken, the light step below surface */
   /* The two steps the current design's panels and controls are drawn on
      (tokens.json Light --color-surface-secondary / --color-surface-tertiary):

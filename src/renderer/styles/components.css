@@ -1352,11 +1352,16 @@ body {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--zuri-radius-lg);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--zuri-radius-brand);
   background: var(--zuri-accent);
   color: var(--zuri-text-on-accent);
+}
+
+.sidebar-brand-mark svg {
+  width: 15px;
+  height: 15px;
 }
 
 .sidebar-brand-name {
@@ -1377,15 +1382,15 @@ body {
   height: 32px;
   border: 0;
   border-radius: var(--zuri-radius-row);
-  background: var(--zuri-surface-secondary);
+  background: var(--zuri-sidebar-toggle-surface);
   color: var(--zuri-text-secondary);
 }
 
 /* (32 - 18) / 2 = 7: the node insets the glyph 7 px, so the box centres it without
    a padding of its own. */
 .sidebar-brand-toggle .shell-toggle-icon {
-  width: 18px;
-  height: 18px;
+  width: 16px;
+  height: 16px;
 }
 
 .sidebar-new-chat {

@@ -18,3 +18,9 @@
 - Key files: `src/renderer/styles/components.css`, `src/renderer/styles/tokens.css`.
 - Other OS action: no build required; run `npm test` after syncing.
 - Done on: Windows
+## 2026-10-23 - Windows
+
+- Refined the shell sidebar brand mark to the 32px design geometry and increased collapse-control contrast.
+- Key files: `src/renderer/index.html`, `src/renderer/styles/components.css`, `src/renderer/styles/tokens.css`.
+- Other OS action: no build required; run `npm test` after syncing.
+- Done on: Windows
