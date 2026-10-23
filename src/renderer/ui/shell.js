@@ -1,7 +1,14 @@
 /**
- * The three-column shell: which of #sidebar, #chat and #context-panel is
- * collapsed. The state is renderer memory only (architecture.md keeps column
- * state there), so a reload starts from the defaults again.
+ * The three-column shell: which of #sidebar and #context-panel is collapsed.
+ * The state is renderer memory only (architecture.md keeps column state there),
+ * so a reload starts from the defaults again.
+ *
+ * #chat is not collapsible, and that is deliberate. As a rail it was a 12 px
+ * sliver clipped by the column's own overflow, so the toggle inside it could not
+ * be clicked at all and the conversation could not be reopened. It is also the
+ * content: with the chat a rail the two panels took about 570 px of the window
+ * and every remaining pixel was empty surface. The chat column keeps whatever the
+ * two panels leave, always.
  *
  * On a phone the same state does double duty: a collapsed #sidebar is the drawer
  * pushed off screen and a collapsed #context-panel is the panel pulled off it,
@@ -20,16 +27,24 @@ export const PHONE_BREAKPOINT = 768;
 /** The columns that are sheets over the conversation on a phone. */
 const PHONE_SHEETS = Object.freeze(['sidebar', 'context-panel']);
 
-/** Tab bar items that open one column, by data-shell-tab value. */
-const TAB_COLUMNS = Object.freeze({ chats: 'sidebar', context: 'context-panel' });
+/**
+ * Tab bar items that open one column, by data-shell-tab value. The everyday
+ * destinations carry data-route instead and are handled by ui/router.js, so the bar
+ * shows where the app goes without hiding the rest of the navigation behind one
+ * item: More opens the drawer that holds the remaining destinations.
+ */
+const TAB_COLUMNS = Object.freeze({ more: 'sidebar', context: 'context-panel' });
 
-/** Column ids, in DOM order. */
-export const COLUMN_IDS = Object.freeze(['sidebar', 'chat', 'context-panel']);
+/**
+ * The columns that can be collapsed, in DOM order. #chat is absent on purpose;
+ * the module comment above says why, and assertColumnName turns a call to
+ * collapse it into a loud error rather than a silent dead end.
+ */
+export const COLUMN_IDS = Object.freeze(['sidebar', 'context-panel']);
 
 /** @type {Record<string, boolean>} */
 const collapsedState = {
   sidebar: false,
-  chat: false,
   'context-panel': false,
 };
 
@@ -169,9 +184,34 @@ export function fillSidebarUser(name) {
 }
 
 /**
+ * Which layout band a viewport width falls in. The two breakpoints above split
+ * the window into three, and each band starts from its own defaults.
+ * @param {number} width
+ * @returns {'phone' | 'narrow' | 'wide'}
+ */
+function bandFor(width) {
+  if (width < PHONE_BREAKPOINT) return 'phone';
+  if (width < CONTEXT_PANEL_BREAKPOINT) return 'narrow';
+  return 'wide';
+}
+
+/**
+ * The columns' starting state for a band: a phone starts with both side panels
+ * closed because each one is a full-height sheet over the conversation, a narrow
+ * window keeps the sidebar and closes the context panel, a wide one shows all three.
+ * @param {'phone' | 'narrow' | 'wide'} band
+ */
+function applyBandDefaults(band) {
+  setColumnCollapsed('sidebar', band === 'phone');
+  setColumnCollapsed('context-panel', band !== 'wide');
+}
+
+/**
  * Wire the collapse toggles and apply the starting state.
- * The breakpoints are read once, at start: a later resize must not undo a choice
- * the user made by hand, so nothing here listens for resize.
+ * The breakpoints decide the starting state only: a window that opens narrow starts
+ * with its sheets closed and a wide one shows all three columns. A resize never
+ * re-applies them, because a panel the reader opened by hand is theirs to keep - a
+ * drag that put it back would undo a deliberate choice.
  * @param {Window} [viewport]
  */
 export function initShell(viewport = window) {
@@ -186,12 +226,5 @@ export function initShell(viewport = window) {
       ?.addEventListener('click', () => toggleColumn(column));
   }
 
-  // The tab bar's middle item starts a thread by pressing the real New chat
-  // button, so the phone route goes through the same handler as the desktop one.
-  document
-    .querySelector('.shell-tabbar-item[data-shell-tab="new"]')
-    ?.addEventListener('click', () => document.getElementById('new-chat-button')?.click());
-
-  setColumnCollapsed('sidebar', viewport.innerWidth < PHONE_BREAKPOINT);
-  setColumnCollapsed('context-panel', viewport.innerWidth < CONTEXT_PANEL_BREAKPOINT);
+  applyBandDefaults(bandFor(viewport.innerWidth));
 }
