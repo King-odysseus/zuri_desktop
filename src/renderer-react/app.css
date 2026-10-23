@@ -183,6 +183,23 @@ body {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
 }
 
+/* The composer already labels the mode through its surrounding controls. Keep
+   the mode menu keyboard accessible without adding another visible pill. */
+.zuri-dropdown-trigger.zuri-dropdown-icon-only {
+  width: 40px;
+  min-height: 40px;
+  justify-content: center;
+  padding-inline: 0;
+  border: 0 !important;
+  border-radius: 9999px;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.zuri-dropdown-trigger.zuri-dropdown-icon-only:hover {
+  background: color-mix(in srgb, var(--selected) 42%, transparent) !important;
+}
+
 .zuri-dropdown-menu {
   width: max-content !important;
   min-width: 8rem !important;

@@ -8,7 +8,7 @@ function optionKey(value) {
   return value === '' ? EMPTY_KEY : value;
 }
 
-export default function SelectField({ label, value, options, onChange, hideLabel = false, compact = false, className = '' }) {
+export default function SelectField({ label, value, options, onChange, hideLabel = false, compact = false, iconOnly = false, className = '' }) {
   const selectedOption = options.find((option) => String(option.value ?? '') === String(value ?? '')) ?? options[0];
   const fieldId = `select-${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
@@ -25,9 +25,10 @@ export default function SelectField({ label, value, options, onChange, hideLabel
             id={fieldId}
             type="button"
             aria-label={hideLabel ? label : undefined}
-            className="zuri-dropdown-trigger flex min-h-10 w-full items-center justify-between gap-1 rounded-full border-0 bg-transparent px-2 text-sm font-medium text-foreground outline-none focus:ring-2 focus:ring-accent/30"
+            title={`${label}: ${selectedOption?.label ?? ''}`}
+            className={`zuri-dropdown-trigger ${iconOnly ? 'zuri-dropdown-icon-only' : ''} flex min-h-10 w-full items-center justify-between gap-1 rounded-full border-0 bg-transparent px-2 text-sm font-medium text-foreground outline-none focus:ring-2 focus:ring-accent/30`}
           >
-            <span className="truncate">{selectedOption?.label ?? ''}</span>
+            {!iconOnly && <span className="truncate">{selectedOption?.label ?? ''}</span>}
             <ChevronDownIcon size={14} />
           </button>
         )}

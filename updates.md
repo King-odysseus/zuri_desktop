@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Made the composer assistant-mode control icon-only, removing its visible oval while preserving the accessible label, tooltip, and dropdown options.
+- Key files: `src/renderer-react/SelectField.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`.
+- Other OS action: run `npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Expanded the React chat pane to the available width with side padding, wrapped long unbroken messages, lowered the in-chat composer, and hid the conversation scrollbar while preserving scrolling.
 - Key files: `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.

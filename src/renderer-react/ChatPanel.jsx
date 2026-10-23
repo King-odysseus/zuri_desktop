@@ -333,7 +333,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               className="min-h-10 min-w-0 flex-1 max-h-48 py-2 text-base outline-none"
               disabled={replying}
             />
-            <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact className="w-24 shrink-0" />
+            <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact iconOnly className="shrink-0" />
             <Button
               type="button"
               isIconOnly
