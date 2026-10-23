@@ -113,7 +113,7 @@ export default function FilesView() {
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
-      <div className="flex w-full min-w-0 flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+      <div className="zuri-page-content zuri-scrollbar-hidden">
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-medium tracking-tight">Office files</h1>

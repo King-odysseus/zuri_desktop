@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Chip, Input, Textarea } from './ui.jsx';
+import { Button, Checkbox, Chip, DateField, Input, Textarea } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 
 const MODES = [
@@ -205,7 +205,7 @@ export default function AutomationsView() {
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
-      <div className="flex w-full min-w-0 flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
+      <div className="zuri-page-content zuri-scrollbar-hidden">
         <header className="mb-6">
           <h1 className="text-3xl font-medium tracking-tight">Automations</h1>
           <p className="mt-2 text-sm text-muted">Schedule Zuri runs while the app is open, and catch up on the next start.</p>
@@ -231,7 +231,12 @@ export default function AutomationsView() {
             />
             <SelectField label="Mode" value={mode} options={MODES} onChange={setMode} />
             <SelectField label="How often" value={cadenceType} options={CADENCES} onChange={setCadenceType} />
-            {cadenceType === 'once' && <Input type="datetime-local" label="Date and time" value={onceAt} onChange={(event) => setOnceAt(event.target.value)} />}
+            {cadenceType === 'once' && (
+              <>
+                <DateField label="Date" value={onceAt.slice(0, 10)} onChange={(date) => setOnceAt(`${date}T${onceAt.slice(11, 16)}`)} />
+                <Input type="time" label="Time" value={onceAt.slice(11, 16)} onChange={(event) => setOnceAt(`${onceAt.slice(0, 10)}T${event.target.value}`)} />
+              </>
+            )}
             {cadenceType === 'interval' && <Input type="number" min="1" step="1" label="Minutes between runs" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} />}
             {cadenceType === 'daily' && <Input type="time" label="Time of day" value={timeOfDay} onChange={(event) => setTimeOfDay(event.target.value)} />}
             <SelectField label="Agent" value={agentId} options={[{ value: '', label: 'Whoever is active' }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={setAgentId} />

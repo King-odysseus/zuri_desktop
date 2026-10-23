@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Chip, Input } from './ui.jsx';
+import { Button, Chip, DateField, Input } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 
 const REPEAT_OPTIONS = [
@@ -25,6 +25,10 @@ function describeRepeat(reminder) {
   }
   if (reminder.repeat === 'daily') return `Daily at ${reminder.timeOfDay ?? 'the saved time'}`;
   return 'Once';
+}
+
+function combineDateTime(date, time) {
+  return `${date}T${time}`;
 }
 
 // Port of the legacy Reminders destination on the same window.zuri.reminders
@@ -134,22 +138,29 @@ export default function RemindersView() {
 
   return (
     <main className="flex h-full flex-1 flex-col bg-background text-foreground">
-      <div className="w-full min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-10">
+      <div className="zuri-page-content zuri-scrollbar-hidden">
         <h1 className="mb-6 text-3xl font-medium tracking-tight">Reminders</h1>
 
-        <form onSubmit={addReminder} className="mb-2 flex flex-wrap gap-2">
+        <form onSubmit={addReminder} className="zuri-form-row mb-2">
           <Input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="Call the bank"
             aria-label="What is it for"
-            className="min-w-48 flex-1"
+            className="min-w-64 flex-1"
+          />
+          <DateField
+            label="Date"
+            value={when.slice(0, 10)}
+            onChange={(date) => setWhen(combineDateTime(date, when.slice(11, 16)))}
+            className="min-w-56"
           />
           <Input
-            type="datetime-local"
-            value={when}
-            onChange={(event) => setWhen(event.target.value)}
-            aria-label="When"
+            type="time"
+            label="Time"
+            value={when.slice(11, 16)}
+            onChange={(event) => setWhen(combineDateTime(when.slice(0, 10), event.target.value))}
+            className="w-40"
           />
           <SelectField label="How often" value={repeat} options={REPEAT_OPTIONS} onChange={setRepeat} />
           {repeat === 'interval' && (

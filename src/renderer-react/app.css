@@ -44,6 +44,62 @@ body {
   color: var(--foreground);
 }
 
+/* Every non-chat page uses the same readable gutter and centred content width.
+   Keeping this on the shell prevents wide screens from stretching controls to
+   the window edges or making each page invent its own padding rhythm. */
+.zuri-page-content {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 1.5rem 1rem;
+}
+
+.zuri-page-content > * {
+  width: min(100%, 90rem);
+  margin-inline: auto;
+}
+
+.zuri-form-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+@media (min-width: 640px) {
+  .zuri-page-content {
+    padding-inline: 1.5rem;
+    padding-block: 2rem;
+  }
+}
+
+.zuri-datepicker {
+  min-width: 0;
+}
+
+.zuri-datepicker input {
+  min-height: 52px;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 9999px !important;
+  background: var(--field-background) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+
+.zuri-datepicker input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+}
+
+.zuri-datepicker > div {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
 .composer-textarea {
   scrollbar-width: none;
 }

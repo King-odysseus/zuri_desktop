@@ -1,5 +1,5 @@
 import { forwardRef, useId } from 'react';
-import { Badge, Button as FlowbiteButton, Checkbox as FlowbiteCheckbox, Label, Select as FlowbiteSelect, TextInput, Textarea as FlowbiteTextarea } from 'flowbite-react';
+import { Badge, Button as FlowbiteButton, Checkbox as FlowbiteCheckbox, Datepicker, Label, Select as FlowbiteSelect, TextInput, Textarea as FlowbiteTextarea } from 'flowbite-react';
 
 const BUTTON_COLORS = {
   primary: 'blue',
@@ -77,6 +77,30 @@ export function Input({ label, id, isReadOnly = false, isDisabled = false, fullW
       {label && <Label htmlFor={inputId} value={label} className={FIELD_LABEL_CLASSES} />}
       <TextInput id={inputId} readOnly={isReadOnly} disabled={isDisabled} sizing="md" className={`${FIELD_CLASSES} zuri-input`} {...props} />
     </div>
+  );
+}
+
+function dateValue(value) {
+  if (typeof value !== 'string' || value.trim() === '') return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function localDateValue(value) {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return '';
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+export function DateField({ label, value, onChange, className = '', ...props }) {
+  return (
+    <Datepicker
+      label={label}
+      value={dateValue(value)}
+      onChange={(next) => onChange?.(localDateValue(next))}
+      className={`zuri-datepicker ${className}`.trim()}
+      {...props}
+    />
   );
 }
 
