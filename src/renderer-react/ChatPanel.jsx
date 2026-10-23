@@ -427,7 +427,6 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               aria-label="Message Zuri"
               rows={1}
               className="min-h-10 min-w-0 flex-1 max-h-48 py-2 text-base outline-none"
-              disabled={replying}
             />
             <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact plainTrigger className="shrink-0" />
             <Button

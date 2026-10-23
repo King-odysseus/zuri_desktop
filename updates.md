@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Kept the chat composer typeable while a reply is running. It was disabled until the reply finished, so a slow provider locked typing for up to two minutes. Sending stays blocked mid-reply and the half-typed message is kept.
+- Key file: `src/renderer-react/ChatPanel.jsx`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Rebuilt the Tasks, Reminders, Automations, Settings, Office files and AI agents pages on one shared frame: a title and description on every page, one card per section, centred 1200px content, one 44px control height for fields and buttons, one centred empty state, and quiet red text actions for delete. The Chat and Work landing now carries its mode switch above the headline, four pressable tool cards with icons, and suggestions as chips instead of text lines. The assistant is also told the current date and time, so it no longer refuses questions like "what day is it".
 - Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`, `src/renderer-react/TasksView.jsx`, `src/renderer-react/RemindersView.jsx`, `src/renderer-react/AutomationsView.jsx`, `src/renderer-react/SettingsView.jsx`, `src/renderer-react/FilesView.jsx`, `src/renderer-react/AgentsView.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/main/providers/chat.js`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.
