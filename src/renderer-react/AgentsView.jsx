@@ -164,12 +164,13 @@ export default function AgentsView() {
                 {agents.map((agent) => (
                   <Button
                     key={agent.id}
-                    variant={agent.id === selectedId ? 'secondary' : 'ghost'}
-                    className="h-auto justify-start px-3 py-2 text-left"
+                    variant="ghost"
+                    aria-pressed={agent.id === selectedId}
+                    className={`h-auto w-full justify-start rounded-none border-l-2 border-transparent bg-transparent px-3 py-2 text-left shadow-none hover:bg-transparent dark:hover:bg-transparent ${agent.id === selectedId ? 'border-blue-400 font-semibold text-blue-300' : 'text-foreground'}`}
                     onPress={() => setSelectedId(agent.id)}
                   >
                     <span className="flex min-w-0 flex-1 flex-col items-start">
-                      <span className="w-full truncate text-sm">{agent.name || 'Untitled agent'}</span>
+                      <span className={`w-full truncate text-sm ${agent.id === selectedId ? 'text-blue-300' : ''}`}>{agent.name || 'Untitled agent'}</span>
                       <span className="text-xs text-muted">{agent.allowedTools.length} tools</span>
                     </span>
                   </Button>

@@ -1,5 +1,12 @@
 ## 2026-10-24 - Windows
 
+- Removed the rounded selected-pill background from the Agents list and replaced it with a flat selected row using a left rule and accent text.
+- Key files: `src/renderer-react/AgentsView.jsx`.
+- Other OS action: run `npm install && npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Applied Flowbite-native styling to shared React inputs, textareas, selects, labels, and checkbox text, including dark-mode variants driven by the app theme.
 - Key files: `src/renderer-react/ui.jsx`, `src/renderer-react/SelectField.jsx`, `src/renderer-react/App.jsx`.
 - Other OS action: run `npm install && npm run react:build` after syncing.
