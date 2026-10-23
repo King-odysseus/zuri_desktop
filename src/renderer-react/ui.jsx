@@ -15,7 +15,7 @@ const BADGE_COLORS = {
   warning: 'warning',
 };
 
-const FIELD_CLASSES = 'rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400';
+const FIELD_CLASSES = 'zuri-field w-full rounded-full border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted';
 const FIELD_LABEL_CLASSES = 'mb-1 block text-sm font-medium text-gray-900 dark:text-white';
 
 function fieldId(label, id, fallback) {
@@ -67,9 +67,9 @@ export function Chip({ color = 'default', size, className = '', children, ...pro
 export function Input({ label, id, isReadOnly = false, isDisabled = false, fullWidth = false, className = '', ...props }) {
   const inputId = fieldId(label, id, undefined);
   return (
-    <div className={`${fullWidth ? 'w-full' : ''} ${className}`.trim()}>
+    <div className={`zuri-field-wrap ${fullWidth ? 'w-full' : ''} ${className}`.trim()}>
       {label && <Label htmlFor={inputId} value={label} className={FIELD_LABEL_CLASSES} />}
-      <TextInput id={inputId} readOnly={isReadOnly} disabled={isDisabled} sizing="md" className={`w-full ${FIELD_CLASSES}`} {...props} />
+      <TextInput id={inputId} readOnly={isReadOnly} disabled={isDisabled} sizing="md" className={FIELD_CLASSES} {...props} />
     </div>
   );
 }
@@ -81,9 +81,9 @@ export const ComposerTextarea = forwardRef(function ComposerTextarea({ className
 export function Textarea({ label, id, isDisabled = false, className = '', ...props }) {
   const textareaId = fieldId(label, id, undefined);
   return (
-    <div className={className}>
+    <div className={`zuri-field-wrap ${className}`.trim()}>
       {label && <Label htmlFor={textareaId} value={label} className={FIELD_LABEL_CLASSES} />}
-      <FlowbiteTextarea id={textareaId} disabled={isDisabled} className={`w-full ${FIELD_CLASSES}`} {...props} />
+      <FlowbiteTextarea id={textareaId} disabled={isDisabled} className={FIELD_CLASSES} {...props} />
     </div>
   );
 }

@@ -18,7 +18,7 @@ export default function SelectField({ label, value, options, onChange, hideLabel
         sizing="md"
         className={compact
           ? 'w-full rounded-lg border-0 bg-transparent px-2 text-foreground shadow-none focus:ring-0'
-          : 'w-full rounded-lg border border-gray-300 bg-gray-50 p-2.5 text-sm text-gray-900 focus:border-blue-500 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400'}
+          : 'zuri-field rounded-full border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted'}
       >
         {options.map((option) => <option key={optionKey(option.value)} value={optionKey(option.value)}>{option.label}</option>)}
       </Select>

@@ -16,6 +16,29 @@
   display: none;
 }
 
+/* Flowbite wraps text inputs in a positioning element. Keep that wrapper
+   transparent so the control reads as one light pill instead of two stacked
+   white boxes. */
+.zuri-field-wrap > div {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.zuri-field {
+  min-height: 48px;
+  border-color: transparent !important;
+  border-radius: 9999px !important;
+  background: var(--field-background) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+
+.zuri-field:focus {
+  border-color: transparent !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+}
+
 /*
  * Maps the app's navy/dark palette onto semantic variables used by Flowbite
  * controls and the surrounding page surfaces. Hex values stay explicit so the
