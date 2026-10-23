@@ -1,8 +1,36 @@
 ## 2026-10-23 - Windows
 
+- Added Chat and Work workspace modes, a visible dark-mode toggle, and a full-width Search page route in the React shell.
+- Key files: `src/renderer-react/App.jsx`, `src/renderer-react/Sidebar.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/SearchView.jsx`, `src/renderer-react/Icons.jsx`.
+- Other OS action: run `npm install && npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Improved assistant response formatting with safe Markdown blocks and responsive styles.
 - Key files: `src/renderer/ui/composer.js`, `src/renderer/styles/components.css`, `scripts/selftest.js`.
 - Other OS action: no build required; run `npm test` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
+- Polished the React shell with a slimmer icon rail, roomier conversation panel, compact mode selector, and layered navy surfaces; rebuilt and installed the React desktop app.
+- Key files: `src/renderer-react/Sidebar.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`.
+- Other OS action: run `npm install && npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
+- Replaced all remaining native React dropdowns with the shared HeroUI Select and ListBox field, including the chat mode, reminders, automations, settings theme/provider, and allow-list controls.
+- Key files: `src/renderer-react/SelectField.jsx`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/RemindersView.jsx`, `src/renderer-react/AutomationsView.jsx`, `src/renderer-react/SettingsView.jsx`.
+- Other OS action: run `npm install && npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
+- Removed narrow max-width page shells from Tasks, Reminders, Agents, Automations, Files, and Settings so content fills the available window while using responsive mobile padding.
+- Key files: `src/renderer-react/TasksView.jsx`, `src/renderer-react/RemindersView.jsx`, `src/renderer-react/AgentsView.jsx`, `src/renderer-react/AutomationsView.jsx`, `src/renderer-react/FilesView.jsx`, `src/renderer-react/SettingsView.jsx`.
+- Other OS action: run `npm install && npm run react:build` after syncing.
 - Done on: Windows
 
 ## 2026-10-23 - Windows

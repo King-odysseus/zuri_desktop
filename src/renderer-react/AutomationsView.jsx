@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, Chip, Input } from '@heroui/react';
+import SelectField from './SelectField.jsx';
 
 const MODES = [
   { value: 'ask', label: 'Ask' },
@@ -204,7 +205,7 @@ export default function AutomationsView() {
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-1 flex-col overflow-y-auto px-6 py-8">
+      <div className="flex w-full min-w-0 flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
         <header className="mb-6">
           <h1 className="text-3xl font-medium tracking-tight">Automations</h1>
           <p className="mt-2 text-sm text-muted">Schedule Zuri runs while the app is open, and catch up on the next start.</p>
@@ -223,12 +224,12 @@ export default function AutomationsView() {
               What should it do
               <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={3} maxLength={2000} placeholder="Summarise unread mail and list anything urgent" className="w-full resize-y rounded-medium border border-border bg-surface-secondary px-3 py-2 text-sm font-normal text-foreground outline-none placeholder:text-muted focus:border-primary" />
             </label>
-            <label className="flex flex-col gap-1 text-sm font-medium">Mode<select value={mode} onChange={(event) => setMode(event.target.value)} className="h-10 rounded-medium border border-border bg-surface-secondary px-3 font-normal text-foreground">{MODES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-            <label className="flex flex-col gap-1 text-sm font-medium">How often<select value={cadenceType} onChange={(event) => setCadenceType(event.target.value)} className="h-10 rounded-medium border border-border bg-surface-secondary px-3 font-normal text-foreground">{CADENCES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+            <SelectField label="Mode" value={mode} options={MODES} onChange={setMode} />
+            <SelectField label="How often" value={cadenceType} options={CADENCES} onChange={setCadenceType} />
             {cadenceType === 'once' && <Input type="datetime-local" label="Date and time" value={onceAt} onChange={(event) => setOnceAt(event.target.value)} />}
             {cadenceType === 'interval' && <Input type="number" min="1" step="1" label="Minutes between runs" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} />}
             {cadenceType === 'daily' && <Input type="time" label="Time of day" value={timeOfDay} onChange={(event) => setTimeOfDay(event.target.value)} />}
-            <label className="flex flex-col gap-1 text-sm font-medium">Agent<select value={agentId} onChange={(event) => setAgentId(event.target.value)} className="h-10 rounded-medium border border-border bg-surface-secondary px-3 font-normal text-foreground"><option value="">Whoever is active</option>{agents.map((agent) => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
+            <SelectField label="Agent" value={agentId} options={[{ value: '', label: 'Whoever is active' }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={setAgentId} />
           </div>
           {tools.length > 0 && <div className="mt-4"><p className="mb-2 text-sm font-medium">Tools it may use</p><div className="grid gap-2 sm:grid-cols-2">{tools.map((tool) => <Checkbox key={tool.name} isSelected={allowedTools.includes(tool.name)} onChange={(checked) => setAllowedTools((current) => checked ? [...new Set([...current, tool.name])] : current.filter((name) => name !== tool.name))}>{tool.label}</Checkbox>)}</div></div>}
           <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4"><span role="status" className="text-sm text-muted">{message}</span><Button variant="primary" onPress={() => void save()}>{editing ? 'Save changes' : 'Add automation'}</Button></div>

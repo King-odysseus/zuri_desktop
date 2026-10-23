@@ -39,19 +39,22 @@
   }
 
   [data-theme="dark"] {
-    --background: #0b0b0f;
-    --foreground: #f4f4f6;
-    --surface: #16161c;
-    --surface-foreground: #f4f4f6;
-    --surface-secondary: #10243b; /* tokens.css --zuri-sidebar-surface */
-    --surface-secondary-foreground: #f4f4f6;
-    --surface-tertiary: #3f3f46;
-    --surface-tertiary-foreground: #f4f4f6;
-    --default: #27272a;
-    --default-foreground: #f4f4f6;
-    --accent: #006fee; /* tokens.css --zuri-accent */
-    --accent-foreground: #ffffff;
-    --border: rgba(255, 255, 255, 0.1);
-    --separator: rgba(255, 255, 255, 0.1);
+    /* Keep the canvas close to the navy reference while lifting each layer just enough to separate panels. */
+    --background: #0d1633;
+    --foreground: #f5f7ff;
+    --surface: #121e40;
+    --surface-foreground: #f5f7ff;
+    --surface-secondary: #17274b;
+    --surface-secondary-foreground: #f5f7ff;
+    --surface-tertiary: #20345e;
+    --surface-tertiary-foreground: #f5f7ff;
+    --default: #243a68;
+    --default-foreground: #f5f7ff;
+    --muted: #a9b7d3;
+    --accent: #76a9ff;
+    --accent-foreground: #09142d;
+    --border: rgba(176, 196, 235, 0.18);
+    --separator: rgba(176, 196, 235, 0.14);
+    --field-background: #152548;
   }
 }

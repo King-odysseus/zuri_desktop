@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Chip, Input } from '@heroui/react';
+import SelectField from './SelectField.jsx';
 
 const REPEAT_OPTIONS = [
   { value: 'once', label: 'Once' },
@@ -133,7 +134,7 @@ export default function RemindersView() {
 
   return (
     <main className="flex h-full flex-1 flex-col bg-background text-foreground">
-      <div className="mx-auto w-full max-w-xl flex-1 overflow-y-auto px-6 py-10">
+      <div className="w-full min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-10">
         <h1 className="mb-6 text-3xl font-medium tracking-tight">Reminders</h1>
 
         <form onSubmit={addReminder} className="mb-2 flex flex-wrap gap-2">
@@ -150,18 +151,7 @@ export default function RemindersView() {
             onChange={(event) => setWhen(event.target.value)}
             aria-label="When"
           />
-          <select
-            value={repeat}
-            onChange={(event) => setRepeat(event.target.value)}
-            aria-label="How often"
-            className="h-10 rounded-medium border border-border bg-surface px-3 text-sm text-foreground"
-          >
-            {REPEAT_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <SelectField label="How often" value={repeat} options={REPEAT_OPTIONS} onChange={setRepeat} />
           {repeat === 'interval' && (
             <Input
               type="number"

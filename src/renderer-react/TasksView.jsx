@@ -89,7 +89,7 @@ export default function TasksView() {
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-xl flex-1 overflow-y-auto px-6 py-8">
+      <div className="w-full min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
         <form onSubmit={addTask} className="mb-6 flex gap-2">
           <Input
             value={newTitle}

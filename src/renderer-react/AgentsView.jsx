@@ -142,7 +142,7 @@ export default function AgentsView() {
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
-      <div className="mx-auto flex w-full max-w-5xl min-w-0 flex-1 flex-col overflow-y-auto px-6 py-8">
+      <div className="flex w-full min-w-0 flex-1 flex-col overflow-y-auto px-4 py-6 sm:px-6 sm:py-8">
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-medium tracking-tight">AI agents</h1>

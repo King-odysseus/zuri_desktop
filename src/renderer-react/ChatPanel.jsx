@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Button } from '@heroui/react';
-import { ArrowUpIcon, ChevronDownIcon, MicIcon, PlusIcon } from './Icons.jsx';
+import { ArrowUpIcon, MicIcon, PlusIcon } from './Icons.jsx';
+import SelectField from './SelectField.jsx';
 
-const MODES = ['Ask', 'Act', 'Autopilot'];
+const MODES = ['Ask', 'Act', 'Autopilot'].map((name) => ({ value: name, label: name }));
 
 const SUGGESTIONS = [
   'Which lines are over budget?',
@@ -11,33 +12,35 @@ const SUGGESTIONS = [
   "Find last month's unpaid invoices",
 ];
 
-// Layout follows the reference chat screen: a mode toggle centred at the top,
+const WORKSPACE_MODES = [
+  { value: 'chat', label: 'Chat' },
+  { value: 'work', label: 'Work' },
+];
+
+// Layout follows the reference chat screen: one compact workspace control at the top,
 // the greeting and a single-line pill composer centred in the page, and the
-// openings listed under the composer as one bordered card. Modes are the app's
-// own Ask / Act / Autopilot rather than the reference's Chat / Work. Sending is
-// not wired yet; this is the visual port.
+// openings listed under the composer as one bordered card. Keeping assistant
+// mode choice in one compact HeroUI control leaves the composer calm.
 export default function ChatPanel() {
   const [mode, setMode] = useState('Ask');
+  const [workspaceMode, setWorkspaceMode] = useState('chat');
   const [draft, setDraft] = useState('');
 
   return (
     <main className="relative flex h-full flex-1 flex-col bg-background text-foreground">
-      <div className="flex justify-center pt-6">
-        <div
-          role="group"
-          aria-label="Mode"
-          className="inline-flex rounded-full border border-border bg-surface-secondary p-1"
-        >
-          {MODES.map((name) => (
+      <div className="flex justify-center px-4 pt-6">
+        <div role="tablist" aria-label="Workspace mode" className="inline-flex rounded-full border border-border bg-surface-secondary p-1 shadow-sm">
+          {WORKSPACE_MODES.map(({ value, label }) => (
             <Button
-              key={name}
+              key={value}
+              role="tab"
               size="sm"
-              variant={mode === name ? 'secondary' : 'ghost'}
-              className="rounded-full px-4"
-              aria-pressed={mode === name}
-              onPress={() => setMode(name)}
+              variant={workspaceMode === value ? 'secondary' : 'ghost'}
+              aria-selected={workspaceMode === value}
+              className="min-w-20 rounded-full px-4"
+              onPress={() => setWorkspaceMode(value)}
             >
-              {name}
+              {label}
             </Button>
           ))}
         </div>
@@ -45,28 +48,29 @@ export default function ChatPanel() {
 
       <div className="flex flex-1 flex-col items-center justify-center px-6 pb-24">
         <h1 className="mb-6 text-center text-3xl font-medium tracking-tight">
-          What&rsquo;s on the agenda today?
+          {workspaceMode === 'work' ? 'What should we work on?' : 'What&rsquo;s on the agenda today?'}
         </h1>
 
         <div className="w-full max-w-2xl">
-          <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 shadow-sm">
+          <div className="flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-2 shadow-sm">
             <Button isIconOnly size="sm" variant="ghost" aria-label="Attach a file">
               <PlusIcon />
             </Button>
             <input
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              placeholder="Ask Zuri"
+              placeholder={workspaceMode === 'work' ? 'Work with Zuri' : 'Ask Zuri'}
               aria-label="Message Zuri"
               className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted"
             />
-            <button
-              type="button"
-              className="flex items-center gap-1 px-2 text-sm text-muted"
-            >
-              {mode}
-              <ChevronDownIcon size={14} />
-            </button>
+            <SelectField
+              label="Assistant mode"
+              value={mode}
+              options={MODES}
+              onChange={setMode}
+              hideLabel
+              className="min-w-0 w-28 shrink-0"
+            />
             <Button isIconOnly size="sm" variant="ghost" aria-label="Dictate">
               <MicIcon />
             </Button>
@@ -82,7 +86,7 @@ export default function ChatPanel() {
             </Button>
           </div>
 
-          <div className="mt-3 rounded-2xl border border-border bg-background p-2">
+          <div className="mt-3 rounded-2xl border border-border bg-surface-secondary p-2">
             <p className="px-3 pb-1 pt-2 text-sm text-muted">Try one of these</p>
             {SUGGESTIONS.map((suggestion) => (
               <Button
