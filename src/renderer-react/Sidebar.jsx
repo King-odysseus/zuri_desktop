@@ -68,7 +68,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             isIconOnly
             size="sm"
             variant="ghost"
-            className={current === key ? 'bg-surface-tertiary text-foreground' : 'text-muted'}
+            className={current === key ? 'zuri-selected-pill' : 'text-muted'}
             aria-label={label}
             title={label}
             aria-current={current === key ? 'page' : undefined}

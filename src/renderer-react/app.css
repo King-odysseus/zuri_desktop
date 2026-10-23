@@ -25,6 +25,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-border: var(--border);
   --color-separator: var(--separator);
+  --color-selected: var(--selected);
+  --color-selected-foreground: var(--selected-foreground);
   --color-danger: #ef6b7a;
 }
 
@@ -81,15 +83,15 @@ body {
   /* Light is the default look, matching the reference screen: white page, a
      barely-grey list panel, near-black text and a single blue accent. */
   [data-theme="light"] {
-    --background: #f6f8fc;
+    --background: #eef3f9;
     --foreground: #142033;
     --surface: #ffffff;
     --surface-foreground: #142033;
-    --surface-secondary: #f9fbff;
+    --surface-secondary: #e7eef8;
     --surface-secondary-foreground: #142033;
-    --surface-tertiary: #eef3f9;
+    --surface-tertiary: #dbe7f4;
     --surface-tertiary-foreground: #142033;
-    --default: #e9eff7;
+    --default: #dce6f1;
     --default-foreground: #142033;
     --muted: #6f7e95;
     --accent: #3478e5;
@@ -97,6 +99,8 @@ body {
     --border: transparent;
     --separator: transparent;
     --field-background: #ffffff;
+    --selected: #d4e5ff;
+    --selected-foreground: #174b91;
   }
 
   [data-theme="dark"] {
@@ -117,12 +121,31 @@ body {
     --border: transparent;
     --separator: transparent;
     --field-background: #172740;
+    --selected: #2a507f;
+    --selected-foreground: #f2f7ff;
   }
 }
 
 /* Keep panels clean and let elevation, not gray hairlines, define grouping. */
 .border-border {
   border-color: transparent !important;
+}
+
+/* Selected controls need a visible state even when borders are intentionally absent. */
+.zuri-selected-pill {
+  background: var(--selected) !important;
+  color: var(--selected-foreground) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 42%, transparent) !important;
+}
+
+.zuri-selected-pill:hover {
+  background: var(--selected) !important;
+  color: var(--selected-foreground) !important;
+}
+
+.zuri-dropdown-trigger {
+  background: var(--field-background) !important;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 .border-border.bg-surface {

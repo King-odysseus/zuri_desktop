@@ -28,6 +28,7 @@ export function Button({ variant = 'default', size, isIconOnly = false, fullWidt
   const classes = [
     isIconOnly ? 'p-2' : '',
     fullWidth ? 'w-full' : '',
+    variant === 'secondary' ? 'zuri-selected-pill' : '',
     variant === 'ghost' ? 'border-0 bg-transparent shadow-none hover:bg-gray-100 dark:hover:bg-gray-800' : '',
     className,
   ].filter(Boolean).join(' ');
