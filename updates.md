@@ -241,3 +241,10 @@
 - Key files: `src/renderer/index.html`, `src/renderer/styles/components.css`, `src/renderer/styles/tokens.css`.
 - Other OS action: no build required; run `npm test` after syncing.
 - Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Restored the shared Flowbite pill treatment on page inputs by styling the visible TextInput element instead of its transparent wrapper.
+- Key files: `src/renderer-react/app.css`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows

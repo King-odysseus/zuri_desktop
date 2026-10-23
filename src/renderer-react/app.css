@@ -71,6 +71,33 @@ body {
   box-shadow: none !important;
 }
 
+/* TextInput owns two nested wrappers. The visible border belongs on the native
+   input, otherwise the wrapper reset above leaves a thin browser control behind. */
+.zuri-field-wrap > div.zuri-field > div {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.zuri-field-wrap input {
+  min-height: 52px;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 9999px !important;
+  background: var(--field-background) !important;
+  color: var(--foreground) !important;
+  box-shadow: none !important;
+}
+
+.zuri-field-wrap input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+}
+
+.zuri-field-wrap input::placeholder,
+.zuri-field::placeholder {
+  color: var(--muted) !important;
+}
+
 .zuri-field {
   min-height: 52px;
   border: 1px solid var(--control-border) !important;
