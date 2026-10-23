@@ -1,5 +1,12 @@
 ## 2026-10-23 - Windows
 
+- Added more breathing room to the empty-chat suggestion list with a larger card inset, taller rows, and consistent row gaps.
+- Key files: `src/renderer-react/ChatPanel.jsx`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-23 - Windows
+
 - Increased light-theme surface contrast and added a dedicated blue-tinted selected state for active tabs, navigation, secondary buttons, and dropdown triggers.
 - Key files: `src/renderer-react/app.css`, `src/renderer-react/ui.jsx`, `src/renderer-react/Sidebar.jsx`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.

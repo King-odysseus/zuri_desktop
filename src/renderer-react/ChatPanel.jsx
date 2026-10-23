@@ -267,13 +267,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </div>
 
           {!hasConversation && (
-            <div className="mt-3 rounded-2xl border border-border bg-surface-secondary p-2">
-              <p className="px-3 pb-1 pt-2 text-sm text-muted">Try one of these</p>
-              {SUGGESTIONS.map((suggestion) => (
-                <Button key={suggestion} variant="ghost" fullWidth className="justify-start font-normal" onPress={() => setDraft(suggestion)}>
+            <div className="mt-4 rounded-2xl border border-border bg-surface-secondary p-3 sm:p-4">
+              <p className="px-3 pb-2 pt-1 text-sm text-muted">Try one of these</p>
+              <div className="space-y-1">
+                {SUGGESTIONS.map((suggestion) => (
+                  <Button key={suggestion} variant="ghost" fullWidth className="min-h-10 justify-start rounded-xl px-3 py-2.5 text-left font-normal leading-5" onPress={() => setDraft(suggestion)}>
                   {suggestion}
-                </Button>
-              ))}
+                  </Button>
+                ))}
+              </div>
             </div>
           )}
         </div>
