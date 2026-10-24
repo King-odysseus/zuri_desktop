@@ -1,0 +1,6 @@
+# Keep tests, docs and local handles out of the deployed image.
+test
+README.md
+.git
+node_modules
+npm-debug.log

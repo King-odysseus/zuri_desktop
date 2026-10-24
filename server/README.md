@@ -34,7 +34,14 @@ the `x-paystack-signature` HMAC before parsing or applying an event. Successful 
 checkouts and later recurring `charge.success` events update the local subscription;
 failed or disabled subscription events move it to `past_due`, `cancelled`, or `expired`.
 
-The server also serves a web dashboard at `/` (sign in with Google, usage, plans, Paystack checkout, payment history). Apply the database schema with `npm run migrate` (needs `DATABASE_URL`, for example from a Railway PostgreSQL service; no local Postgres is required to run the tests).
+The server also serves the React web dashboard from `public/` (sign in with Google, usage, plans, Paystack checkout, payment history). The dashboard source lives in the repo's `web/` folder and is built into `public/` with `npm run web:build` at the repo root (Vite + React 19). The build output is committed because the Railway image only ships this folder. Apply the database schema with `npm run migrate` (needs `DATABASE_URL`, for example from a Railway PostgreSQL service; no local Postgres is required to run the tests).
+
+## Deploying
+
+The Railway service builds this folder with its `Dockerfile` (node:20-alpine). Two things catch people out:
+
+- The service domain needs a target port. The server listens on `PORT` (default 8080), so set the domain's target port to the same number. Without it Railway answers 502 "Application failed to respond" while the app itself is healthy.
+- Deploy this folder, not the repo root. The root is the Electron desktop app, whose start script cannot run in a container.
 
 Run locally from this directory:
 
@@ -43,4 +50,6 @@ npm test
 npm start
 ```
 
-Railway supplies `PORT`; `DATABASE_URL` enables PostgreSQL-backed accounts. Never put provider keys or Google client secrets in source control.
+To review the dashboard without a database or Google credentials, run `node scripts/preview-web.mjs` from the repo root: it serves `public/` with sample plans, usage and payments on http://127.0.0.1:8099.
+
+Railway supplies `PORT`; `DATABASE_URL` enables PostgreSQL-backed accounts. Google sign-in stays switched off until `GOOGLE_CLIENT_ID` is set, and the sign-in card says so. Never put provider keys or Google client secrets in source control.

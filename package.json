@@ -16,6 +16,7 @@
     "demo:autopilot": "node scripts/demo-autopilot.js",
     "react:dev": "vite",
     "react:build": "vite build",
+    "web:build": "vite build --config vite.web.config.mjs",
     "dist": "electron-builder --win nsis",
     "test": "npm run react:build && npm run smoke && npm run selftest && npm run firstrun && npm run demo:act && npm run demo:autopilot"
   },

@@ -1,5 +1,14 @@
 ## 2026-10-24 - Windows
 
+- Rebuilt the Zuri Cloud web dashboard as a React app (`web/`, Vite, React 19) instead of plain HTML and JS. It has a signed-out page (hero, sign-in card, features, Naira plans) and a signed-in shell with Overview, Usage and limits, Plans and Billing, a sidebar on desktop and a fixed bottom tab bar on phones, and a light/dark toggle. `npm run web:build` builds it into `server/public`.
+- The server now serves that bundle from `public/` with a path guard (traversal and unknown extensions are refused) and falls back to the app shell for extension-less routes. Added `server/Dockerfile` so the Railway service builds this folder reproducibly.
+- Fixed the live 502: the Railway domain had no target port, so nothing was routed to the app. The domain now targets 8080.
+- Key files: `web/src/**`, `vite.web.config.mjs`, `server/src/app.js`, `server/public/**`, `server/Dockerfile`, `server/test/server.test.js`.
+- Other OS action: run `npm run web:build` then `cd server && npm test` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Added the Zuri Cloud web dashboard (served by the cloud server at `/`: Google sign-in, usage, plans, Paystack checkout, payment history) and `npm run migrate` in `server/` to create the database tables. A PostgreSQL database must still be added on Railway and `DATABASE_URL` set.
 - Key files: `server/public/index.html`, `server/public/dashboard.js`, `server/src/migrate.js`, `server/src/app.js`.
 - Other OS action: none for the desktop app; in `server/` run `npm test`.

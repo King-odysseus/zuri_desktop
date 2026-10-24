@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { readdir } from 'node:fs/promises';
 import { handleRequest, createApp } from '../src/app.js';
 import { canConsume, usageStatus } from '../src/usage.js';
 import { createAuthService, hashSessionToken, normalizeGoogleProfile } from '../src/auth.js';
@@ -172,7 +173,16 @@ const dashboardPage = await app(new Request('https://cloud.example.com/'));
 assert.equal(dashboardPage.status, 200);
 assert.match(dashboardPage.headers.get('content-type'), /text\/html/);
 assert.ok(dashboardPage.headers.get('content-security-policy'));
-assert.equal((await app(new Request('https://cloud.example.com/dashboard.js'))).status, 200);
+// The React bundle is fingerprinted per build, so pick whatever the build produced.
+const builtAssets = await readdir(new URL('../public/assets/', import.meta.url));
+const scriptAsset = builtAssets.find((name) => name.endsWith('.js'));
+assert.ok(scriptAsset, 'the web bundle should be built into server/public/assets (npm run web:build)');
+const assetResponse = await app(new Request(`https://cloud.example.com/assets/${scriptAsset}`));
+assert.equal(assetResponse.status, 200);
+assert.match(assetResponse.headers.get('content-type'), /javascript/);
+assert.match(assetResponse.headers.get('cache-control') ?? '', /immutable/);
+assert.equal((await app(new Request('https://cloud.example.com/dashboard.js'))).status, 404);
 assert.equal((await app(new Request('https://cloud.example.com/..%2Fsrc%2Fconfig.js'))).status, 404);
+assert.equal((await app(new Request('https://cloud.example.com/package.json'))).status, 404);
 
 console.log('PASS server contract');
