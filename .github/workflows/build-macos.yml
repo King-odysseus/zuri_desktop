@@ -36,6 +36,13 @@ jobs:
       # built first; dist:mac alone would ship the previous renderer.
       - run: npm run react:build
 
+      # dmg-builder declares dmg-license as an optionalDependency that only
+      # installs on darwin. The lockfile is generated on Windows, so it carries
+      # no installable entry for it and npm ci leaves it out; electron-builder
+      # then stops at "Cannot find module 'dmg-license'" before building
+      # anything. Installing it here keeps it out of the app package.json.
+      - name: Add the dmg licence helper
+        run: npm install dmg-license@1.0.11 --no-save --no-audit --no-fund
       - name: Build the dmg
         run: npm run dist:mac
         env:
