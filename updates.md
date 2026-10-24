@@ -1,7 +1,7 @@
 ## 2026-10-24 - Windows
 
-- Fixed the packaged ExcelJS dependency tree by shipping `es-abstract-get` as an extra runtime resource and adding packaged runtime resources to Node's module lookup path. This prevents the installed app from failing at startup with a missing `es-abstract-get/GetMethod` module.
-- Key files: `package.json`, `src/main/bootstrap.js`.
+- Fixed the packaged ExcelJS dependency tree by shipping `es-abstract-get` and its small runtime dependency chain as extra resources, and adding packaged runtime resources to Node's module lookup path. This prevents the installed app from failing at startup with missing abstract-operation modules.
+- Key files: `package.json`, `src/main/bootstrap.js`, `scripts/selftest.js`.
 - Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
 - Done on: Windows
 

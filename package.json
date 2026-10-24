@@ -42,6 +42,22 @@
       {
         "from": "node_modules/es-abstract-get",
         "to": "node_modules/es-abstract-get"
+      },
+      {
+        "from": "node_modules/es-errors",
+        "to": "node_modules/es-errors"
+      },
+      {
+        "from": "node_modules/es-object-atoms",
+        "to": "node_modules/es-object-atoms"
+      },
+      {
+        "from": "node_modules/is-callable",
+        "to": "node_modules/is-callable"
+      },
+      {
+        "from": "node_modules/object-inspect",
+        "to": "node_modules/object-inspect"
       }
     ],
     "win": {

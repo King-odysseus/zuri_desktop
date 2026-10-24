@@ -45,6 +45,12 @@ check('the app package points at the React main process', () => {
   if (!packageJson.build?.files?.includes('dist-react/**/*')) {
     throw new Error('electron-builder does not package dist-react');
   }
+  const runtimeResources = packageJson.build?.extraResources ?? [];
+  for (const required of ['node_modules/es-abstract-get', 'node_modules/es-errors']) {
+    if (!runtimeResources.some((entry) => entry?.from === required && entry?.to === required)) {
+      throw new Error(`missing packaged runtime resource ${required}`);
+    }
+  }
   return packageJson.main;
 });
 
