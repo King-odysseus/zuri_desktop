@@ -21,6 +21,29 @@ import {
 } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
 import { copyText } from './clipboard.js';
+// The app mark that sits above the opening line. Importing it lets the bundler
+// fingerprint the file and rewrite the URL relative to the built index.html,
+// which is what keeps it loading over file:// in the packaged app.
+import zuriMarkUrl from './assets/zuri-logo.png';
+
+const OPENING_QUESTION = "What's on the agenda today?";
+
+/**
+ * "Good morning", plus the first name when one was saved in Settings. The hour
+ * is read when the chat view mounts, so an app left open overnight greets the
+ * new day on the next new chat rather than staying on yesterday's afternoon.
+ * @param {string} name Saved display name, or '' when none is set.
+ * @param {Date} [now]
+ * @returns {string}
+ */
+function greetingHeading(name, now = new Date()) {
+  const hour = now.getHours();
+  const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  if (trimmed === '') return part;
+  // First name only: "Good evening, Alex" reads like a greeting, the full name reads like a form.
+  return `${part}, ${trimmed.split(/\s+/)[0]}`;
+}
 
 const CAPABILITY_HINTS = [
   'Ask me to summarise your files.',
@@ -177,7 +200,7 @@ function FileCard({ file, api }) {
   );
 }
 
-export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar }) {
+export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar, openingKind = 'question' }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [draft, setDraft] = useState('');
   const [threadId, setThreadId] = useState(initialThreadId);
@@ -207,6 +230,25 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     () => CAPABILITY_HINTS[Math.floor(Math.random() * CAPABILITY_HINTS.length)],
     [],
   );
+  // The shell alternates this per chat session, so the first screen is a
+  // greeting one time and the agenda question the next. It is a prop rather
+  // than a value this view picks itself: a mount counter would be read twice
+  // under React's development checks and land on the same line every time.
+  const [personName, setPersonName] = useState('');
+  const openingHeading = openingKind === 'greeting' ? greetingHeading(personName) : OPENING_QUESTION;
+
+  // The greeting greets the person by name only once Settings has answered, so
+  // the line is derived from state rather than baked in when the turn was taken.
+  useEffect(() => {
+    let active = true;
+    const loadName = async () => {
+      const result = await api?.settings?.get?.();
+      if (!active || !result?.ok) return;
+      if (typeof result.data?.name === 'string') setPersonName(result.data.name);
+    };
+    void loadName();
+    return () => { active = false; };
+  }, [api]);
 
   useEffect(() => () => {
     recognitionRef.current?.abort();
@@ -613,7 +655,18 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         )}
         {!compact && !hasConversation && (
           <div className={`mb-6 flex w-full ${contentWidth} flex-col items-center`}>
-            <h1 className="text-center text-3xl font-medium tracking-tight">What's on the agenda today?</h1>
+            {/* The mark sits above the line rather than beside it: the heading is
+                the thing to read, and a logo beside it would pull the eye first. */}
+            <img
+              src={zuriMarkUrl}
+              alt=""
+              aria-hidden="true"
+              width={52}
+              height={52}
+              className="zuri-chat-mark"
+              decoding="async"
+            />
+            <h1 className="mt-5 text-center text-3xl font-medium tracking-tight">{openingHeading}</h1>
             <p className="mt-3 text-center text-base text-muted">{capabilityHint}</p>
           </div>
         )}

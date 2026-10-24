@@ -408,6 +408,15 @@ body {
   outline-offset: 2px;
 }
 
+/* Brand mark above the opening line on an empty chat. Its own corner radius
+   keeps the soft shadow on the mark rather than on the image's square edge. */
+.zuri-chat-mark {
+  width: 3.25rem;
+  height: 3.25rem;
+  border-radius: 0.9rem;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
 .zuri-dropdown-trigger {
   min-height: var(--control-height);
   border: 1px solid var(--control-border) !important;
