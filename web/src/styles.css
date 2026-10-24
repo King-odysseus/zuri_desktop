@@ -1580,6 +1580,9 @@ a {
 
 /* Account screens ------------------------------------------------------- */
 
+/* The account screens fill the window edge to edge. Their content is what gets
+   a reading width (the card, the copy column), never the page itself: a capped
+   page leaves two bare strips beside the photograph on a 1920px screen. */
 .auth-page {
   position: relative;
   z-index: 1;
@@ -1587,20 +1590,54 @@ a {
   grid-template-columns: minmax(0, 1fr);
   width: 100%;
   min-height: calc(100dvh - var(--bar-height));
-  margin: 0 auto;
 }
 
+/* The panel behind the copy is a photograph, not a painted gradient: a soft
+   painted wash read as a smudge at this size. Photo: "Blue waves form a soft,
+   abstract gradient" by Hassaan Here, Unsplash License, stored under
+   web/public/img so the page never waits on another host to paint.
+   The scrim is the first of the two background layers. It is what keeps the
+   white copy readable over the bright top of the picture, and it deepens on
+   the dark theme, where the surrounding canvas is already navy. */
 .auth-aside {
   position: relative;
-  min-height: 132px;
+  min-height: 148px;
   overflow: hidden;
-  background:
-    radial-gradient(90% 120% at 15% 10%, color-mix(in srgb, var(--accent) 34%, transparent), transparent 60%),
-    linear-gradient(150deg, var(--surface-secondary), var(--canvas));
+  background-color: #0d2a4d;
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(8, 20, 38, 0.74) 0%,
+      rgba(8, 20, 38, 0.26) 20%,
+      rgba(10, 28, 56, 0.5) 55%,
+      rgba(8, 20, 38, 0.86) 100%
+    ),
+    url("/img/auth-backdrop.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   isolation: isolate;
 }
 
-/* Below 900px the aside is a colour band: the copy lives in the card, where a
+:root[data-theme="dark"] .auth-aside {
+  background-image:
+    linear-gradient(
+      180deg,
+      rgba(4, 1, 48, 0.72) 0%,
+      rgba(4, 1, 48, 0.38) 20%,
+      rgba(4, 1, 48, 0.62) 55%,
+      rgba(4, 1, 48, 0.92) 100%
+    ),
+    url("/img/auth-backdrop.jpg");
+}
+
+/* The copy stands on the photograph, so it is white in both themes rather than
+   following the page's text colour. */
+.auth-aside .brand {
+  color: #ffffff;
+}
+
+/* Below 900px the aside is a photo band: the copy lives in the card, where a
    thumb can reach it. */
 .auth-aside-inner {
   display: none;
@@ -1750,23 +1787,27 @@ a {
   gap: 8px;
 }
 
+/* The chips are the only furniture on the photograph, so they are glass rather
+   than surface-coloured: a solid white chip would punch a hole in the picture. */
 .auth-trust li {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 11px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 9999px;
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
-  color: var(--muted);
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
   font-size: 12px;
   font-weight: 600;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .auth-trust svg {
   width: 14px;
   height: 14px;
-  stroke: var(--accent);
+  stroke: #ffffff;
   fill: none;
 }
 
@@ -2025,7 +2066,6 @@ a.download-card:hover {
   .auth-page {
     grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
     align-items: stretch;
-    max-width: var(--max-width);
     min-height: calc(100dvh - var(--bar-height));
   }
 
@@ -2048,18 +2088,20 @@ a.download-card:hover {
 
   .auth-aside-inner h1 {
     max-width: 16ch;
-    color: var(--text);
+    color: #ffffff;
     font-size: clamp(26px, 2.6vw, 38px);
     font-weight: 600;
     letter-spacing: -0.03em;
     line-height: 1.1;
+    text-shadow: 0 1px 18px rgba(4, 12, 28, 0.35);
   }
 
   .auth-aside-inner p {
     max-width: 40ch;
-    color: var(--muted);
+    color: rgba(255, 255, 255, 0.84);
     font-size: 15px;
     line-height: 1.6;
+    text-shadow: 0 1px 14px rgba(4, 12, 28, 0.3);
   }
 
   .auth-brand {
