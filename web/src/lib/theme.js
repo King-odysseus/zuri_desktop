@@ -2,18 +2,22 @@
 const THEME_KEY = 'zuri-theme';
 
 /**
- * Saved choice, or dark for a first visit.
+ * Saved choice, or light for a first visit.
+ *
+ * The page opens on paper-white surfaces by default. A dark screen is only ever
+ * a choice the reader made with the bar's toggle, so a first visit never lands
+ * on the navy canvas.
  * @returns {'dark' | 'light'}
  */
 export function preferredTheme() {
   try {
     const saved = localStorage.getItem(THEME_KEY);
-    return saved === 'light' || saved === 'dark' ? saved : 'dark';
+    return saved === 'light' || saved === 'dark' ? saved : 'light';
   } catch (error) {
     // Blocked storage (private mode, third-party cookies off) must not stop the
     // page booting: fall back to the default theme for this visit.
     console.warn('[zuri-cloud] theme preference unavailable', error?.message ?? error);
-    return 'dark';
+    return 'light';
   }
 }
 

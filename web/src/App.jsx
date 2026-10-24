@@ -237,7 +237,6 @@ export default function App() {
     return (
       <Landing
         plans={plans}
-        theme={theme}
         busy={busyPlan}
         onChoose={handleChoose}
         onNavigate={navigate}

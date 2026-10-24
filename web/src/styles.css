@@ -2,54 +2,48 @@
  * Zuri Cloud web UI.
  *
  * The tokens and control shapes are the desktop app's own (see
- * src/renderer-react/app.css): the same navy canvas, the same ice-blue light
- * theme, 44px controls on a 12px radius, 16px cards, pill chips and the
- * accent-tinted selected state. Keeping the values literal means the two
- * surfaces can be compared side by side without a mapping table.
+ * src/renderer-react/app.css): 44px controls on a 12px radius, 16px cards, pill
+ * chips and the accent-tinted selected state. Keeping the values literal means
+ * the two surfaces can be compared side by side without a mapping table.
+ *
+ * Light is the page's own paint: a first visit shows paper-white surfaces and a
+ * blue accent. The navy canvas is one attribute away and the bar's toggle is
+ * the only thing that sets it, so nobody lands on a dark screen by default.
  */
-:root {
-  color-scheme: dark;
-  --canvas: #040130;
-  --surface: #0a0548;
-  --surface-secondary: #100a5c;
-  --surface-tertiary: #181072;
-  --raised: #241c8c;
-  --glass: rgba(16, 10, 92, 0.78);
-  --hairline: rgba(180, 177, 232, 0.16);
-  --strong: rgba(180, 177, 232, 0.32);
-  --control-border: #342eaa;
-  --field-background: #070240;
-  --text: #ecebff;
-  --muted: #b4b1e8;
-  --faint: #8b86cf;
-  --accent: #a9b4ff;
-  --accent-hover: #c6ceff;
-  --accent-foreground: #040130;
-  --accent-soft: #2a23a0;
-  --accent-text: #f2f1ff;
-  --selected: #2a23a0;
-  --selected-foreground: #f2f1ff;
-  --success: #4ade80;
-  --success-soft: #0c3d24;
-  --warning: #f5a623;
-  --warning-soft: #3a2a05;
-  --danger: #ef6b7a;
-  --danger-soft: #3d1220;
-  --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.24);
-  --shadow-glass: 0 18px 40px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.28);
-  --glow: radial-gradient(60% 60% at 100% 0%, rgba(169, 180, 255, 0.16), transparent 60%);
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
-  /* One height for every button and field, as on the desktop pages. */
-  --control-height: 44px;
-  --bar-height: 64px;
-  --max-width: 1280px;
+@import "tailwindcss";
+@import "flowbite-react/plugin/tailwindcss";
+@source "./**/*.{jsx,js}";
+@source "../../node_modules/flowbite-react/dist";
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Tailwind and Flowbite React generate utilities; these tokens give those
+ * utilities the site's own colours, so a Flowbite button, badge or progress bar
+ * wears the same accent as the rest of the page instead of Flowbite's cyan.
+ */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-secondary: var(--surface-secondary);
+  --color-surface-tertiary: var(--surface-tertiary);
+  --color-raised: var(--raised);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-body: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-hairline: var(--hairline);
+  --color-control-border: var(--control-border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --radius-control: var(--radius-lg);
+  --radius-card: var(--radius-xl);
 }
 
-:root[data-theme="light"] {
+:root {
   color-scheme: light;
   --canvas: #eef3f9;
   --surface: #ffffff;
@@ -80,6 +74,51 @@
   --shadow-soft: 0 10px 30px rgba(25, 42, 70, 0.08), 0 2px 8px rgba(25, 42, 70, 0.04);
   --shadow-glass: 0 18px 40px rgba(25, 42, 70, 0.12), 0 2px 8px rgba(25, 42, 70, 0.05);
   --glow: radial-gradient(60% 60% at 100% 0%, rgba(52, 120, 229, 0.14), transparent 60%);
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  /* One height for every button and field, as on the desktop pages. */
+  --control-height: 44px;
+  --bar-height: 64px;
+  /* The reading column. Bands keep their full width; this only decides where
+     their content stops growing, so a 1920px window still shows one page. */
+  --max-width: 1440px;
+  --gutter: clamp(20px, 4vw, 48px);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #040130;
+  --surface: #0a0548;
+  --surface-secondary: #100a5c;
+  --surface-tertiary: #181072;
+  --raised: #241c8c;
+  --glass: rgba(16, 10, 92, 0.78);
+  --hairline: rgba(180, 177, 232, 0.16);
+  --strong: rgba(180, 177, 232, 0.32);
+  --control-border: #342eaa;
+  --field-background: #070240;
+  --text: #ecebff;
+  --muted: #b4b1e8;
+  --faint: #8b86cf;
+  --accent: #a9b4ff;
+  --accent-hover: #c6ceff;
+  --accent-foreground: #040130;
+  --accent-soft: #2a23a0;
+  --accent-text: #f2f1ff;
+  --selected: #2a23a0;
+  --selected-foreground: #f2f1ff;
+  --success: #4ade80;
+  --success-soft: #0c3d24;
+  --warning: #f5a623;
+  --warning-soft: #3a2a05;
+  --danger: #ef6b7a;
+  --danger-soft: #3d1220;
+  --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow-glass: 0 18px 40px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --glow: radial-gradient(60% 60% at 100% 0%, rgba(169, 180, 255, 0.16), transparent 60%);
 }
 
 * {
@@ -159,10 +198,10 @@ a {
   align-items: center;
   gap: 16px;
   width: 100%;
-  max-width: var(--max-width);
   min-height: var(--bar-height);
-  margin: 0 auto;
-  padding: 10px 20px;
+  /* Same gutter as the page below it, so the brand sits exactly over the
+     headline instead of a padding's width further in. */
+  padding: 10px max(var(--gutter), calc((100% - var(--max-width)) / 2));
 }
 
 .brand {
@@ -343,6 +382,9 @@ a {
 .notice {
   position: relative;
   z-index: 1;
+  /* Same gutter as the page, so the bar lines up with the headline it sits
+     above instead of running into the window edges. */
+  width: calc(100% - 2 * var(--gutter));
   max-width: var(--max-width);
   margin: 16px auto 0;
   padding: 12px 16px;
@@ -369,9 +411,22 @@ a {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: var(--max-width);
-  margin: 0 auto;
-  padding: 0 20px 64px;
+}
+
+/*
+ * The page fills the window. Every band (the hero, the stat strip, each section)
+ * spans edge to edge, and its own inline padding is what pulls the content into
+ * one centred column. A capped <main> is what left a 1280px island with bare
+ * shoulders on either side of a 1920px screen.
+ *
+ * The selector is deliberately more specific than the `.section` shorthand
+ * below, so those bands keep their own vertical rhythm and still get the gutter.
+ */
+.landing > .hero,
+.landing > .stat-strip,
+.landing > .section,
+.landing > .foot {
+  padding-inline: max(var(--gutter), calc((100% - var(--max-width)) / 2));
 }
 
 .hero {
@@ -587,6 +642,14 @@ a {
   display: grid;
   gap: 16px;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+/* Six features in one row at 1520px made every card a narrow strip of wrapped
+   text, so the grid stops at three across once there is room for it. */
+@media (min-width: 1024px) {
+  .feature-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .feature {
@@ -1229,109 +1292,152 @@ a {
   font-size: 15px;
 }
 
-/* The visual panel: photo texture at the back, then the 3D globe, then
-   particles, then the floating badge. */
+/*
+ * The visual is a plain product preview: the figures the dashboard would show,
+ * drawn with DOM and the page tokens. The photo, the 3D globe and the drifting
+ * particle network that used to stack here competed with each other and with
+ * the headline, and none of them survived a light background.
+ */
 .hero-visual {
   position: relative;
-  min-height: 300px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
-  border-radius: var(--radius-2xl);
-  background:
-    radial-gradient(120% 100% at 80% 0%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 62%),
-    linear-gradient(160deg, var(--surface-secondary), var(--surface));
-  box-shadow: var(--shadow-glass);
-  isolation: isolate;
-}
-
-.hero-image {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.55;
-  filter: saturate(115%);
-}
-
-/* Keeps the globe readable over a bright photo and blends the panel into the page. */
-.hero-visual::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  background:
-    radial-gradient(70% 70% at 50% 45%, transparent 20%, color-mix(in srgb, var(--canvas) 78%, transparent) 100%),
-    linear-gradient(180deg, transparent 45%, color-mix(in srgb, var(--canvas) 55%, transparent));
-  pointer-events: none;
-}
-
-:root[data-theme="light"] .hero-image {
-  opacity: 0.42;
-}
-
-.three-scene,
-.particle-field {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-
-.hero-scene {
-  z-index: 2;
-}
-
-.hero-particles {
-  z-index: 3;
-}
-
-.three-scene-canvas,
-.particle-field canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-}
-
-.hero-badge {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 4;
   display: flex;
   align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 32px);
-  padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 86%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--glass);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  justify-content: center;
+  min-height: 340px;
+  padding: clamp(8px, 1.4vw, 16px) 0;
+  overflow: visible;
+  /* No panel behind the card: the preview itself carries the weight and sits
+     straight on the page, so nothing has to be tinted, blurred or masked. */
+  border: 0;
+  background: none;
 }
 
-.hero-badge-mark {
+.preview {
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--control-border) 70%, transparent);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-glass);
+}
+
+.preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  background: color-mix(in srgb, var(--surface-secondary) 64%, var(--surface));
+}
+
+.preview-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.preview-brand .preview-mark {
   display: grid;
   place-items: center;
-  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(140deg, var(--accent), color-mix(in srgb, var(--accent) 62%, var(--surface)));
+  color: var(--accent-foreground);
 }
 
-.hero-badge-text {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  line-height: 1.3;
+.preview-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px 16px;
 }
 
-.hero-badge-text strong {
-  font-size: 14px;
-  color: var(--text);
+.preview-usage {
+  display: grid;
+  gap: 2px;
 }
 
-.hero-badge-text span {
+.preview-label {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.preview-value {
+  color: var(--text);
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+
+.preview-sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* The bar is shared with the showcase card; only its offset differs here. */
+.preview .bar {
+  margin-top: 12px;
+}
+
+.preview-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.preview-tile {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 58%, transparent);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--surface-secondary) 58%, var(--surface));
+}
+
+.preview-tile span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.preview-tile strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 48%, transparent);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.preview-row strong {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
 }
 
 /* At a glance ----------------------------------------------------------- */
@@ -1397,50 +1503,65 @@ a {
   align-self: flex-start;
 }
 
+/* The copy promises the same figure on every device, so the visual shows
+   exactly that: two device cards carrying one number. */
 .showcase-visual {
   position: relative;
-  min-height: 220px;
-  overflow: hidden;
-  border-radius: var(--radius-xl);
-  background: var(--surface-tertiary);
-}
-
-.showcase-visual img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.85;
-}
-
-.showcase-card {
-  position: absolute;
-  right: 14px;
-  bottom: 14px;
-  left: 14px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 80%, transparent);
+  justify-content: center;
+  gap: 14px;
+  min-height: 220px;
+  padding: clamp(16px, 2vw, 26px);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(110% 100% at 15% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
+    linear-gradient(160deg, var(--surface-secondary), var(--canvas));
+}
+
+.device-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.device-card {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
   border-radius: var(--radius-lg);
-  background: var(--glass);
+  background: var(--surface);
   box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
 }
 
-.showcase-card .bar {
-  display: block;
-  margin-top: 2px;
+.device-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.showcase-value {
+.device-value {
   color: var(--text);
-  font-size: 18px;
+  font-size: 24px;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
+}
+
+.device-card .bar {
+  height: 8px;
+  margin-top: 6px;
+}
+
+.device-note {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 /* Account screens ------------------------------------------------------- */
@@ -1469,26 +1590,6 @@ a {
    thumb can reach it. */
 .auth-aside-inner {
   display: none;
-}
-
-.auth-scene {
-  z-index: 1;
-  opacity: 0.62;
-}
-
-/* The globe is busy behind a paragraph, so a soft scrim keeps the text at full
-   contrast without hiding the network. */
-.auth-aside::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  background: linear-gradient(100deg, color-mix(in srgb, var(--canvas) 72%, transparent) 30%, transparent 78%);
-  pointer-events: none;
-}
-
-.auth-particles {
-  z-index: 2;
 }
 
 .auth-panel {
@@ -1804,7 +1905,7 @@ a {
   .auth-page {
     grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
     align-items: stretch;
-    max-width: 1440px;
+    max-width: var(--max-width);
     min-height: calc(100dvh - var(--bar-height));
   }
 
@@ -1859,35 +1960,21 @@ a {
   }
 }
 
-/* A narrow window must not scroll sideways: long badge text wraps or leaves
-   rather than pushing the hero panel wider. */
-@media (max-width: 899px) {
-  /* On a phone the aside is a short colour band. A cropped globe there reads as
-     a stray object, and it would spend battery behind a card that covers it. */
-  .auth-aside .three-scene,
-  .auth-aside .particle-field {
-    display: none;
+/* A 1920px window gets a wider column instead of the same centred island with
+   more empty shoulder on either side. */
+@media (min-width: 1600px) {
+  :root {
+    --max-width: 1520px;
   }
 }
 
+/* A narrow window must not scroll sideways. */
 @media (max-width: 520px) {
-  .hero-badge-text span {
-    display: none;
-  }
-
   .hero-cta .btn {
     flex: 1 1 auto;
   }
 
   .topbar-signin {
-    display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  /* The globe already draws one still frame; the particle field has no still
-     state, so it steps aside entirely. */
-  .particle-field {
     display: none;
   }
 }

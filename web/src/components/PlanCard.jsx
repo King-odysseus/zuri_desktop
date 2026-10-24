@@ -1,4 +1,5 @@
 import { formatNaira, formatTokens, planFeatures } from '../lib/format.js';
+import { Button, Chip } from './ui.jsx';
 
 /**
  * One pricing tile. The current plan shows a disabled badge, the free plan
@@ -11,28 +12,19 @@ export default function PlanCard({ plan, currentPlan, signedIn, busy, onChoose, 
   let action = null;
   if (isCurrent) {
     action = (
-      <button type="button" className="btn btn-secondary" disabled>
+      <Button variant="secondary" disabled>
         Your plan
-      </button>
+      </Button>
     );
   } else if (plan.code === 'free') {
     action = <p className="stat-meta">Contact support to move back to Free.</p>;
   } else if (!signedIn) {
-    action = (
-      <button type="button" className="btn btn-primary" onClick={onSignIn}>
-        Sign in to choose
-      </button>
-    );
+    action = <Button onClick={onSignIn}>Sign in to choose</Button>;
   } else {
     action = (
-      <button
-        type="button"
-        className="btn btn-primary"
-        disabled={busy}
-        onClick={() => onChoose(plan.code)}
-      >
+      <Button disabled={busy} onClick={() => onChoose(plan.code)}>
         {busy ? 'Opening checkout...' : 'Choose plan'}
-      </button>
+      </Button>
     );
   }
 
@@ -40,7 +32,7 @@ export default function PlanCard({ plan, currentPlan, signedIn, busy, onChoose, 
     <article className={`plan-card${isCurrent ? ' is-current' : ''}`}>
       <div className="plan-top">
         <span className="plan-name">{plan.name}</span>
-        {isCurrent && <span className="chip">Current plan</span>}
+        {isCurrent && <Chip>Current plan</Chip>}
       </div>
       <p className="plan-price">
         {plan.amountKobo === 0 ? 'Free' : formatNaira(plan.amountKobo)}

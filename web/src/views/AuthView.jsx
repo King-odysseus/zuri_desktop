@@ -1,6 +1,6 @@
 import Footer from '../components/Footer.jsx';
 import GoogleSignIn from '../components/GoogleSignIn.jsx';
-import HeroBackdrop from '../components/HeroBackdrop.jsx';
+import { Button } from '../components/ui.jsx';
 import { BoltIcon, BrainIcon, CheckIcon, GlobeIcon, LockIcon, LogoMark } from '../components/Icons.jsx';
 
 const COPY = {
@@ -53,7 +53,6 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
   return (
     <main className="auth-page">
       <aside className="auth-aside">
-        <HeroBackdrop theme={theme} variant="auth" />
         <div className="auth-aside-inner">
           <button type="button" className="brand auth-brand" onClick={() => onNavigate('/')}>
             <span className="brand-mark">
@@ -136,9 +135,9 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
             dashboard can show them. Zuri never posts to your Google account.
           </p>
 
-          <button type="button" className="btn btn-ghost btn-block auth-back" onClick={() => onNavigate('/')}>
+          <Button variant="ghost" block className="auth-back" onClick={() => onNavigate('/')}>
             Back to home
-          </button>
+          </Button>
         </div>
 
         <div className="auth-meta">

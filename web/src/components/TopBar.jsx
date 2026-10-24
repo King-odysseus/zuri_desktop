@@ -1,4 +1,5 @@
 import { LogoMark, MoonIcon, SunIcon } from './Icons.jsx';
+import { Button } from './ui.jsx';
 import { themeLabel } from '../lib/theme.js';
 
 /**
@@ -50,17 +51,15 @@ export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onSig
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
           {signedIn ? (
-            <button type="button" className="btn btn-ghost" onClick={onSignOut}>
+            <Button variant="ghost" onClick={onSignOut}>
               Sign out
-            </button>
+            </Button>
           ) : (
             <>
-              <button type="button" className="btn btn-ghost topbar-signin" onClick={onSignIn}>
+              <Button variant="ghost" className="topbar-signin" onClick={onSignIn}>
                 Sign in
-              </button>
-              <button type="button" className="btn btn-primary" onClick={() => onNavigate('/signup')}>
-                Get started
-              </button>
+              </Button>
+              <Button onClick={() => onNavigate('/signup')}>Get started</Button>
             </>
           )}
         </div>

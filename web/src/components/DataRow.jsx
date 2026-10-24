@@ -1,3 +1,5 @@
+import { Alert as FlowbiteAlert, Progress } from 'flowbite-react';
+
 /** A label/value line used by every dashboard table. */
 export function DataRow({ label, children }) {
   return (
@@ -9,22 +11,31 @@ export function DataRow({ label, children }) {
 }
 
 /**
- * Token allowance bar. Switches to warning colours once the plan is close to,
- * or over, its limit.
+ * Token allowance bar. Flowbite supplies role="progressbar" and aria-valuenow;
+ * the site's bar classes paint it, and is-warning takes over near the limit.
  */
 export function ProgressBar({ percent, warn }) {
+  const value = Math.min(100, Math.max(0, Math.round(Number(percent) || 0)));
   return (
-    <div className="bar">
-      <div
-        className={`bar-fill${warn ? ' is-warning' : ''}`}
-        style={{ width: `${Math.min(100, Math.max(0, percent))}%` }}
-      />
-    </div>
+    <Progress
+      progress={value}
+      textLabel={`usage ${value}%`}
+      theme={{ base: 'bar', bar: 'bar-fill', color: { accent: warn ? 'is-warning' : '' } }}
+      color="accent"
+    />
   );
 }
 
 /** Inline status messages: warning by default, danger when the limit is gone. */
 export function Alert({ tone = 'warning', children }) {
   if (!children) return null;
-  return <div className={`alert${tone === 'danger' ? ' is-danger' : ''}`}>{children}</div>;
+  return (
+    <FlowbiteAlert
+      color={tone === 'danger' ? 'failure' : 'warning'}
+      className={`alert${tone === 'danger' ? ' is-danger' : ''}`}
+      role="status"
+    >
+      {children}
+    </FlowbiteAlert>
+  );
 }

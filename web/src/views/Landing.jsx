@@ -1,6 +1,6 @@
 import Footer from '../components/Footer.jsx';
-import HeroBackdrop from '../components/HeroBackdrop.jsx';
 import PlanCard from '../components/PlanCard.jsx';
+import { Button, Chip, UsageBar } from '../components/ui.jsx';
 import { DOWNLOADS } from '../lib/downloads.js';
 import {
   ArrowRightIcon,
@@ -65,7 +65,7 @@ const STATS = [
  * The sign-in form itself lives on /signin and /signup so the landing keeps one
  * job per screen.
  */
-export default function Landing({ plans, theme, busy, onChoose, onNavigate }) {
+export default function Landing({ plans, busy, onChoose, onNavigate }) {
   return (
     <main className="landing">
       <section className="hero">
@@ -84,13 +84,13 @@ export default function Landing({ plans, theme, busy, onChoose, onNavigate }) {
           </p>
 
           <div className="hero-cta">
-            <button type="button" className="btn btn-primary" onClick={() => onNavigate('/signup')}>
+            <Button size="lg" onClick={() => onNavigate('/signup')}>
               Create free account
               <ArrowRightIcon />
-            </button>
-            <button type="button" className="btn btn-outline" onClick={() => onNavigate('/signin')}>
+            </Button>
+            <Button size="lg" variant="outline" onClick={() => onNavigate('/signin')}>
               Sign in
-            </button>
+            </Button>
           </div>
 
           <ul className="hero-points">
@@ -104,27 +104,45 @@ export default function Landing({ plans, theme, busy, onChoose, onNavigate }) {
         </div>
 
         <div className="hero-visual">
-          {/* Decorative layers, back to front: the photo texture, the linked
-              point globe, then drifting particles. All three are aria-hidden;
-              the copy carries the meaning. */}
-          <img
-            className="hero-image"
-            src="/img/hero-abstract.jpg"
-            alt=""
-            aria-hidden="true"
-            decoding="async"
-            width="1000"
-            height="541"
-          />
-          <HeroBackdrop theme={theme} />
-          <div className="hero-badge">
-            <span className="hero-badge-mark">
-              <LogoMark size={28} />
-            </span>
-            <span className="hero-badge-text">
-              <strong>Zuri</strong>
-              <span>Account, usage and billing in one place</span>
-            </span>
+          {/* A still of the dashboard rather than decoration: the same two
+              figures a customer sees after signing in. The copy beside it
+              carries the meaning, so the panel is hidden from assistive tech. */}
+          <div className="preview" aria-hidden="true">
+            <div className="preview-bar">
+              <span className="preview-brand">
+                <span className="preview-mark">
+                  <LogoMark size={15} />
+                </span>
+                Zuri Cloud
+              </span>
+              <Chip>Overview</Chip>
+            </div>
+            <div className="preview-body">
+              <div className="preview-usage">
+                <span className="preview-label">This month</span>
+                <span className="preview-value">68%</span>
+                <span className="preview-sub">of the Pro plan used</span>
+                <UsageBar percent={68} label="Pro plan used" />
+              </div>
+              <div className="preview-tiles">
+                <div className="preview-tile">
+                  <span>Tokens left</span>
+                  <strong>32,000</strong>
+                </div>
+                <div className="preview-tile">
+                  <span>Renews</span>
+                  <strong>12 Nov</strong>
+                </div>
+              </div>
+              <div className="preview-row">
+                <span>Answer style</span>
+                <strong>Balanced, neutral</strong>
+              </div>
+              <div className="preview-row">
+                <span>Requests today</span>
+                <strong>14 of 200</strong>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -165,29 +183,25 @@ export default function Landing({ plans, theme, busy, onChoose, onNavigate }) {
               Your plan, token meter and payment history follow the account, not the machine. Sign in
               anywhere and the numbers match.
             </p>
-            <button type="button" className="btn btn-primary" onClick={() => onNavigate('/signup')}>
+            <Button onClick={() => onNavigate('/signup')}>
               Create your account
               <ArrowRightIcon />
-            </button>
+            </Button>
           </div>
-          <div className="showcase-visual">
-            <img
-              src="/img/hero-rays.jpg"
-              alt=""
-              aria-hidden="true"
-              loading="lazy"
-              decoding="async"
-              width="800"
-              height="1200"
-            />
-            <div className="showcase-card">
-              <span className="stat-label">This month</span>
-              <span className="showcase-value">68% of plan used</span>
-              <span className="bar" aria-hidden="true">
-                <span className="bar-fill" style={{ width: '68%' }} />
-              </span>
-              <span className="stat-meta">Same figure on desktop, web and the next device.</span>
+          <div className="showcase-visual" aria-hidden="true">
+            <div className="device-row">
+              <div className="device-card">
+                <span className="device-label">Desktop app</span>
+                <strong className="device-value">68%</strong>
+                <UsageBar percent={68} label="Desktop app" />
+              </div>
+              <div className="device-card">
+                <span className="device-label">This browser</span>
+                <strong className="device-value">68%</strong>
+                <UsageBar percent={68} label="This browser" />
+              </div>
             </div>
+            <p className="device-note">Same figure on desktop, web and the next device.</p>
           </div>
         </div>
       </section>
