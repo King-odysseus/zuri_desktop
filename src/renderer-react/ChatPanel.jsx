@@ -47,10 +47,12 @@ const WEB_SEARCH_STORAGE_KEY = 'zuri.webSearch';
 
 function readWebSearchPreference() {
   try {
-    return window.localStorage.getItem(WEB_SEARCH_STORAGE_KEY) === 'on';
+    // New installs start ready for current answers; an explicit saved "off" choice
+    // still wins so changing the default does not override the person's setting.
+    return window.localStorage.getItem(WEB_SEARCH_STORAGE_KEY) !== 'off';
   } catch (error) {
     console.warn('[zuri:chat] web search preference', error?.message ?? error);
-    return false;
+    return true;
   }
 }
 
@@ -140,8 +142,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [copiedIndex, setCopiedIndex] = useState(-1);
   const [stopping, setStopping] = useState(false);
   const [menuView, setMenuView] = useState('');
-  // Off until the person turns it on (each lookup is an extra paid provider request),
-  // then remembered so it stays on across restarts.
+  // On by default for current answers, then remembered when the person changes it.
   const [webSearch, setWebSearch] = useState(readWebSearchPreference);
   const menuRef = useRef(null);
   const composerRef = useRef(null);

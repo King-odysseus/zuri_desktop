@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Web search is now enabled by default for new users. An explicit saved off choice is preserved, and the setting remains available in the composer menu.
+- Key file: `src/renderer-react/ChatPanel.jsx`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows
+
 - Completed Office integration: uploaded DOCX, XLSX and PPTX files can be edited into new copies, and Windows users can install or remove a local HTTPS Word add-in from Settings. The add-in registers a per-user manifest, trusts its localhost certificate, resumes its server while Zuri runs, and keeps provider keys in the main process.
 - Key files: `src/main/office-edit.js`, `src/main/addin.js`, `src/addin/taskpane.html`, `src/addin/taskpane.js`, `src/renderer-react/SettingsView.jsx`, `src/main/main.js`, `src/main/preload.js`.
 - Other OS action: run `npm install && npm run test` after syncing.
