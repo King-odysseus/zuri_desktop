@@ -3,6 +3,7 @@ import { readConfig } from './config.js';
 import { createApp } from './app.js';
 import { createAuthService, createGoogleVerifier } from './auth.js';
 import { createDatabase, createRepository } from './db.js';
+import { createDeepSeekClient } from './deepseek.js';
 
 const config = readConfig();
 const pool = config.databaseUrl ? createDatabase(config.databaseUrl, process.env) : null;
@@ -10,7 +11,8 @@ const repository = pool ? createRepository(pool) : null;
 const auth = repository && config.googleClientId
   ? createAuthService({ repository, verifyGoogleCredential: createGoogleVerifier(config.googleClientId) })
   : null;
-const app = createApp({ auth, repository });
+const chatProvider = createDeepSeekClient({ apiKey: config.deepSeekApiKey, endpoint: config.deepSeekEndpoint });
+const app = createApp({ auth, repository, chatProvider, defaultModel: config.deepSeekModel });
 
 /**
  * Adapt Node's incoming request to the Fetch Request contract used by the app

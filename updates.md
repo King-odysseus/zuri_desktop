@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Added the authenticated Railway chat proxy with DeepSeek forwarding, PostgreSQL-backed atomic token reservations, actual usage commits, failed-request releases, and free-plan request guard enforcement.
+- Key files: `server/src/app.js`, `server/src/db.js`, `server/src/deepseek.js`, `server/src/config.js`, `server/db/schema.sql`, `server/test/server.test.js`.
+- Other OS action: run `npm install --prefix server && npm --prefix server test` after syncing.
+- Done on: Windows
+
 - Added server-side free-plan guardrails with per-user request rate, concurrency, prompt-size limits, and a protected limits endpoint. Monthly token quota remains backed by PostgreSQL usage events.
 - Key files: `server/src/limits.js`, `server/src/app.js`, `server/test/server.test.js`, `server/README.md`.
 - Other OS action: run `npm install --prefix server && npm --prefix server test` after syncing.

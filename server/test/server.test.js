@@ -44,15 +44,27 @@ const sessions = new Map();
 const repository = {
   async findOrCreateGoogleUser() { return user; },
   async createSession(userId, tokenHash, expiresAt) { sessions.set(tokenHash, { userId, expiresAt }); },
-  async findSessionUser(tokenHash) { const session = sessions.get(tokenHash); return session ? { user, subscription: { planCode: 'free', monthlyTokens: 1000, currentPeriodStart: fixedNow(), currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z') } } : null; },
+  async findSessionUser(tokenHash) { const session = sessions.get(tokenHash); return session ? { user, subscription: { id: 'subscription-1', planCode: 'free', monthlyTokens: 1000, currentPeriodStart: fixedNow(), currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z') } } : null; },
   async getUsage() { return { usedTokens: 125 }; },
+  async reserveUsage() { return { id: 'reservation-1', reservedTokens: 9000 }; },
+  async commitUsage() {},
+  async releaseUsage() {},
   async revokeSession(tokenHash) { sessions.delete(tokenHash); },
 };
 const auth = createAuthService({ repository, verifyGoogleCredential: async () => ({ googleSubject: 'google-1', email: user.email, displayName: 'User' }), now: fixedNow, random: () => Buffer.from('session-token') });
 const signedIn = await auth.signInWithGoogle('credential');
 assert.equal(signedIn.user.id, user.id);
 assert.ok(sessions.has(hashSessionToken(signedIn.token)));
-const app = createApp({ auth, repository, now: fixedNow });
+const providerCalls = [];
+const app = createApp({
+  auth,
+  repository,
+  now: fixedNow,
+  chatProvider: async (request) => {
+    providerCalls.push(request);
+    return { model: request.model, content: 'Cloud reply', usage: { inputTokens: 12, outputTokens: 8 } };
+  },
+});
 const googleRoute = await app(new Request('https://cloud.example.com/api/auth/google', {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
@@ -66,6 +78,40 @@ assert.equal((await me.json()).data.user.id, user.id);
 const limits = await app(new Request('https://cloud.example.com/api/me/limits', { headers: { authorization: `Bearer ${signedIn.token}` } }));
 assert.equal(limits.status, 200);
 assert.deepEqual((await limits.json()).data.limits, { requestsPerMinute: 10, maxConcurrent: 1, maxInputTokens: 8_000, maxOutputTokens: 1_000 });
+const chat = await app(new Request('https://cloud.example.com/api/chat', {
+  method: 'POST',
+  headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
+  body: JSON.stringify({ messages: [{ role: 'user', content: 'Hello cloud' }] }),
+}));
+assert.equal(chat.status, 200);
+assert.equal((await chat.json()).data.content, 'Cloud reply');
+assert.equal(providerCalls.length, 1);
+assert.equal(providerCalls[0].maxTokens, 1000);
+const invalidChat = await app(new Request('https://cloud.example.com/api/chat', {
+  method: 'POST',
+  headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
+  body: JSON.stringify({ messages: [] }),
+}));
+assert.equal(invalidChat.status, 400);
+const quotaApp = createApp({
+  auth,
+  repository: {
+    ...repository,
+    async reserveUsage() {
+      const error = new Error('This request would exceed the plan quota.');
+      error.code = 'QUOTA_EXCEEDED';
+      throw error;
+    },
+  },
+  chatProvider: async () => ({ model: 'deepseek-chat', content: 'not reached', usage: { inputTokens: 1, outputTokens: 1 } }),
+  now: fixedNow,
+});
+const quotaResponse = await quotaApp(new Request('https://cloud.example.com/api/chat', {
+  method: 'POST',
+  headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
+  body: JSON.stringify({ messages: [{ role: 'user', content: 'Over quota' }] }),
+}));
+assert.equal(quotaResponse.status, 429);
 const unauthorized = await app(new Request('https://cloud.example.com/api/me'));
 assert.equal(unauthorized.status, 401);
 const signedOut = await app(new Request('https://cloud.example.com/api/auth/sign-out', { method: 'POST', headers: { authorization: `Bearer ${signedIn.token}` } }));

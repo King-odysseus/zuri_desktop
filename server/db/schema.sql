@@ -64,6 +64,22 @@ CREATE TABLE IF NOT EXISTS usage_events (
 
 CREATE INDEX IF NOT EXISTS usage_events_user_created_idx ON usage_events(user_id, created_at DESC);
 
+-- Reservations are held while the provider request is in flight. The
+-- subscription row lock makes quota decisions atomic across concurrent calls.
+CREATE TABLE IF NOT EXISTS usage_reservations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+  reserved_tokens BIGINT NOT NULL CHECK (reserved_tokens > 0),
+  status TEXT NOT NULL CHECK (status IN ('reserved', 'committed', 'released')),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  committed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS usage_reservations_quota_idx
+  ON usage_reservations(user_id, subscription_id, status, expires_at);
+
 CREATE TABLE IF NOT EXISTS payments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,

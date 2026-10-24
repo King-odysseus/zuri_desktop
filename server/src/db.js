@@ -70,7 +70,7 @@ export function createRepository(pool) {
     },
     async findSessionUser(tokenHash) {
       const result = await pool.query(
-        'SELECT u.*, s2.plan_code, s2.current_period_start, s2.current_period_end, p.name AS plan_name, p.monthly_tokens ' +
+        'SELECT u.*, s2.id AS subscription_id, s2.plan_code, s2.current_period_start, s2.current_period_end, p.name AS plan_name, p.monthly_tokens ' +
         'FROM sessions s JOIN users u ON u.id = s.user_id ' +
         "JOIN subscriptions s2 ON s2.user_id = u.id AND s2.status IN ('active', 'past_due') " +
         'JOIN plans p ON p.code = s2.plan_code ' +
@@ -83,6 +83,7 @@ export function createRepository(pool) {
       return {
         user: publicUser(row),
         subscription: {
+          id: row.subscription_id,
           planCode: row.plan_code,
           planName: row.plan_name,
           monthlyTokens: Number(row.monthly_tokens),
@@ -98,6 +99,96 @@ export function createRepository(pool) {
         [userId, periodStart, subscription.currentPeriodEnd],
       );
       return { usedTokens: Number(result.rows[0]?.used_tokens ?? 0), subscription };
+    },
+    async reserveUsage({ userId, subscriptionId, requestedTokens, expiresAt }) {
+      const requested = Number(requestedTokens);
+      if (!Number.isSafeInteger(requested) || requested < 1) {
+        const error = new Error('The requested token reservation is invalid.');
+        error.code = 'INVALID_TOKEN_RESERVATION';
+        throw error;
+      }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const subscriptionResult = await client.query(
+          "SELECT s.id, s.current_period_start, s.current_period_end, p.monthly_tokens FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.id = $1 AND s.user_id = $2 AND s.status IN ('active', 'past_due') FOR UPDATE",
+          [subscriptionId, userId],
+        );
+        const subscription = subscriptionResult.rows[0];
+        if (!subscription) {
+          const error = new Error('The subscription is no longer active.');
+          error.code = 'SUBSCRIPTION_NOT_ACTIVE';
+          throw error;
+        }
+        await client.query(
+          "UPDATE usage_reservations SET status = 'released' WHERE user_id = $1 AND status = 'reserved' AND expires_at <= NOW()",
+          [userId],
+        );
+        const usageResult = await client.query(
+          "SELECT COALESCE((SELECT SUM(total_tokens) FROM usage_events WHERE user_id = $1 AND created_at >= $2 AND created_at < $3), 0) + COALESCE((SELECT SUM(reserved_tokens) FROM usage_reservations WHERE user_id = $1 AND subscription_id = $4 AND status = 'reserved' AND expires_at > NOW()), 0) AS committed_tokens",
+          [userId, subscription.current_period_start, subscription.current_period_end, subscription.id],
+        );
+        const committedTokens = Number(usageResult.rows[0]?.committed_tokens ?? 0);
+        if (!Number.isSafeInteger(committedTokens) || committedTokens + requested > Number(subscription.monthly_tokens)) {
+          const error = new Error('This request would exceed the plan quota.');
+          error.code = 'QUOTA_EXCEEDED';
+          throw error;
+        }
+        const reservationResult = await client.query(
+          "INSERT INTO usage_reservations (user_id, subscription_id, reserved_tokens, status, expires_at) VALUES ($1, $2, $3, 'reserved', $4) RETURNING id",
+          [userId, subscription.id, requested, expiresAt],
+        );
+        await client.query('COMMIT');
+        return { id: reservationResult.rows[0].id, reservedTokens: requested };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    async commitUsage({ reservationId, userId, model, inputTokens, outputTokens, requestId }) {
+      const input = Number(inputTokens);
+      const output = Number(outputTokens);
+      if (![input, output].every((value) => Number.isSafeInteger(value) && value >= 0)) {
+        const error = new Error('The provider usage total is invalid.');
+        error.code = 'INVALID_PROVIDER_USAGE';
+        throw error;
+      }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const reservationResult = await client.query(
+          'SELECT id, subscription_id, reserved_tokens, status FROM usage_reservations WHERE id = $1 AND user_id = $2 FOR UPDATE',
+          [reservationId, userId],
+        );
+        const reservation = reservationResult.rows[0];
+        if (!reservation) throw new Error('The usage reservation was not found.');
+        if (reservation.status === 'committed') {
+          await client.query('COMMIT');
+          return;
+        }
+        if (reservation.status !== 'reserved') throw new Error('The usage reservation is no longer available.');
+        if (input + output > Number(reservation.reserved_tokens)) {
+          const error = new Error('The provider usage exceeded the reserved budget.');
+          error.code = 'RESERVATION_EXCEEDED';
+          throw error;
+        }
+        await client.query(
+          'INSERT INTO usage_events (user_id, subscription_id, model, input_tokens, output_tokens, request_id) VALUES ($1, $2, $3, $4, $5, $6)',
+          [userId, reservation.subscription_id, model, input, output, requestId],
+        );
+        await client.query("UPDATE usage_reservations SET status = 'committed', committed_at = NOW() WHERE id = $1", [reservation.id]);
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    async releaseUsage(reservationId, userId) {
+      await pool.query("UPDATE usage_reservations SET status = 'released' WHERE id = $1 AND user_id = $2 AND status = 'reserved'", [reservationId, userId]);
     },
     async revokeSession(tokenHash) {
       await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);
