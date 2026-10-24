@@ -1,5 +1,13 @@
 ## 2026-10-24 - Windows
 
+- Fixed the landing sign-in card: the Google button slot kept its 44px height even on a server with no `GOOGLE_CLIENT_ID`, leaving a blank hole above the notice. The slot now renders only while a button lives in it, and the unconfigured state is a framed notice that says what to set.
+- Added `npm run cloud:deploy` (`scripts/deploy-cloud.mjs`). Running `railway up` from the repo root uploads the desktop app, so the service builds Electron and the live site answers 502; this script builds the web bundle, copies `server/` to a scratch folder outside the repo and uploads that, which is the only upload path that ships the Dockerfile in `server/`.
+- Key files: `web/src/components/GoogleSignIn.jsx`, `web/src/styles.css`, `scripts/deploy-cloud.mjs`, `package.json`, `server/public/**`.
+- Other OS action: run `npm run web:build && cd server && npm test` after syncing. Deploy with `npm run cloud:deploy`, never `railway up` from the repo root.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Rebuilt the Zuri Cloud web dashboard as a React app (`web/`, Vite, React 19) instead of plain HTML and JS. It has a signed-out page (hero, sign-in card, features, Naira plans) and a signed-in shell with Overview, Usage and limits, Plans and Billing, a sidebar on desktop and a fixed bottom tab bar on phones, and a light/dark toggle. `npm run web:build` builds it into `server/public`.
 - The server now serves that bundle from `public/` with a path guard (traversal and unknown extensions are refused) and falls back to the app shell for extension-less routes. Added `server/Dockerfile` so the Railway service builds this folder reproducibly.
 - Fixed the live 502: the Railway domain had no target port, so nothing was routed to the app. The domain now targets 8080.
