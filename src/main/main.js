@@ -812,9 +812,11 @@ async function handleCloudSetPassword(payload) {
   // account has nothing to re-enter.
   const currentPassword = typeof payload?.currentPassword === 'string' ? payload.currentPassword : '';
   if (currentPassword !== '') body.currentPassword = currentPassword;
-  const result = await cloudFetch('/api/auth/password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, true);
+  const result = await cloudFetch('/api/auth/set-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, true);
   if (!result.ok) return result;
-  return { ok: true, data: { hasPassword: result.data?.hasPassword === true } };
+  // The server answers { updated: true }; whether the account now has a password
+  // comes back from /api/me, so nothing is inferred from this reply.
+  return { ok: true, data: { hasPassword: result.data?.updated === true } };
 }
 
 async function handleCloudAccount() {
