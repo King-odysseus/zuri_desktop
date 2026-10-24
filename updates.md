@@ -1,5 +1,12 @@
 ## 2026-10-24 - Windows
 
+- Assigned the packaged Zuri ICO and AUMID directly to the running BrowserWindow taskbar button, fixing live taskbar buttons that still displayed Electron after the shortcut icon was corrected.
+- Key files: `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Refreshed the packaged Start Menu and desktop shortcuts with the embedded Zuri executable icon and app identity, repairing stale Electron taskbar grouping after upgrades.
 - Key files: `src/main/main.js`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.

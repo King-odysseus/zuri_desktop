@@ -181,6 +181,19 @@ function createMainWindow() {
     },
   });
 
+  if (process.platform === 'win32') {
+    // The process AUMID identifies the app, but Windows can still derive the
+    // running taskbar button from the window unless its icon is assigned too.
+    window.setIcon(ICO_ENTRY);
+    window.setAppDetails({
+      appId: APP_USER_MODEL_ID,
+      appIconPath: ICO_ENTRY,
+      appIconIndex: 0,
+      relaunchCommand: process.execPath,
+      relaunchDisplayName: 'Zuri',
+    });
+  }
+
   window.loadFile(RENDERER_ENTRY);
 
   // Answers can contain links. Electron would otherwise open one in a new
