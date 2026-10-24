@@ -1,7 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, session, shell, Tray } from 'electron';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { mkdir, stat } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { CHAT_STREAM_CHANNEL, sendChatMessage, summarizeText } from './providers/chat.js';
@@ -270,7 +270,32 @@ const HANDLERS = new Map([
   ['zuri:tools:list', handleToolsList],
   ['zuri:tools:run', handleToolsRun],
   ['zuri:tools:cancel', handleToolsCancel],
+  ['zuri:overlay:open', handleOverlayOpen],
+  ['zuri:overlay:hide', handleOverlayHide],
+  ['zuri:overlay:open-main', handleOverlayOpenMain],
 ]);
+
+/** Show the quick-ask card from a button in the main window. */
+function handleOverlayOpen() {
+  openOverlay();
+  refreshTray();
+  return { ok: true };
+}
+
+/** The card's close button: hide it, keeping any unsent text for the next open. */
+function handleOverlayHide() {
+  hideOverlay();
+  refreshTray();
+  return { ok: true };
+}
+
+/** The card's "back to Zuri" button: hide the card and raise the main window. */
+function handleOverlayOpenMain() {
+  hideOverlay();
+  bringMainWindowForward();
+  refreshTray();
+  return { ok: true };
+}
 
 /**
  * Identity and paths a view may show. Deliberately no secrets: the API key never
@@ -520,6 +545,7 @@ function handleChatSend(payload, event) {
     // The composer sends the agent it has picked; without one the reply falls back to
     // settings.activeAgentId, which is the same id in the normal case.
     agentId: typeof payload?.agentId === 'string' ? payload.agentId : undefined,
+    webSearch: payload?.webSearch === true,
     signal: controller.signal,
     emit: (streamEvent) => {
       // The window can close mid-stream; sending to a destroyed webContents throws.
@@ -738,6 +764,64 @@ async function measureFile(filePath) {
   }
 }
 
+// Folder reads are capped because every character is sent to the provider and billed.
+const FOLDER_TEXT_EXTENSIONS = new Set(['.txt', '.md', '.markdown', '.csv', '.json', '.log']);
+const FOLDER_MAX_FILES = 20;
+const FOLDER_MAX_FILE_BYTES = 100 * 1024;
+const FOLDER_MAX_TOTAL_CHARS = 200_000;
+
+/**
+ * Let the person pick a folder and read its top-level text files in this process, so
+ * the renderer never supplies a path to read. Sub-folders and hidden files are
+ * skipped on purpose: the cap, not recursion, keeps the cost predictable.
+ * @param {Electron.BrowserWindow | null} owner
+ * @returns {Promise<object>}
+ */
+async function chooseFolderForChat(owner) {
+  const options = { title: 'Add a folder', buttonLabel: 'Add folder', properties: ['openDirectory'] };
+  try {
+    const picked = owner === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(owner, options);
+    const folderPath = Array.isArray(picked.filePaths) ? picked.filePaths[0] : undefined;
+    if (picked.canceled || typeof folderPath !== 'string' || folderPath === '') {
+      return { ok: true, data: { cancelled: true } };
+    }
+
+    const entries = await readdir(folderPath, { withFileTypes: true });
+    const candidates = entries
+      .filter((entry) => entry.isFile() && !entry.name.startsWith('.') && FOLDER_TEXT_EXTENSIONS.has(path.extname(entry.name).toLowerCase()))
+      .sort((left, right) => left.name.localeCompare(right.name));
+
+    const sections = [];
+    let totalChars = 0;
+    let skipped = Math.max(entries.length - candidates.length, 0);
+    for (const entry of candidates) {
+      const filePath = path.join(folderPath, entry.name);
+      const size = await measureFile(filePath);
+      if (sections.length >= FOLDER_MAX_FILES || totalChars >= FOLDER_MAX_TOTAL_CHARS || !Number.isFinite(size) || size > FOLDER_MAX_FILE_BYTES) {
+        skipped += 1;
+        continue;
+      }
+      const text = (await readFile(filePath, 'utf8')).slice(0, FOLDER_MAX_TOTAL_CHARS - totalChars);
+      totalChars += text.length;
+      sections.push(`--- ${entry.name} ---\n${text}`);
+    }
+
+    return {
+      ok: true,
+      data: {
+        cancelled: false,
+        name: path.basename(folderPath),
+        fileCount: sections.length,
+        skipped,
+        text: sections.join('\n\n'),
+      },
+    };
+  } catch (error) {
+    console.error('[zuri:files] folder', error);
+    return filesFailure(error, 'FILES_CHOOSE_FAILED');
+  }
+}
+
 /**
  * The native picker behind the Files view's Open action and behind the composer's
  * paperclip. Only the path, name and size are returned; the renderer never gets
@@ -748,6 +832,8 @@ async function measureFile(filePath) {
  */
 async function handleFilesChoose(payload, event) {
   const owner = BrowserWindow.fromWebContents(event?.sender) ?? BrowserWindow.getFocusedWindow();
+  if (payload?.purpose === 'folder') return chooseFolderForChat(owner);
+
   // One picker, two jobs: the composer asks for a file to attach to a message, the
   // Files view for a document to summarize. The title and the filter list say which.
   const options = payload?.purpose === 'attach'
@@ -756,7 +842,7 @@ async function handleFilesChoose(payload, event) {
         buttonLabel: 'Attach',
         properties: ['openFile'],
         filters: [
-          { name: 'Documents and text', extensions: ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv'] },
+          { name: 'Documents, text and images', extensions: ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv', 'png', 'jpg', 'jpeg', 'webp', 'gif'] },
           { name: 'All files', extensions: ['*'] },
         ],
       }

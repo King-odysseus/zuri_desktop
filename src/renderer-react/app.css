@@ -313,27 +313,27 @@ body {
   }
 
   [data-theme="dark"] {
-    /* Deep navy rather than black, with each layer a clear step lighter so a
-       card, a field and the canvas stay separable without any border glow. */
-    --background: #0a1930;
-    --foreground: #e9f1fc;
-    --surface: #122742;
-    --surface-foreground: #e9f1fc;
-    --surface-secondary: #16304f;
-    --surface-secondary-foreground: #e9f1fc;
-    --surface-tertiary: #1d3a5f;
-    --surface-tertiary-foreground: #e9f1fc;
-    --default: #24476f;
-    --default-foreground: #e9f1fc;
-    --muted: #a3b8d4;
-    --accent: #7fb0ff;
-    --accent-foreground: #08172b;
+    /* The canvas is #06005e; every other layer is a step lighter in the same
+       indigo hue so a card, a field and the canvas stay separable. */
+    --background: #06005e;
+    --foreground: #ecebff;
+    --surface: #0e0872;
+    --surface-foreground: #ecebff;
+    --surface-secondary: #150f82;
+    --surface-secondary-foreground: #ecebff;
+    --surface-tertiary: #1e1892;
+    --surface-tertiary-foreground: #ecebff;
+    --default: #2b24a0;
+    --default-foreground: #ecebff;
+    --muted: #b4b1e8;
+    --accent: #a9b4ff;
+    --accent-foreground: #06005e;
     --border: transparent;
     --separator: transparent;
-    --field-background: #0f2138;
-    --selected: #24487a;
-    --selected-foreground: #eef5ff;
-    --control-border: #2f4f78;
+    --field-background: #0a0468;
+    --selected: #2f29b0;
+    --selected-foreground: #f2f1ff;
+    --control-border: #3d37bb;
   }
 }
 

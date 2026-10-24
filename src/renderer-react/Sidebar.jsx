@@ -7,6 +7,7 @@ import {
   ChatIcon,
   ChevronDownIcon,
   EditIcon,
+  FeaturesIcon,
   HistoryIcon,
   FolderIcon,
   PanelLeftCloseIcon,
@@ -14,6 +15,7 @@ import {
   SearchIcon,
   SettingsIcon,
   MoonIcon,
+  OverlayIcon,
   SunIcon,
   TaskIcon,
 } from './Icons.jsx';
@@ -25,11 +27,12 @@ export const NAV_ITEMS = [
   { key: 'reminders', label: 'Reminders', Icon: BellIcon },
   { key: 'automations', label: 'Automations', Icon: AutomationIcon },
   { key: 'files', label: 'Files', Icon: FolderIcon },
+  { key: 'features', label: 'Features', Icon: FeaturesIcon },
   { key: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
 // The reference app pairs a narrow icon rail (where you are) with a list panel
-// (what you have). The rail carries the seven destinations; the panel is the
+// (what you have). The rail carries the eight destinations; the panel is the
 // conversation list, which routing in App.jsx keeps in step with the rail.
 export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, activeThreadId, refreshKey, theme, onToggleTheme }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -100,6 +103,16 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
               onPress={() => setCollapsed(true)}
             >
               <PanelLeftCloseIcon size={17} />
+            </Button>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              aria-label="Open quick ask overlay"
+              title="Quick ask overlay"
+              onPress={() => void window.zuri?.overlay?.open?.()}
+            >
+              <OverlayIcon size={16} />
             </Button>
             <Button isIconOnly size="sm" variant="ghost" aria-label="Notifications">
               <BellIcon size={16} />

@@ -26,4 +26,10 @@ export {
   Square as StopIcon,
   Copy as CopyIcon,
   Check as CheckIcon,
+  LayoutGrid as FeaturesIcon,
+  Maximize2 as ExpandIcon,
+  PictureInPicture2 as OverlayIcon,
+  Paperclip as PaperclipIcon,
+  Globe as GlobeIcon,
+  SquareSlash as SlashCommandIcon,
 } from 'lucide-react';

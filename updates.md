@@ -1,3 +1,10 @@
+## 2026-10-24 - Windows
+
+- Chat can now search the web and read pages (DeepSeek and other OpenAI-style providers) through a tool loop capped at 4 rounds, only when the "Search the web" switch in the composer + menu is on (remembered between restarts, off by default). The + menu also gained "Add folder" (reads up to 20 top-level text files, 100 KB each, 200,000 characters total) and slash commands that fill the box with a starter sentence. The quick-ask overlay got Close and Open Zuri buttons and a sidebar button, and a Features page was added.
+- Key files: `src/main/providers/chat.js`, `src/main/main.js`, `src/main/preload.js`, `src/main/store.js`, `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/Icons.jsx`, `src/renderer-react/App.jsx`, `src/renderer-react/Sidebar.jsx`, `src/renderer-react/FeaturesView.jsx`, `src/renderer-react/app.css`.
+- Other OS action: run `npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
 ## 2026-10-23 - Windows
 
 - Kept the chat composer typeable while a reply is running. It was disabled until the reply finished, so a slow provider locked typing for up to two minutes. Sending stays blocked mid-reply and the half-typed message is kept.

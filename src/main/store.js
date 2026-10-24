@@ -746,7 +746,20 @@ export async function appendMessage(threadId, message, options = {}) {
     if (!Array.isArray(thread.messages)) thread.messages = [];
 
     const mode = MESSAGE_MODES.includes(message.mode) ? message.mode : null;
-    const stored = { id: randomUUID(), role, content, createdAt: now, ...(mode ? { mode } : {}) };
+    // Only the file path is kept, never the pixels, so chats.json stays small and
+    // the image is read from disk again each time the thread is sent.
+    const images = (Array.isArray(message.images) ? message.images : [])
+      .filter((image) => typeof image?.path === 'string' && image.path !== '')
+      .slice(0, 4)
+      .map((image) => ({ name: String(image.name ?? ''), path: image.path }));
+    const stored = {
+      id: randomUUID(),
+      role,
+      content,
+      createdAt: now,
+      ...(mode ? { mode } : {}),
+      ...(role === 'user' && images.length > 0 ? { images } : {}),
+    };
     thread.messages.push(stored);
     thread.updatedAt = now;
     // The first user message names the thread, so a chat called "New chat" in the

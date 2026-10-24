@@ -19,8 +19,46 @@
  * renderer.
  */
 
+import { readFile, stat } from 'node:fs/promises';
+import path from 'node:path';
+
 import { DEFAULT_PROVIDER, PROVIDERS, getKey } from '../secrets.js';
 import { appendMessage, findAgent, readStore } from '../store.js';
+import { agentAllowedTools, runTool } from '../tools/index.js';
+
+/**
+ * Tools the model may call on its own in chat, only when the person has switched web
+ * search on for the message. Each call costs another provider request, so the default
+ * is no tools. Attached files are already inlined into the message, and the
+ * confirmation-gated tools have no approval step in a streaming reply, so none of
+ * those are offered.
+ */
+const CHAT_TOOLS = Object.freeze([
+  {
+    name: 'webSearch',
+    description: 'Search the web. Use for current events, facts you are unsure of, or anything after your training data.',
+    parameters: {
+      type: 'object',
+      properties: { query: { type: 'string', description: 'What to search for.' } },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'webFetch',
+    description: 'Read one web page by URL and return its text. Use after webSearch to read a result.',
+    parameters: {
+      type: 'object',
+      properties: { url: { type: 'string', description: 'Full http or https URL.' } },
+      required: ['url'],
+    },
+  },
+]);
+
+/** Each extra round is another paid model call, so the loop is capped hard. */
+const MAX_TOOL_ROUNDS = 4;
+
+/** A tool result is trimmed before going back to the model to keep the extra call cheap. */
+const TOOL_RESULT_LIMIT = 8_000;
 
 /**
  * Channel main pushes token events on. It is a one-way push, not an `invoke`
@@ -209,10 +247,78 @@ function splitMessages(messages) {
     if (content === '') continue;
 
     if (message.role === 'system') system.push(content);
-    else turns.push({ role: message.role === 'assistant' ? 'assistant' : 'user', content });
+    else {
+      turns.push({
+        role: message.role === 'assistant' ? 'assistant' : 'user',
+        content,
+        ...(Array.isArray(message.images) && message.images.length > 0 ? { images: message.images } : {}),
+      });
+    }
   }
 
   return { system: system.join('\n\n'), turns };
+}
+
+const IMAGE_MEDIA_TYPES = Object.freeze({
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+});
+
+/** Larger than this is refused by the providers or wastes a lot of tokens. */
+const IMAGE_SIZE_LIMIT = 5 * 1024 * 1024;
+
+/**
+ * Replace each turn's saved image paths with the image parts its provider expects.
+ * Only OpenAI and Anthropic models are known to read images; for the others the
+ * images are left out and the model is told, so it does not pretend to see them.
+ * The `images` key is always removed, because no provider accepts it on a message.
+ * @param {'openai'|'anthropic'|'deepseek'|'moonshot'|'zai'} provider
+ * @param {{ role: string, content: string, images?: { name: string, path: string }[] }[]} turns
+ * @returns {Promise<{ role: string, content: unknown }[]>}
+ */
+async function withImageParts(provider, turns) {
+  const result = [];
+  for (const { images, ...turn } of turns) {
+    if (!Array.isArray(images) || images.length === 0) {
+      result.push(turn);
+      continue;
+    }
+
+    const parts = [];
+    const skipped = [];
+    for (const image of images) {
+      const mediaType = IMAGE_MEDIA_TYPES[path.extname(image.path).toLowerCase()];
+      const supported = provider === 'openai' || provider === 'anthropic';
+      let bytes = null;
+      if (supported && mediaType) {
+        try {
+          const info = await stat(image.path);
+          if (info.size <= IMAGE_SIZE_LIMIT) bytes = await readFile(image.path);
+        } catch (error) {
+          console.warn('[zuri:chat] image', error?.message ?? error);
+        }
+      }
+      if (bytes === null) {
+        skipped.push(image.name || path.basename(image.path));
+        continue;
+      }
+      const data = bytes.toString('base64');
+      parts.push(
+        provider === 'anthropic'
+          ? { type: 'image', source: { type: 'base64', media_type: mediaType, data } }
+          : { type: 'image_url', image_url: { url: `data:${mediaType};base64,${data}` } },
+      );
+    }
+
+    const note = skipped.length > 0
+      ? `\n\n(The image ${skipped.join(', ')} could not be shown to you: this model cannot read images, or the file is missing or over 5 MB. Say so if it matters.)`
+      : '';
+    result.push({ ...turn, content: [...parts, { type: 'text', text: `${turn.content}${note}` }] });
+  }
+  return result;
 }
 
 /**
@@ -223,7 +329,7 @@ function splitMessages(messages) {
  * @param {{ system: string, turns: { role: string, content: string }[] }} conversation
  * @returns {Record<string, unknown>}
  */
-function requestBody(provider, model, conversation) {
+function requestBody(provider, model, conversation, tools = []) {
   if (provider === 'anthropic') {
     return {
       model,
@@ -242,6 +348,9 @@ function requestBody(provider, model, conversation) {
       ...(conversation.system ? [{ role: 'system', content: conversation.system }] : []),
       ...conversation.turns,
     ],
+    ...(tools.length > 0
+      ? { tools: tools.map((tool) => ({ type: 'function', function: tool })) }
+      : {}),
   };
 }
 
@@ -374,7 +483,7 @@ async function streamReply(provider, model, key, conversation, options = {}) {
     response = await fetchImpl(config.endpoint, {
       method: 'POST',
       headers: requestHeaders(provider, key),
-      body: JSON.stringify(requestBody(provider, model, conversation)),
+      body: JSON.stringify(requestBody(provider, model, conversation, options.tools ?? [])),
       // Stop and the request timeout are separate reasons to give up, so both drive
       // the same fetch: whichever fires first ends the request. AbortSignal.any keeps
       // the caller's signal from removing the timeout.
@@ -423,7 +532,10 @@ async function streamReply(provider, model, key, conversation, options = {}) {
   }
 
   let reply = '';
+  let reasoning = '';
   let streamedFailure = '';
+  /** @type {{ id: string, name: string, arguments: string }[]} */
+  const toolCalls = [];
 
   try {
     await readEventStream(response.body, (event) => {
@@ -431,6 +543,17 @@ async function streamReply(provider, model, key, conversation, options = {}) {
       if (problem !== '') {
         streamedFailure = problem;
         return;
+      }
+
+      // Tool calls arrive in pieces keyed by index; the name comes first, the JSON
+      // arguments are spread over later events.
+      const delta = Array.isArray(event?.choices) ? event.choices[0]?.delta : null;
+      if (typeof delta?.reasoning_content === 'string') reasoning += delta.reasoning_content;
+      for (const piece of Array.isArray(delta?.tool_calls) ? delta.tool_calls : []) {
+        const slot = (toolCalls[piece.index ?? 0] ??= { id: '', name: '', arguments: '' });
+        if (piece.id) slot.id = piece.id;
+        if (piece.function?.name) slot.name += piece.function.name;
+        if (typeof piece.function?.arguments === 'string') slot.arguments += piece.function.arguments;
       }
 
       const text = deltaText(provider, event);
@@ -454,11 +577,49 @@ async function streamReply(provider, model, key, conversation, options = {}) {
     return failure('CHAT_PROVIDER_ERROR', `${config.label} reported: ${streamedFailure}`);
   }
 
-  if (reply.trim() === '') {
+  const calls = toolCalls.filter((call) => call?.name);
+  if (reply.trim() === '' && calls.length === 0) {
     return failure('CHAT_EMPTY_REPLY', `${config.label} sent an empty reply. Try again.`);
   }
 
-  return { ok: true, text: reply };
+  return { ok: true, text: reply, reasoning, toolCalls: calls };
+}
+
+/**
+ * Run the tool calls the model asked for and append the exchange to the conversation.
+ * DeepSeek's thinking mode rejects the next request unless the assistant message that
+ * made the calls carries its reasoning_content back, so it is kept here.
+ */
+async function answerToolCalls(conversation, reply, allowedTools) {
+  conversation.turns.push({
+    role: 'assistant',
+    content: reply.text,
+    ...(reply.reasoning ? { reasoning_content: reply.reasoning } : {}),
+    tool_calls: reply.toolCalls.map((call, index) => ({
+      id: call.id || `call_${index}`,
+      type: 'function',
+      function: { name: call.name, arguments: call.arguments || '{}' },
+    })),
+  });
+
+  for (const [index, call] of reply.toolCalls.entries()) {
+    let args = {};
+    try {
+      args = JSON.parse(call.arguments || '{}');
+    } catch {
+      args = {};
+    }
+    // Only the chat tool list is reachable; the model cannot name another tool.
+    const offered = CHAT_TOOLS.some((tool) => tool.name === call.name);
+    const result = offered
+      ? await runTool(call.name, args, { allowedTools })
+      : failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
+    conversation.turns.push({
+      role: 'tool',
+      tool_call_id: call.id || `call_${index}`,
+      content: JSON.stringify(result).slice(0, TOOL_RESULT_LIMIT),
+    });
+  }
 }
 
 /**
@@ -556,6 +717,7 @@ export async function sendChatMessage(threadId, options = {}) {
   const settings = (await readStore('settings')).data;
   const { provider, model } = resolveChatTarget(settings);
   const config = PROVIDER_CONFIG[provider];
+  conversation.turns = await withImageParts(provider, conversation.turns);
 
   // An agent's system prompt rides in front of any the thread already carries, so
   // the picked agent decides how the reply is written without losing the thread's own.
@@ -577,14 +739,36 @@ export async function sendChatMessage(threadId, options = {}) {
     );
   }
 
-  const reply = await streamReply(provider, model, key, conversation, {
-    fetchImpl,
-    signal: options.signal,
-    onDelta: (text) => emit({ threadId, delta: text }),
-  });
-  if (!reply.ok) return reply;
+  // Anthropic uses a different tool format, so tools are offered on the OpenAI-style
+  // providers only. An agent's allow-list narrows what the model can call.
+  const allowedTools = agentAllowedTools(settings, options.agentId);
+  const tools =
+    provider === 'anthropic' || options.webSearch !== true
+      ? []
+      : CHAT_TOOLS.filter((tool) => allowedTools === null || allowedTools.includes(tool.name));
 
-  const saved = await appendMessage(threadId, { role: 'assistant', content: reply.text });
+  // Text from every round is kept because it was all streamed to the window, so the
+  // saved message matches what the person watched arrive.
+  let fullText = '';
+  for (let round = 0; ; round += 1) {
+    const reply = await streamReply(provider, model, key, conversation, {
+      fetchImpl,
+      signal: options.signal,
+      tools: round < MAX_TOOL_ROUNDS ? tools : [],
+      onDelta: (text) => emit({ threadId, delta: text }),
+    });
+    if (!reply.ok) return reply;
+
+    fullText += reply.text;
+    if (reply.toolCalls.length === 0) break;
+    await answerToolCalls(conversation, reply, allowedTools);
+  }
+
+  if (fullText.trim() === '') {
+    return failure('CHAT_EMPTY_REPLY', `${config.label} sent an empty reply. Try again.`);
+  }
+
+  const saved = await appendMessage(threadId, { role: 'assistant', content: fullText });
   if (!saved.ok) return saved;
 
   emit({ threadId, done: true });

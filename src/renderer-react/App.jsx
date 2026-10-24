@@ -9,6 +9,7 @@ import TasksView from './TasksView.jsx';
 import RemindersView from './RemindersView.jsx';
 import SearchView from './SearchView.jsx';
 import HistoryView from './HistoryView.jsx';
+import FeaturesView from './FeaturesView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const isOverlay = new URLSearchParams(window.location.search).has('overlay');
@@ -77,6 +78,7 @@ export default function App() {
       {route === 'tasks' && <TasksView />}
       {route === 'reminders' && <RemindersView />}
       {route === 'search' && <SearchView onSelectThread={openThread} />}
+      {route === 'features' && <FeaturesView onNavigate={setRoute} />}
       {route === 'history' && <HistoryView onSelectThread={openThread} />}
     </div>
   );

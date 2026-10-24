@@ -2,44 +2,68 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ComposerTextarea } from './ui.jsx';
 import {
   ArrowUpIcon,
-  AutomationIcon,
-  BellIcon,
   CheckIcon,
-  ChevronRightIcon,
+  CloseIcon,
   CopyIcon,
+  ExpandIcon,
   FolderIcon,
+  GlobeIcon,
   MicIcon,
+  PaperclipIcon,
   PlusIcon,
+  SlashCommandIcon,
   StopIcon,
-  TaskIcon,
 } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
-import SelectField from './SelectField.jsx';
 import { copyText } from './clipboard.js';
 
-const MODES = ['Ask', 'Act', 'Autopilot'].map((name) => ({ value: name, label: name }));
-const WORKSPACE_MODES = [
-  { value: 'chat', label: 'Chat' },
-  { value: 'work', label: 'Work' },
+const CAPABILITY_HINTS = [
+  'Ask me to summarise your files.',
+  'I can turn a rough thought into a task.',
+  'Ask me to remind you about something tomorrow.',
+  'I can draft a reply for you to edit.',
+  'Ask what needs your attention this week.',
+  'I can set up a recurring research automation.',
+  'Ask me to explain a document in plain words.',
+  'I can search past conversations for you.',
+  'Ask me to compare two options and pick one.',
+  'Paste a table and I will help you check it.',
 ];
-const COMMON_SUGGESTIONS = [
-  'Over-budget lines',
-  'Add a variance column',
-  'Monday inbox brief',
-  'Unpaid invoices',
-  'Summarise my files',
-  'What needs attention',
-  'Create a follow-up task',
-  'Tomorrow reminder',
-  'Draft a reply',
+// Each command only fills the composer with a starter sentence; the person finishes
+// it and sends as usual, so nothing runs until they press Send.
+const SLASH_COMMANDS = [
+  { label: 'Summarise', text: 'Summarise this: ' },
+  { label: 'Search the web', text: 'Search the web for ' },
+  { label: 'Make a task', text: 'Turn this into a task: ' },
+  { label: 'Set a reminder', text: 'Remind me to ' },
+  { label: 'Draft a reply', text: 'Draft a reply to this: ' },
 ];
-const WORK_TOOLS = [
-  { route: 'tasks', label: 'Tasks', description: 'Plan and track work that needs doing.', Icon: TaskIcon },
-  { route: 'files', label: 'Files', description: 'Open, review, and summarise workspace files.', Icon: FolderIcon },
-  { route: 'reminders', label: 'Reminders', description: 'Keep important follow-ups on schedule.', Icon: BellIcon },
-  { route: 'automations', label: 'Automations', description: 'Run recurring research and desktop tasks.', Icon: AutomationIcon },
-];
-const ATTACHMENT_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv', 'md', 'json'];
+const IMAGE_EXTENSIONS =['png', 'jpg', 'jpeg', 'webp', 'gif'];
+const ATTACHMENT_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv', 'md', 'json', ...IMAGE_EXTENSIONS];
+
+const WEB_SEARCH_STORAGE_KEY = 'zuri.webSearch';
+
+function readWebSearchPreference() {
+  try {
+    return window.localStorage.getItem(WEB_SEARCH_STORAGE_KEY) === 'on';
+  } catch (error) {
+    console.warn('[zuri:chat] web search preference', error?.message ?? error);
+    return false;
+  }
+}
+
+function saveWebSearchPreference(enabled) {
+  try {
+    window.localStorage.setItem(WEB_SEARCH_STORAGE_KEY, enabled ? 'on' : 'off');
+  } catch (error) {
+    console.warn('[zuri:chat] web search preference', error?.message ?? error);
+  }
+}
+
+function isImageName(name) {
+  const extension = typeof name === 'string' && name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  return IMAGE_EXTENSIONS.includes(extension);
+}
 
 function messageKey(message, index) {
   return message?.id ?? `${message?.role ?? 'message'}-${index}`;
@@ -71,8 +95,6 @@ function voiceErrorMessage(code) {
 
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
-  const [mode, setMode] = useState('Ask');
-  const [workspaceMode, setWorkspaceMode] = useState('chat');
   const [draft, setDraft] = useState('');
   const [threadId, setThreadId] = useState(initialThreadId);
   const [messages, setMessages] = useState([]);
@@ -83,14 +105,19 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [listening, setListening] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(-1);
   const [stopping, setStopping] = useState(false);
+  const [menuView, setMenuView] = useState('');
+  // Off until the person turns it on (each lookup is an extra paid provider request),
+  // then remembered so it stays on across restarts.
+  const [webSearch, setWebSearch] = useState(readWebSearchPreference);
+  const menuRef = useRef(null);
   const composerRef = useRef(null);
   const scrollRef = useRef(null);
   // Starts true so opening a thread lands on its newest message.
   const stickToBottomRef = useRef(true);
   const recognitionRef = useRef(null);
   const voiceDraftRef = useRef('');
-  const suggestions = useMemo(
-    () => [...COMMON_SUGGESTIONS].sort(() => Math.random() - 0.5).slice(0, 3),
+  const capabilityHint = useMemo(
+    () => CAPABILITY_HINTS[Math.floor(Math.random() * CAPABILITY_HINTS.length)],
     [],
   );
 
@@ -120,6 +147,21 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       if (event.done === true) setReplying(false);
     });
   }, [api, threadId]);
+
+  useEffect(() => {
+    if (menuView === '') return undefined;
+    const close = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'mousedown' && menuRef.current?.contains(event.target)) return;
+      setMenuView('');
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [menuView]);
 
   useEffect(() => {
     const composer = composerRef.current;
@@ -176,7 +218,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     const name = typeof picked.data?.name === 'string' ? picked.data.name : '';
     const extension = name.includes('.') ? name.split('.').pop()?.toLowerCase() : '';
     if (!ATTACHMENT_EXTENSIONS.includes(extension)) {
-      setError('Attach a PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON file.');
+      setError('Attach a PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, JSON or image file.');
       return;
     }
     setAttachment({
@@ -185,6 +227,42 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       size: picked.data?.size,
     });
     setError('');
+  }
+
+  async function chooseFolder() {
+    if (replying) return;
+    if (typeof api?.files?.choose !== 'function') {
+      setError('Folders can only be added inside the Zuri app.');
+      return;
+    }
+    const picked = await api.files.choose({ purpose: 'folder' });
+    if (!picked?.ok) {
+      setError(picked?.error?.message ?? 'That folder could not be read.');
+      return;
+    }
+    if (picked.data?.cancelled) return;
+    if (!picked.data?.fileCount) {
+      setError('That folder has no text files Zuri can read (txt, md, csv, json, log).');
+      return;
+    }
+    setAttachment({
+      kind: 'folder',
+      name: picked.data.name,
+      text: picked.data.text,
+      fileCount: picked.data.fileCount,
+      skipped: picked.data.skipped,
+    });
+    setError('');
+  }
+
+  function pickMenuItem(action) {
+    setMenuView('');
+    action();
+  }
+
+  function insertCommand(text) {
+    setDraft((current) => (current.trim() === '' ? text : `${current.trimEnd()}\n${text}`));
+    composerRef.current?.focus();
   }
 
   function toggleVoiceInput() {
@@ -265,7 +343,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
     try {
       let content = prompt || 'Please analyze the attached file.';
-      if (attachment) {
+      const attachedImage = attachment && attachment.kind !== 'folder' && isImageName(attachment.name);
+      if (attachment?.kind === 'folder') {
+        content = `${content}\n\nAttached folder: ${attachment.name} (${attachment.fileCount} files)\n\n${attachment.text}`;
+      } else if (attachment && !attachedImage) {
         if (typeof api?.tools?.run !== 'function' || typeof attachment.path !== 'string' || attachment.path === '') {
           setError('This file could not be read. Choose it again or use the Files page.');
           return;
@@ -293,7 +374,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
       const appended = await api.chats.appendMessage({
         threadId: activeThreadId,
-        message: { role: 'user', content, mode: mode.toLowerCase() },
+        message: {
+          role: 'user',
+          content,
+          ...(attachedImage ? { images: [{ name: attachment.name, path: attachment.path }] } : {}),
+        },
       });
       if (!appended?.ok) {
         setError(appended?.error?.message ?? 'Your message could not be saved.');
@@ -303,7 +388,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       setMessages(Array.isArray(appended.data?.thread?.messages) ? appended.data.thread.messages : []);
       onChatUpdated?.();
 
-      const result = await api.chat.send({ threadId: activeThreadId });
+      const result = await api.chat.send({ threadId: activeThreadId, webSearch });
       if (!result?.ok) {
         if (result?.error?.code === 'CHAT_STOPPED') {
           // Stop intentionally discards the partial answer, so this is the
@@ -329,35 +414,24 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
   const hasConversation = messages.length > 0 || streamingText !== '';
   const contentWidth = 'max-w-4xl';
-  const workspaceSwitch = (
-    <div role="tablist" aria-label="Workspace mode" className="inline-flex rounded-full border border-border bg-surface-secondary p-1 shadow-sm">
-      {WORKSPACE_MODES.map(({ value, label }) => (
-        <Button
-          key={value}
-          role="tab"
-          size="sm"
-          variant={workspaceMode === value ? 'secondary' : 'ghost'}
-          aria-selected={workspaceMode === value}
-          className="min-w-20 rounded-full px-4"
-          onPress={() => setWorkspaceMode(value)}
-        >
-          {label}
-        </Button>
-      ))}
-    </div>
-  );
 
   return (
     <main className={`relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground ${compact ? 'zuri-overlay-panel' : ''}`}>
       <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
-        {!compact && hasConversation && <div className="pb-3">{workspaceSwitch}</div>}
-
+        {compact && (
+          <div className="absolute right-3 top-3 z-10 flex gap-1">
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Open Zuri" title="Open Zuri" onPress={() => void window.zuri?.overlay?.openMain?.()}>
+              <ExpandIcon size={16} />
+            </Button>
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Close" title="Close (Esc)" onPress={() => void window.zuri?.overlay?.hide?.()}>
+              <CloseIcon size={16} />
+            </Button>
+          </div>
+        )}
         {!compact && !hasConversation && (
           <div className={`mb-6 flex w-full ${contentWidth} flex-col items-center`}>
-            {workspaceSwitch}
-            <h1 className="mt-6 text-center text-3xl font-medium tracking-tight">
-              {workspaceMode === 'work' ? 'What should we work on?' : "What's on the agenda today?"}
-            </h1>
+            <h1 className="text-center text-3xl font-medium tracking-tight">What's on the agenda today?</h1>
+            <p className="mt-3 text-center text-base text-muted">{capabilityHint}</p>
           </div>
         )}
 
@@ -392,32 +466,46 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </div>
         )}
 
-        {/* Two columns only once the shell sidebar has left room for them. At
-            sm each card is about 200px and the description wraps one word per
-            line, so single column holds until lg. */}
-        {!compact && !hasConversation && (
-          <section className={`mb-6 grid w-full ${contentWidth} grid-cols-1 gap-3 lg:grid-cols-2`} aria-label="Work tools">
-            {WORK_TOOLS.map(({ route, label, description, Icon }) => (
-              <Button key={route} className="zuri-tool-card text-left" onPress={() => onNavigate?.(route)}>
-                <span className="zuri-tool-icon">
-                  <Icon size={16} />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col items-start">
-                  <span className="text-sm font-medium leading-tight text-foreground">{label}</span>
-                  <span className="w-full truncate text-xs font-normal text-muted">{description}</span>
-                </span>
-                <ChevronRightIcon size={16} className="shrink-0 self-center text-muted" />
-              </Button>
-            ))}
-          </section>
-        )}
-
         <div className={`w-full ${contentWidth} ${compact ? 'zuri-overlay-composer-wrap' : ''}`}>
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
           <form onSubmit={sendMessage} className={`flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>
-            <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Attach a file" title="Attach PDF, DOCX, XLSX, PPTX, TXT, CSV, Markdown, or JSON" onPress={() => void chooseAttachment()}>
-              <PlusIcon />
-            </Button>
+            <div ref={menuRef} className="relative">
+              <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Add to message" aria-haspopup="menu" aria-expanded={menuView !== ''} title="Add files, photos or a command" onPress={() => setMenuView((current) => (current === '' ? 'main' : ''))}>
+                <PlusIcon />
+              </Button>
+              {menuView !== '' && (
+                <div role="menu" aria-label="Add to message" className="absolute bottom-full left-0 z-20 mb-2 w-64 rounded-2xl border border-border bg-surface p-1 shadow-lg">
+                  {menuView === 'main' ? (
+                    <>
+                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseAttachment())}>
+                        <PaperclipIcon size={16} />
+                        <span>Add files or photos</span>
+                      </button>
+                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseFolder())}>
+                        <FolderIcon size={16} />
+                        <span>Add folder</span>
+                      </button>
+                      <button type="button" role="menuitemcheckbox" aria-checked={webSearch} title="Lets Zuri search the web and read pages. Each lookup is an extra request to your provider." className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => { const next = !webSearch; setWebSearch(next); saveWebSearchPreference(next); }}>
+                        <GlobeIcon size={16} />
+                        <span className="flex-1">Search the web</span>
+                        {webSearch && <CheckIcon size={16} />}
+                      </button>
+                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => setMenuView('commands')}>
+                        <SlashCommandIcon size={16} />
+                        <span>Slash commands</span>
+                      </button>
+                    </>
+                  ) : (
+                    SLASH_COMMANDS.map((command) => (
+                      <button key={command.label} type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => insertCommand(command.text))}>
+                        <SlashCommandIcon size={16} />
+                        <span>{command.label}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
             <ComposerTextarea
               ref={composerRef}
               value={draft}
@@ -428,7 +516,6 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               rows={1}
               className="min-h-10 min-w-0 flex-1 max-h-48 py-2 text-base outline-none"
             />
-            <SelectField label="Assistant mode" value={mode} options={MODES} onChange={setMode} hideLabel compact plainTrigger className="shrink-0" />
             <Button
               type="button"
               isIconOnly
@@ -466,25 +553,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           {!compact && attachment && (
             <div className="mt-2 flex min-h-6 items-center gap-3 px-2 text-xs text-muted">
               <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-foreground">Attached: {attachment.name}</span>
-                {formatAttachmentSize(attachment.size) && <span className="shrink-0">{formatAttachmentSize(attachment.size)}</span>}
+                <span className="truncate text-foreground">{attachment.kind === 'folder' ? `Folder: ${attachment.name}` : `Attached: ${attachment.name}`}</span>
+                {attachment.kind === 'folder'
+                  ? <span className="shrink-0">{attachment.fileCount} files{attachment.skipped > 0 ? `, ${attachment.skipped} skipped` : ''}</span>
+                  : formatAttachmentSize(attachment.size) && <span className="shrink-0">{formatAttachmentSize(attachment.size)}</span>}
                 <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onPress={() => setAttachment(null)} isDisabled={replying}>Remove</Button>
               </span>
             </div>
           )}
 
-          {!compact && !hasConversation && (
-            <div className="mt-4 px-1 sm:px-2">
-              <p className="pb-2 pt-1 text-sm text-muted">Try one of these</p>
-              <div className="flex flex-wrap gap-2">
-                {suggestions.map((suggestion) => (
-                  <Button key={suggestion} size="sm" variant="ghost" className="zuri-suggestion-chip font-normal" onPress={() => setDraft(suggestion)}>
-                    {suggestion}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </main>
