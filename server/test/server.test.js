@@ -216,4 +216,34 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
   }
 }
 
+// Downloads: the list must describe only installers the server really holds, and
+// each one must be sent as a file attachment. The folder is not in git, so the
+// count is compared against the disk rather than hard-coded; on a checkout
+// without installers this asserts an empty list instead of a broken link.
+{
+  const listed = await app(new Request('https://cloud.example.com/api/downloads'));
+  assert.equal(listed.status, 200);
+  const { files } = (await listed.json()).data;
+  assert.ok(Array.isArray(files));
+
+  const onDisk = await readdir(new URL('../downloads/', import.meta.url)).catch(() => []);
+  assert.equal(files.length, onDisk.filter((name) => /\.(exe|dmg)$/i.test(name)).length);
+
+  for (const file of files) {
+    assert.ok(['windows', 'macos'].includes(file.platform), 'each file needs a known platform');
+    assert.match(file.url, /^\/downloads\//);
+    assert.ok(file.size > 0, 'the size the page prints comes from here');
+
+    const download = await app(new Request(`https://cloud.example.com${file.url}`));
+    assert.equal(download.status, 200);
+    assert.equal(download.headers.get('content-type'), 'application/octet-stream');
+    assert.equal(download.headers.get('content-disposition'), `attachment; filename="${file.name}"`);
+    assert.equal(Number(download.headers.get('content-length')), file.size);
+  }
+}
+// A name that is not an installer, or tries to climb out of the folder, is a miss.
+assert.equal((await app(new Request('https://cloud.example.com/downloads/%2e%2e%2fsrc%2fconfig.js'))).status, 404);
+assert.equal((await app(new Request('https://cloud.example.com/downloads/notes.txt'))).status, 404);
+assert.equal((await app(new Request('https://cloud.example.com/downloads/missing.exe'))).status, 404);
+
 console.log('PASS server contract');

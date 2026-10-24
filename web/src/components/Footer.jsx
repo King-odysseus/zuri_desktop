@@ -1,5 +1,5 @@
 import { LogoMark } from './Icons.jsx';
-import { RELEASES_URL } from '../lib/downloads.js';
+import DownloadLink from './DownloadLink.jsx';
 
 /**
  * One footer for every page. "Powered by Tijha" is plain text on purpose:
@@ -16,9 +16,7 @@ export default function Footer({ compact = false }) {
         <span>Zuri Cloud</span>
       </span>
       {!compact && <span>The online half of the Zuri desktop app. Payments by Paystack, prices in Naira.</span>}
-      <a className="foot-download" href={RELEASES_URL} target="_blank" rel="noreferrer">
-        Download the desktop app
-      </a>
+      <DownloadLink />
       <span className="foot-powered">
         Powered by <strong>Tijha</strong>
       </span>

@@ -12,7 +12,7 @@
  *
  * Usage: npm run cloud:deploy
  */
-import { cp, mkdtemp, rm, readdir } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, readdir } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -20,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const serverDir = path.join(repoRoot, 'server');
+const releaseDir = path.join(repoRoot, 'release');
 
 // Overridable so the script is not tied to one Railway project.
 const projectId = process.env.RAILWAY_PROJECT_ID ?? '862406dd-b090-43e6-88ed-28ff61d215fc';
@@ -44,6 +45,23 @@ async function copyServer(scratch) {
   });
 }
 
+async function stageDownloads(scratch) {
+  // The installers are not in git: the Windows build is 140 MB, past GitHub's
+  // 100 MB per-file limit. Copying the newest ones from release/ here means the
+  // deployed site always offers the build that was just produced, instead of
+  // whatever was copied by hand last time.
+  const target = path.join(scratch, 'downloads');
+  await mkdir(target, { recursive: true });
+  const built = await readdir(releaseDir).catch(() => []);
+  const installers = built.filter((name) => /\.(exe|dmg)$/i.test(name));
+  for (const name of installers) {
+    await cp(path.join(releaseDir, name), path.join(target, name));
+  }
+  console.log(installers.length > 0
+    ? `Staged ${installers.length} installer(s): ${installers.join(', ')}`
+    : 'No installer in release/: the site will report the desktop app as not available yet.');
+}
+
 async function main() {
   console.log('Building the React dashboard...');
   run('npm', ['run', 'web:build'], repoRoot);
@@ -59,6 +77,7 @@ async function main() {
   const scratch = await mkdtemp(path.join(tmpdir(), 'zuri-cloud-'));
   try {
     await copyServer(scratch);
+    await stageDownloads(scratch);
     console.log(`Uploading ${scratch} to ${service} (${environment})...`);
     run('railway', ['up', '-p', projectId, '-s', service, '-e', environment, '-c'], scratch);
   } finally {

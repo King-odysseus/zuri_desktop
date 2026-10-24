@@ -1,7 +1,7 @@
 import Footer from '../components/Footer.jsx';
+import DownloadList from '../components/DownloadList.jsx';
 import PlanCard from '../components/PlanCard.jsx';
 import { Button, Chip, UsageBar } from '../components/ui.jsx';
-import { DOWNLOADS } from '../lib/downloads.js';
 import {
   ArrowRightIcon,
   BoltIcon,
@@ -209,25 +209,9 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
       <section className="section downloads" id="downloads">
         <div className="section-head">
           <h2>Get the Zuri desktop app</h2>
-          <p>Install the Windows app to keep your assistant, files and automations close at hand.</p>
+          <p>Install Zuri on your computer to keep your assistant, files and automations close at hand. The download starts straight away.</p>
         </div>
-        <div className="download-grid">
-          {Object.values(DOWNLOADS).map((download) => (
-            <a
-              className={`download-card${download.available ? '' : ' is-unavailable'}`}
-              href={download.href}
-              target="_blank"
-              rel="noreferrer"
-              key={download.label}
-            >
-              <span className="download-card-copy">
-                <strong>{download.label}</strong>
-                <span>{download.detail}</span>
-              </span>
-              <span className="download-card-action">{download.available ? 'View release' : 'Watch releases'}</span>
-            </a>
-          ))}
-        </div>
+        <DownloadList />
       </section>
 
       <section className="section" id="pricing">

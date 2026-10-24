@@ -19,6 +19,15 @@
 
 ## 2026-10-24 - Windows
 
+- The site now hands out the desktop app itself instead of linking to a GitHub releases page: `GET /api/downloads` lists the installers this server actually holds, and `GET /downloads/<file>` sends them with `content-disposition: attachment`, so a click saves `Zuri-0.1.0-Setup.exe` rather than opening a tab. The landing cards, the footer and the dashboard sidebar all read that one endpoint through a cached fetch in `web/src/lib/downloads.js`; a platform with no build says "Not available yet" rather than showing a dead link.
+- The installers are deliberately not in git: the Windows build is 140 MB, past GitHub's 100 MB per-file limit. `server/downloads/` is ignored, and `npm run cloud:deploy` now stages the newest `release/*.exe` and `release/*.dmg` into the uploaded image, so the deployed site always offers the build that was just produced.
+- `package.json` gained a real macOS target (`build.mac`, dmg for arm64 and x64, `npm run dist:mac`). A .dmg cannot be built on Windows, so the macOS card stays unavailable until someone runs that script on a Mac and drops the file into `release/`.
+- `server/src/downloads.js`, `server/src/app.js`, `server/test/server.test.js` (listing, attachment headers, and a refused `%2e%2e%2f` traversal), `scripts/deploy-cloud.mjs`, `web/src/lib/downloads.js`, `web/src/components/{DownloadList,DownloadLink,Footer}.jsx`, `web/src/views/{Landing,Dashboard}.jsx`, `web/src/styles.css`, `server/public/**`.
+- Other OS action: run `npm run web:build && cd server && npm test` after syncing, then `npm run cloud:deploy` from a checkout that has `release/` (or copy an installer into `server/downloads/`) or the site will report the desktop app as unavailable.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Added desktop download cards to the Zuri Cloud landing page, footer, and signed-in dashboard. The Windows card links to the GitHub releases page; macOS is shown as not published because the current build only targets Windows.
 - Key files: `web/src/lib/downloads.js`, `web/src/views/Landing.jsx`, `web/src/components/Footer.jsx`, `web/src/views/Dashboard.jsx`, `web/src/styles.css`.
 - Other OS action: run `npm run web:build` and `npm --prefix server test` after syncing.

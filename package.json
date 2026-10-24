@@ -19,6 +19,7 @@
     "web:build": "vite build --config vite.web.config.mjs",
     "cloud:deploy": "node scripts/deploy-cloud.mjs",
     "dist": "electron-builder --win nsis",
+    "dist:mac": "electron-builder --mac dmg",
     "test": "npm run react:build && npm run smoke && npm run selftest && npm run firstrun && npm run demo:act && npm run demo:autopilot"
   },
   "devDependencies": {
@@ -73,6 +74,20 @@
       ],
       "icon": "src/main/assets/zuri-icon.ico",
       "artifactName": "${productName}-${version}-Setup.${ext}"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "src/main/assets/zuri-icon.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "${productName}-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,

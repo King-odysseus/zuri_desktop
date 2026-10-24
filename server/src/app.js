@@ -6,6 +6,7 @@ import { findPlan, PLANS, publicPlan } from './plans.js';
 import { usageStatus } from './usage.js';
 import { createRequestLimiter, limitsForPlan } from './limits.js';
 import { verifyPaystackSignature } from './paystack.js';
+import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const ASSETS_DIR = `${PUBLIC_DIR}${path.sep}assets`;
@@ -131,6 +132,49 @@ async function serveStatic(pathname) {
   return extension === '' ? appShell() : null;
 }
 
+/**
+ * Send one installer from the downloads folder as a file attachment.
+ *
+ * The name is validated by resolveDownloadPath before it is resolved, so a
+ * crafted '../' is refused rather than normalised away, and a folder that is
+ * empty (the installers are not in git) answers 404 instead of 500.
+ *
+ * @param {string} rawName percent-encoded file name taken from the URL
+ * @returns {Promise<Response>}
+ */
+async function serveDownload(rawName) {
+  let name;
+  try {
+    name = decodeURIComponent(rawName);
+  } catch {
+    return response(400, { ok: false, error: { code: 'INVALID_DOWNLOAD', message: 'That download link is not valid.' } });
+  }
+
+  const filePath = resolveDownloadPath(name);
+  if (!filePath) return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'No such download.' } });
+
+  try {
+    const body = await readFile(filePath);
+    return new Response(body, {
+      status: 200,
+      headers: {
+        'content-type': DOWNLOAD_CONTENT_TYPE,
+        'content-length': String(body.byteLength),
+        'content-disposition': `attachment; filename="${name}"`,
+        // A rebuilt installer keeps its file name, so caching it would hand out
+        // the previous build after an update.
+        'cache-control': 'no-cache',
+        ...DASHBOARD_SECURITY_HEADERS,
+      },
+    });
+  } catch (error) {
+    if (error?.code === 'ENOENT' || error?.code === 'EISDIR') {
+      return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'No such download.' } });
+    }
+    throw error;
+  }
+}
+
 /** @param {Request} request @param {number} maxBytes @returns {Promise<string>} */
 async function readRawBody(request, maxBytes) {
   const raw = await request.text();
@@ -189,6 +233,15 @@ export function createApp(dependencies = {}) {
     }
     if (request.method === 'GET' && url.pathname === '/api/public-config') {
       return response(200, { ok: true, data: { googleClientId: typeof dependencies.googleClientId === 'string' ? dependencies.googleClientId : '' } });
+    }
+    if (request.method === 'GET' && url.pathname === '/api/downloads') {
+      return response(200, { ok: true, data: { files: await listDownloads() } });
+    }
+
+    // Installers are sent as an attachment so the click saves the file instead of
+    // the browser trying to display a 140 MB executable.
+    if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/downloads/')) {
+      return serveDownload(url.pathname.slice('/downloads/'.length));
     }
 
     if (request.method === 'POST' && url.pathname === '/api/auth/google') {
