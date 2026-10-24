@@ -456,6 +456,30 @@ a {
   color: var(--danger);
 }
 
+/* Shown instead of the Google button when the server has no client id. It reads
+   as a deliberate state rather than a missing control. */
+.google-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--accent-soft);
+}
+
+.google-notice strong {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.google-notice p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 /* Visible to screen readers only; used for the loading announcement. */
 .sr-only {
   position: absolute;

@@ -55,12 +55,18 @@ export default function GoogleSignIn({ theme, onCredential, onError }) {
 
   return (
     <>
-      <div className="google-slot" ref={slot} aria-busy={status === 'checking'} />
+      {/* The slot keeps its 44px height only while a button lives in it. Rendering
+          it unconditionally left a blank hole in the card on servers without a
+          Google client id, which is the state every fresh deployment starts in. */}
+      {status !== 'unconfigured' && (
+        <div className="google-slot" ref={slot} aria-busy={status === 'checking'} />
+      )}
       {status === 'checking' && <p className="google-hint">Preparing Google sign-in...</p>}
       {status === 'unconfigured' && (
-        <p className="google-hint">
-          Google sign-in is not configured on this server yet. Set GOOGLE_CLIENT_ID and redeploy.
-        </p>
+        <div className="google-notice" role="status">
+          <strong>Google sign-in is not set up on this server yet.</strong>
+          <p>Add GOOGLE_CLIENT_ID in Railway and redeploy. This card becomes the sign-in button as soon as that is set.</p>
+        </div>
       )}
       {status === 'failed' && <p className="google-hint is-error">{message}</p>}
     </>
