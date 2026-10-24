@@ -54,6 +54,55 @@ const CHAT_TOOLS = Object.freeze([
   },
 ]);
 
+/**
+ * Offered on every message (not only with web search on) because it costs nothing
+ * unless the person asks for a file, and it only ever adds a new file to the workspace.
+ */
+const DOCUMENT_TOOL = Object.freeze({
+  name: 'createDocument',
+  description:
+    'Create a downloadable Word (docx), Excel (xlsx) or PowerPoint (pptx) file when the person asks for a document, spreadsheet, deck or slides. ' +
+    'Write the full content into the call; never ask them to copy text into Office themselves. After it succeeds, tell them the file is ready in one short sentence.',
+  parameters: {
+    type: 'object',
+    properties: {
+      kind: { type: 'string', enum: ['docx', 'xlsx', 'pptx'], description: 'docx = Word, xlsx = Excel, pptx = PowerPoint.' },
+      fileName: { type: 'string', description: 'Short file name without extension.' },
+      content: {
+        type: 'object',
+        description:
+          'docx: { title, sections: [{ heading, paragraphs: [text], bullets: [text], table: { rows: [[cell]] } }] }. ' +
+          'xlsx: { sheets: [{ name, columns: [header], rows: [[value]] }] }; numbers stay numbers and a text value starting with "=" is a formula such as "=SUM(B2:B9)". ' +
+          'pptx: { title, subtitle, slides: [{ title, bullets: [text], notes }] }.',
+      },
+    },
+    required: ['kind', 'content'],
+  },
+});
+
+const EDIT_TOOL = Object.freeze({
+  name: 'editDocument',
+  description:
+    'Change an attached Word, Excel or PowerPoint file. Pass the file path shown after "Attached file" and a list of edits; the result is a new copy and the original stays untouched. ' +
+    'docx/pptx edits: { find, replace } with the exact existing text. xlsx edits: { sheet, cell, value } (a value starting with "=" is a formula), { sheet, appendRow: [values] } or { find, replace }. ' +
+    'Only use it when the person asks to change the file; otherwise just answer.',
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'The attached file path.' },
+      edits: { type: 'array', items: { type: 'object' }, description: 'The changes to make, in order.' },
+    },
+    required: ['path', 'edits'],
+  },
+});
+
+/** Tools that produce a downloadable file; each success becomes a card under the reply. */
+const FILE_TOOLS = Object.freeze([DOCUMENT_TOOL, EDIT_TOOL]);
+const FILE_TOOL_NAMES = new Set(FILE_TOOLS.map((tool) => tool.name));
+
+/** Every tool chat can run by name; which are offered on a given message is decided per send. */
+const ALL_CHAT_TOOLS = Object.freeze([...CHAT_TOOLS, ...FILE_TOOLS]);
+
 /** Each extra round is another paid model call, so the loop is capped hard. */
 const MAX_TOOL_ROUNDS = 4;
 
@@ -455,6 +504,35 @@ async function readEventStream(body, onEvent) {
   }
 }
 
+// DeepSeek sometimes writes its tool request into the reply text as DSML markup
+// (`<｜DSML｜function_calls>...`) instead of a real tool_calls field. Left alone it
+// would show up in the chat, so the markup is cut from the text and read as calls.
+const DSML_START = /<[|｜\s]*DSML/;
+const DSML_HOLD_BACK = 16;
+
+/**
+ * Split reply text into what the person should read and any DSML tool calls.
+ * @param {string} text
+ * @returns {{ visible: string, calls: { id: string, name: string, arguments: string }[] }}
+ */
+export function splitDsml(text) {
+  const start = text.search(DSML_START);
+  if (start === -1) return { visible: text, calls: [] };
+
+  const calls = [];
+  const chunks = text.slice(start).split(/invoke\s+name="/).slice(1);
+  for (const chunk of chunks) {
+    const name = chunk.slice(0, chunk.indexOf('"'));
+    if (name === '') continue;
+    const args = {};
+    for (const match of chunk.matchAll(/parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)<\s*\/[^>]*?parameter\s*>/g)) {
+      args[match[1]] = match[2].trim();
+    }
+    calls.push({ id: '', name, arguments: JSON.stringify(args) });
+  }
+  return { visible: text.slice(0, start).trimEnd(), calls };
+}
+
 /**
  * Send one conversation to the configured provider and collect the streamed reply.
  * This is the single request path: chat and document summaries both come through
@@ -532,6 +610,7 @@ async function streamReply(provider, model, key, conversation, options = {}) {
   }
 
   let reply = '';
+  let streamedLength = 0;
   let reasoning = '';
   let streamedFailure = '';
   /** @type {{ id: string, name: string, arguments: string }[]} */
@@ -560,7 +639,20 @@ async function streamReply(provider, model, key, conversation, options = {}) {
       if (text === '') return;
 
       reply += text;
-      if (typeof options.onDelta === 'function') options.onDelta(text);
+      if (typeof options.onDelta !== 'function') return;
+
+      // Stream only what comes before any DSML markup, and hold back a trailing "<"
+      // that might be the start of one split across two chunks.
+      const marker = reply.search(DSML_START);
+      let limit = marker;
+      if (marker === -1) {
+        const tail = reply.lastIndexOf('<');
+        limit = tail !== -1 && reply.length - tail < DSML_HOLD_BACK ? tail : reply.length;
+      }
+      if (limit > streamedLength) {
+        options.onDelta(reply.slice(streamedLength, limit));
+        streamedLength = limit;
+      }
     });
   } catch (error) {
     if (error?.name === 'TimeoutError') {
@@ -577,12 +669,24 @@ async function streamReply(provider, model, key, conversation, options = {}) {
     return failure('CHAT_PROVIDER_ERROR', `${config.label} reported: ${streamedFailure}`);
   }
 
-  const calls = toolCalls.filter((call) => call?.name);
-  if (reply.trim() === '' && calls.length === 0) {
+  const split = splitDsml(reply);
+  // Markup calls only count when tools were offered; otherwise the model is asking for
+  // something this turn cannot do, so the markup is dropped and the rest is shown.
+  const offeredNames = (options.tools ?? []).map((tool) => tool.name);
+  const calls = [
+    ...toolCalls.filter((call) => call?.name),
+    ...split.calls.filter((call) => offeredNames.includes(call.name)),
+  ];
+  if (split.visible.trim() === '' && calls.length === 0) {
     return failure('CHAT_EMPTY_REPLY', `${config.label} sent an empty reply. Try again.`);
   }
 
-  return { ok: true, text: reply, reasoning, toolCalls: calls };
+  // Whatever was held back (a trailing "<" that turned out to be plain text) goes out now.
+  if (typeof options.onDelta === 'function' && split.visible.length > streamedLength) {
+    options.onDelta(split.visible.slice(streamedLength));
+  }
+
+  return { ok: true, text: split.visible, reasoning, toolCalls: calls };
 }
 
 /**
@@ -590,7 +694,9 @@ async function streamReply(provider, model, key, conversation, options = {}) {
  * DeepSeek's thinking mode rejects the next request unless the assistant message that
  * made the calls carries its reasoning_content back, so it is kept here.
  */
-async function answerToolCalls(conversation, reply, allowedTools) {
+async function answerToolCalls(conversation, reply, allowedTools, onStatus = () => {}, offeredTools = ALL_CHAT_TOOLS) {
+  /** Files built by createDocument in this round, handed back so the reply can carry them. */
+  const files = [];
   conversation.turns.push({
     role: 'assistant',
     content: reply.text,
@@ -610,16 +716,45 @@ async function answerToolCalls(conversation, reply, allowedTools) {
       args = {};
     }
     // Only the chat tool list is reachable; the model cannot name another tool.
-    const offered = CHAT_TOOLS.some((tool) => tool.name === call.name);
+    const offered = offeredTools.some((tool) => tool.name === call.name);
+    if (offered) {
+      if (call.name === 'createDocument') {
+        onStatus(`Creating your ${String(args.kind ?? 'document').toLowerCase()} file`);
+      } else if (call.name === 'editDocument') {
+        onStatus('Editing a copy of your file');
+      } else {
+        const target = String(args.query ?? args.url ?? '').slice(0, 80);
+        onStatus(call.name === 'webFetch' ? `Reading ${target}` : `Searching the web for ${target}`);
+      }
+    }
     const result = offered
       ? await runTool(call.name, args, { allowedTools })
       : failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
+    const madeFile = FILE_TOOL_NAMES.has(call.name) && result.ok;
+    if (madeFile) {
+      const { path: filePath, name, kind, bytes } = result.data;
+      files.push({ path: filePath, name, kind, bytes });
+    }
     conversation.turns.push({
       role: 'tool',
       tool_call_id: call.id || `call_${index}`,
-      content: JSON.stringify(result).slice(0, TOOL_RESULT_LIMIT),
+      // The model only needs to know it worked; the full disk path is not useful to it.
+      content: JSON.stringify(
+        madeFile
+          ? {
+              ok: true,
+              data: {
+                name: result.data.name,
+                kind: result.data.kind,
+                ...(result.data.changes !== undefined ? { changes: result.data.changes, notFound: result.data.notFound } : {}),
+                note: 'The file is ready and shown to the person as a download card.',
+              },
+            }
+          : result,
+      ).slice(0, TOOL_RESULT_LIMIT),
     });
   }
+  return files;
 }
 
 /**
@@ -679,6 +814,42 @@ export async function summarizeText(document = {}, options = {}) {
       truncated,
     },
   };
+}
+
+const WORD_ADDIN_SYSTEM_PROMPT =
+  'You are Zuri, working inside Microsoft Word. Do what the person asks using the document text they give you. ' +
+  'Reply with only the text to put in the document: no greeting, no explanation, no markdown fences.';
+
+/** Longest slice of a document sent along with an add-in request; every character is billed. */
+const ADDIN_CONTEXT_LIMIT = 30_000;
+
+/**
+ * One question from the Word add-in: an instruction plus the selected text or the
+ * document, answered once with the configured provider. Not saved to any chat.
+ * @param {{ prompt?: string, context?: string }} request
+ * @param {{ fetchImpl?: typeof fetch, signal?: AbortSignal }} [options]
+ * @returns {Promise<{ ok: true, data: { text: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function askForAddin(request = {}, options = {}) {
+  const prompt = typeof request.prompt === 'string' ? request.prompt.trim() : '';
+  if (prompt === '') return failure('ADDIN_EMPTY_PROMPT', 'Type what you want Zuri to do first.');
+
+  const settings = await readStore('settings');
+  if (!settings.ok) return settings;
+  const { provider, model } = resolveChatTarget(settings.data);
+  const key = getKey(provider);
+  if (key === null) {
+    return failure('ADDIN_NO_KEY', `No ${PROVIDER_CONFIG[provider].label} key is saved. Add one in Zuri Settings, then try again.`);
+  }
+
+  const context = typeof request.context === 'string' ? request.context.slice(0, ADDIN_CONTEXT_LIMIT) : '';
+  const content = context === '' ? prompt : `${prompt}\n\nDocument text:\n${context}`;
+  const reply = await streamReply(provider, model, key, {
+    system: [WORD_ADDIN_SYSTEM_PROMPT, currentTimeContext()].join('\n\n'),
+    turns: [{ role: 'user', content }],
+  }, options);
+  if (!reply.ok) return reply;
+  return { ok: true, data: { text: reply.text.trim() } };
 }
 
 /**
@@ -742,33 +913,66 @@ export async function sendChatMessage(threadId, options = {}) {
   // Anthropic uses a different tool format, so tools are offered on the OpenAI-style
   // providers only. An agent's allow-list narrows what the model can call.
   const allowedTools = agentAllowedTools(settings, options.agentId);
+  const candidateTools = options.webSearch === true ? ALL_CHAT_TOOLS : FILE_TOOLS;
   const tools =
-    provider === 'anthropic' || options.webSearch !== true
+    provider === 'anthropic'
       ? []
-      : CHAT_TOOLS.filter((tool) => allowedTools === null || allowedTools.includes(tool.name));
+      : candidateTools.filter((tool) => allowedTools === null || allowedTools.includes(tool.name));
+  const builtFiles = [];
 
   // Text from every round is kept because it was all streamed to the window, so the
   // saved message matches what the person watched arrive.
   let fullText = '';
+  let nudged = false;
   for (let round = 0; ; round += 1) {
+    const toolsOffered = round < MAX_TOOL_ROUNDS ? tools : [];
+
+    // Once tools are withdrawn (or a round came back empty) the model must be told to
+    // answer; otherwise it keeps writing tool markup that is stripped to nothing.
+    if (round > 0 && !nudged && (toolsOffered.length === 0 || conversation.needsAnswer === true)) {
+      conversation.turns.push({ role: 'user', content: 'Answer now in plain text using the search results above. Do not call any tools.' });
+      nudged = true;
+    }
+
     const reply = await streamReply(provider, model, key, conversation, {
       fetchImpl,
       signal: options.signal,
-      tools: round < MAX_TOOL_ROUNDS ? tools : [],
+      tools: toolsOffered,
       onDelta: (text) => emit({ threadId, delta: text }),
     });
-    if (!reply.ok) return reply;
 
+    if (!reply.ok) {
+      // An empty round after tools ran is not worth losing the text already shown.
+      if (reply.error.code === 'CHAT_EMPTY_REPLY' && round > 0) {
+        if (fullText.trim() !== '') break;
+        if (!nudged) {
+          conversation.needsAnswer = true;
+          continue;
+        }
+      }
+      return reply;
+    }
+
+    // Rounds are joined with a blank line so "...licence." and "Let me read" do not run together.
+    if (fullText !== '' && reply.text !== '') {
+      emit({ threadId, delta: '\n\n' });
+      fullText += '\n\n';
+    }
     fullText += reply.text;
     if (reply.toolCalls.length === 0) break;
-    await answerToolCalls(conversation, reply, allowedTools);
+    const made = await answerToolCalls(conversation, reply, allowedTools, (status) => emit({ threadId, status }), tools);
+    emit({ threadId, status: '' });
+    if (made.length > 0) {
+      builtFiles.push(...made);
+      emit({ threadId, files: made });
+    }
   }
 
   if (fullText.trim() === '') {
     return failure('CHAT_EMPTY_REPLY', `${config.label} sent an empty reply. Try again.`);
   }
 
-  const saved = await appendMessage(threadId, { role: 'assistant', content: fullText });
+  const saved = await appendMessage(threadId, { role: 'assistant', content: fullText, files: builtFiles });
   if (!saved.ok) return saved;
 
   emit({ threadId, done: true });

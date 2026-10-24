@@ -5,7 +5,9 @@ import {
   CheckIcon,
   CloseIcon,
   CopyIcon,
+  DownloadIcon,
   ExpandIcon,
+  FileIcon,
   FolderIcon,
   GlobeIcon,
   MicIcon,
@@ -93,13 +95,45 @@ function voiceErrorMessage(code) {
   return 'Voice typing stopped unexpectedly. Try again.';
 }
 
+const FILE_KIND_LABELS = { docx: 'Word document', xlsx: 'Excel spreadsheet', pptx: 'PowerPoint presentation' };
+
+/** A file Zuri built in a reply: open it, find it in its folder, or save a copy elsewhere. */
+function FileCard({ file, api }) {
+  const [note, setNote] = useState('');
+  const run = async (action) => {
+    if (typeof api?.files?.[action] !== 'function') return;
+    const result = await api.files[action]({ path: file.path });
+    if (!result?.ok) setNote(result?.error?.message ?? 'That did not work.');
+    else setNote(action === 'saveAs' && result.data?.cancelled === false ? 'Saved' : '');
+  };
+  return (
+    <div className="flex w-full min-w-0 flex-col gap-2 rounded-2xl border border-border bg-surface px-3 py-3 text-sm">
+      <div className="flex min-w-0 items-center gap-3">
+        <FileIcon size={22} className="shrink-0 text-muted" />
+        <div className="min-w-0">
+          <p className="truncate font-medium text-foreground">{file.name}</p>
+          <p className="text-xs text-muted">{FILE_KIND_LABELS[file.kind] ?? 'File'}{file.bytes ? `, ${formatAttachmentSize(file.bytes)}` : ''}</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="secondary" onPress={() => void run('open')}>Open</Button>
+        <Button size="sm" variant="ghost" onPress={() => void run('saveAs')}><DownloadIcon size={14} />Save as</Button>
+        <Button size="sm" variant="ghost" onPress={() => void run('reveal')}><FolderIcon size={14} />Show in folder</Button>
+      </div>
+      {note !== '' && <p role="status" className="text-xs text-muted">{note}</p>}
+    </div>
+  );
+}
+
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [draft, setDraft] = useState('');
   const [threadId, setThreadId] = useState(initialThreadId);
   const [messages, setMessages] = useState([]);
   const [streamingText, setStreamingText] = useState('');
+  const [streamingFiles, setStreamingFiles] = useState([]);
   const [replying, setReplying] = useState(false);
+  const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
   const [attachment, setAttachment] = useState(null);
   const [listening, setListening] = useState(false);
@@ -144,7 +178,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     return api.chat.onStream((event) => {
       if (!event || event.threadId !== threadId) return;
       if (typeof event.delta === 'string') setStreamingText((current) => current + event.delta);
-      if (event.done === true) setReplying(false);
+      if (typeof event.status === 'string') setActivity(event.status);
+      if (Array.isArray(event.files)) setStreamingFiles((current) => [...current, ...event.files]);
+      if (event.done === true) {
+        setReplying(false);
+        setActivity('');
+      }
     });
   }, [api, threadId]);
 
@@ -338,6 +377,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setDraft('');
     setError('');
     setStreamingText('');
+    setStreamingFiles([]);
     setReplying(true);
     if (listening) recognitionRef.current?.stop();
 
@@ -357,7 +397,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           setError(read?.error?.message ?? 'That file could not be read. Try a text or Office document.');
           return;
         }
-        content = `${content}\n\nAttached file: ${attachment.name}\n\n${attachmentText}`;
+        content = `${content}\n\nAttached file: ${attachment.name} (path: ${attachment.path})\n\n${attachmentText}`;
       }
       let activeThreadId = threadId;
       if (activeThreadId === '') {
@@ -403,6 +443,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       setMessages(Array.isArray(result.data?.thread?.messages) ? result.data.thread.messages : []);
       onChatUpdated?.();
       setStreamingText('');
+      setStreamingFiles([]);
       setAttachment(null);
     } catch (sendError) {
       setError(sendError?.message ?? 'Zuri could not respond.');
@@ -447,6 +488,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   <div className="min-w-0 break-words rounded-2xl bg-surface-secondary px-4 py-3 text-sm text-foreground">
                     <FormattedMessage content={message.content} />
                   </div>
+                  {Array.isArray(message.files) && message.files.map((file) => <FileCard key={file.path} file={file} api={api} />)}
                   <Button
                     isIconOnly
                     size="sm"
@@ -462,7 +504,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               )
             ))}
             {streamingText !== '' && <div className="max-w-[85%] self-start rounded-2xl bg-surface-secondary px-4 py-3 text-sm"><FormattedMessage content={streamingText} /></div>}
-            {replying && streamingText === '' && <p className="self-start text-sm text-muted">Zuri is thinking...</p>}
+            {streamingFiles.length > 0 && (
+              <div className="flex max-w-[85%] flex-col gap-2 self-start">
+                {streamingFiles.map((file) => <FileCard key={file.path} file={file} api={api} />)}
+              </div>
+            )}
+            {replying && activity !== '' && <p className="self-start text-sm text-muted">{activity}...</p>}
+            {replying && streamingText === '' && activity === '' && <p className="self-start text-sm text-muted">Zuri is thinking...</p>}
           </div>
         )}
 

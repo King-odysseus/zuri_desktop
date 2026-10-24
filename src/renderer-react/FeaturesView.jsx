@@ -32,7 +32,7 @@ export default function FeaturesView({ onNavigate }) {
           <h1 className="text-3xl font-medium tracking-tight">What Zuri can do</h1>
           <p className="mt-2 text-sm text-muted">Everything in one place. Open any feature to start using it.</p>
         </header>
-        <section className="grid grid-cols-1 gap-3 lg:grid-cols-2" aria-label="Features">
+        <section className="zuri-features-grid" aria-label="Features">
           {FEATURES.map(({ route, label, description, Icon }) => (
             <Button key={label} className="zuri-tool-card text-left" onPress={() => onNavigate?.(route)}>
               <span className="zuri-tool-icon">

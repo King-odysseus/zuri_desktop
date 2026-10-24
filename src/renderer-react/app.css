@@ -313,27 +313,27 @@ body {
   }
 
   [data-theme="dark"] {
-    /* The canvas is #06005e; every other layer is a step lighter in the same
+    /* The canvas is #040130; every other layer is a step lighter in the same
        indigo hue so a card, a field and the canvas stay separable. */
-    --background: #06005e;
+    --background: #040130;
     --foreground: #ecebff;
-    --surface: #0e0872;
+    --surface: #0a0548;
     --surface-foreground: #ecebff;
-    --surface-secondary: #150f82;
+    --surface-secondary: #100a5c;
     --surface-secondary-foreground: #ecebff;
-    --surface-tertiary: #1e1892;
+    --surface-tertiary: #181072;
     --surface-tertiary-foreground: #ecebff;
-    --default: #2b24a0;
+    --default: #241c8c;
     --default-foreground: #ecebff;
     --muted: #b4b1e8;
     --accent: #a9b4ff;
-    --accent-foreground: #06005e;
+    --accent-foreground: #040130;
     --border: transparent;
     --separator: transparent;
-    --field-background: #0a0468;
-    --selected: #2f29b0;
+    --field-background: #070240;
+    --selected: #2a23a0;
     --selected-foreground: #f2f1ff;
-    --control-border: #3d37bb;
+    --control-border: #342eaa;
   }
 }
 
@@ -588,6 +588,21 @@ label {
   color: var(--muted);
   font-size: 0.875rem;
   line-height: 1.5;
+}
+
+/* The cards sit inside a bordered section, so it needs its own inner padding, and
+   minmax(0, 1fr) stops long descriptions from pushing a column past the section edge. */
+.zuri-features-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+@media (min-width: 1024px) {
+  .zuri-features-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 /* The Work landing cards navigate, so they must look pressable: a real card, an

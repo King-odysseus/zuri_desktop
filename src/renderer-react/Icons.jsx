@@ -32,4 +32,6 @@ export {
   Paperclip as PaperclipIcon,
   Globe as GlobeIcon,
   SquareSlash as SlashCommandIcon,
+  FileText as FileIcon,
+  Download as DownloadIcon,
 } from 'lucide-react';

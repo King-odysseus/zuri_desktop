@@ -39,6 +39,9 @@ const CHANNELS = Object.freeze([
   'zuri:onboarding:complete',
   'zuri:settings:keyStatus',
   'zuri:settings:open-data-folder',
+  'zuri:settings:addin-status',
+  'zuri:settings:addin-install',
+  'zuri:settings:addin-remove',
   'zuri:tasks:list',
   'zuri:tasks:create',
   'zuri:tasks:update',
@@ -56,6 +59,7 @@ const CHANNELS = Object.freeze([
   'zuri:files:list',
   'zuri:files:open',
   'zuri:files:reveal',
+  'zuri:files:saveAs',
   'zuri:files:choose',
   'zuri:files:summarize',
   // The tool registry, so the agents page ticks the tools that really exist rather

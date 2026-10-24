@@ -19,9 +19,12 @@ function formatModified(value) {
   return Number.isNaN(date.getTime()) ? '' : date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+const OFFICE_TYPE_LABELS = { DOCX: 'WORD', XLSX: 'EXCEL', PPTX: 'POWERPOINT' };
+
 function fileType(name) {
   const extension = name.split('.').pop()?.toUpperCase();
-  return extension && extension !== name.toUpperCase() ? extension : 'FILE';
+  if (!extension || extension === name.toUpperCase()) return 'FILE';
+  return OFFICE_TYPE_LABELS[extension] ?? extension;
 }
 
 // The renderer is sandboxed and cannot import node:path, so the workspace folder

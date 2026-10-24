@@ -1,10 +1,10 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, session, shell, Tray } from 'electron';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { CHAT_STREAM_CHANNEL, sendChatMessage, summarizeText } from './providers/chat.js';
+import { CHAT_STREAM_CHANNEL, askForAddin, sendChatMessage, summarizeText } from './providers/chat.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
 import { runOnboardingSetup } from './onboarding.js';
 import {
@@ -27,6 +27,7 @@ import {
 } from './tray-menu.js';
 import { bringToFront } from './second-launch.js';
 import { clearKey, keyStatus, setKey } from './secrets.js';
+import { addinStatus, installAddin, removeAddin, resumeAddin } from './addin.js';
 import {
   appendMessage,
   completeReminder,
@@ -48,7 +49,7 @@ import {
   updateAutomation,
   updateTask,
 } from './store.js';
-import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, resolveWorkspaceFile, runTool, toolCatalogue } from './tools/index.js';
+import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, runTool, toolCatalogue } from './tools/index.js';
 
 // ESM main process (package.json sets "type": "module"), so __dirname is built here.
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -64,7 +65,7 @@ export const ICON_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.png');
 // that matches the size it is drawing; the PNG above stays the source the other
 // platforms and the smoke check read. Both come from the same capture.
 export const ICO_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.ico');
-const CANVAS_DARK = '#0B0B0F'; // matches --zuri-bg-canvas dark, so the window does not flash white before first paint
+const CANVAS_DARK = '#040130'; // matches --background in dark mode, so the window does not flash white before first paint
 
 /**
  * Abort handles for replies in flight, keyed by thread. Stop (node 0:944) is the
@@ -250,6 +251,9 @@ const HANDLERS = new Map([
   ['zuri:onboarding:complete', handleOnboardingComplete],
   ['zuri:settings:keyStatus', handleSettingsKeyStatus],
   ['zuri:settings:open-data-folder', handleSettingsOpenDataFolder],
+  ['zuri:settings:addin-status', handleSettingsAddinStatus],
+  ['zuri:settings:addin-install', handleSettingsAddinInstall],
+  ['zuri:settings:addin-remove', handleSettingsAddinRemove],
   ['zuri:tasks:list', handleTasksList],
   ['zuri:tasks:create', handleTasksCreate],
   ['zuri:tasks:update', handleTasksUpdate],
@@ -265,6 +269,7 @@ const HANDLERS = new Map([
   ['zuri:files:list', handleFilesList],
   ['zuri:files:open', handleFilesOpen],
   ['zuri:files:reveal', handleFilesReveal],
+  ['zuri:files:saveAs', handleFilesSaveAs],
   ['zuri:files:choose', handleFilesChoose],
   ['zuri:files:summarize', handleFilesSummarize],
   ['zuri:tools:list', handleToolsList],
@@ -670,6 +675,35 @@ async function handleSettingsOpenDataFolder() {
   }
 }
 
+async function handleSettingsAddinStatus() {
+  try {
+    return { ok: true, data: await addinStatus(getStoreRoot()) };
+  } catch (error) {
+    console.error('[zuri:addin] status', error);
+    return { ok: false, error: { code: 'ADDIN_STATUS_FAILED', message: error?.message ?? 'Word add-in status is unavailable.' } };
+  }
+}
+
+async function handleSettingsAddinInstall() {
+  try {
+    await installAddin(getStoreRoot(), (request) => askForAddin(request));
+    return { ok: true, data: await addinStatus(getStoreRoot()) };
+  } catch (error) {
+    console.error('[zuri:addin] install', error);
+    return { ok: false, error: { code: 'ADDIN_INSTALL_FAILED', message: error?.message ?? 'The Word add-in could not be installed.' } };
+  }
+}
+
+async function handleSettingsAddinRemove() {
+  try {
+    await removeAddin(getStoreRoot());
+    return { ok: true, data: await addinStatus(getStoreRoot()) };
+  } catch (error) {
+    console.error('[zuri:addin] remove', error);
+    return { ok: false, error: { code: 'ADDIN_REMOVE_FAILED', message: error?.message ?? 'The Word add-in could not be removed.' } };
+  }
+}
+
 /* ------------------------------------------------------------------- files */
 
 /**
@@ -738,6 +772,32 @@ async function handleFilesReveal(payload) {
   } catch (error) {
     if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:files] reveal', error);
     return filesFailure(error, 'FILES_REVEAL_FAILED');
+  }
+}
+
+/**
+ * Copy a workspace file to a place the person picks, so a generated Word, Excel or
+ * PowerPoint file can be saved outside the app. The source goes through the same
+ * workspace guard as open and reveal; the destination is whatever the person chose
+ * in the system dialog, never a path the renderer supplied.
+ * @param {{ path?: string }} [payload]
+ * @param {Electron.IpcMainInvokeEvent} [event]
+ * @returns {Promise<object>}
+ */
+async function handleFilesSaveAs(payload, event) {
+  try {
+    const source = await resolveWorkspaceFile(payload?.path);
+    const owner = BrowserWindow.fromWebContents(event?.sender) ?? BrowserWindow.getFocusedWindow();
+    const options = { title: 'Save a copy', defaultPath: path.join(app.getPath('documents'), path.basename(source)) };
+    const picked = owner === null ? await dialog.showSaveDialog(options) : await dialog.showSaveDialog(owner, options);
+    if (picked.canceled || typeof picked.filePath !== 'string' || picked.filePath === '') {
+      return { ok: true, data: { cancelled: true } };
+    }
+    await copyFile(source, picked.filePath);
+    return { ok: true, data: { cancelled: false, path: picked.filePath } };
+  } catch (error) {
+    if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:files] saveAs', error);
+    return filesFailure(error, 'FILES_SAVE_FAILED');
   }
 }
 
@@ -865,6 +925,8 @@ async function handleFilesChoose(payload, event) {
     if (picked.canceled || typeof chosenPath !== 'string' || chosenPath === '') {
       return { ok: true, data: { cancelled: true } };
     }
+    // Picking a file in the dialog is the person's consent to let a reply edit a copy of it.
+    registerChosenFile(chosenPath);
     return {
       ok: true,
       data: { cancelled: false, path: chosenPath, name: path.basename(chosenPath), size: await measureFile(chosenPath) },
@@ -1309,6 +1371,12 @@ app.whenReady().then(async () => {
     else console.error('[zuri:overlay]', settings.error?.message ?? 'settings could not be read');
   } catch (error) {
     console.error('[zuri:overlay]', error);
+  }
+
+  try {
+    await resumeAddin(getStoreRoot(), (request) => askForAddin(request));
+  } catch (error) {
+    console.error('[zuri:addin] resume', error);
   }
 
   // Reminders tick every ten seconds for as long as Zuri is open. The ticker's

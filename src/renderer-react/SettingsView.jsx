@@ -38,6 +38,8 @@ export default function SettingsView() {
   const [allowKind, setAllowKind] = useState('apps');
   const [allowValue, setAllowValue] = useState('');
   const [busy, setBusy] = useState(false);
+  const [addin, setAddin] = useState({ supported: false, installed: false, running: false });
+  const [addinBusy, setAddinBusy] = useState(false);
 
   async function load() {
     if (typeof api?.settings?.get !== 'function') {
@@ -57,6 +59,7 @@ export default function SettingsView() {
       applyTheme(next.theme);
       setStatus('ready');
       await refreshKeyStatus(provider);
+      await refreshAddinStatus();
     } catch (error) {
       setStatus('error');
       setMessage(error?.message ?? 'Settings could not be read.');
@@ -77,6 +80,46 @@ export default function SettingsView() {
     setKeyState('checking');
     const result = await api.settings.keyStatus({ provider: nextProvider });
     setKeyState(result?.ok && result.data?.hasKey === true ? 'saved' : result?.ok ? 'missing' : 'error');
+  }
+
+  async function refreshAddinStatus() {
+    if (typeof api?.settings?.addinStatus !== 'function') return;
+    const result = await api.settings.addinStatus();
+    if (result?.ok && result.data) setAddin(result.data);
+  }
+
+  async function installWordAddin() {
+    if (typeof api?.settings?.addinInstall !== 'function') return;
+    setAddinBusy(true);
+    try {
+      const result = await api.settings.addinInstall();
+      if (!result?.ok) setMessage(result?.error?.message ?? 'The Word add-in could not be installed.');
+      else {
+        setAddin(result.data ?? {});
+        setMessage('Word add-in installed for this Windows user. Restart Word if it is already open.');
+      }
+    } catch (error) {
+      setMessage(error?.message ?? 'The Word add-in could not be installed.');
+    } finally {
+      setAddinBusy(false);
+    }
+  }
+
+  async function removeWordAddin() {
+    if (typeof api?.settings?.addinRemove !== 'function') return;
+    setAddinBusy(true);
+    try {
+      const result = await api.settings.addinRemove();
+      if (!result?.ok) setMessage(result?.error?.message ?? 'The Word add-in could not be removed.');
+      else {
+        setAddin(result.data ?? {});
+        setMessage('Word add-in removed from this Windows user.');
+      }
+    } catch (error) {
+      setMessage(error?.message ?? 'The Word add-in could not be removed.');
+    } finally {
+      setAddinBusy(false);
+    }
   }
 
   async function savePatch(patch, successMessage) {
@@ -225,6 +268,17 @@ export default function SettingsView() {
                 <Button type="button" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeKey()} isDisabled={busy || keyState !== 'saved'}>Remove key</Button>
               </div>
             </form>
+          </section>
+
+          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+            <h2 className="text-lg font-medium">Microsoft Word add-in</h2>
+            <p className="mt-1 text-sm text-muted">Install Zuri's local Word task pane for this Windows user. It needs Zuri running to answer requests.</p>
+            {!addin.supported && <p className="mt-3 text-sm text-muted">The Word add-in is available on Windows only.</p>}
+            {addin.supported && <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Chip color={addin.installed ? 'primary' : 'default'}>{addin.installed ? 'Installed' : 'Not installed'}</Chip>
+              <Button variant="secondary" onPress={() => void installWordAddin()} isDisabled={addinBusy || addin.installed}>Install for Word</Button>
+              <Button variant="ghost" className="zuri-danger-quiet" onPress={() => void removeWordAddin()} isDisabled={addinBusy || !addin.installed}>Remove add-in</Button>
+            </div>}
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">

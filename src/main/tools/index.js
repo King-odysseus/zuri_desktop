@@ -26,6 +26,8 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readStore, findAgent } from '../store.js';
+import { OFFICE_KINDS, OfficeError, buildOfficeFile } from '../office.js';
+import { describeWorkbook, editOfficeFile } from '../office-edit.js';
 
 const WORKSPACE_DIR_NAME = 'workspace';
 const WORKSPACE_LIST_LIMIT = 500;
@@ -258,7 +260,7 @@ export async function resolveWorkspaceFile(userPath) {
  * Write through a temp file and rename it into place, the same guarantee store.js
  * gives its JSON files: a crash mid-write cannot leave a half-written document.
  * @param {string} target Absolute destination path.
- * @param {string} content UTF-8 text.
+ * @param {string | Buffer} content UTF-8 text, or the bytes of a binary file.
  * @returns {Promise<void>}
  */
 async function writeAtomically(target, content) {
@@ -596,6 +598,157 @@ async function writeFileTool(args, context) {
   });
 }
 
+/** Folder inside the workspace that holds files Zuri builds for the person to download. */
+const DOCUMENTS_DIR_NAME = 'documents';
+
+/**
+ * A safe base name for a generated file: no folders, no reserved characters, no
+ * extension (the kind supplies it). Falls back to "document" when nothing is left.
+ * @param {unknown} raw
+ * @returns {string}
+ */
+function documentBaseName(raw) {
+  const leaf = String(raw ?? '').split(/[\\/]/).pop() ?? '';
+  const stem = leaf.replace(/\.(docx|xlsx|pptx)$/i, '');
+  const cleaned = stem.replace(/[<>:"|?*\x00-\x1f]/g, '-').replace(/\s+/g, ' ').replace(/^[.\s]+|[.\s]+$/g, '');
+  return cleaned.slice(0, 80) || 'document';
+}
+
+/** First path under `directory` that does not exist yet, so a new file never overwrites one. */
+async function freeDocumentPath(directory, base, kind) {
+  for (let n = 1; n < 1000; n += 1) {
+    const candidate = path.join(directory, n === 1 ? `${base}.${kind}` : `${base} (${n}).${kind}`);
+    const taken = await fs.stat(candidate).then(() => true).catch(() => false);
+    if (!taken) return candidate;
+  }
+  throw new ToolError('TOOL_WRITE_FAILED', 'Too many files with that name already exist in the workspace.');
+}
+
+/** @param {any} args @param {any} context */
+async function createDocumentTool(args, context) {
+  const kind = String(args?.kind ?? '').toLowerCase();
+  if (!OFFICE_KINDS.includes(kind)) {
+    throw new ToolError('TOOL_INVALID_ARGUMENT', 'createDocument needs `kind` to be docx, xlsx or pptx.');
+  }
+
+  // Some providers hand nested arguments back as a JSON string rather than an object.
+  let content = args?.content;
+  if (typeof content === 'string') {
+    try {
+      content = JSON.parse(content);
+    } catch {
+      throw new ToolError('TOOL_INVALID_ARGUMENT', 'createDocument `content` must be a JSON object.');
+    }
+  }
+
+  let bytes;
+  try {
+    bytes = await buildOfficeFile(kind, content);
+  } catch (error) {
+    if (error instanceof OfficeError) throw new ToolError('TOOL_INVALID_ARGUMENT', error.message);
+    console.error('[zuri:tools] createDocument', error);
+    throw new ToolError('TOOL_WRITE_FAILED', `Could not build the ${kind} file.`);
+  }
+
+  const directory = resolveWorkspacePath(DOCUMENTS_DIR_NAME);
+  const filePath = await freeDocumentPath(directory, documentBaseName(args?.fileName), kind);
+  try {
+    await fs.mkdir(directory, { recursive: true });
+    await writeAtomically(filePath, bytes);
+  } catch (error) {
+    console.error('[zuri:tools] createDocument', error);
+    throw new ToolError('TOOL_WRITE_FAILED', `Could not save "${path.basename(filePath)}" in the workspace.`);
+  }
+
+  return ok({
+    path: filePath,
+    name: path.basename(filePath),
+    kind,
+    relative: path.relative(getWorkspaceRoot(), filePath).split(path.sep).join('/'),
+    bytes: bytes.length,
+  });
+}
+
+/**
+ * Absolute paths of files the person picked in a system dialog. The model may name a
+ * path to edit, but only one the person chose (or one already in the workspace), so a
+ * reply can never reach for an arbitrary file on the disk.
+ * @type {Set<string>}
+ */
+const chosenFiles = new Set();
+
+/** @param {string} filePath Absolute path returned by a file dialog. */
+export function registerChosenFile(filePath) {
+  if (typeof filePath === 'string' && path.isAbsolute(filePath)) chosenFiles.add(path.resolve(filePath).toLowerCase());
+}
+
+/** @param {unknown} userPath @returns {string} Absolute, permitted path. */
+function resolveEditableSource(userPath) {
+  if (typeof userPath !== 'string' || userPath.trim() === '') {
+    throw new ToolError('TOOL_INVALID_ARGUMENT', 'editDocument needs the `path` of the attached file.');
+  }
+  if (!path.isAbsolute(userPath)) return resolveWorkspacePath(userPath);
+  const absolute = path.resolve(userPath);
+  const relative = path.relative(getWorkspaceRoot(), absolute);
+  const insideWorkspace = relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+  if (!insideWorkspace && !chosenFiles.has(absolute.toLowerCase())) {
+    throw new ToolError('TOOL_PATH_NOT_CHOSEN', 'That file was not attached in this app, so it cannot be edited. Attach it first.');
+  }
+  return absolute;
+}
+
+/** @param {any} args @param {any} context */
+async function editDocumentTool(args, context) {
+  const source = resolveEditableSource(args?.path);
+  const kind = path.extname(source).slice(1).toLowerCase();
+  if (!OFFICE_KINDS.includes(kind)) {
+    throw new ToolError('TOOL_INVALID_ARGUMENT', 'editDocument works on .docx, .xlsx and .pptx files only.');
+  }
+
+  let original;
+  try {
+    const stats = await fs.stat(source);
+    if (stats.size > FILE_SIZE_LIMIT) throw new ToolError('TOOL_FILE_TOO_LARGE', 'That file is too large to edit here.');
+    original = await fs.readFile(source);
+  } catch (error) {
+    if (error instanceof ToolError) throw error;
+    throw new ToolError('TOOL_READ_FAILED', `Could not open "${path.basename(source)}". Check that it exists and is not open in another app.`);
+  }
+
+  let edited;
+  try {
+    edited = await editOfficeFile(kind, original, args?.edits);
+  } catch (error) {
+    if (error instanceof OfficeError) throw new ToolError('TOOL_INVALID_ARGUMENT', error.message);
+    console.error('[zuri:tools] editDocument', error);
+    throw new ToolError('TOOL_WRITE_FAILED', `Could not edit the ${kind} file.`);
+  }
+  if (edited.applied === 0) {
+    throw new ToolError('TOOL_NOTHING_CHANGED', `None of the edits matched anything in the file. Text that was not found: ${edited.notFound.join('; ').slice(0, 300)}`);
+  }
+
+  const directory = resolveWorkspacePath(DOCUMENTS_DIR_NAME);
+  const base = `${documentBaseName(path.basename(source))}-edited`;
+  const filePath = await freeDocumentPath(directory, base, kind);
+  try {
+    await fs.mkdir(directory, { recursive: true });
+    await writeAtomically(filePath, edited.buffer);
+  } catch (error) {
+    console.error('[zuri:tools] editDocument', error);
+    throw new ToolError('TOOL_WRITE_FAILED', `Could not save "${path.basename(filePath)}" in the workspace.`);
+  }
+
+  return ok({
+    path: filePath,
+    name: path.basename(filePath),
+    kind,
+    relative: path.relative(getWorkspaceRoot(), filePath).split(path.sep).join('/'),
+    bytes: edited.buffer.length,
+    changes: edited.applied,
+    notFound: edited.notFound,
+  });
+}
+
 /** @param {any} args @param {any} context */
 async function summarizeDocumentTool(args, context) {
   // A caller that already ran readFile passes the text in, so the document is
@@ -748,6 +901,21 @@ export const TOOLS = Object.freeze([
     requiresConfirmation: true,
     handler: writeFileTool,
   }),
+  // Needs no confirmation: it only ever adds a new file inside the Zuri workspace.
+  Object.freeze({
+    name: 'createDocument',
+    label: 'Create a Word, Excel or PowerPoint file',
+    description: 'Build a new .docx, .xlsx or .pptx file in the workspace from structured content, for the person to open and edit.',
+    requiresConfirmation: false,
+    handler: createDocumentTool,
+  }),
+  Object.freeze({
+    name: 'editDocument',
+    label: 'Edit a Word, Excel or PowerPoint file',
+    description: 'Change text or cells in an attached .docx, .xlsx or .pptx file. The result is saved as a new copy; the original is never changed.',
+    requiresConfirmation: false,
+    handler: editDocumentTool,
+  }),
   Object.freeze({
     name: 'summarizeDocument',
     label: 'Summarise a document',
@@ -821,22 +989,23 @@ const DEFAULT_DEPENDENCIES = Object.freeze({
   },
 
   /**
-   * Extract text from an Office file. officeparser is in the stack but is not
-   * installed yet, so the failure names the missing package instead of crashing.
+   * Extract text from an Office file. A workbook is listed cell by cell with its
+   * addresses so an edit can name the cell; Word and PowerPoint use officeparser.
    * @param {string} filePath @returns {Promise<string>}
    */
   async extractDocument(filePath) {
-    let officeparser;
     try {
-      officeparser = await import('officeparser');
+      if (path.extname(filePath).toLowerCase() === '.xlsx') return await describeWorkbook(filePath);
+      const officeparser = await import('officeparser');
+      const parsed = await officeparser.parseOffice(filePath);
+      return parsed.toText();
     } catch (error) {
       console.error('[zuri:tools] extractDocument', error);
       throw new ToolError(
-        'TOOL_DOCUMENT_READER_MISSING',
-        'Reading .docx, .xlsx and .pptx files needs the officeparser package, which is not installed.',
+        'TOOL_READ_FAILED',
+        `Could not read "${path.basename(filePath)}". It may be damaged, password protected or open in another app.`,
       );
     }
-    return officeparser.parseOfficeAsync(filePath);
   },
 
   /**

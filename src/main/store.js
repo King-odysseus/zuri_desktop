@@ -752,6 +752,17 @@ export async function appendMessage(threadId, message, options = {}) {
       .filter((image) => typeof image?.path === 'string' && image.path !== '')
       .slice(0, 4)
       .map((image) => ({ name: String(image.name ?? ''), path: image.path }));
+    // Files Zuri built for this reply (Word, Excel, PowerPoint) ride on the assistant
+    // message so the download card is still there when the chat is reopened.
+    const files = (Array.isArray(message.files) ? message.files : [])
+      .filter((file) => typeof file?.path === 'string' && file.path !== '')
+      .slice(0, 8)
+      .map((file) => ({
+        name: String(file.name ?? ''),
+        path: file.path,
+        kind: String(file.kind ?? ''),
+        bytes: Number.isFinite(file.bytes) ? file.bytes : 0,
+      }));
     const stored = {
       id: randomUUID(),
       role,
@@ -759,6 +770,7 @@ export async function appendMessage(threadId, message, options = {}) {
       createdAt: now,
       ...(mode ? { mode } : {}),
       ...(role === 'user' && images.length > 0 ? { images } : {}),
+      ...(role === 'assistant' && files.length > 0 ? { files } : {}),
     };
     thread.messages.push(stored);
     thread.updatedAt = now;
