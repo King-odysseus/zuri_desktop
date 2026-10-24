@@ -1,0 +1,14 @@
+{
+  "name": "zuri-cloud-server",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Railway API for Zuri Cloud accounts, subscriptions, quotas, and chat usage.",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node test/server.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
