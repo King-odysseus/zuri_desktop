@@ -6,7 +6,7 @@
   "description": "Zuri Desktop - a local AI command centre for Windows",
   "author": "Zuri",
   "type": "module",
-  "main": "src/main/main.js",
+  "main": "src/main/bootstrap.js",
   "scripts": {
     "start": "electron .",
     "smoke": "electron scripts/smoke.js",
@@ -64,6 +64,7 @@
     }
   },
   "dependencies": {
+    "call-bind-apply-helpers": "^1.0.2",
     "docx": "^9.14.0",
     "exceljs": "^4.4.0",
     "flowbite-react": "^0.12.17",

@@ -1,5 +1,11 @@
 ## 2026-10-24 - Windows
 
+- Made `call-bind-apply-helpers` an explicit production dependency so electron-builder includes it at the package root. This fixes the packaged app startup crash raised while loading Excel support.
+- Added a packaged-app bootstrap that exposes electron-builder's nested helper directory before loading the main process.
+- Key files: `package.json`, `package-lock.json`, `src/main/bootstrap.js`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
 - Added the Zuri Cloud desktop account screen with Google Identity Services sign-in, encrypted main-process session storage, usage meter, plan cards, payment history, checkout launch, and configurable cloud server URL. Added a public Railway config endpoint that exposes only the Google client ID needed by the desktop sign-in button.
 - Key files: `src/renderer-react/CloudView.jsx`, `src/main/cloud-session.js`, `src/main/main.js`, `src/main/preload.js`, `src/main/store.js`, `src/renderer-react/App.jsx`, `src/renderer-react/Sidebar.jsx`, `src/renderer-react/SettingsView.jsx`, `server/src/app.js`, `server/src/server.js`.
 - Other OS action: run `npm install && npm test` after syncing.

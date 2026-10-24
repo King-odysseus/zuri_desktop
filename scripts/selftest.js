@@ -37,7 +37,11 @@ check('React build output exists', () => {
 });
 
 check('the app package points at the React main process', () => {
-  if (packageJson.main !== 'src/main/main.js') throw new Error(`main is ${packageJson.main}`);
+  if (packageJson.main !== 'src/main/bootstrap.js') throw new Error(`main is ${packageJson.main}`);
+  if (!exists('src/main/bootstrap.js')) throw new Error('bootstrap.js is missing');
+  if (!read('src/main/bootstrap.js').includes("await import('./main.js')")) {
+    throw new Error('bootstrap does not load the main process');
+  }
   if (!packageJson.build?.files?.includes('dist-react/**/*')) {
     throw new Error('electron-builder does not package dist-react');
   }

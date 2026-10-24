@@ -4,7 +4,7 @@ import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import '../src/main/main.js';
+import '../src/main/bootstrap.js';
 import { captureConsoleErrors, createReporter, useScratchProfile, waitForFirstWindow, waitForLoad } from './lib/app-launch.js';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
