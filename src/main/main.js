@@ -27,6 +27,7 @@ import {
 } from './tray-menu.js';
 import { bringToFront } from './second-launch.js';
 import { clearKey, keyStatus, setKey } from './secrets.js';
+import { clearCloudSession, readCloudSession, writeCloudSession } from './cloud-session.js';
 import { addinStatus, installAddin, removeAddin, resumeAddin } from './addin.js';
 import {
   appendMessage,
@@ -256,6 +257,12 @@ const HANDLERS = new Map([
   ['zuri:settings:addin-status', handleSettingsAddinStatus],
   ['zuri:settings:addin-install', handleSettingsAddinInstall],
   ['zuri:settings:addin-remove', handleSettingsAddinRemove],
+  ['zuri:cloud:config', handleCloudConfig],
+  ['zuri:cloud:sign-in', handleCloudSignIn],
+  ['zuri:cloud:account', handleCloudAccount],
+  ['zuri:cloud:plans', handleCloudPlans],
+  ['zuri:cloud:checkout', handleCloudCheckout],
+  ['zuri:cloud:sign-out', handleCloudSignOut],
   ['zuri:tasks:list', handleTasksList],
   ['zuri:tasks:create', handleTasksCreate],
   ['zuri:tasks:update', handleTasksUpdate],
@@ -609,6 +616,98 @@ async function handleSettingsSave(payload) {
     }
   }
   return saved;
+}
+
+function cloudBaseUrl(settings) {
+  const raw = typeof settings?.cloudUrl === 'string' ? settings.cloudUrl.trim() : '';
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username !== '' || url.password !== '' || url.hash !== '') return null;
+  if (url.protocol === 'http:' && !['localhost', '127.0.0.1'].includes(url.hostname)) return null;
+  return url.toString().replace(/\/$/, '');
+}
+
+async function cloudFetch(pathname, options = {}, requireSession = false) {
+  const settings = await readSettings();
+  if (!settings.ok) return settings;
+  const base = cloudBaseUrl(settings.data);
+  if (!base) return { ok: false, error: { code: 'CLOUD_URL_INVALID', message: 'Set a valid Zuri Cloud server URL in Settings.' } };
+  const headers = { accept: 'application/json', ...(options.headers ?? {}) };
+  if (requireSession) {
+    const saved = await readCloudSession();
+    if (!saved.ok) return saved;
+    if (!saved.data?.token) return { ok: false, error: { code: 'CLOUD_AUTH_REQUIRED', message: 'Sign in to Zuri Cloud first.' } };
+    headers.authorization = `Bearer ${saved.data.token}`;
+  }
+  let response;
+  try {
+    response = await fetch(`${base}${pathname}`, { ...options, headers, signal: AbortSignal.timeout(20_000) });
+  } catch {
+    return { ok: false, error: { code: 'CLOUD_UNAVAILABLE', message: 'Zuri Cloud could not be reached.' } };
+  }
+  let body;
+  try { body = await response.json(); } catch { body = null; }
+  if (!response.ok || body?.ok !== true) return { ok: false, error: body?.error ?? { code: 'CLOUD_REQUEST_FAILED', message: 'Zuri Cloud rejected the request.' }, status: response.status };
+  return body;
+}
+
+async function handleCloudConfig() {
+  const settings = await readSettings();
+  if (!settings.ok) return settings;
+  const base = cloudBaseUrl(settings.data);
+  if (!base) return { ok: false, error: { code: 'CLOUD_URL_INVALID', message: 'Set a valid Zuri Cloud server URL in Settings.' } };
+  const config = await cloudFetch('/api/public-config');
+  if (!config.ok) return config;
+  return { ok: true, data: { cloudUrl: base, googleClientId: config.data?.googleClientId ?? '' } };
+}
+
+async function handleCloudSignIn(payload) {
+  if (typeof payload?.credential !== 'string' || payload.credential.trim() === '') return { ok: false, error: { code: 'CLOUD_CREDENTIAL_REQUIRED', message: 'Google sign-in did not return a credential.' } };
+  const result = await cloudFetch('/api/auth/google', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ credential: payload.credential }) });
+  if (!result.ok) return result;
+  const stored = await writeCloudSession(result.data?.token, result.data?.expiresAt);
+  if (!stored.ok) return stored;
+  return { ok: true, data: { user: result.data?.user, usage: result.data?.usage, expiresAt: result.data?.expiresAt } };
+}
+
+async function handleCloudAccount() {
+  const [account, limits, billing] = await Promise.all([
+    cloudFetch('/api/me', {}, true),
+    cloudFetch('/api/me/limits', {}, true),
+    cloudFetch('/api/me/billing', {}, true),
+  ]);
+  if (!account.ok) {
+    if (account.status === 401 || account.error?.code === 'CLOUD_AUTH_REQUIRED') await clearCloudSession();
+    return account;
+  }
+  if (!limits.ok) return limits;
+  if (!billing.ok) return billing;
+  return { ok: true, data: { user: account.data?.user, subscription: account.data?.subscription, usage: limits.data?.usage, limits: limits.data?.limits, billing: billing.data } };
+}
+
+async function handleCloudPlans() {
+  return cloudFetch('/api/plans');
+}
+
+async function handleCloudCheckout(payload) {
+  const result = await cloudFetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ planCode: payload?.planCode }) }, true);
+  if (!result.ok) return result;
+  let checkout;
+  try { checkout = new URL(result.data?.authorizationUrl); } catch { return { ok: false, error: { code: 'CLOUD_CHECKOUT_INVALID', message: 'The checkout link was invalid.' } }; }
+  if (checkout.origin !== 'https://checkout.paystack.com') return { ok: false, error: { code: 'CLOUD_CHECKOUT_INVALID', message: 'The checkout link was not trusted.' } };
+  const problem = await shell.openExternal(checkout.toString());
+  if (problem) return { ok: false, error: { code: 'CLOUD_CHECKOUT_OPEN_FAILED', message: problem } };
+  return { ok: true, data: { opened: true, planCode: result.data?.planCode ?? payload?.planCode } };
+}
+
+async function handleCloudSignOut() {
+  const saved = await readCloudSession();
+  if (saved.ok && saved.data?.token) await cloudFetch('/api/auth/sign-out', { method: 'POST' }, true);
+  return clearCloudSession();
 }
 
 /**

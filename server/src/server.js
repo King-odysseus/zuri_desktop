@@ -23,6 +23,7 @@ const app = createApp({
   paystackSecretKey: config.paystackSecretKey,
   paystackPlanCodes: config.paystackPlanCodes,
   paystackCallbackUrl: config.paystackCallbackUrl,
+  googleClientId: config.googleClientId,
 });
 
 /**

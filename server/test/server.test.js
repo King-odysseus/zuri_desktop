@@ -13,6 +13,8 @@ assert.deepEqual(await health.json(), { ok: true, service: 'zuri-cloud', time: '
 const plans = await handleRequest(new Request('https://cloud.example.com/api/plans'));
 assert.equal(plans.status, 200);
 assert.deepEqual((await plans.json()).data.map((plan) => plan.code), ['free', 'starter', 'pro', 'power']);
+const publicConfig = await handleRequest(new Request('https://cloud.example.com/api/public-config'), { googleClientId: 'client-id' });
+assert.deepEqual(await publicConfig.json(), { ok: true, data: { googleClientId: 'client-id' } });
 assert.equal((await handleRequest(new Request('https://cloud.example.com/api/unknown'))).status, 404);
 const usage = usageStatus({ code: 'starter', monthlyTokens: 2_000_000 }, 1_650_001);
 assert.deepEqual(usage, { planCode: 'starter', monthlyTokens: 2_000_000, usedTokens: 1_650_001, remainingTokens: 349_999, percentUsed: 83, overQuota: false, nearLimit: true });

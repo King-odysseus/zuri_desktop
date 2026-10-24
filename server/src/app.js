@@ -81,7 +81,7 @@ function validateMessages(messages) {
   return { ok: true, data: normalized, inputTokens: Math.ceil(characters / 4) };
 }
 
-/** @param {{ auth?: object, repository?: object, now?: () => Date }} [dependencies] @returns {(request: Request) => Promise<Response>} */
+/** @param {{ auth?: object, repository?: object, now?: () => Date, googleClientId?: string }} [dependencies] @returns {(request: Request) => Promise<Response>} */
 export function createApp(dependencies = {}) {
   const now = dependencies.now ?? (() => new Date());
   const limiter = dependencies.limiter ?? createRequestLimiter({ now: () => now().getTime() });
@@ -94,6 +94,9 @@ export function createApp(dependencies = {}) {
     }
     if (request.method === 'GET' && url.pathname === '/api/plans') {
       return response(200, { ok: true, data: PLANS.map(publicPlan) });
+    }
+    if (request.method === 'GET' && url.pathname === '/api/public-config') {
+      return response(200, { ok: true, data: { googleClientId: typeof dependencies.googleClientId === 'string' ? dependencies.googleClientId : '' } });
     }
 
     if (request.method === 'POST' && url.pathname === '/api/auth/google') {

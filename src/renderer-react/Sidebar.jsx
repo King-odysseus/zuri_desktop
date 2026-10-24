@@ -5,6 +5,7 @@ import {
   AutomationIcon,
   BellIcon,
   ChatIcon,
+  CloudIcon,
   ChevronDownIcon,
   EditIcon,
   FeaturesIcon,
@@ -28,6 +29,7 @@ export const NAV_ITEMS = [
   { key: 'automations', label: 'Automations', Icon: AutomationIcon },
   { key: 'files', label: 'Files', Icon: FolderIcon },
   { key: 'features', label: 'Features', Icon: FeaturesIcon },
+  { key: 'cloud', label: 'Zuri Cloud', Icon: CloudIcon },
   { key: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 

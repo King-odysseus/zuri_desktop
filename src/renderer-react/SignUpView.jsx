@@ -17,7 +17,7 @@ export default function SignUpView({ onNavigate }) {
           <p className="mt-3 text-sm leading-6 text-muted">
             Use any verified Google account to get started. Gmail is supported, along with Google Workspace accounts from your company, school, or another domain.
           </p>
-          <Button type="button" variant="primary" fullWidth className="mt-6" onPress={() => onNavigate?.('settings')}>
+          <Button type="button" variant="primary" fullWidth className="mt-6" onPress={() => onNavigate?.('cloud')}>
             Continue with Google
           </Button>
           <p className="mt-4 text-center text-xs text-muted">

@@ -2,6 +2,7 @@
 // while preserving the existing component names used by the page views.
 export {
   MessageSquare as ChatIcon,
+  Cloud as CloudIcon,
   Bot as AgentIcon,
   UserPlus as UserPlusIcon,
   ListChecks as TaskIcon,
@@ -35,4 +36,5 @@ export {
   SquareSlash as SlashCommandIcon,
   FileText as FileIcon,
   Download as DownloadIcon,
+  LogOut as LogOutIcon,
 } from 'lucide-react';

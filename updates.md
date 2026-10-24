@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Added the Zuri Cloud desktop account screen with Google Identity Services sign-in, encrypted main-process session storage, usage meter, plan cards, payment history, checkout launch, and configurable cloud server URL. Added a public Railway config endpoint that exposes only the Google client ID needed by the desktop sign-in button.
+- Key files: `src/renderer-react/CloudView.jsx`, `src/main/cloud-session.js`, `src/main/main.js`, `src/main/preload.js`, `src/main/store.js`, `src/renderer-react/App.jsx`, `src/renderer-react/Sidebar.jsx`, `src/renderer-react/SettingsView.jsx`, `server/src/app.js`, `server/src/server.js`.
+- Other OS action: run `npm install && npm test` after syncing.
+- Done on: Windows
+
 - Added Paystack recurring checkout initialization, server-side verification, HMAC-SHA512 webhook validation, idempotent payment fulfillment, subscription renewal/status updates, and protected billing data.
 - Key files: `server/src/paystack.js`, `server/src/app.js`, `server/src/db.js`, `server/src/config.js`, `server/db/schema.sql`, `server/test/server.test.js`.
 - Other OS action: run `npm install --prefix server && npm --prefix server test` after syncing, then apply `server/db/schema.sql` to the Railway database.

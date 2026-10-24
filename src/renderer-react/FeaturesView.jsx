@@ -23,7 +23,7 @@ const FEATURES = [
   { route: 'files', label: 'Files', Icon: FolderIcon, description: 'Open, review and summarise files in your workspace folder.' },
   { route: 'search', label: 'Search', Icon: SearchIcon, description: 'Find anything you said or Zuri replied in any saved conversation.' },
   { route: 'settings', label: 'Settings', Icon: SettingsIcon, description: 'Choose the AI provider and model, add your own keys, switch theme and turn on the floating quick-ask window.' },
-  { route: 'signup', label: 'Create a Zuri Cloud account', Icon: UserPlusIcon, description: 'Sign up with Gmail or a verified Google Workspace account from your company, school, or another domain.' },
+  { route: 'cloud', label: 'Zuri Cloud account', Icon: UserPlusIcon, description: 'Sign in with Gmail or a verified Google Workspace account, view usage and manage your plan.' },
 ];
 
 export default function FeaturesView({ onNavigate }) {

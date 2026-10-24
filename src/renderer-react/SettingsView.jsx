@@ -254,6 +254,12 @@ export default function SettingsView() {
             <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
           </section>
 
+          <section className="rounded-xl border border-border bg-surface p-5">
+            <h2 className="text-lg font-medium">Zuri Cloud connection</h2>
+            <p className="mt-1 text-sm text-muted">Choose the Railway server used for Google sign-in, usage and subscriptions.</p>
+            <Input className="mt-4" label="Cloud server URL" value={current.cloudUrl ?? ''} onChange={(event) => setSettings((value) => ({ ...(value ?? {}), cloudUrl: event.target.value }))} onBlur={() => void savePatch({ cloudUrl: String(current.cloudUrl ?? '').trim() }, 'Cloud server URL saved.')} placeholder="https://your-cloud-service.up.railway.app" />
+          </section>
+
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
             <h2 className="text-lg font-medium">Providers and keys</h2>
             <p className="mt-1 text-sm text-muted">Keys are stored on this computer. Zuri only knows whether one is saved.</p>
