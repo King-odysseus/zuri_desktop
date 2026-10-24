@@ -59,7 +59,7 @@ check('the Windows app identity uses the Zuri icon', () => {
   if (!exists('src/main/assets/zuri-icon.ico') || !exists('src/main/assets/zuri-icon.png')) {
     throw new Error('Zuri icon assets are missing');
   }
-  for (const required of ["app.setAppUserModelId(APP_USER_MODEL_ID)", "icon: process.platform === 'win32' ? ICO_ENTRY : ICON_ENTRY", "window.setIcon(ICO_ENTRY)", "window.setAppDetails({", "appIconPath: ICO_ENTRY", "shell.writeShortcutLink", "app.getPath('desktop')"]) {
+  for (const required of ["app.setAppUserModelId(APP_USER_MODEL_ID)", "const WINDOWS_SHELL_ICON = app.isPackaged ? process.execPath : ICO_ENTRY", "icon: process.platform === 'win32' ? ICO_ENTRY : ICON_ENTRY", "window.setIcon(ICO_ENTRY)", "window.setAppDetails({", "appIconPath: WINDOWS_SHELL_ICON", "shell.readShortcutLink(staleElectronLink)", "details.appUserModelId === APP_USER_MODEL_ID", "unlinkSync(staleElectronLink)", "shell.writeShortcutLink", "app.getPath('desktop')"]) {
     if (!source.includes(required)) throw new Error(`missing ${required}`);
   }
   if (packageJson.build?.win?.icon !== 'src/main/assets/zuri-icon.ico') {

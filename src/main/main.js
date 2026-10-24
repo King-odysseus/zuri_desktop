@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell, Tray } from 'electron';
-import { existsSync } from 'node:fs';
+import { existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { copyFile, mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
@@ -67,6 +67,9 @@ export const ICON_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.png');
 // that matches the size it is drawing; the PNG above stays the source the other
 // platforms and the smoke check read. Both come from the same capture.
 export const ICO_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.ico');
+// Windows shell APIs cannot read an icon path inside app.asar. The packaged
+// executable embeds the same ICO, so it is the real on-disk source for taskbar metadata.
+const WINDOWS_SHELL_ICON = app.isPackaged ? process.execPath : ICO_ENTRY;
 const CANVAS_DARK = '#040130'; // matches --background in dark mode, so the window does not flash white before first paint
 
 /**
@@ -130,8 +133,24 @@ function adoptTaskbarIdentity() {
   const isSourceRun = !app.isPackaged && path.resolve(app.getAppPath()) === path.resolve(appRoot);
   if (!isSourceRun && !app.isPackaged) return;
 
+  const startMenuPrograms = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
+  const staleElectronLink = path.join(startMenuPrograms, 'Electron.lnk');
+  try {
+    if (existsSync(staleElectronLink)) {
+      const details = shell.readShortcutLink(staleElectronLink);
+      const targetsElectron = path.basename(details.target ?? '').toLowerCase() === 'electron.exe';
+      if (targetsElectron && details.appUserModelId === APP_USER_MODEL_ID) {
+        // An older source launch registered Electron under Zuri's AUMID. Windows
+        // resolves that duplicate first and shows the atom for the packaged app.
+        unlinkSync(staleElectronLink);
+      }
+    }
+  } catch (error) {
+    console.warn('[zuri:taskbar] stale Electron shortcut cleanup failed', error.message);
+  }
+
   const links = [
-    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Zuri.lnk'),
+    path.join(startMenuPrograms, 'Zuri.lnk'),
     path.join(app.getPath('desktop'), 'Zuri.lnk'),
   ];
   try {
@@ -187,7 +206,7 @@ function createMainWindow() {
     window.setIcon(ICO_ENTRY);
     window.setAppDetails({
       appId: APP_USER_MODEL_ID,
-      appIconPath: ICO_ENTRY,
+      appIconPath: WINDOWS_SHELL_ICON,
       appIconIndex: 0,
       relaunchCommand: process.execPath,
       relaunchDisplayName: 'Zuri',

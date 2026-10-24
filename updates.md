@@ -1,5 +1,19 @@
 ## 2026-10-24 - Windows
 
+- Removed a stale Electron Start Menu shortcut only when it points to `electron.exe` while carrying Zuri's AUMID. The duplicate identity made Windows select Electron's atom for Zuri's running taskbar group even though the executable and window icons were correct.
+- Key files: `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Fixed the remaining Electron taskbar icon fallback by pointing Windows taskbar metadata at the installed Zuri executable. Windows cannot load an icon from Electron's internal app.asar path, while Zuri.exe contains the correct embedded icon.
+- Key files: `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Assigned the packaged Zuri ICO and AUMID directly to the running BrowserWindow taskbar button, fixing live taskbar buttons that still displayed Electron after the shortcut icon was corrected.
 - Key files: `src/main/main.js`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.
