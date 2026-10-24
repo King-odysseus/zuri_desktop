@@ -108,7 +108,7 @@ const trayState = { overlayOpen: false, remindersDue: 0 };
 app.setName('Zuri');
 
 /** The id Windows groups this app's taskbar buttons under. */
-const APP_USER_MODEL_ID = 'com.zuri.desktop';
+const APP_USER_MODEL_ID = 'com.zuri.desktop.Zuri';
 // A source or test launch runs through electron.exe. Giving that process the
 // production id makes Windows recreate Electron.lnk under Zuri's taskbar group.
 if (process.platform === 'win32' && app.isPackaged) app.setAppUserModelId(APP_USER_MODEL_ID);

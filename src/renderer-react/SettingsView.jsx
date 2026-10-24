@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, Chip, Input } from './ui.jsx';
+import { Button, Checkbox, Chip, Input, Textarea } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 
 const PROVIDERS = [
@@ -9,6 +9,25 @@ const PROVIDERS = [
   ['moonshot', 'Kimi (Moonshot)'],
   ['zai', 'Z.ai (GLM)'],
 ];
+
+// The ids match store.js ANSWER_STYLE_CHOICES, which refuses anything else; the
+// labels are here because the renderer cannot import main-process code.
+const ANSWER_STYLE_OPTIONS = {
+  answerLength: [['concise', 'Concise'], ['balanced', 'Balanced'], ['detailed', 'Detailed']],
+  answerTone: [['neutral', 'Neutral'], ['professional', 'Professional'], ['friendly', 'Friendly'], ['direct', 'Direct']],
+  answerDetail: [['simple', 'Simple'], ['standard', 'Standard'], ['expert', 'Expert']],
+  answerLayout: [['auto', 'Automatic'], ['plain', 'Plain text'], ['structured', 'Structured']],
+};
+
+// Field, label and one line of help, in the order the card shows them.
+const FIELD_LABELS = [
+  ['answerLength', 'Length', 'How much each reply carries.'],
+  ['answerTone', 'Tone', 'The voice it writes in.'],
+  ['answerDetail', 'Explanation level', 'Who the answer is pitched at.'],
+  ['answerLayout', 'Layout', 'Whether replies use headings, lists and tables.'],
+];
+
+const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 2000;
 
 const KEY_STATE_LABELS = {
   checking: 'Checking...',
@@ -252,6 +271,35 @@ export default function SettingsView() {
             </div>
             <p className="mt-1 text-sm text-muted">Chosen during setup. To change it, open the Zuri data folder.</p>
             <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
+          </section>
+
+          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+            <h2 className="text-lg font-medium">How Zuri answers</h2>
+            <p className="mt-1 text-sm text-muted">Every reply follows these choices, whichever model is answering.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {FIELD_LABELS.map(([field, label, hint]) => (
+                <div key={field}>
+                  <SelectField
+                    label={label}
+                    value={String(current[field] ?? ANSWER_STYLE_OPTIONS[field][0][0])}
+                    options={ANSWER_STYLE_OPTIONS[field].map(([value, optionLabel]) => ({ value, label: optionLabel }))}
+                    onChange={(value) => void savePatch({ [field]: value }, `${label} set to ${value}.`)}
+                  />
+                  <p className="mt-1 text-xs text-muted">{hint}</p>
+                </div>
+              ))}
+            </div>
+            <Textarea
+              className="mt-4"
+              label="Standing instructions (optional)"
+              rows={3}
+              maxLength={CUSTOM_INSTRUCTIONS_MAX_LENGTH}
+              value={current.customInstructions ?? ''}
+              onChange={(event) => setSettings((value) => ({ ...(value ?? {}), customInstructions: event.target.value }))}
+              onBlur={() => void savePatch({ customInstructions: String(current.customInstructions ?? '') }, 'Standing instructions saved.')}
+              placeholder="For example: answer in British English, and always show the cost in naira."
+            />
+            <p className="mt-1 text-xs text-muted">Added to every request. These win over the four choices above when the two disagree.</p>
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5">

@@ -62,6 +62,9 @@ check('the Windows app identity uses the Zuri icon', () => {
   for (const required of ["if (process.platform === 'win32' && app.isPackaged) app.setAppUserModelId(APP_USER_MODEL_ID)", "if (process.platform !== 'win32' || !app.isPackaged) return", "const WINDOWS_SHELL_ICON = app.isPackaged ? process.execPath : ICO_ENTRY", "icon: process.platform === 'win32' ? ICO_ENTRY : ICON_ENTRY", "window.setIcon(ICO_ENTRY)", "window.setAppDetails({", "appIconPath: WINDOWS_SHELL_ICON", "shell.readShortcutLink(staleElectronLink)", "path.basename(details.target ?? '').toLowerCase() === 'electron.exe'", "unlinkSync(staleElectronLink)", "shell.writeShortcutLink", "app.getPath('desktop')"]) {
     if (!source.includes(required)) throw new Error(`missing ${required}`);
   }
+  if (!source.includes("const APP_USER_MODEL_ID = 'com.zuri.desktop.Zuri'")) {
+    throw new Error('the installed app does not have its isolated production identity');
+  }
   if (source.includes('const isSourceRun')) throw new Error('source launches can still rewrite installed shortcuts');
   if (packageJson.build?.win?.icon !== 'src/main/assets/zuri-icon.ico') {
     throw new Error('Windows packaging does not use zuri-icon.ico');
@@ -105,7 +108,7 @@ check('the sidebar refreshes after chat history changes', () => {
   return 'Recents follows clear and delete events';
 });
 
-const { splitDsml } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+const { splitDsml, answerStylePolicy } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
 
 check('DSML tool markup is hidden from the reply and read as tool calls', () => {
   const markup =
@@ -116,6 +119,47 @@ check('DSML tool markup is hidden from the reply and read as tool calls', () => 
   if (calls.length !== 1 || calls[0].name !== 'webSearch') throw new Error('call not read');
   if (JSON.parse(calls[0].arguments).query !== 'terms') throw new Error('argument not read');
   if (splitDsml('1 < 2').visible !== '1 < 2') throw new Error('plain text was altered');
+});
+
+check('the reply policy follows the saved answer style', () => {
+  const defaults = answerStylePolicy({});
+  for (const expected of ['a short paragraph or a few bullets', 'neutral and plain', 'an informed adult', 'choose what fits the answer']) {
+    if (!defaults.includes(expected)) throw new Error(`the default block is missing "${expected}"`);
+  }
+  const chosen = answerStylePolicy({ answerLength: 'concise', answerTone: 'friendly', answerDetail: 'expert', answerLayout: 'structured' });
+  for (const expected of ['as short as the question allows', 'warm and conversational', 'an expert reader', 'structure every answer']) {
+    if (!chosen.includes(expected)) throw new Error(`the chosen block is missing "${expected}"`);
+  }
+  if (chosen.includes('neutral and plain')) throw new Error('the default tone survived a saved choice');
+  return 'balanced, neutral, standard, automatic by default';
+});
+
+check('an unknown or older answer style falls back instead of failing', () => {
+  const stale = answerStylePolicy({ answerLength: 'essay', answerTone: '', answerDetail: null });
+  if (!stale.includes('a short paragraph or a few bullets')) throw new Error('a bad length did not fall back');
+  if (!stale.includes('neutral and plain')) throw new Error('a bad tone did not fall back');
+});
+
+check('standing instructions are trimmed, kept last, and left out when empty', () => {
+  const withCustom = answerStylePolicy({ customInstructions: '  Use British English.  ' });
+  if (!withCustom.endsWith('Use British English.')) throw new Error('the instructions were not last and trimmed');
+  if (withCustom.includes('  Use British')) throw new Error('the instructions kept their padding');
+  if (answerStylePolicy({ customInstructions: '   ' }).includes('standing instructions')) throw new Error('empty instructions were still added');
+});
+
+const { setStoreRoot, readSettings, saveSettings } = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+setStoreRoot(fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-settings-')));
+
+check('answer style choices are validated and stored trimmed', async () => {
+  const refused = await saveSettings({ answerTone: 'shouty' });
+  if (refused.ok || refused.error.code !== 'SETTINGS_INVALID_ANSWER_STYLE') throw new Error('an unknown tone was accepted');
+  const saved = await saveSettings({ answerTone: 'friendly', customInstructions: '  Use British English.  ' });
+  if (!saved.ok) throw new Error(saved.error.message);
+  if (saved.data.answerTone !== 'friendly') throw new Error('the tone was not saved');
+  if (saved.data.customInstructions !== 'Use British English.') throw new Error('the instructions were not trimmed');
+  const read = await readSettings();
+  if (read.data.answerLength !== 'balanced') throw new Error('the defaults were not filled in on read');
+  return 'unknown values refused, defaults filled in';
 });
 
 const { setWorkspaceRoot, runTool } = await import(pathToFileURL(path.join(root, 'src/main/tools/index.js')).href);

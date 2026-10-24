@@ -152,6 +152,78 @@ const RESPONSE_LANGUAGE_POLICY = [
   'Keep names, code, file names, and quoted source text unchanged when they are not English.',
 ].join(' ');
 
+/* ---------------------------------------------------------------------------
+   Answer style
+
+   The person chooses a length, tone, explanation level and layout once in
+   Settings. These rules turn that choice into instructions that sit after any
+   agent prompt (which decides what to say) and before the language policy
+   (which owns the language), so a custom agent cannot undo a saved choice by
+   accident and the language rule always has the last word.
+   ------------------------------------------------------------------------ */
+
+const ANSWER_LENGTH_RULES = Object.freeze({
+  concise: 'Length: as short as the question allows. Answer in one or two sentences, then at most three short bullets, and leave out background nobody asked for.',
+  balanced: 'Length: a short paragraph or a few bullets. The direct answer first, then only the detail needed to act on it.',
+  detailed: 'Length: thorough. The direct answer first, then the reasoning, steps, caveats and examples that support it. Use headings once the answer has more than three sections.',
+});
+
+const ANSWER_TONE_RULES = Object.freeze({
+  neutral: 'Tone: neutral and plain. No filler praise, no exclamation marks, no apology for replying.',
+  professional: 'Tone: professional. Precise and courteous, with no slang and no filler.',
+  friendly: 'Tone: warm and conversational, while staying accurate and no longer than the length rule allows.',
+  direct: 'Tone: direct. State the answer and any recommendation plainly, say what you would do, and do not hedge.',
+});
+
+const ANSWER_DETAIL_RULES = Object.freeze({
+  simple: 'Explanation level: plain words for a non-specialist. Define a technical term the first time it is needed and use a common word where one will do.',
+  standard: 'Explanation level: an informed adult. Use ordinary technical words without stopping to define them.',
+  expert: 'Explanation level: an expert reader. Use precise technical terms, skip the basics, and include numbers, edge cases and trade-offs.',
+});
+
+const ANSWER_LAYOUT_RULES = Object.freeze({
+  auto: 'Layout: choose what fits the answer. No headings or lists in a short reply; bullets for separate facts; numbered steps for a procedure; a table only for a real comparison of the same attributes across two or more things; a fenced code block with a language tag for code.',
+  plain: 'Layout: plain prose only. No headings, bullets, numbered lists, tables or code blocks unless the person explicitly asks for one.',
+  structured: 'Layout: structure every answer. A one-line summary first, then short headings or bullets, and a table whenever two or more things are compared.',
+});
+
+/** Formatting rules that hold whatever layout was chosen. */
+const ANSWER_FORMAT_POLICY = [
+  'Answer shape:',
+  'Start with the answer itself, never with a restatement of the question or a preamble such as "Great question".',
+  'Markdown is rendered: headings, bold, italics, links, bullet and numbered lists, tables, inline code and fenced code blocks all display.',
+  'Never wrap a whole answer in a code fence, and never use decorative unicode or emoji.',
+  'A table has to earn its place: the same attributes, one row per item. Do not use one for two lines of text or put prose in a cell.',
+  'Say plainly when you do not know, and keep a link next to the claim it supports.',
+].join(' ');
+
+/**
+ * Turn the saved answer-style choices into one instruction block.
+ *
+ * A missing or unknown value falls back to the default instead of throwing: a
+ * settings file written by an older build, or one edited by hand, must still
+ * produce a sensible reply rather than no reply at all.
+ * @param {object} [settings] The settings object, as read from settings.json.
+ * @returns {string}
+ */
+export function answerStylePolicy(settings = {}) {
+  const pick = (value, rules, fallback) => (typeof value === 'string' && Object.hasOwn(rules, value) ? rules[value] : rules[fallback]);
+  const parts = [
+    'How to write this reply:',
+    pick(settings?.answerLength, ANSWER_LENGTH_RULES, 'balanced'),
+    pick(settings?.answerTone, ANSWER_TONE_RULES, 'neutral'),
+    pick(settings?.answerDetail, ANSWER_DETAIL_RULES, 'standard'),
+    pick(settings?.answerLayout, ANSWER_LAYOUT_RULES, 'auto'),
+    ANSWER_FORMAT_POLICY,
+  ];
+  const custom = typeof settings?.customInstructions === 'string' ? settings.customInstructions.trim() : '';
+  if (custom !== '') {
+    // Last on purpose: people write these to override the defaults above.
+    parts.push(`The user's own standing instructions, which win over the style defaults above when the two disagree: ${custom}`);
+  }
+  return parts.join('\n');
+}
+
 /** Provider error bodies are trimmed to this before they reach a bubble. */
 const MAX_ERROR_DETAIL = 240;
 
@@ -898,7 +970,7 @@ export async function sendChatMessage(threadId, options = {}) {
       .filter((part) => part !== '')
       .join('\n\n');
   }
-  conversation.system = [conversation.system, currentTimeContext(), RESPONSE_LANGUAGE_POLICY]
+  conversation.system = [conversation.system, currentTimeContext(), answerStylePolicy(settings), RESPONSE_LANGUAGE_POLICY]
     .filter((part) => part !== '')
     .join('\n\n');
 

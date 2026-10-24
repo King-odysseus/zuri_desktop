@@ -1,6 +1,20 @@
 ## 2026-10-24 - Windows
 
-- Isolated source and test launches from the installed app's production taskbar identity. Tests no longer recreate an Electron shortcut under Zuri's identity or overwrite installed Zuri shortcuts.
+- Added the Zuri Cloud web dashboard (served by the cloud server at `/`: Google sign-in, usage, plans, Paystack checkout, payment history) and `npm run migrate` in `server/` to create the database tables. A PostgreSQL database must still be added on Railway and `DATABASE_URL` set.
+- Key files: `server/public/index.html`, `server/public/dashboard.js`, `server/src/migrate.js`, `server/src/app.js`.
+- Other OS action: none for the desktop app; in `server/` run `npm test`.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Added a saved answer style. Settings now offers length, tone, explanation level, layout and optional standing instructions, and every chat request carries them as one instruction block, so replies keep one shape across models. The newest reply also gained Shorter, More detail, Explain simply and As a table rewrite buttons, which send a short follow-up in the same thread and offer to save the habit as the default after two uses.
+- Key files: `src/main/store.js`, `src/main/providers/chat.js`, `src/renderer-react/SettingsView.jsx`, `src/renderer-react/ChatPanel.jsx`, `scripts/selftest.js`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
+- Isolated source and test launches from the installed app's production taskbar identity, and moved packaged Zuri to a fresh identity that cannot group with the stale Electron entry. Tests no longer recreate an Electron shortcut under Zuri's identity or overwrite installed Zuri shortcuts.
 - Key files: `src/main/main.js`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.
 - Done on: Windows

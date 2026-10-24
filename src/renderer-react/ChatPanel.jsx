@@ -64,6 +64,53 @@ function saveWebSearchPreference(enabled) {
   }
 }
 
+// Under the newest reply: one-press rewrites. Each sends a short follow-up in the
+// same thread, so the earlier answer stays on screen to compare against.
+const QUICK_ADJUSTMENTS = [
+  { label: 'Shorter', text: 'Rewrite the same answer, shorter.', field: 'answerLength', value: 'concise' },
+  { label: 'More detail', text: 'Rewrite the same answer with more detail.', field: 'answerLength', value: 'detailed' },
+  { label: 'Explain simply', text: 'Rewrite the same answer in simpler words.', field: 'answerDetail', value: 'simple' },
+  { label: 'As a table', text: 'Show the same answer as a table.', field: 'answerLayout', value: 'structured' },
+];
+
+const STYLE_HINT_STORAGE_KEY = 'zuri.styleHints';
+/** Uses of one rewrite before Zuri offers to make it the saved default. */
+const STYLE_HINT_THRESHOLD = 2;
+
+function readStyleHints() {
+  try {
+    const raw = window.localStorage.getItem(STYLE_HINT_STORAGE_KEY);
+    const parsed = raw === null ? {} : JSON.parse(raw);
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (error) {
+    console.warn('[zuri:chat] answer style hints', error?.message ?? error);
+    return {};
+  }
+}
+
+function writeStyleHints(hints) {
+  try {
+    window.localStorage.setItem(STYLE_HINT_STORAGE_KEY, JSON.stringify(hints));
+  } catch (error) {
+    console.warn('[zuri:chat] answer style hints', error?.message ?? error);
+  }
+}
+
+/** Count one use of a rewrite, so the offer follows a habit and not a stray click. */
+function countAdjustment(field, value) {
+  const hints = readStyleHints();
+  const key = `${field}:${value}`;
+  const next = (Number(hints[key]) || 0) + 1;
+  writeStyleHints({ ...hints, [key]: next });
+  return next;
+}
+
+function forgetAdjustment(field, value) {
+  const hints = readStyleHints();
+  delete hints[`${field}:${value}`];
+  writeStyleHints(hints);
+}
+
 function isImageName(name) {
   const extension = typeof name === 'string' && name.includes('.') ? name.split('.').pop().toLowerCase() : '';
   return IMAGE_EXTENSIONS.includes(extension);
@@ -141,6 +188,8 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [listening, setListening] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(-1);
   const [stopping, setStopping] = useState(false);
+  // The rewrite a person has now used often enough to be worth offering as their default.
+  const [styleOffer, setStyleOffer] = useState(null);
   const [menuView, setMenuView] = useState('');
   // On by default for current answers, then remembered when the person changes it.
   const [webSearch, setWebSearch] = useState(readWebSearchPreference);
@@ -366,46 +415,32 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     void sendMessage(event);
   }
 
-  async function sendMessage(event) {
-    event.preventDefault();
-    const prompt = draft.trim();
-    if ((prompt === '' && !attachment) || replying) return;
+  /**
+   * Send one turn: create the thread when this is its first message, append the
+   * text, ask for the reply, then repaint from the store's saved copy. Send and the
+   * quick rewrites both come through here, so the two behave identically.
+   * @param {string} content Message text.
+   * @param {string} title Title for a thread this turn creates.
+   * @param {{ name: string, path: string } | null} [image] Attached image, if any.
+   */
+  async function runTurn(content, title, image = null) {
     if (typeof api?.chats?.create !== 'function' || typeof api?.chats?.appendMessage !== 'function' || typeof api?.chat?.send !== 'function') {
       setError('Chat is only available when this page runs inside the Zuri app.');
+      setReplying(false);
       return;
     }
 
-    setDraft('');
     setError('');
     setStreamingText('');
     setStreamingFiles([]);
     setReplying(true);
-    if (listening) recognitionRef.current?.stop();
 
     try {
-      let content = prompt || 'Please analyze the attached file.';
-      const attachedImage = attachment && attachment.kind !== 'folder' && isImageName(attachment.name);
-      if (attachment?.kind === 'folder') {
-        content = `${content}\n\nAttached folder: ${attachment.name} (${attachment.fileCount} files)\n\n${attachment.text}`;
-      } else if (attachment && !attachedImage) {
-        if (typeof api?.tools?.run !== 'function' || typeof attachment.path !== 'string' || attachment.path === '') {
-          setError('This file could not be read. Choose it again or use the Files page.');
-          return;
-        }
-        const read = await api.tools.run({ name: 'readFile', args: { path: attachment.path } });
-        const attachmentText = read?.ok && typeof read.data?.text === 'string' ? read.data.text.trim() : '';
-        if (attachmentText === '') {
-          setError(read?.error?.message ?? 'That file could not be read. Try a text or Office document.');
-          return;
-        }
-        content = `${content}\n\nAttached file: ${attachment.name} (path: ${attachment.path})\n\n${attachmentText}`;
-      }
       let activeThreadId = threadId;
       if (activeThreadId === '') {
-        const created = await api.chats.create({ title: prompt.slice(0, 60) || attachment?.name || 'New chat' });
+        const created = await api.chats.create({ title: title.slice(0, 60) || 'New chat' });
         if (!created?.ok || typeof created.data?.id !== 'string') {
           setError(created?.error?.message ?? 'A new chat could not be created.');
-          setReplying(false);
           return;
         }
         activeThreadId = created.data.id;
@@ -418,12 +453,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         message: {
           role: 'user',
           content,
-          ...(attachedImage ? { images: [{ name: attachment.name, path: attachment.path }] } : {}),
+          ...(image ? { images: [image] } : {}),
         },
       });
       if (!appended?.ok) {
         setError(appended?.error?.message ?? 'Your message could not be saved.');
-        setReplying(false);
         return;
       }
       setMessages(Array.isArray(appended.data?.thread?.messages) ? appended.data.thread.messages : []);
@@ -438,7 +472,6 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         } else {
           setError(result?.error?.message ?? 'Zuri could not respond. Check Settings and try again.');
         }
-        setReplying(false);
         return;
       }
       setMessages(Array.isArray(result.data?.thread?.messages) ? result.data.thread.messages : []);
@@ -453,6 +486,81 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       setStopping(false);
     }
   }
+
+  async function sendMessage(event) {
+    event.preventDefault();
+    const prompt = draft.trim();
+    if ((prompt === '' && !attachment) || replying) return;
+
+    setDraft('');
+    if (listening) recognitionRef.current?.stop();
+    // Held from here so a second click during the file read cannot send twice.
+    setReplying(true);
+
+    let content = prompt || 'Please analyze the attached file.';
+    let image = null;
+    const attachedImage = attachment && attachment.kind !== 'folder' && isImageName(attachment.name);
+    if (attachedImage) image = { name: attachment.name, path: attachment.path };
+    if (attachment?.kind === 'folder') {
+      content = `${content}\n\nAttached folder: ${attachment.name} (${attachment.fileCount} files)\n\n${attachment.text}`;
+    } else if (attachment && !attachedImage) {
+      if (typeof api?.tools?.run !== 'function' || typeof attachment.path !== 'string' || attachment.path === '') {
+        setError('This file could not be read. Choose it again or use the Files page.');
+        setReplying(false);
+        return;
+      }
+      const read = await api.tools.run({ name: 'readFile', args: { path: attachment.path } });
+      const attachmentText = read?.ok && typeof read.data?.text === 'string' ? read.data.text.trim() : '';
+      if (attachmentText === '') {
+        setError(read?.error?.message ?? 'That file could not be read. Try a text or Office document.');
+        setReplying(false);
+        return;
+      }
+      content = `${content}\n\nAttached file: ${attachment.name} (path: ${attachment.path})\n\n${attachmentText}`;
+    }
+
+    await runTurn(content, prompt || attachment?.name || 'New chat', image);
+  }
+
+  /**
+   * Rewrite the last answer in a new shape. The follow-up is an ordinary message,
+   * so the thread keeps both versions and the request stays readable in history.
+   * @param {{ label: string, text: string, field: string, value: string }} adjustment
+   */
+  async function adjustAnswer(adjustment) {
+    if (replying) return;
+    // Two uses of the same rewrite is a habit worth offering as a default. The
+    // offer only ever suggests, and "Not now" resets the count so it stops asking.
+    if (countAdjustment(adjustment.field, adjustment.value) >= STYLE_HINT_THRESHOLD) {
+      setStyleOffer({ field: adjustment.field, value: adjustment.value });
+    }
+    await runTurn(adjustment.text, adjustment.text);
+  }
+
+  async function saveStyleDefault() {
+    if (styleOffer === null) return;
+    const saved = await api?.settings?.save?.({ [styleOffer.field]: styleOffer.value });
+    if (saved?.ok !== true) {
+      setError(saved?.error?.message ?? 'That preference could not be saved.');
+      return;
+    }
+    forgetAdjustment(styleOffer.field, styleOffer.value);
+    setStyleOffer(null);
+  }
+
+  function dismissStyleOffer() {
+    if (styleOffer !== null) forgetAdjustment(styleOffer.field, styleOffer.value);
+    setStyleOffer(null);
+  }
+
+  // Only the newest answer carries the rewrite row: on every answer it would turn
+  // the transcript into a wall of buttons.
+  const lastAnswerIndex = useMemo(() => {
+    for (let index = messages.length - 1; index >= 0; index -= 1) {
+      if (messages[index]?.role !== 'user') return index;
+    }
+    return -1;
+  }, [messages]);
 
   const hasConversation = messages.length > 0 || streamingText !== '';
   const contentWidth = 'max-w-4xl';
@@ -490,17 +598,32 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                     <FormattedMessage content={message.content} />
                   </div>
                   {Array.isArray(message.files) && message.files.map((file) => <FileCard key={file.path} file={file} api={api} />)}
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 w-7 rounded-lg text-muted"
-                    aria-label="Copy reply"
-                    title={copiedIndex === index ? 'Copied' : 'Copy reply'}
-                    onPress={() => void copyMessage(message, index)}
-                  >
-                    {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
-                  </Button>
+                  {/* Copy and the rewrite choices share one row, so the newest reply
+                      keeps one tidy action line instead of two stacked ones. */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 rounded-lg text-muted"
+                      aria-label="Copy reply"
+                      title={copiedIndex === index ? 'Copied' : 'Copy reply'}
+                      onPress={() => void copyMessage(message, index)}
+                    >
+                      {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                    </Button>
+                    {index === lastAnswerIndex && !replying && QUICK_ADJUSTMENTS.map((adjustment) => (
+                      <Button
+                        key={adjustment.label}
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 rounded-lg px-2 text-xs text-muted"
+                        title={`Rewrite: ${adjustment.label}`}
+                        aria-label={`Rewrite: ${adjustment.label}`}
+                        onPress={() => void adjustAnswer(adjustment)}
+                      >{adjustment.label}</Button>
+                    ))}
+                  </div>
                 </div>
               )
             ))}
@@ -517,6 +640,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
         <div className={`w-full ${contentWidth} ${compact ? 'zuri-overlay-composer-wrap' : ''}`}>
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
+          {styleOffer !== null && (
+            <div role="status" className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm">
+              <span className="flex-1">Make that your default for every answer?</span>
+              <Button size="sm" variant="primary" onPress={() => void saveStyleDefault()}>Yes, save it</Button>
+              <Button size="sm" variant="ghost" onPress={dismissStyleOffer}>Not now</Button>
+            </div>
+          )}
           <form onSubmit={sendMessage} className={`flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>
             <div ref={menuRef} className="relative">
               <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Add to message" aria-haspopup="menu" aria-expanded={menuView !== ''} title="Add files, photos or a command" onPress={() => setMenuView((current) => (current === '' ? 'main' : ''))}>

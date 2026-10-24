@@ -57,8 +57,33 @@ export const DEFAULT_DATA = Object.freeze({
     // person was reading. Written by the chat view; empty until a thread is opened.
     activeThreadId: '',
     cloudUrl: 'http://localhost:8080',
+    // How replies are written. providers/chat.js turns these into one instruction
+    // block on every request, so every model answers in a shape the person chose
+    // once instead of one that drifts with whichever model is active. The defaults
+    // describe a balanced, neutral, plain-English reply with the layout left to the
+    // model: what a new person expects before tuning anything.
+    answerLength: 'balanced',
+    answerTone: 'neutral',
+    answerDetail: 'standard',
+    answerLayout: 'auto',
+    customInstructions: '',
   }),
 });
+
+/**
+ * The values each answer-style field accepts. Kept beside the defaults so a value
+ * can never be stored that providers/chat.js has no rule for: an unknown id would
+ * otherwise fall back silently and the choice would look saved but do nothing.
+ */
+export const ANSWER_STYLE_CHOICES = Object.freeze({
+  answerLength: Object.freeze(['concise', 'balanced', 'detailed']),
+  answerTone: Object.freeze(['neutral', 'professional', 'friendly', 'direct']),
+  answerDetail: Object.freeze(['simple', 'standard', 'expert']),
+  answerLayout: Object.freeze(['auto', 'plain', 'structured']),
+});
+
+/** Longest set of standing instructions Zuri stores, in characters. */
+export const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 2000;
 
 /** Every store key, in the order the acceptance test lists the files. */
 export const STORE_KEYS = Object.freeze(Object.keys(DEFAULT_DATA));
@@ -282,12 +307,28 @@ export async function saveSettings(patch, options = {}) {
   if (Object.hasOwn(patch, 'theme') && patch.theme !== 'light' && patch.theme !== 'dark') {
     return failure('SETTINGS_INVALID_THEME', "theme must be 'light' or 'dark'");
   }
+  // Refused rather than rewritten: a typo in a renderer call should surface as an
+  // error, not leave the person with a preference that quietly never applies.
+  for (const [field, allowed] of Object.entries(ANSWER_STYLE_CHOICES)) {
+    if (Object.hasOwn(patch, field) && !allowed.includes(patch[field])) {
+      return failure('SETTINGS_INVALID_ANSWER_STYLE', `${field} must be one of ${allowed.join(', ')}`);
+    }
+  }
+  if (Object.hasOwn(patch, 'customInstructions') && typeof patch.customInstructions !== 'string') {
+    return failure('SETTINGS_INVALID_ANSWER_STYLE', 'customInstructions must be text');
+  }
+
+  // Standing instructions come from a text box and ride in every request, so the
+  // stored copy is trimmed and capped here rather than trusted as sent.
+  const clean = Object.hasOwn(patch, 'customInstructions')
+    ? { ...patch, customInstructions: patch.customInstructions.trim().slice(0, CUSTOM_INSTRUCTIONS_MAX_LENGTH) }
+    : patch;
 
   return withSettingsLock(async () => {
     const read = await readStore('settings', options);
     if (!read.ok) return read;
 
-    const next = { ...read.data, ...patch };
+    const next = { ...read.data, ...clean };
     const written = await writeStore('settings', next, options);
     if (!written.ok) return written;
 
