@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { handleRequest, createApp } from '../src/app.js';
 import { canConsume, usageStatus } from '../src/usage.js';
-import { createAuthService, hashSessionToken } from '../src/auth.js';
+import { createAuthService, hashSessionToken, normalizeGoogleProfile } from '../src/auth.js';
 
 const fixedNow = () => new Date('2026-10-24T12:00:00.000Z');
 const health = await handleRequest(new Request('https://cloud.example.com/api/health'), { now: fixedNow });
@@ -16,6 +16,11 @@ assert.deepEqual(usage, { planCode: 'starter', monthlyTokens: 2_000_000, usedTok
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 349_999), { allowed: true, reason: 'ok' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 350_000), { allowed: false, reason: 'quota_exceeded' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 'bad'), { allowed: false, reason: 'invalid_tokens' });
+assert.deepEqual(normalizeGoogleProfile({ sub: 'workspace-1', email: 'person@company.example', name: 'Company User', email_verified: true }), {
+  googleSubject: 'workspace-1',
+  email: 'person@company.example',
+  displayName: 'Company User',
+});
 
 const user = { id: 'user-1', email: 'user@example.com', status: 'active' };
 const sessions = new Map();

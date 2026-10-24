@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Added a Zuri Cloud signup screen that explicitly supports Gmail and verified Google Workspace accounts from company, school, and custom domains. The account normalizer also has regression coverage for a non-Gmail domain.
+- Key files: `src/renderer-react/SignUpView.jsx`, `src/renderer-react/App.jsx`, `src/renderer-react/FeaturesView.jsx`, `src/renderer-react/Icons.jsx`, `server/test/server.test.js`.
+- Other OS action: run `npm install --prefix server && npm test` after syncing.
+- Done on: Windows
+
 - Added a confirmed Clear all history action to Chat history. It uses one locked store operation, clears all saved threads, refreshes the view, and announces the change to other open views.
 - Key files: `src/main/store.js`, `src/main/main.js`, `src/main/preload.js`, `src/renderer-react/HistoryView.jsx`.
 - Other OS action: run `npm run react:build && npm test` after syncing.

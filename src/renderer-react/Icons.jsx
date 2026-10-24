@@ -3,6 +3,7 @@
 export {
   MessageSquare as ChatIcon,
   Bot as AgentIcon,
+  UserPlus as UserPlusIcon,
   ListChecks as TaskIcon,
   Bell as BellIcon,
   Clock3 as AutomationIcon,
