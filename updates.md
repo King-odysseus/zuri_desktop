@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Added Google identity verification, hashed bearer sessions, PostgreSQL user/subscription/usage repository methods, and protected account endpoints to the Railway package.
+- Key files: `server/src/auth.js`, `server/src/db.js`, `server/src/app.js`, `server/src/server.js`, `server/test/server.test.js`, `server/package.json`.
+- Other OS action: run `npm install --prefix server && npm --prefix server test`.
+- Done on: Windows
+
 - Web search is now enabled by default for new users. An explicit saved off choice is preserved, and the setting remains available in the composer menu.
 - Key file: `src/renderer-react/ChatPanel.jsx`.
 - Other OS action: run `npm run react:build` after syncing.

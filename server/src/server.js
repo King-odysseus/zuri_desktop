@@ -1,8 +1,16 @@
 import { createServer } from 'node:http';
 import { readConfig } from './config.js';
-import { handleRequest } from './app.js';
+import { createApp } from './app.js';
+import { createAuthService, createGoogleVerifier } from './auth.js';
+import { createDatabase, createRepository } from './db.js';
 
 const config = readConfig();
+const pool = config.databaseUrl ? createDatabase(config.databaseUrl, process.env) : null;
+const repository = pool ? createRepository(pool) : null;
+const auth = repository && config.googleClientId
+  ? createAuthService({ repository, verifyGoogleCredential: createGoogleVerifier(config.googleClientId) })
+  : null;
+const app = createApp({ auth, repository });
 
 /**
  * Adapt Node's incoming request to the Fetch Request contract used by the app
@@ -18,7 +26,7 @@ async function serve(request, response) {
   const body = request.method === 'GET' || request.method === 'HEAD' ? undefined : request;
 
   try {
-    const result = await handleRequest(new Request(`${protocol}://${host}${request.url ?? '/'}`, {
+    const result = await app(new Request(`${protocol}://${host}${request.url ?? '/'}`, {
       method: request.method,
       headers: request.headers,
       body,
@@ -26,6 +34,8 @@ async function serve(request, response) {
     }));
     response.statusCode = result.status;
     result.headers.forEach((value, name) => response.setHeader(name, value));
+    const cookies = result.headers.getSetCookie?.();
+    if (Array.isArray(cookies) && cookies.length > 0) response.setHeader('set-cookie', cookies);
     response.end(await result.text());
   } catch (error) {
     console.error('[zuri-cloud] request', error);
