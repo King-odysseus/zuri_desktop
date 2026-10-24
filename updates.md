@@ -1,5 +1,15 @@
 ## 2026-10-24 - Windows
 
+- The web app now wears the real Zuri icon (the same `zuri-icon.png` the desktop build ships) in the top bar, the hero badge, the account screens and the browser tab, and the landing page gained a motion layer: a three.js point globe and a tsparticles field over a Pexels texture, both lazy loaded and both paused when off screen or when reduced motion is requested.
+- New `/signin` and `/signup` pages. They are separate addresses with their own layout (visual aside on desktop, colour band on phones), a Sign in / Create account switch, what the free plan includes, and the honest unconfigured-Google state. Google is the only method the server supports, so there is no email form to fill in.
+- Footer on every page reads "Powered by Tijha" (plain text: the project has no Tijha URL to link to).
+- Fixed two server bugs the new assets exposed: every response body was decoded as UTF-8 before being written, so PNG/JPEG responses came back as replacement characters and larger than the file (now copied as bytes, with a regression test); and the SPA fallback sat behind an extension check it could never pass, so `/signin` returned 404 (now extension-less routes get the app shell). `.jpg`/`.jpeg` were also missing from the static allowlist.
+- Key files: `web/src/views/AuthView.jsx`, `web/src/views/Landing.jsx`, `web/src/components/{HeroBackdrop,ParticleField,ThreeScene,Footer,TopBar,Icons}.jsx`, `web/src/App.jsx`, `web/src/styles.css`, `web/public/**`, `server/src/serve.js`, `server/src/app.js`, `server/test/server.test.js`.
+- `three` and `@tsparticles/{engine,slim}` are devDependencies: the web build bundles them, and electron-builder packs only `dependencies`, so the installed desktop app does not grow.
+- Other OS action: run `npm install && npm run web:build && cd server && npm test` after syncing, then `npm run cloud:deploy`.
+
+## 2026-10-24 - Windows
+
 - Restyled the Zuri Cloud web app onto the desktop app's own design tokens instead of a separate purple palette: the navy `#040130` canvas with `#0a0548` cards in dark mode, the ice-blue `#eef3f9` canvas with white cards in light mode, the accent-tinted selected state (`#2a23a0` dark, `#d4e5ff` light), 44px controls on a 12px radius, 16px cards, pill chips and the dashed centred empty state. The signed-in sidebar is now the desktop list panel (`surface-secondary` with accent-tinted nav rows), and pages carry the same top-right accent wash.
 - The brand mark and the favicon now use the desktop blue (`#3478e5`) and the tile glyph inherits `accent-foreground`, so it stays legible on the lavender dark-mode accent.
 - Theme is applied from `web/src/main.jsx` before the first render (an inline pre-paint script is refused by the server's CSP), and blocked storage no longer stops the page booting.

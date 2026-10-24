@@ -17,6 +17,8 @@ const STATIC_TYPES = new Map([
   ['.css', 'text/css; charset=utf-8'],
   ['.svg', 'image/svg+xml'],
   ['.png', 'image/png'],
+  ['.jpg', 'image/jpeg'],
+  ['.jpeg', 'image/jpeg'],
   ['.ico', 'image/x-icon'],
   ['.webp', 'image/webp'],
   ['.json', 'application/json; charset=utf-8'],
@@ -78,6 +80,19 @@ async function readJson(request, maxBytes = MAX_BODY_BYTES) {
  * @param {string} pathname
  * @returns {Promise<Response | null>} null when the caller should answer 404.
  */
+/**
+ * The built single-page app's entry document. Sent for the root and for any
+ * extension-less route the client router owns.
+ * @returns {Promise<Response>}
+ */
+async function appShell() {
+  const shell = await readFile(path.join(PUBLIC_DIR, 'index.html'));
+  return new Response(shell, {
+    status: 200,
+    headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', ...DASHBOARD_SECURITY_HEADERS },
+  });
+}
+
 async function serveStatic(pathname) {
   let requested;
   try {
@@ -90,8 +105,13 @@ async function serveStatic(pathname) {
   const insidePublic = filePath === PUBLIC_DIR || filePath.startsWith(`${PUBLIC_DIR}${path.sep}`);
   if (!insidePublic) return null;
 
-  const type = STATIC_TYPES.get(path.extname(filePath).toLowerCase());
-  if (!type) return null;
+  const extension = path.extname(filePath).toLowerCase();
+  const type = STATIC_TYPES.get(extension);
+
+  // An extension-less path is one of the app's own pages (/signin, /signup),
+  // so it gets the shell. A path that names a file type we do not ship is a
+  // miss: answering it with HTML would hide a broken asset behind a 200.
+  if (!type) return extension === '' ? appShell() : null;
 
   try {
     const body = await readFile(filePath);
@@ -107,15 +127,8 @@ async function serveStatic(pathname) {
     if (error?.code !== 'ENOENT' && error?.code !== 'EISDIR') throw error;
   }
 
-  // Missing file with no extension: hand back the app shell so client routes load.
-  if (path.extname(requested) === '') {
-    const shell = await readFile(path.join(PUBLIC_DIR, 'index.html'));
-    return new Response(shell, {
-      status: 200,
-      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', ...DASHBOARD_SECURITY_HEADERS },
-    });
-  }
-  return null;
+  // A directory path such as /img/ has no page behind it either.
+  return extension === '' ? appShell() : null;
 }
 
 /** @param {Request} request @param {number} maxBytes @returns {Promise<string>} */

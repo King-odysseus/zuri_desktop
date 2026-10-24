@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import NoticeBar from './components/NoticeBar.jsx';
 import TopBar from './components/TopBar.jsx';
+import AuthView from './views/AuthView.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import Landing from './views/Landing.jsx';
 import {
@@ -17,9 +18,19 @@ import {
 import { applyTheme, preferredTheme } from './lib/theme.js';
 
 const VIEWS = ['overview', 'usage', 'plans', 'billing'];
+const AUTH_PATHS = ['/signin', '/signup'];
 
-function scrollToSignIn() {
-  document.getElementById('signin-card')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+/**
+ * The three public addresses. Everything else is the landing page, so a stale
+ * link or a typo lands somewhere useful instead of a blank shell.
+ * @returns {{ path: '/' | '/signin' | '/signup', hash: string }}
+ */
+function readRoute() {
+  const raw = window.location.pathname.replace(/\/+$/, '') || '/';
+  return {
+    path: AUTH_PATHS.includes(raw) ? raw : '/',
+    hash: window.location.hash ?? '',
+  };
 }
 
 export default function App() {
@@ -32,10 +43,35 @@ export default function App() {
   const [notice, setNotice] = useState(null);
   const [view, setView] = useState('overview');
   const [busyPlan, setBusyPlan] = useState('');
+  const [route, setRoute] = useState(readRoute);
 
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // Back and forward move between the landing page and the two account screens.
+  useEffect(() => {
+    const onPop = () => setRoute(readRoute());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const navigate = useCallback((next) => {
+    const [rawPath, rawHash = ''] = String(next).split('#');
+    const path = AUTH_PATHS.includes(rawPath) ? rawPath : '/';
+    window.history.pushState({}, '', `${path}${rawHash ? `#${rawHash}` : ''}`);
+    setRoute({ path, hash: rawHash ? `#${rawHash}` : '' });
+  }, []);
+
+  // Scrolling belongs to the route, not to the click: the section has to exist
+  // in the DOM first, which only happens after this render commits.
+  useEffect(() => {
+    if (route.hash) {
+      document.getElementById(route.hash.slice(1))?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    window.scrollTo({ top: 0 });
+  }, [route]);
 
   const showNotice = useCallback((message, kind = 'info') => {
     setNotice(message ? { message, kind } : null);
@@ -111,6 +147,9 @@ export default function App() {
         showNotice(null);
         setStatus('booting');
         await loadAccount();
+        // The account screens are only for people without a session.
+        window.history.replaceState({}, '', '/');
+        setRoute({ path: '/', hash: '' });
       } catch (error) {
         showNotice(error.message, 'error');
         setStatus('signed-out');
@@ -126,6 +165,8 @@ export default function App() {
     setStatus('signed-out');
     setView('overview');
     showNotice(null);
+    window.history.replaceState({}, '', '/');
+    setRoute({ path: '/', hash: '' });
     window.scrollTo({ top: 0 });
   }, [showNotice]);
 
@@ -152,6 +193,8 @@ export default function App() {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
   }, []);
 
+  const handleSignIn = useCallback(() => navigate('/signin'), [navigate]);
+
   const body = useMemo(() => {
     if (status === 'booting') {
       return (
@@ -176,7 +219,18 @@ export default function App() {
           busy={busyPlan}
           onViewChange={handleViewChange}
           onChoose={handleChoose}
-          onSignIn={scrollToSignIn}
+          onSignIn={handleSignIn}
+        />
+      );
+    }
+    if (route.path === '/signin' || route.path === '/signup') {
+      return (
+        <AuthView
+          mode={route.path === '/signup' ? 'signup' : 'signin'}
+          theme={theme}
+          onCredential={handleCredential}
+          onError={(message) => showNotice(message, 'error')}
+          onNavigate={navigate}
         />
       );
     }
@@ -185,10 +239,8 @@ export default function App() {
         plans={plans}
         theme={theme}
         busy={busyPlan}
-        onCredential={handleCredential}
-        onError={(message) => showNotice(message, 'error')}
         onChoose={handleChoose}
-        onSignIn={scrollToSignIn}
+        onNavigate={navigate}
       />
     );
   }, [
@@ -196,8 +248,11 @@ export default function App() {
     busyPlan,
     handleChoose,
     handleCredential,
+    handleSignIn,
     handleViewChange,
+    navigate,
     plans,
+    route.path,
     showNotice,
     status,
     theme,
@@ -210,8 +265,9 @@ export default function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         signedIn={status === 'signed-in'}
-        onSignIn={scrollToSignIn}
+        onSignIn={handleSignIn}
         onSignOut={handleSignOut}
+        onNavigate={navigate}
       />
       <NoticeBar notice={notice} />
       {body}

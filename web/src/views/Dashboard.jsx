@@ -1,3 +1,4 @@
+import Footer from '../components/Footer.jsx';
 import { ChartIcon, CardIcon, GridIcon, ReceiptIcon } from '../components/Icons.jsx';
 import { initialsFor } from '../lib/format.js';
 import OverviewView from './OverviewView.jsx';
@@ -71,6 +72,10 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
             />
           )}
           {view === 'billing' && <BillingView me={account.me} billing={account.billing} />}
+
+          <div className="app-foot">
+            <Footer compact />
+          </div>
         </div>
       </main>
 

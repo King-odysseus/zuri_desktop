@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { readdir } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
+import { createServer } from 'node:http';
 import { handleRequest, createApp } from '../src/app.js';
+import { createRequestListener } from '../src/serve.js';
 import { canConsume, usageStatus } from '../src/usage.js';
 import { createAuthService, hashSessionToken, normalizeGoogleProfile } from '../src/auth.js';
 import { createRequestLimiter, limitsForPlan } from '../src/limits.js';
@@ -184,5 +186,34 @@ assert.match(assetResponse.headers.get('cache-control') ?? '', /immutable/);
 assert.equal((await app(new Request('https://cloud.example.com/dashboard.js'))).status, 404);
 assert.equal((await app(new Request('https://cloud.example.com/..%2Fsrc%2Fconfig.js'))).status, 404);
 assert.equal((await app(new Request('https://cloud.example.com/package.json'))).status, 404);
+
+// The two account screens are client routes: the server has to hand back the
+// shell for them or a reload on /signin lands on a 404.
+for (const route of ['/signin', '/signup']) {
+  const page = await app(new Request(`https://cloud.example.com${route}`));
+  assert.equal(page.status, 200, `${route} should serve the app shell`);
+  assert.match(page.headers.get('content-type'), /text\/html/);
+  assert.match(await page.text(), /<div id="root">/);
+}
+// A missing image is still a miss; only extension-less routes fall back.
+assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg'))).status, 404);
+
+// The Node adapter has to copy bytes: decoding the body as text turned every
+// image into replacement characters and sent more bytes than the file holds.
+{
+  const listener = createRequestListener({ app, port: 0 });
+  const nodeServer = createServer((request, response) => void listener(request, response));
+  await new Promise((resolve) => nodeServer.listen(0, '127.0.0.1', resolve));
+  try {
+    const { port } = nodeServer.address();
+    const onDisk = await readFile(new URL('../public/zuri-logo.png', import.meta.url));
+    const served = Buffer.from(await (await fetch(`http://127.0.0.1:${port}/zuri-logo.png`)).arrayBuffer());
+    assert.equal(served.length, onDisk.length, 'the logo must be served byte for byte');
+    assert.equal(served.subarray(0, 4).toString('hex'), '89504e47', 'the PNG signature must survive the adapter');
+    assert.ok(served.equals(onDisk), 'served bytes must equal the file on disk');
+  } finally {
+    await new Promise((resolve) => nodeServer.close(resolve));
+  }
+}
 
 console.log('PASS server contract');
