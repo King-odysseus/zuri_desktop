@@ -1,5 +1,12 @@
 ## 2026-10-24 - Windows
 
+- Refreshed the packaged Start Menu and desktop shortcuts with the embedded Zuri executable icon and app identity, repairing stale Electron taskbar grouping after upgrades.
+- Key files: `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Synchronized Electron's native title bar and application menu with the saved light/dark app theme at startup and when the theme toggle changes.
 - Key files: `src/main/main.js`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.

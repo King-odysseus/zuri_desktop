@@ -121,27 +121,33 @@ if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
  */
 function adoptTaskbarIdentity() {
   if (process.platform !== 'win32') return;
-  if (app.isPackaged) return;
+  // Packaged launches also refresh the Windows shortcuts so stale Electron
+  // taskbar identities are repaired after an upgrade.
 
-  // The shortcut must point at the app, so it is only written when this process
-  // really is the app: a check script launched as `electron scripts/x.js` reports
-  // that folder as its app path, and a shortcut to it would open nothing.
+  // A check script launched as `electron scripts/x.js` is not the app itself, so
+  // source shortcuts are only written when the app path matches the project root.
   const appRoot = path.join(moduleDir, '..', '..');
-  if (path.resolve(app.getAppPath()) !== path.resolve(appRoot)) return;
+  const isSourceRun = !app.isPackaged && path.resolve(app.getAppPath()) === path.resolve(appRoot);
+  if (!isSourceRun && !app.isPackaged) return;
 
-  const link = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Zuri.lnk');
+  const links = [
+    path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Zuri.lnk'),
+    path.join(app.getPath('desktop'), 'Zuri.lnk'),
+  ];
   try {
-    const operation = existsSync(link) ? 'update' : 'create';
-    const written = shell.writeShortcutLink(link, operation, {
-      target: process.execPath,
-      args: `"${appRoot}"`,
-      icon: ICO_ENTRY,
-      iconIndex: 0,
-      description: 'Zuri',
-      appUserModelId: APP_USER_MODEL_ID,
-    });
-    if (!written) {
-      console.warn("[zuri:taskbar] Windows refused the shortcut, so the taskbar keeps Electron's icon");
+    for (const link of links) {
+      const operation = existsSync(link) ? 'update' : 'create';
+      const written = shell.writeShortcutLink(link, operation, {
+        target: process.execPath,
+        args: isSourceRun ? `"${appRoot}"` : '',
+        icon: process.execPath,
+        iconIndex: 0,
+        description: 'Zuri',
+        appUserModelId: APP_USER_MODEL_ID,
+      });
+      if (!written) {
+        console.warn(`[zuri:taskbar] Windows refused shortcut refresh: ${link}`);
+      }
     }
   } catch (error) {
     // A read-only or redirected Start Menu must never stop the app from opening.
