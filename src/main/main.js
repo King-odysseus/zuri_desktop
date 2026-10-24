@@ -109,7 +109,9 @@ app.setName('Zuri');
 
 /** The id Windows groups this app's taskbar buttons under. */
 const APP_USER_MODEL_ID = 'com.zuri.desktop';
-if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
+// A source or test launch runs through electron.exe. Giving that process the
+// production id makes Windows recreate Electron.lnk under Zuri's taskbar group.
+if (process.platform === 'win32' && app.isPackaged) app.setAppUserModelId(APP_USER_MODEL_ID);
 
 /**
  * Give the app a taskbar identity that carries the Zuri mark.
@@ -123,15 +125,9 @@ if (process.platform === 'win32') app.setAppUserModelId(APP_USER_MODEL_ID);
  * @returns {void}
  */
 function adoptTaskbarIdentity() {
-  if (process.platform !== 'win32') return;
-  // Packaged launches also refresh the Windows shortcuts so stale Electron
-  // taskbar identities are repaired after an upgrade.
-
-  // A check script launched as `electron scripts/x.js` is not the app itself, so
-  // source shortcuts are only written when the app path matches the project root.
-  const appRoot = path.join(moduleDir, '..', '..');
-  const isSourceRun = !app.isPackaged && path.resolve(app.getAppPath()) === path.resolve(appRoot);
-  if (!isSourceRun && !app.isPackaged) return;
+  // Source and smoke-test processes run as electron.exe and must never register
+  // shortcuts under the installed app's production taskbar identity.
+  if (process.platform !== 'win32' || !app.isPackaged) return;
 
   const startMenuPrograms = path.join(app.getPath('appData'), 'Microsoft', 'Windows', 'Start Menu', 'Programs');
   const staleElectronLink = path.join(startMenuPrograms, 'Electron.lnk');
@@ -139,9 +135,10 @@ function adoptTaskbarIdentity() {
     if (existsSync(staleElectronLink)) {
       const details = shell.readShortcutLink(staleElectronLink);
       const targetsElectron = path.basename(details.target ?? '').toLowerCase() === 'electron.exe';
-      if (targetsElectron && details.appUserModelId === APP_USER_MODEL_ID) {
-        // An older source launch registered Electron under Zuri's AUMID. Windows
-        // resolves that duplicate first and shows the atom for the packaged app.
+      if (targetsElectron) {
+        // Explorer can cache Zuri's AUMID on this generic link even when Electron's
+        // reader reports its original id. The exact filename and target keep this
+        // cleanup scoped to the stale development launcher.
         unlinkSync(staleElectronLink);
       }
     }
@@ -158,7 +155,7 @@ function adoptTaskbarIdentity() {
       const operation = existsSync(link) ? 'update' : 'create';
       const written = shell.writeShortcutLink(link, operation, {
         target: process.execPath,
-        args: isSourceRun ? `"${appRoot}"` : '',
+        args: '',
         icon: process.execPath,
         iconIndex: 0,
         description: 'Zuri',
@@ -200,7 +197,7 @@ function createMainWindow() {
     },
   });
 
-  if (process.platform === 'win32') {
+  if (process.platform === 'win32' && app.isPackaged) {
     // The process AUMID identifies the app, but Windows can still derive the
     // running taskbar button from the window unless its icon is assigned too.
     window.setIcon(ICO_ENTRY);

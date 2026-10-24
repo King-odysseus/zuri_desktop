@@ -1,5 +1,12 @@
 ## 2026-10-24 - Windows
 
+- Isolated source and test launches from the installed app's production taskbar identity. Tests no longer recreate an Electron shortcut under Zuri's identity or overwrite installed Zuri shortcuts.
+- Key files: `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Kept the sidebar Recents list synchronized with chat history changes, so clearing or deleting conversations removes them from both places immediately.
 - Key files: `src/renderer-react/Sidebar.jsx`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build` after syncing.
