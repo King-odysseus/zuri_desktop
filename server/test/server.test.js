@@ -10,6 +10,14 @@ import { createRequestLimiter, limitsForPlan } from '../src/limits.js';
 import { verifyPaystackSignature } from '../src/paystack.js';
 import { downloadsFromReleases } from '../src/downloads.js';
 import { createMailer } from '../src/mail.js';
+import { readConfig } from '../src/config.js';
+
+// A deployed server that was never given SITE_URL must still build a reset link
+// that opens. Railway injects its public domain, so that is the last resort; a
+// local run stays empty so the link falls back to the request's own origin.
+assert.equal(readConfig({ RAILWAY_PUBLIC_DOMAIN: 'zuricloud.example.app' }).siteUrl, 'https://zuricloud.example.app');
+assert.equal(readConfig({ SITE_URL: 'https://site.example.com/', RAILWAY_PUBLIC_DOMAIN: 'ignored.example.app' }).siteUrl, 'https://site.example.com');
+assert.equal(readConfig({}).siteUrl, '');
 
 // The download list is read from GitHub Releases on the deployed site. Tests must
 // not depend on the network or on what has been published, so the repository is

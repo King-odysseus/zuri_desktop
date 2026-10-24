@@ -16,8 +16,12 @@ export function readConfig(environment = process.env) {
     : 'http://localhost:8080';
   // Reset links have to point at the public site, which is not always the API host,
   // so SITE_URL is separate and stays empty when it is not set; the link builder
-  // falls back to CLOUD_URL so local links still open.
-  const siteUrl = typeof environment.SITE_URL === 'string' ? environment.SITE_URL.trim().replace(/\/$/, '') : '';
+  // falls back to CLOUD_URL so local links still open. Railway always injects its
+  // public domain, so a deployed server that was never given either still sends a
+  // link that opens instead of one pointing at localhost.
+  const railwayDomain = typeof environment.RAILWAY_PUBLIC_DOMAIN === 'string' ? environment.RAILWAY_PUBLIC_DOMAIN.trim() : '';
+  const siteUrl = (typeof environment.SITE_URL === 'string' ? environment.SITE_URL.trim().replace(/\/$/, '') : '')
+    || (railwayDomain === '' ? '' : `https://${railwayDomain}`);
 
   return {
     port,
