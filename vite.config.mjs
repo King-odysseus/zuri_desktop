@@ -14,8 +14,10 @@ import { fileURLToPath } from 'node:url';
 // machine's TEMP is C:\Users\MEGA-M~1\...), root stays short while rollup
 // resolves the entry html to the long name; the two no longer share a prefix,
 // the emitted html file name becomes a chain of "..", and the build stops.
-// Taking the real path once makes both sides the same string.
-const projectDir = realpathSync(fileURLToPath(new URL('.', import.meta.url)));
+// Taking the real path once makes both sides the same string, but only the
+// native call does it: the default implementation rebuilds the path from what it
+// was given and hands an 8.3 segment straight back, which is the short form again.
+const projectDir = realpathSync.native(fileURLToPath(new URL('.', import.meta.url)));
 
 export default defineConfig({
   base: './',

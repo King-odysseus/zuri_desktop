@@ -17,10 +17,11 @@
     "react:dev": "vite",
     "react:build": "vite build",
     "web:build": "vite build --config vite.web.config.mjs",
+    "server:test": "npm --prefix server test",
     "cloud:deploy": "node scripts/deploy-cloud.mjs",
     "dist": "electron-builder --win nsis",
     "dist:mac": "electron-builder --mac dmg",
-    "test": "npm run react:build && npm run smoke && npm run selftest && npm run firstrun && npm run demo:act && npm run demo:autopilot",
+    "test": "npm run react:build && npm run server:test && npm run smoke && npm run selftest && npm run firstrun && npm run demo:act && npm run demo:autopilot",
     "release:publish": "node scripts/publish-release.mjs"
   },
   "devDependencies": {
