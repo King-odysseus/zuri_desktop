@@ -12,7 +12,9 @@ const base = {
 export function LogoMark() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M7 7h10L7 17h10" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      {/* Inherits the tile's foreground token, so the mark stays legible on both
+          the light blue and the lavender dark-mode accent. */}
+      <path d="M7 7h10L7 17h10" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
     </svg>
   );
 }

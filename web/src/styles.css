@@ -1,65 +1,85 @@
 /*
  * Zuri Cloud web UI.
- * Tokens mirror the desktop style guide (dark first, light override on
- * <html data-theme="light">) so the product looks the same everywhere.
+ *
+ * The tokens and control shapes are the desktop app's own (see
+ * src/renderer-react/app.css): the same navy canvas, the same ice-blue light
+ * theme, 44px controls on a 12px radius, 16px cards, pill chips and the
+ * accent-tinted selected state. Keeping the values literal means the two
+ * surfaces can be compared side by side without a mapping table.
  */
 :root {
   color-scheme: dark;
-  --canvas: #0b0b0f;
-  --surface: #16161c;
-  --raised: #1e1e26;
-  --glass: rgba(20, 20, 26, 0.66);
-  --hairline: rgba(255, 255, 255, 0.1);
-  --strong: rgba(255, 255, 255, 0.18);
-  --text: #f4f4f6;
-  --muted: #a6a6b2;
-  --faint: #71717c;
-  --accent: #7c7cec;
-  --accent-hover: #8f8ff2;
-  --accent-soft: rgba(124, 124, 236, 0.16);
-  --accent-text: #c7c7ff;
-  --success: #3ddc84;
-  --success-soft: rgba(61, 220, 132, 0.14);
+  --canvas: #040130;
+  --surface: #0a0548;
+  --surface-secondary: #100a5c;
+  --surface-tertiary: #181072;
+  --raised: #241c8c;
+  --glass: rgba(16, 10, 92, 0.78);
+  --hairline: rgba(180, 177, 232, 0.16);
+  --strong: rgba(180, 177, 232, 0.32);
+  --control-border: #342eaa;
+  --field-background: #070240;
+  --text: #ecebff;
+  --muted: #b4b1e8;
+  --faint: #8b86cf;
+  --accent: #a9b4ff;
+  --accent-hover: #c6ceff;
+  --accent-foreground: #040130;
+  --accent-soft: #2a23a0;
+  --accent-text: #f2f1ff;
+  --selected: #2a23a0;
+  --selected-foreground: #f2f1ff;
+  --success: #4ade80;
+  --success-soft: #0c3d24;
   --warning: #f5a623;
-  --warning-soft: rgba(245, 166, 35, 0.14);
-  --danger: #f05252;
-  --danger-soft: rgba(240, 82, 82, 0.14);
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
-  --shadow-glass: 0 1px 1px rgba(0, 0, 0, 0.5), 0 12px 32px rgba(0, 0, 0, 0.45);
-  --glow: radial-gradient(60% 60% at 50% 0%, rgba(124, 124, 236, 0.22), transparent 70%);
+  --warning-soft: #3a2a05;
+  --danger: #ef6b7a;
+  --danger-soft: #3d1220;
+  --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.24);
+  --shadow-glass: 0 18px 40px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.28);
+  --glow: radial-gradient(60% 60% at 100% 0%, rgba(169, 180, 255, 0.16), transparent 60%);
   --radius-sm: 8px;
   --radius-md: 10px;
   --radius-lg: 12px;
   --radius-xl: 16px;
   --radius-2xl: 24px;
+  /* One height for every button and field, as on the desktop pages. */
+  --control-height: 44px;
   --bar-height: 64px;
   --max-width: 1280px;
 }
 
 :root[data-theme="light"] {
   color-scheme: light;
-  --canvas: #f5f5f7;
+  --canvas: #eef3f9;
   --surface: #ffffff;
-  --raised: #ffffff;
-  --glass: rgba(255, 255, 255, 0.78);
-  --hairline: rgba(17, 17, 20, 0.09);
-  --strong: rgba(17, 17, 20, 0.18);
-  --text: #111114;
-  --muted: #5b5b66;
-  --faint: #8a8a96;
-  --accent: #5b5bd6;
-  --accent-hover: #4f4fc4;
-  --accent-soft: rgba(91, 91, 214, 0.1);
-  --accent-text: #4343b8;
-  --success: #17a34a;
-  --success-soft: rgba(23, 163, 74, 0.1);
-  --warning: #b06d05;
-  --warning-soft: rgba(217, 119, 6, 0.12);
-  --danger: #dc2626;
-  --danger-soft: rgba(220, 38, 38, 0.1);
-  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-glass: 0 1px 1px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06);
-  --glow: radial-gradient(60% 60% at 50% 0%, rgba(91, 91, 214, 0.16), transparent 70%);
+  --surface-secondary: #e7eef8;
+  --surface-tertiary: #dbe7f4;
+  --raised: #dce6f1;
+  --glass: rgba(255, 255, 255, 0.82);
+  --hairline: rgba(20, 32, 51, 0.1);
+  --strong: rgba(20, 32, 51, 0.2);
+  --control-border: #b8c7da;
+  --field-background: #ffffff;
+  --text: #142033;
+  --muted: #6f7e95;
+  --faint: #8b99ad;
+  --accent: #3478e5;
+  --accent-hover: #2a66cb;
+  --accent-foreground: #ffffff;
+  --accent-soft: #d4e5ff;
+  --accent-text: #174b91;
+  --selected: #d4e5ff;
+  --selected-foreground: #174b91;
+  --success: #157f4a;
+  --success-soft: #d9f2e4;
+  --warning: #9a6407;
+  --warning-soft: #fbeed4;
+  --danger: #c8394a;
+  --danger-soft: #fbdfe3;
+  --shadow-soft: 0 10px 30px rgba(25, 42, 70, 0.08), 0 2px 8px rgba(25, 42, 70, 0.04);
+  --shadow-glass: 0 18px 40px rgba(25, 42, 70, 0.12), 0 2px 8px rgba(25, 42, 70, 0.05);
+  --glow: radial-gradient(60% 60% at 100% 0%, rgba(52, 120, 229, 0.14), transparent 60%);
 }
 
 * {
@@ -85,6 +105,7 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* The same top-right accent wash the desktop pages paint behind their cards. */
 body::before {
   content: "";
   position: fixed;
@@ -128,7 +149,7 @@ a {
   z-index: 30;
   width: 100%;
   background: var(--glass);
-  border-bottom: 1px solid var(--hairline);
+  border-bottom: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
 }
@@ -154,20 +175,26 @@ a {
   letter-spacing: -0.01em;
 }
 
+/* The desktop brand tile: a 32px accent square carrying the mark. */
 .brand-mark {
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: linear-gradient(140deg, var(--accent), #4b3fa8);
+  background: linear-gradient(
+    140deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 62%, var(--surface))
+  );
+  color: var(--accent-foreground);
   box-shadow: var(--shadow-soft);
 }
 
 .brand-mark svg {
   width: 18px;
   height: 18px;
-  stroke: #ffffff;
+  stroke: currentColor;
 }
 
 .brand-name {
@@ -186,16 +213,16 @@ a {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 44px;
+  min-height: var(--control-height);
   padding: 0 18px;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--text);
   font: 500 14px/1 "Segoe UI", system-ui, sans-serif;
   text-decoration: none;
   cursor: pointer;
-  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease, color 150ms ease;
+  transition: background 150ms ease, border-color 150ms ease, box-shadow 150ms ease, color 150ms ease;
 }
 
 .btn:active {
@@ -203,26 +230,29 @@ a {
 }
 
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .btn-primary {
   background: var(--accent);
-  color: #ffffff;
+  color: var(--accent-foreground);
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
+/* Secondary is the desktop's selected pill, not a second neutral button. */
 .btn-secondary {
-  background: var(--raised);
-  border-color: var(--hairline);
+  background: var(--selected);
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--control-border));
+  color: var(--selected-foreground);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 42%, transparent);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  border-color: var(--strong);
+  background: color-mix(in srgb, var(--selected) 82%, var(--surface));
 }
 
 .btn-ghost {
@@ -230,8 +260,8 @@ a {
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: var(--accent-soft);
-  color: var(--text);
+  background: color-mix(in srgb, var(--selected) 46%, transparent);
+  color: var(--selected-foreground);
 }
 
 .btn-block {
@@ -241,11 +271,11 @@ a {
 .icon-btn {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  width: var(--control-height);
+  height: var(--control-height);
   padding: 0;
   border: 1px solid transparent;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--muted);
   cursor: pointer;
@@ -253,8 +283,8 @@ a {
 }
 
 .icon-btn:hover {
-  background: var(--accent-soft);
-  color: var(--text);
+  background: color-mix(in srgb, var(--selected) 46%, transparent);
+  color: var(--selected-foreground);
 }
 
 .icon-btn svg {
@@ -284,12 +314,14 @@ a {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
   border-radius: 9999px;
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  background: var(--surface-tertiary);
+  color: var(--text);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.02em;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
@@ -314,21 +346,22 @@ a {
   max-width: var(--max-width);
   margin: 16px auto 0;
   padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-lg);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--selected) 55%, var(--surface));
   color: var(--text);
   font-size: 14px;
 }
 
 .notice.is-error {
   border-left-color: var(--danger);
-  background: var(--danger-soft);
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
 }
 
 .notice.is-success {
   border-left-color: var(--success);
-  background: var(--success-soft);
+  background: color-mix(in srgb, var(--success) 16%, var(--surface));
 }
 
 /* Landing */
@@ -360,9 +393,9 @@ a {
   gap: 8px;
   width: fit-content;
   padding: 6px 12px;
-  border: 1px solid var(--hairline);
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
   border-radius: 9999px;
-  background: var(--glass);
+  background: color-mix(in srgb, var(--surface) 88%, var(--accent) 12%);
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
@@ -371,7 +404,8 @@ a {
 }
 
 .hero h1 {
-  font-size: clamp(2rem, 6vw, 3.5rem);
+  color: var(--text);
+  font-size: clamp(2rem, 6vw, 3.25rem);
   font-weight: 600;
   line-height: 1.08;
   letter-spacing: -0.03em;
@@ -382,6 +416,7 @@ a {
   max-width: 52ch;
   color: var(--muted);
   font-size: clamp(15px, 1.6vw, 17px);
+  line-height: 1.55;
 }
 
 .hero-points {
@@ -409,10 +444,12 @@ a {
   stroke-linejoin: round;
 }
 
+/* Cards carry the desktop page language: a faint accent tint, a hairline and
+   depth from the shadow rather than a hard border. */
 .card {
-  border: 1px solid var(--hairline);
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
   box-shadow: var(--shadow-soft);
   padding: 20px;
 }
@@ -422,7 +459,8 @@ a {
   flex-direction: column;
   gap: 16px;
   padding: 24px;
-  background: var(--glass);
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
   border-radius: var(--radius-2xl);
   box-shadow: var(--shadow-glass);
   backdrop-filter: blur(20px) saturate(140%);
@@ -430,6 +468,7 @@ a {
 }
 
 .signin-card h2 {
+  color: var(--text);
   font-size: 20px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -441,13 +480,13 @@ a {
 }
 
 .google-slot {
-  min-height: 44px;
+  min-height: var(--control-height);
   display: flex;
   justify-content: center;
 }
 
 .google-hint {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 13px;
   text-align: center;
 }
@@ -463,9 +502,9 @@ a {
   flex-direction: column;
   gap: 4px;
   padding: 12px 14px;
-  border: 1px solid var(--hairline);
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
   border-radius: var(--radius-lg);
-  background: var(--accent-soft);
+  background: color-mix(in srgb, var(--selected) 60%, transparent);
 }
 
 .google-notice strong {
@@ -498,8 +537,8 @@ a {
   align-items: center;
   gap: 8px;
   padding-top: 14px;
-  border-top: 1px solid var(--hairline);
-  color: var(--faint);
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -519,7 +558,7 @@ a {
 /* Marketing sections */
 .section {
   padding: 40px 0;
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
 }
 
 .section-head {
@@ -531,6 +570,7 @@ a {
 }
 
 .section-head h2 {
+  color: var(--text);
   font-size: clamp(22px, 3vw, 28px);
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -539,6 +579,7 @@ a {
 .section-head p {
   color: var(--muted);
   font-size: 14px;
+  line-height: 1.55;
 }
 
 .feature-grid {
@@ -554,19 +595,21 @@ a {
   padding: 20px;
 }
 
+/* The desktop tool-card icon tile: a rounded accent square. */
 .feature-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-md);
-  background: var(--accent-soft);
+  background: var(--selected);
+  color: var(--selected-foreground);
 }
 
 .feature-icon svg {
-  width: 20px;
-  height: 20px;
-  stroke: var(--accent-text);
+  width: 19px;
+  height: 19px;
+  stroke: currentColor;
   fill: none;
   stroke-width: 1.7;
   stroke-linecap: round;
@@ -574,6 +617,7 @@ a {
 }
 
 .feature h3 {
+  color: var(--text);
   font-size: 16px;
   font-weight: 600;
 }
@@ -581,12 +625,15 @@ a {
 .feature p {
   color: var(--muted);
   font-size: 14px;
+  line-height: 1.55;
 }
 
 .plan-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  /* 200px keeps all four plans on one row inside the 952px content column at
+     1280px, instead of leaving one card orphaned on a second row. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
 }
 
 .plan-card {
@@ -594,15 +641,26 @@ a {
   flex-direction: column;
   gap: 12px;
   padding: 20px;
-  border: 1px solid var(--hairline);
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
   box-shadow: var(--shadow-soft);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.plan-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--control-border));
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--text) 10%, transparent);
 }
 
 .plan-card.is-current {
-  border-color: var(--accent);
-  background: linear-gradient(180deg, var(--accent-soft), transparent 55%), var(--surface);
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--control-border));
+  background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--selected) 70%, transparent),
+      transparent 55%
+    ),
+    var(--surface);
 }
 
 .plan-top {
@@ -613,11 +671,13 @@ a {
 }
 
 .plan-name {
+  color: var(--text);
   font-size: 16px;
   font-weight: 600;
 }
 
 .plan-price {
+  color: var(--text);
   font-size: 26px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -659,8 +719,8 @@ a {
   justify-content: space-between;
   gap: 12px;
   padding-top: 32px;
-  border-top: 1px solid var(--hairline);
-  color: var(--faint);
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  color: var(--muted);
   font-size: 13px;
 }
 
@@ -681,6 +741,9 @@ a {
   flex: 1 1 auto;
   min-width: 0;
   padding: 20px 16px calc(96px + env(safe-area-inset-bottom));
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 34rem),
+    var(--canvas);
 }
 
 .app-content {
@@ -689,10 +752,12 @@ a {
   margin: 0 auto;
 }
 
+/* Views keep the desktop page rhythm: a header, then sections that share one
+   width, one gap and one card treatment. */
 .view {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .view-head {
@@ -701,17 +766,23 @@ a {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  padding: 4px 0 2px;
 }
 
 .view-head h1 {
-  font-size: clamp(22px, 4vw, 26px);
+  color: var(--text);
+  font-size: clamp(24px, 3vw, 30px);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
 }
 
 .view-head p {
+  max-width: 48rem;
+  margin-top: 4px;
   color: var(--muted);
   font-size: 14px;
+  line-height: 1.55;
 }
 
 .stat-grid {
@@ -721,7 +792,7 @@ a {
 }
 
 .stat-label {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -730,6 +801,7 @@ a {
 
 .stat-value {
   margin-top: 6px;
+  color: var(--text);
   font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -745,8 +817,8 @@ a {
   height: 10px;
   margin-top: 14px;
   border-radius: 9999px;
-  background: var(--raised);
-  border: 1px solid var(--hairline);
+  background: var(--surface-tertiary);
+  border: 1px solid color-mix(in srgb, var(--control-border) 60%, transparent);
   overflow: hidden;
 }
 
@@ -773,8 +845,9 @@ a {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 0;
-  border-top: 1px solid var(--hairline);
+  padding: 12px 2px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  color: var(--text);
   font-size: 14px;
 }
 
@@ -787,27 +860,39 @@ a {
   font-size: 13px;
 }
 
+/* One empty state everywhere, as on the desktop pages: a dashed panel with a
+   centred sentence rather than a bare grey line. */
 .empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 10rem;
+  margin-top: 8px;
   padding: 20px;
-  border: 1px dashed var(--hairline);
-  border-radius: var(--radius-lg);
-  color: var(--faint);
+  border: 1px dashed color-mix(in srgb, var(--control-border) 92%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  color: var(--muted);
   font-size: 14px;
+  line-height: 1.5;
   text-align: center;
 }
 
 .alert {
   padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 60%, transparent);
   border-left: 3px solid var(--warning);
   border-radius: var(--radius-lg);
-  background: var(--warning-soft);
+  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
   color: var(--text);
   font-size: 14px;
 }
 
 .alert.is-danger {
   border-left-color: var(--danger);
-  background: var(--danger-soft);
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
 }
 
 .account-card {
@@ -815,9 +900,9 @@ a {
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border: 1px solid var(--hairline);
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 88%, var(--accent) 12%);
 }
 
 .avatar {
@@ -827,8 +912,8 @@ a {
   height: 40px;
   flex: 0 0 40px;
   border-radius: 9999px;
-  background: var(--accent-soft);
-  color: var(--accent-text);
+  background: var(--selected);
+  color: var(--selected-foreground);
   font-weight: 600;
   font-size: 14px;
 }
@@ -842,7 +927,7 @@ a {
 }
 
 .account-email {
-  color: var(--faint);
+  color: var(--muted);
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -852,23 +937,24 @@ a {
 .nav {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
+/* Desktop navigation rows: quiet by default, accent-tinted pill when selected. */
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 44px;
+  min-height: var(--control-height);
   padding: 0 12px;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: 0.875rem;
   background: transparent;
   color: var(--muted);
   font: 500 14px/1 "Segoe UI", system-ui, sans-serif;
   text-align: left;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease;
+  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
 }
 
 .nav-item svg {
@@ -883,17 +969,18 @@ a {
 }
 
 .nav-item:hover {
-  background: var(--accent-soft);
-  color: var(--text);
+  background: color-mix(in srgb, var(--selected) 46%, transparent);
+  color: var(--selected-foreground);
 }
 
 .nav-item.is-active {
-  background: var(--accent-soft);
-  color: var(--text);
+  background: var(--selected);
+  color: var(--selected-foreground);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 42%, transparent);
 }
 
 .nav-item.is-active svg {
-  stroke: var(--accent-text);
+  stroke: var(--selected-foreground);
 }
 
 .tabbar {
@@ -906,7 +993,7 @@ a {
   width: 100%;
   padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
   background: var(--glass);
-  border-top: 1px solid var(--hairline);
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
 }
@@ -921,9 +1008,9 @@ a {
   min-height: 52px;
   padding: 4px;
   border: 0;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: transparent;
-  color: var(--faint);
+  color: var(--muted);
   font: 500 11px/1.2 "Segoe UI", system-ui, sans-serif;
   cursor: pointer;
 }
@@ -939,14 +1026,14 @@ a {
 }
 
 .tab.is-active {
-  color: var(--accent-text);
-  background: var(--accent-soft);
+  color: var(--selected-foreground);
+  background: var(--selected);
 }
 
 .skeleton {
   height: 96px;
   border-radius: var(--radius-xl);
-  background: linear-gradient(90deg, var(--raised) 25%, var(--surface) 50%, var(--raised) 75%);
+  background: linear-gradient(90deg, var(--surface-secondary) 25%, var(--surface) 50%, var(--surface-secondary) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
@@ -981,14 +1068,17 @@ a {
     display: flex;
   }
 
+  /* The signed-in sidebar is the desktop's list panel: a lighter surface than
+     the canvas, one accent-tinted row for where you are. */
   .sidebar {
     display: flex;
     flex-direction: column;
     gap: 20px;
-    flex: 0 0 260px;
-    width: 260px;
+    flex: 0 0 264px;
+    width: 264px;
     padding: 24px 16px;
-    border-right: 1px solid var(--hairline);
+    border-right: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
+    background: var(--surface-secondary);
     position: sticky;
     top: var(--bar-height);
     height: calc(100dvh - var(--bar-height));

@@ -1,5 +1,14 @@
 ## 2026-10-24 - Windows
 
+- Restyled the Zuri Cloud web app onto the desktop app's own design tokens instead of a separate purple palette: the navy `#040130` canvas with `#0a0548` cards in dark mode, the ice-blue `#eef3f9` canvas with white cards in light mode, the accent-tinted selected state (`#2a23a0` dark, `#d4e5ff` light), 44px controls on a 12px radius, 16px cards, pill chips and the dashed centred empty state. The signed-in sidebar is now the desktop list panel (`surface-secondary` with accent-tinted nav rows), and pages carry the same top-right accent wash.
+- The brand mark and the favicon now use the desktop blue (`#3478e5`) and the tile glyph inherits `accent-foreground`, so it stays legible on the lavender dark-mode accent.
+- Theme is applied from `web/src/main.jsx` before the first render (an inline pre-paint script is refused by the server's CSP), and blocked storage no longer stops the page booting.
+- Key files: `web/src/styles.css`, `web/src/main.jsx`, `web/src/lib/theme.js`, `web/src/components/Icons.jsx`, `web/index.html`, `server/public/**`.
+- Other OS action: run `npm run web:build && cd server && npm test` after syncing, then `npm run cloud:deploy`.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Fixed the landing sign-in card: the Google button slot kept its 44px height even on a server with no `GOOGLE_CLIENT_ID`, leaving a blank hole above the notice. The slot now renders only while a button lives in it, and the unconfigured state is a framed notice that says what to set.
 - Added `npm run cloud:deploy` (`scripts/deploy-cloud.mjs`). Running `railway up` from the repo root uploads the desktop app, so the service builds Electron and the live site answers 502; this script builds the web bundle, copies `server/` to a scratch folder outside the repo and uploads that, which is the only upload path that ships the Dockerfile in `server/`.
 - Key files: `web/src/components/GoogleSignIn.jsx`, `web/src/styles.css`, `scripts/deploy-cloud.mjs`, `package.json`, `server/public/**`.
