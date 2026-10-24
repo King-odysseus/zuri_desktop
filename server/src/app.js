@@ -1,5 +1,6 @@
 import { PLANS, publicPlan } from './plans.js';
 import { usageStatus } from './usage.js';
+import { limitsForPlan } from './limits.js';
 
 const JSON_HEADERS = Object.freeze({
   'content-type': 'application/json; charset=utf-8',
@@ -75,7 +76,7 @@ export function createApp(dependencies = {}) {
       }
     }
 
-    if (url.pathname === '/api/me' || url.pathname === '/api/me/usage' || url.pathname === '/api/auth/sign-out') {
+    if (url.pathname === '/api/me' || url.pathname === '/api/me/usage' || url.pathname === '/api/me/limits' || url.pathname === '/api/auth/sign-out') {
       if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
       const token = bearerToken(request);
       const session = await dependencies.auth.authenticate(token);
@@ -88,6 +89,16 @@ export function createApp(dependencies = {}) {
       if (url.pathname === '/api/me') return response(200, { ok: true, data: session });
       if (!dependencies.repository?.getUsage) return response(503, { ok: false, error: { code: 'USAGE_NOT_CONFIGURED', message: 'Usage data is not configured yet.' } });
       const usage = await dependencies.repository.getUsage(session.user.id, session.subscription.currentPeriodStart, session.subscription);
+      if (url.pathname === '/api/me/limits') {
+        return response(200, {
+          ok: true,
+          data: {
+            planCode: session.subscription.planCode,
+            limits: limitsForPlan(session.subscription.planCode),
+            usage: usageStatus(session.subscription, usage.usedTokens),
+          },
+        });
+      }
       return response(200, { ok: true, data: usageStatus(session.subscription, usage.usedTokens) });
     }
 

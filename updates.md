@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Added server-side free-plan guardrails with per-user request rate, concurrency, prompt-size limits, and a protected limits endpoint. Monthly token quota remains backed by PostgreSQL usage events.
+- Key files: `server/src/limits.js`, `server/src/app.js`, `server/test/server.test.js`, `server/README.md`.
+- Other OS action: run `npm install --prefix server && npm --prefix server test` after syncing.
+- Done on: Windows
+
 - Added a Zuri Cloud signup screen that explicitly supports Gmail and verified Google Workspace accounts from company, school, and custom domains. The account normalizer also has regression coverage for a non-Gmail domain.
 - Key files: `src/renderer-react/SignUpView.jsx`, `src/renderer-react/App.jsx`, `src/renderer-react/FeaturesView.jsx`, `src/renderer-react/Icons.jsx`, `server/test/server.test.js`.
 - Other OS action: run `npm install --prefix server && npm test` after syncing.

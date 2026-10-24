@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { handleRequest, createApp } from '../src/app.js';
 import { canConsume, usageStatus } from '../src/usage.js';
 import { createAuthService, hashSessionToken, normalizeGoogleProfile } from '../src/auth.js';
+import { createRequestLimiter, limitsForPlan } from '../src/limits.js';
 
 const fixedNow = () => new Date('2026-10-24T12:00:00.000Z');
 const health = await handleRequest(new Request('https://cloud.example.com/api/health'), { now: fixedNow });
@@ -16,6 +17,22 @@ assert.deepEqual(usage, { planCode: 'starter', monthlyTokens: 2_000_000, usedTok
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 349_999), { allowed: true, reason: 'ok' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 350_000), { allowed: false, reason: 'quota_exceeded' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 'bad'), { allowed: false, reason: 'invalid_tokens' });
+assert.deepEqual(limitsForPlan('free'), { requestsPerMinute: 10, maxConcurrent: 1, maxInputTokens: 8_000, maxOutputTokens: 1_000 });
+assert.equal(limitsForPlan('unknown').requestsPerMinute, 10);
+let clock = 0;
+const limiter = createRequestLimiter({ now: () => clock });
+const first = limiter.acquire('user-1', limitsForPlan('free'));
+assert.equal(first.allowed, true);
+assert.equal(limiter.acquire('user-1', limitsForPlan('free')).reason, 'concurrency_limit');
+first.release();
+for (let index = 1; index < 10; index += 1) {
+  const request = limiter.acquire('user-1', limitsForPlan('free'));
+  assert.equal(request.allowed, true);
+  request.release();
+}
+assert.equal(limiter.acquire('user-1', limitsForPlan('free')).reason, 'rate_limit');
+clock = 60_000;
+assert.equal(limiter.acquire('user-1', limitsForPlan('free')).allowed, true);
 assert.deepEqual(normalizeGoogleProfile({ sub: 'workspace-1', email: 'person@company.example', name: 'Company User', email_verified: true }), {
   googleSubject: 'workspace-1',
   email: 'person@company.example',
@@ -46,6 +63,9 @@ assert.equal((await googleRoute.json()).data.user.id, user.id);
 const me = await app(new Request('https://cloud.example.com/api/me', { headers: { authorization: `Bearer ${signedIn.token}` } }));
 assert.equal(me.status, 200);
 assert.equal((await me.json()).data.user.id, user.id);
+const limits = await app(new Request('https://cloud.example.com/api/me/limits', { headers: { authorization: `Bearer ${signedIn.token}` } }));
+assert.equal(limits.status, 200);
+assert.deepEqual((await limits.json()).data.limits, { requestsPerMinute: 10, maxConcurrent: 1, maxInputTokens: 8_000, maxOutputTokens: 1_000 });
 const unauthorized = await app(new Request('https://cloud.example.com/api/me'));
 assert.equal(unauthorized.status, 401);
 const signedOut = await app(new Request('https://cloud.example.com/api/auth/sign-out', { method: 'POST', headers: { authorization: `Bearer ${signedIn.token}` } }));
