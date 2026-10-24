@@ -1,10 +1,6 @@
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { readConfig } from './config.js';
 import { createDatabase } from './db.js';
-
-const schemaPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'db', 'schema.sql');
+import { applySchema } from './schema.js';
 
 const config = readConfig();
 if (config.databaseUrl === '') {
@@ -15,9 +11,8 @@ if (config.databaseUrl === '') {
 const pool = createDatabase(config.databaseUrl);
 try {
   // schema.sql is idempotent (IF NOT EXISTS / ON CONFLICT), so re-running is safe.
-  await pool.query(await readFile(schemaPath, 'utf8'));
-  const { rows } = await pool.query('SELECT code, name, amount_kobo FROM plans ORDER BY amount_kobo');
-  console.log(`[zuri-cloud] schema applied; ${rows.length} plans: ${rows.map((row) => row.code).join(', ')}`);
+  const { plans } = await applySchema(pool);
+  console.log(`[zuri-cloud] schema applied; ${plans.length} plans: ${plans.join(', ')}`);
 } catch (error) {
   console.error('[zuri-cloud] migration failed:', error?.message ?? error);
   process.exitCode = 1;
