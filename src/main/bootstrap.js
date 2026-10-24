@@ -4,16 +4,19 @@ import path from 'node:path';
 
 // electron-builder can nest this small dependency under call-bind even though
 // get-intrinsic resolves it from the app-level module path at runtime.
-const packagedDependencyPath = path.join(
-  process.resourcesPath,
-  'app.asar',
-  'node_modules',
-  'call-bind',
-  'node_modules',
-);
+const packagedDependencyPaths = [
+  path.join(process.resourcesPath, 'node_modules'),
+  path.join(
+    process.resourcesPath,
+    'app.asar',
+    'node_modules',
+    'call-bind',
+    'node_modules',
+  ),
+].filter((dependencyPath) => existsSync(dependencyPath));
 
-if (existsSync(packagedDependencyPath)) {
-  process.env.NODE_PATH = [packagedDependencyPath, process.env.NODE_PATH]
+if (packagedDependencyPaths.length > 0) {
+  process.env.NODE_PATH = [...packagedDependencyPaths, process.env.NODE_PATH]
     .filter(Boolean)
     .join(path.delimiter);
   Module._initPaths();

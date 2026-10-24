@@ -1,5 +1,12 @@
 ## 2026-10-24 - Windows
 
+- Fixed the packaged ExcelJS dependency tree by shipping `es-abstract-get` as an extra runtime resource and adding packaged runtime resources to Node's module lookup path. This prevents the installed app from failing at startup with a missing `es-abstract-get/GetMethod` module.
+- Key files: `package.json`, `src/main/bootstrap.js`.
+- Other OS action: run `npm install && npm run react:build && npm run dist` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Made `call-bind-apply-helpers` an explicit production dependency so electron-builder includes it at the package root. This fixes the packaged app startup crash raised while loading Excel support.
 - Added a packaged-app bootstrap that exposes electron-builder's nested helper directory before loading the main process.
 - Key files: `package.json`, `package-lock.json`, `src/main/bootstrap.js`.

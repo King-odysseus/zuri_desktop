@@ -38,6 +38,12 @@
       "src/main/**/*",
       "dist-react/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "node_modules/es-abstract-get",
+        "to": "node_modules/es-abstract-get"
+      }
+    ],
     "win": {
       "target": [
         {
