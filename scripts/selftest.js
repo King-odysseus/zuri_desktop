@@ -88,6 +88,14 @@ check('the bridge remains isolated', () => {
   }
 });
 
+check('the native desktop chrome follows the saved theme', () => {
+  const source = read('src/main/main.js');
+  for (const required of ['nativeTheme', 'applyNativeTheme(saved.data?.theme)', 'nativeTheme.themeSource']) {
+    if (!source.includes(required)) throw new Error(`missing ${required}`);
+  }
+  return 'native title bar and menu theme are synchronized';
+});
+
 const { splitDsml } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
 
 check('DSML tool markup is hidden from the reply and read as tool calls', () => {

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, session, shell, Tray } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell, Tray } from 'electron';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { copyFile, mkdir, readdir, readFile, stat } from 'node:fs/promises';
@@ -605,6 +605,9 @@ function handleSettingsGet() {
  */
 async function handleSettingsSave(payload) {
   const saved = await saveSettings(payload ?? {});
+  if (saved.ok === true && Object.hasOwn(payload ?? {}, 'theme')) {
+    applyNativeTheme(saved.data?.theme);
+  }
   // The overlay toggle has to act now, not after a restart: launch and this save both
   // go through setOverlayEnabled(), so one flag turns into one window the same way
   // wherever it is changed.
@@ -616,6 +619,11 @@ async function handleSettingsSave(payload) {
     }
   }
   return saved;
+}
+
+/** Keep the native title bar and application menu in step with the renderer theme. */
+function applyNativeTheme(theme) {
+  nativeTheme.themeSource = theme === 'light' ? 'light' : 'dark';
 }
 
 function cloudBaseUrl(settings) {
@@ -1466,6 +1474,14 @@ app.whenReady().then(async () => {
   // Must run before the first window is shown, or the window is already grouped.
   if (process.env.ZURI_NO_AUMID !== '1') adoptTaskbarIdentity();
 
+  let settings = null;
+  try {
+    settings = await readSettings();
+    if (settings.ok === true) applyNativeTheme(settings.data?.theme);
+  } catch (error) {
+    console.error('[zuri:theme]', error);
+  }
+
   createMainWindow();
   // The icon in the notification area is how a hidden window is brought back, so it
   // is created straight after the window it belongs to.
@@ -1474,9 +1490,8 @@ app.whenReady().then(async () => {
   // The overlay is opt-in, so it opens at launch only when the stored setting says so.
   // A failed read leaves it closed, which is the safe half of the toggle.
   try {
-    const settings = await readSettings();
-    if (settings.ok === true) startOverlayFromSettings(settings.data);
-    else console.error('[zuri:overlay]', settings.error?.message ?? 'settings could not be read');
+    if (settings?.ok === true) startOverlayFromSettings(settings.data);
+    else console.error('[zuri:overlay]', settings?.error?.message ?? 'settings could not be read');
   } catch (error) {
     console.error('[zuri:overlay]', error);
   }
