@@ -1,0 +1,61 @@
+## Builds the macOS installer.
+##
+## A .dmg can only be produced on macOS: electron-builder packages the app with
+## hdiutil and the platform's own signing tooling, so a Windows machine cannot
+## make one. This workflow is the macOS machine.
+##
+## The app is built universal (one file for Apple Silicon and Intel). The site
+## shows one card per platform and keeps only the newest file per platform, so
+## two separate dmgs would mean an Intel visitor could be handed an arm64 build.
+##
+## Publishing needs a token that can write to the public releases repo: the
+## workflow's own GITHUB_TOKEN only reaches this private repository. Add a
+## personal access token with `repo` scope for King-odysseus/zuri-releases as the
+## repository secret RELEASES_TOKEN. Without it the dmg is still uploaded as a
+## workflow artifact, which is one manual step away from being published.
+name: Build macOS installer
+
+on:
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # electron-builder packages whatever is in dist-react/, so the renderer is
+      # built first; dist:mac alone would ship the previous renderer.
+      - run: npm run react:build
+
+      - name: Build the dmg
+        run: npm run dist:mac
+        env:
+          # The build is unsigned: no Apple Developer certificate is available to
+          # the runner. Gatekeeper then warns on first open, which is expected
+          # until the app is signed and notarised.
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zuri-macos-dmg
+          path: release/*.dmg
+          if-no-files-found: error
+
+      - name: Publish to the public releases repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "RELEASES_TOKEN is not set, so the dmg stays in the workflow artifact."
+            exit 0
+          fi
+          npm run release:publish
