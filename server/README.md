@@ -34,6 +34,8 @@ the `x-paystack-signature` HMAC before parsing or applying an event. Successful 
 checkouts and later recurring `charge.success` events update the local subscription;
 failed or disabled subscription events move it to `past_due`, `cancelled`, or `expired`.
 
+The server also serves a web dashboard at `/` (sign in with Google, usage, plans, Paystack checkout, payment history). Apply the database schema with `npm run migrate` (needs `DATABASE_URL`, for example from a Railway PostgreSQL service; no local Postgres is required to run the tests).
+
 Run locally from this directory:
 
 ```text

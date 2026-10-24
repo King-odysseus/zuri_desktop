@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Zuri Cloud</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f6f7fb; --card: #fff; --text: #14161f; --muted: #636b7d; --border: #e1e4ee; --accent: #4f46e5; --danger: #c0392b; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #0e1118; --card: #171b26; --text: #eef0f6; --muted: #9aa3b8; --border: #272d3d; --accent: #8b85ff; } }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; min-height: 100dvh; margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+    header { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; background: var(--card); border-bottom: 1px solid var(--border); }
+    header h1 { margin: 0; font-size: 18px; }
+    main { width: 100%; max-width: 1100px; margin: 0 auto; padding: 24px 20px 48px; display: grid; gap: 16px; }
+    section { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    h2 { margin: 0 0 4px; font-size: 17px; }
+    p { margin: 4px 0; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); margin-top: 14px; }
+    .plan { border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .bar { height: 8px; border-radius: 99px; background: var(--border); overflow: hidden; margin-top: 12px; }
+    .bar > div { height: 100%; background: var(--accent); }
+    button { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--card); color: var(--text); font: inherit; cursor: pointer; }
+    button.primary { background: var(--accent); color: #fff; border-color: transparent; }
+    button:disabled { opacity: .5; cursor: default; }
+    .row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 14px; }
+    #notice { color: var(--danger); min-height: 1.4em; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Zuri Cloud</h1>
+    <button id="sign-out" hidden>Sign out</button>
+  </header>
+  <main>
+    <p id="notice" role="status"></p>
+    <section id="signed-out" hidden>
+      <h2>Sign in</h2>
+      <p class="muted">Use any verified Google account, including company and school accounts.</p>
+      <div id="google-button" style="margin-top:16px;min-height:44px"></div>
+      <p id="google-missing" class="muted" hidden>Google sign-in is not configured on this server yet (set GOOGLE_CLIENT_ID).</p>
+    </section>
+    <div id="signed-in" hidden style="display:grid;gap:16px">
+      <section>
+        <h2 id="user-name"></h2>
+        <p id="user-email" class="muted"></p>
+      </section>
+      <section>
+        <h2>Usage this period</h2>
+        <p id="usage-text" class="muted"></p>
+        <div class="bar"><div id="usage-bar" style="width:0"></div></div>
+      </section>
+      <section>
+        <h2>Plans</h2>
+        <div id="plans" class="grid"></div>
+      </section>
+      <section>
+        <h2>Payment history</h2>
+        <div id="payments"></div>
+      </section>
+    </div>
+  </main>
+  <script src="/dashboard.js" defer></script>
+</body>
+</html>

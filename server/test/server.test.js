@@ -168,4 +168,11 @@ const signedOut = await app(new Request('https://cloud.example.com/api/auth/sign
 assert.equal(signedOut.status, 200);
 assert.equal((await app(new Request('https://cloud.example.com/api/me', { headers: { authorization: `Bearer ${signedIn.token}` } }))).status, 401);
 
+const dashboardPage = await app(new Request('https://cloud.example.com/'));
+assert.equal(dashboardPage.status, 200);
+assert.match(dashboardPage.headers.get('content-type'), /text\/html/);
+assert.ok(dashboardPage.headers.get('content-security-policy'));
+assert.equal((await app(new Request('https://cloud.example.com/dashboard.js'))).status, 200);
+assert.equal((await app(new Request('https://cloud.example.com/..%2Fsrc%2Fconfig.js'))).status, 404);
+
 console.log('PASS server contract');

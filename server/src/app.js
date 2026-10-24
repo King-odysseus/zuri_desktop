@@ -1,9 +1,24 @@
 import { randomUUID } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { findPlan, PLANS, publicPlan } from './plans.js';
 import { usageStatus } from './usage.js';
 import { createRequestLimiter, limitsForPlan } from './limits.js';
 import { verifyPaystackSignature } from './paystack.js';
 
+const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
+// A fixed allow-list: request paths never reach the filesystem, so traversal is impossible.
+const STATIC_FILES = new Map([
+  ['/', { name: 'index.html', type: 'text/html; charset=utf-8' }],
+  ['/index.html', { name: 'index.html', type: 'text/html; charset=utf-8' }],
+  ['/dashboard.js', { name: 'dashboard.js', type: 'text/javascript; charset=utf-8' }],
+]);
+const DASHBOARD_SECURITY_HEADERS = Object.freeze({
+  'content-security-policy': "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; frame-src https://accounts.google.com; connect-src 'self' https://accounts.google.com; img-src 'self' data: https:",
+  'x-content-type-options': 'nosniff',
+  'referrer-policy': 'no-referrer',
+});
 const JSON_HEADERS = Object.freeze({
   'content-type': 'application/json; charset=utf-8',
   'cache-control': 'no-store',
@@ -88,6 +103,14 @@ export function createApp(dependencies = {}) {
 
   return async function app(request) {
     const url = new URL(request.url);
+
+    if ((request.method === 'GET' || request.method === 'HEAD') && STATIC_FILES.has(url.pathname)) {
+      const file = STATIC_FILES.get(url.pathname);
+      return new Response(await readFile(path.join(PUBLIC_DIR, file.name)), {
+        status: 200,
+        headers: { 'content-type': file.type, 'cache-control': 'no-cache', ...DASHBOARD_SECURITY_HEADERS },
+      });
+    }
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return response(200, { ok: true, service: 'zuri-cloud', time: now().toISOString() });
