@@ -96,6 +96,14 @@ check('the native desktop chrome follows the saved theme', () => {
   return 'native title bar and menu theme are synchronized';
 });
 
+check('the sidebar refreshes after chat history changes', () => {
+  const source = read('src/renderer-react/Sidebar.jsx');
+  for (const required of ["window.zuri?.state?.onChanged?.", "change?.area === 'chats'", 'stopListening?.()']) {
+    if (!source.includes(required)) throw new Error(`missing ${required}`);
+  }
+  return 'Recents follows clear and delete events';
+});
+
 const { splitDsml } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
 
 check('DSML tool markup is hidden from the reply and read as tool calls', () => {

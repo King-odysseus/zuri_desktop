@@ -46,8 +46,16 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
       const result = await window.zuri?.chats?.list?.();
       if (active && result?.ok) setThreads(Array.isArray(result.data) ? result.data : []);
     };
+    // History writes happen outside this component, so follow main's shared
+    // change event instead of leaving Recents stale until the next chat reply.
+    const stopListening = window.zuri?.state?.onChanged?.((change) => {
+      if (change?.area === 'chats') void loadThreads();
+    });
     void loadThreads();
-    return () => { active = false; };
+    return () => {
+      active = false;
+      stopListening?.();
+    };
   }, [refreshKey]);
   return (
     <div className="flex h-full shrink-0">

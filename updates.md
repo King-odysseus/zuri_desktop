@@ -1,5 +1,12 @@
 ## 2026-10-24 - Windows
 
+- Kept the sidebar Recents list synchronized with chat history changes, so clearing or deleting conversations removes them from both places immediately.
+- Key files: `src/renderer-react/Sidebar.jsx`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Removed a stale Electron Start Menu shortcut only when it points to `electron.exe` while carrying Zuri's AUMID. The duplicate identity made Windows select Electron's atom for Zuri's running taskbar group even though the executable and window icons were correct.
 - Key files: `src/main/main.js`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build && npm run dist` after syncing.
