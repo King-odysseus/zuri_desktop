@@ -30,6 +30,7 @@ import { clearKey, keyStatus, setKey } from './secrets.js';
 import { addinStatus, installAddin, removeAddin, resumeAddin } from './addin.js';
 import {
   appendMessage,
+  clearThreads,
   completeReminder,
   createAutomation,
   createReminder,
@@ -241,6 +242,7 @@ const HANDLERS = new Map([
   ['zuri:chats:list', handleChatList],
   ['zuri:chats:create', handleChatCreate],
   ['zuri:chats:delete', handleChatDelete],
+  ['zuri:chats:clear', handleChatClear],
   ['zuri:chats:append-message', handleChatAppendMessage],
   ['zuri:chat:send', handleChatSend],
   ['zuri:chat:stop', handleChatStop],
@@ -673,6 +675,13 @@ async function handleSettingsOpenDataFolder() {
     console.error('[zuri:settings] open-data-folder', error);
     return filesFailure(error, 'SETTINGS_OPEN_FOLDER_FAILED');
   }
+}
+
+/** Remove all stored chat threads after the history page confirms the action. */
+async function handleChatClear() {
+  const result = await clearThreads();
+  if (result?.ok === true) announceState({ area: 'chats' });
+  return result;
 }
 
 async function handleSettingsAddinStatus() {

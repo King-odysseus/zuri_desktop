@@ -34,12 +34,25 @@ export default function HistoryView({ onSelectThread }) {
     if (result?.ok) await reload();
   }
 
+  async function clearHistory() {
+    if (!window.confirm('Delete all chat history? This cannot be undone.')) return;
+    const result = await window.zuri?.chats?.clear?.();
+    if (result?.ok) await reload();
+  }
+
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-8">
-          <h1 className="text-3xl font-medium tracking-tight">Chat history</h1>
-          <p className="mt-2 text-sm text-muted">Continue a previous conversation or remove it permanently.</p>
+        <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-medium tracking-tight">Chat history</h1>
+            <p className="mt-2 text-sm text-muted">Continue a previous conversation or remove it permanently.</p>
+          </div>
+          {status === 'ready' && threads.length > 0 && (
+            <Button variant="ghost" className="zuri-danger-quiet" onPress={() => void clearHistory()}>
+              Clear all history
+            </Button>
+          )}
         </header>
 
         {status === 'loading' && <p className="text-sm text-muted">Loading chat history...</p>}

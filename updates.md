@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Added a confirmed Clear all history action to Chat history. It uses one locked store operation, clears all saved threads, refreshes the view, and announces the change to other open views.
+- Key files: `src/main/store.js`, `src/main/main.js`, `src/main/preload.js`, `src/renderer-react/HistoryView.jsx`.
+- Other OS action: run `npm run react:build && npm test` after syncing.
+- Done on: Windows
+
 - Added Google identity verification, hashed bearer sessions, PostgreSQL user/subscription/usage repository methods, and protected account endpoints to the Railway package.
 - Key files: `server/src/auth.js`, `server/src/db.js`, `server/src/app.js`, `server/src/server.js`, `server/test/server.test.js`, `server/package.json`.
 - Other OS action: run `npm install --prefix server && npm --prefix server test`.

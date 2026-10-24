@@ -705,6 +705,26 @@ export async function deleteThread(threadId, options = {}) {
 }
 
 /**
+ * Permanently remove every stored chat thread in one locked write. Keeping this
+ * as one store operation prevents a new message arriving between per-thread
+ * deletes from being lost or recreating an old snapshot.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { count: number } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function clearThreads(options = {}) {
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const count = read.data.filter(isThread).length;
+    const written = await writeStore('chats', [], options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { count } };
+  });
+}
+
+/**
  * The modes a turn can be sent in. Kept here as well as in the renderer because a
  * stored turn keeps the mode it was sent in, and an unknown one is dropped rather
  * than written into chats.json.
