@@ -1,4 +1,4 @@
-import{r as Sa,j as vl}from"./index-B6IW4Cvs.js";/**
+import{r as Sa,j as vl}from"./index-B2ewtNRq.js";/**
  * @license
  * Copyright 2010-2026 Three.js Authors
  * SPDX-License-Identifier: MIT

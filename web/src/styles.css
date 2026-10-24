@@ -1687,6 +1687,78 @@ a {
   margin-top: 24px;
 }
 
+.download-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.download-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 88px;
+  padding: 18px 20px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+  color: var(--text);
+  text-decoration: none;
+  box-shadow: var(--shadow-soft);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.download-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--control-border));
+  transform: translateY(-1px);
+}
+
+.download-card.is-unavailable {
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.download-card-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.download-card-copy strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.download-card-copy span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.download-card-action,
+.foot-download,
+.sidebar-download {
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.foot-download:hover,
+.sidebar-download:hover {
+  color: var(--accent-hover);
+}
+
+.sidebar-download {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border-radius: var(--radius-lg);
+  text-decoration: none;
+}
+
 /* Wider screens --------------------------------------------------------- */
 
 .eyebrow svg {

@@ -19,6 +19,13 @@
 
 ## 2026-10-24 - Windows
 
+- Added desktop download cards to the Zuri Cloud landing page, footer, and signed-in dashboard. The Windows card links to the GitHub releases page; macOS is shown as not published because the current build only targets Windows.
+- Key files: `web/src/lib/downloads.js`, `web/src/views/Landing.jsx`, `web/src/components/Footer.jsx`, `web/src/views/Dashboard.jsx`, `web/src/styles.css`.
+- Other OS action: run `npm run web:build` and `npm --prefix server test` after syncing.
+- Done on: Windows
+
+## 2026-10-24 - Windows
+
 - Fixed the landing sign-in card: the Google button slot kept its 44px height even on a server with no `GOOGLE_CLIENT_ID`, leaving a blank hole above the notice. The slot now renders only while a button lives in it, and the unconfigured state is a framed notice that says what to set.
 - Added `npm run cloud:deploy` (`scripts/deploy-cloud.mjs`). Running `railway up` from the repo root uploads the desktop app, so the service builds Electron and the live site answers 502; this script builds the web bundle, copies `server/` to a scratch folder outside the repo and uploads that, which is the only upload path that ships the Dockerfile in `server/`.
 - Key files: `web/src/components/GoogleSignIn.jsx`, `web/src/styles.css`, `scripts/deploy-cloud.mjs`, `package.json`, `server/public/**`.

@@ -1,6 +1,7 @@
 import Footer from '../components/Footer.jsx';
 import { ChartIcon, CardIcon, GridIcon, ReceiptIcon } from '../components/Icons.jsx';
 import { initialsFor } from '../lib/format.js';
+import { RELEASES_URL } from '../lib/downloads.js';
 import OverviewView from './OverviewView.jsx';
 import UsageView from './UsageView.jsx';
 import PlansView from './PlansView.jsx';
@@ -56,6 +57,9 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
         <p className="stat-meta" style={{ marginTop: 'auto' }}>
           Signed in to Zuri Cloud.
         </p>
+        <a className="sidebar-download" href={RELEASES_URL} target="_blank" rel="noreferrer">
+          Download desktop app
+        </a>
       </aside>
 
       <main className="app-main">
