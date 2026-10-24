@@ -8,6 +8,7 @@ The first slice defines:
 - `GET /api/health` for Railway health checks.
 - `GET /api/plans` for the public NGN plan catalogue.
 - `POST /api/auth/google` for Google ID-token sign-in and opaque bearer sessions.
+- `POST /api/auth/sign-up` and `POST /api/auth/sign-in` for email and password accounts, and `POST /api/auth/forgot-password` / `POST /api/auth/reset-password` for the emailed reset link.
 - `GET /api/me` and `GET /api/me/usage` for protected account and quota data.
 - `GET /api/me/limits` for the plan's request, concurrency, and prompt-size guardrails.
 - `POST /api/chat` for an authenticated, quota-checked DeepSeek request.
@@ -18,9 +19,9 @@ The first slice defines:
 - `POST /api/auth/sign-out` to revoke a session.
 - `db/schema.sql` for users, hashed sessions, subscriptions, usage events, and Paystack payments.
 
-The schema is ready for PostgreSQL. Set `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `DEEPSEEK_API_KEY`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_PLAN_STARTER`, `PAYSTACK_PLAN_PRO`, `PAYSTACK_PLAN_POWER`, and `NODE_ENV` in Railway. Google sign-in accepts a Google ID token, verifies its audience and verified email with Google's official client, and stores only a SHA-256 hash of each session token. Apply the schema with `psql "$DATABASE_URL" -f db/schema.sql` before enabling the database-backed server.
+The schema is ready for PostgreSQL. Set `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `DEEPSEEK_API_KEY`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_PLAN_STARTER`, `PAYSTACK_PLAN_PRO`, `PAYSTACK_PLAN_POWER`, and `NODE_ENV` in Railway. Password reset mail needs `BREVO_API_KEY`, `MAIL_FROM`, `MAIL_FROM_NAME` and `SITE_URL` (the public dashboard the reset link points at); without the first two, `/api/auth/forgot-password` answers 503 `MAIL_NOT_CONFIGURED`. Google sign-in accepts a Google ID token, verifies its audience and verified email with Google's official client, and stores only a SHA-256 hash of each session token. Apply the schema with `psql "$DATABASE_URL" -f db/schema.sql` before enabling the database-backed server.
 
-The account endpoints use `Authorization: Bearer <token>`. The sign-in response returns the token once, plus the current subscription and usage summary. Keep the token in the desktop client's protected storage and call sign-out when the user disconnects.
+The account endpoints use `Authorization: Bearer <token>`. The sign-in response returns the token once, plus the current subscription and usage summary. Keep the token in the desktop client's protected storage and call sign-out when the user disconnects. A session lasts while it is used: every authenticated call moves `last_used_at` forward and pushes the expiry out by three days, and three quiet days end it. Passwords are hashed with scrypt, a reset token is stored only as a SHA-256 hash and works once within 60 minutes, and a reset revokes every session of that account.
 
 The free plan is limited to 100,000 tokens per billing period, 10 requests per minute,
 one active request at a time, 8,000 input tokens, and 1,000 output tokens per request.
