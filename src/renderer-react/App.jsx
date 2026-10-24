@@ -12,6 +12,7 @@ import HistoryView from './HistoryView.jsx';
 import FeaturesView from './FeaturesView.jsx';
 import SignUpView from './SignUpView.jsx';
 import CloudView from './CloudView.jsx';
+import OnboardingView from './OnboardingView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const isOverlay = new URLSearchParams(window.location.search).has('overlay');
@@ -24,23 +25,36 @@ export default function App() {
   // state lives here rather than inside Sidebar where the chat view could not
   // reach it without opening the rail first.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Setup has to be decided before the shell paints: a returning user must not see
+  // the chat view flash before the saved answers arrive, and a new one should not
+  // see it at all. The quick-ask window never runs setup, so it starts ready.
+  const [startup, setStartup] = useState(isOverlay ? 'ready' : 'pending');
+  const [needsOnboarding, setNeedsOnboarding] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
   useEffect(() => {
+    if (isOverlay) return undefined;
     let active = true;
-    const loadTheme = async () => {
+    // One read answers both questions the shell asks before it paints: the saved
+    // theme, and whether setup has ever been finished. runOnboardingSetup requires
+    // a name, so an empty one is the first-run signal.
+    const loadSettings = async () => {
       const result = await window.zuri?.settings?.get?.();
+      if (!active) return;
       const savedTheme = result?.ok && result.data?.theme === 'light' ? 'light' : result?.ok ? 'dark' : null;
-      if (!active || !savedTheme) return;
-      document.documentElement.dataset.theme = savedTheme;
-      setTheme(savedTheme);
+      if (savedTheme) {
+        document.documentElement.dataset.theme = savedTheme;
+        setTheme(savedTheme);
+      }
+      setNeedsOnboarding(result?.ok === true && result.data?.name === '');
+      setStartup('ready');
     };
-    void loadTheme();
+    void loadSettings();
     return () => { active = false; };
-  }, []);
+  }, [isOverlay]);
 
   function toggleTheme() {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -65,12 +79,37 @@ export default function App() {
     setChatRefreshKey((key) => key + 1);
   }
 
+  function finishOnboarding(saved) {
+    // The card already painted its choice; store it in state so the shell and the
+    // title bar agree with what the person picked. The painted value is the answer
+    // when main echoes nothing back, so an empty reply cannot flip the window.
+    const chosen =
+      saved?.theme === 'light' || saved?.theme === 'dark'
+        ? saved.theme
+        : document.documentElement.dataset.theme === 'dark'
+          ? 'dark'
+          : 'light';
+    document.documentElement.dataset.theme = chosen;
+    setTheme(chosen);
+    setNeedsOnboarding(false);
+  }
+
   if (isOverlay) {
     return (
       <div className="zuri-overlay-root">
         <ChatPanel compact onChatUpdated={refreshChats} />
       </div>
     );
+  }
+
+  // The page behind the first-run check: no sidebar, no chat, nothing that would
+  // read as a loaded app to someone who is about to be asked to set one up.
+  if (startup === 'pending') {
+    return <div className="flex h-dvh w-full bg-background text-foreground" />;
+  }
+
+  if (needsOnboarding) {
+    return <OnboardingView onDone={finishOnboarding} />;
   }
 
   return (
