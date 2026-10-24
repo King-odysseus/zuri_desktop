@@ -1,5 +1,10 @@
 ## 2026-10-24 - Windows
 
+- Added Paystack recurring checkout initialization, server-side verification, HMAC-SHA512 webhook validation, idempotent payment fulfillment, subscription renewal/status updates, and protected billing data.
+- Key files: `server/src/paystack.js`, `server/src/app.js`, `server/src/db.js`, `server/src/config.js`, `server/db/schema.sql`, `server/test/server.test.js`.
+- Other OS action: run `npm install --prefix server && npm --prefix server test` after syncing, then apply `server/db/schema.sql` to the Railway database.
+- Done on: Windows
+
 - Added the authenticated Railway chat proxy with DeepSeek forwarding, PostgreSQL-backed atomic token reservations, actual usage commits, failed-request releases, and free-plan request guard enforcement.
 - Key files: `server/src/app.js`, `server/src/db.js`, `server/src/deepseek.js`, `server/src/config.js`, `server/db/schema.sql`, `server/test/server.test.js`.
 - Other OS action: run `npm install --prefix server && npm --prefix server test` after syncing.

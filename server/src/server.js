@@ -4,6 +4,7 @@ import { createApp } from './app.js';
 import { createAuthService, createGoogleVerifier } from './auth.js';
 import { createDatabase, createRepository } from './db.js';
 import { createDeepSeekClient } from './deepseek.js';
+import { createPaystackClient } from './paystack.js';
 
 const config = readConfig();
 const pool = config.databaseUrl ? createDatabase(config.databaseUrl, process.env) : null;
@@ -12,7 +13,17 @@ const auth = repository && config.googleClientId
   ? createAuthService({ repository, verifyGoogleCredential: createGoogleVerifier(config.googleClientId) })
   : null;
 const chatProvider = createDeepSeekClient({ apiKey: config.deepSeekApiKey, endpoint: config.deepSeekEndpoint });
-const app = createApp({ auth, repository, chatProvider, defaultModel: config.deepSeekModel });
+const paystack = createPaystackClient({ secretKey: config.paystackSecretKey, endpoint: config.paystackEndpoint });
+const app = createApp({
+  auth,
+  repository,
+  chatProvider,
+  defaultModel: config.deepSeekModel,
+  paystack,
+  paystackSecretKey: config.paystackSecretKey,
+  paystackPlanCodes: config.paystackPlanCodes,
+  paystackCallbackUrl: config.paystackCallbackUrl,
+});
 
 /**
  * Adapt Node's incoming request to the Fetch Request contract used by the app

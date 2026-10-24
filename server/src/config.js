@@ -4,7 +4,7 @@ const DEFAULT_PORT = 8080;
  * Read the small set of configuration values the Railway service needs before
  * database and authentication wiring is added.
  * @param {NodeJS.ProcessEnv} [environment]
- * @returns {{ port: number, nodeEnv: string, databaseUrl: string, googleClientId: string, googleClientSecret: string, googleRedirectUri: string, cloudUrl: string, deepSeekApiKey: string, deepSeekEndpoint: string, deepSeekModel: string }}
+ * @returns {{ port: number, nodeEnv: string, databaseUrl: string, googleClientId: string, googleClientSecret: string, googleRedirectUri: string, cloudUrl: string, deepSeekApiKey: string, deepSeekEndpoint: string, deepSeekModel: string, paystackSecretKey: string, paystackEndpoint: string, paystackCallbackUrl: string, paystackPlanCodes: Record<string, string> }}
  */
 export function readConfig(environment = process.env) {
   const parsedPort = Number(environment.PORT ?? DEFAULT_PORT);
@@ -29,5 +29,15 @@ export function readConfig(environment = process.env) {
     deepSeekModel: typeof environment.DEEPSEEK_MODEL === 'string' && environment.DEEPSEEK_MODEL.trim() !== ''
       ? environment.DEEPSEEK_MODEL.trim()
       : 'deepseek-chat',
+    paystackSecretKey: typeof environment.PAYSTACK_SECRET_KEY === 'string' ? environment.PAYSTACK_SECRET_KEY.trim() : '',
+    paystackEndpoint: typeof environment.PAYSTACK_ENDPOINT === 'string' && environment.PAYSTACK_ENDPOINT.trim() !== ''
+      ? environment.PAYSTACK_ENDPOINT.trim().replace(/\/$/, '')
+      : 'https://api.paystack.co',
+    paystackCallbackUrl: typeof environment.PAYSTACK_CALLBACK_URL === 'string' ? environment.PAYSTACK_CALLBACK_URL.trim() : '',
+    paystackPlanCodes: {
+      starter: typeof environment.PAYSTACK_PLAN_STARTER === 'string' ? environment.PAYSTACK_PLAN_STARTER.trim() : '',
+      pro: typeof environment.PAYSTACK_PLAN_PRO === 'string' ? environment.PAYSTACK_PLAN_PRO.trim() : '',
+      power: typeof environment.PAYSTACK_PLAN_POWER === 'string' ? environment.PAYSTACK_PLAN_POWER.trim() : '',
+    },
   };
 }

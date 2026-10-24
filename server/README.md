@@ -11,10 +11,14 @@ The first slice defines:
 - `GET /api/me` and `GET /api/me/usage` for protected account and quota data.
 - `GET /api/me/limits` for the plan's request, concurrency, and prompt-size guardrails.
 - `POST /api/chat` for an authenticated, quota-checked DeepSeek request.
+- `POST /api/billing/checkout` to initialize a recurring Paystack checkout.
+- `GET /api/billing/verify?reference=...` for server-side payment verification.
+- `POST /api/paystack/webhook` for signed payment and subscription events.
+- `GET /api/me/billing` for the current subscription and recent payments.
 - `POST /api/auth/sign-out` to revoke a session.
 - `db/schema.sql` for users, hashed sessions, subscriptions, usage events, and Paystack payments.
 
-The schema is ready for PostgreSQL. Set `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `DEEPSEEK_API_KEY`, and `NODE_ENV` in Railway. Google sign-in accepts a Google ID token, verifies its audience and verified email with Google's official client, and stores only a SHA-256 hash of each session token. Apply the schema with `psql "$DATABASE_URL" -f db/schema.sql` before enabling the database-backed server.
+The schema is ready for PostgreSQL. Set `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `DEEPSEEK_API_KEY`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_PLAN_STARTER`, `PAYSTACK_PLAN_PRO`, `PAYSTACK_PLAN_POWER`, and `NODE_ENV` in Railway. Google sign-in accepts a Google ID token, verifies its audience and verified email with Google's official client, and stores only a SHA-256 hash of each session token. Apply the schema with `psql "$DATABASE_URL" -f db/schema.sql` before enabling the database-backed server.
 
 The account endpoints use `Authorization: Bearer <token>`. The sign-in response returns the token once, plus the current subscription and usage summary. Keep the token in the desktop client's protected storage and call sign-out when the user disconnects.
 
@@ -24,6 +28,11 @@ The chat proxy reserves the full allowed request envelope in PostgreSQL before c
 DeepSeek, then records actual usage or releases the reservation on failure. The request
 limiter is process-local for the initial single-service deployment. Move it to a shared
 store before running multiple Railway replicas.
+
+Paystack webhooks must be configured to call `/api/paystack/webhook`. The server checks
+the `x-paystack-signature` HMAC before parsing or applying an event. Successful initial
+checkouts and later recurring `charge.success` events update the local subscription;
+failed or disabled subscription events move it to `past_due`, `cancelled`, or `expired`.
 
 Run locally from this directory:
 

@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   current_period_end TIMESTAMPTZ NOT NULL,
   paystack_customer_code TEXT,
   paystack_authorization_code TEXT,
+  paystack_subscription_code TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -88,10 +89,23 @@ CREATE TABLE IF NOT EXISTS payments (
   amount_kobo BIGINT NOT NULL CHECK (amount_kobo > 0),
   currency TEXT NOT NULL CHECK (currency = 'NGN'),
   status TEXT NOT NULL CHECK (status IN ('initialized', 'success', 'failed', 'refunded')),
+  paystack_transaction_id BIGINT,
+  paystack_customer_code TEXT,
+  paystack_authorization_code TEXT,
+  paystack_subscription_code TEXT,
   raw_event JSONB,
   paid_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS paystack_subscription_code TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_transaction_id BIGINT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_customer_code TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_authorization_code TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_subscription_code TEXT;
+
+CREATE INDEX IF NOT EXISTS subscriptions_paystack_code_idx
+  ON subscriptions(paystack_subscription_code);
 
 INSERT INTO plans (code, name, amount_kobo, monthly_tokens)
 VALUES

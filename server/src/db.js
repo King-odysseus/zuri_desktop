@@ -2,6 +2,11 @@ import pg from 'pg';
 
 const { Pool } = pg;
 
+/** @param {unknown} value @returns {string} */
+function text(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 /** @param {object} value @returns {object} */
 function publicUser(value) {
   return {
@@ -189,6 +194,93 @@ export function createRepository(pool) {
     },
     async releaseUsage(reservationId, userId) {
       await pool.query("UPDATE usage_reservations SET status = 'released' WHERE id = $1 AND user_id = $2 AND status = 'reserved'", [reservationId, userId]);
+    },
+    async createPayment({ userId, planCode, reference, amountKobo }) {
+      const result = await pool.query(
+        "INSERT INTO payments (user_id, plan_code, reference, amount_kobo, currency, status) VALUES ($1, $2, $3, $4, 'NGN', 'initialized') RETURNING id, reference, status",
+        [userId, planCode, reference, amountKobo],
+      );
+      return result.rows[0];
+    },
+    async markPaymentFailed(reference, rawEvent) {
+      await pool.query("UPDATE payments SET status = 'failed', raw_event = $2 WHERE reference = $1 AND status = 'initialized'", [reference, rawEvent]);
+    },
+    async applySuccessfulPayment({ reference, transaction }) {
+      const amount = Number(transaction?.amount);
+      const transactionReference = typeof transaction?.reference === 'string' ? transaction.reference : '';
+      if (transactionReference !== reference || transaction?.status !== 'success' || !Number.isSafeInteger(amount) || amount < 1 || transaction?.currency !== 'NGN') {
+        const error = new Error('Paystack did not confirm this payment.');
+        error.code = 'PAYMENT_NOT_CONFIRMED';
+        throw error;
+      }
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const paymentResult = await client.query(
+          'SELECT p.*, u.email FROM payments p JOIN users u ON u.id = p.user_id WHERE p.reference = $1 FOR UPDATE',
+          [reference],
+        );
+        const payment = paymentResult.rows[0];
+        if (!payment) {
+          const error = new Error('The payment reference was not found.');
+          error.code = 'PAYMENT_NOT_FOUND';
+          throw error;
+        }
+        if (payment.status === 'success') {
+          await client.query('COMMIT');
+          return { applied: false, planCode: payment.plan_code };
+        }
+        if (Number(payment.amount_kobo) !== amount || text(transaction?.customer?.email).toLowerCase() !== text(payment.email).toLowerCase()) {
+          const error = new Error('The payment details do not match the checkout.');
+          error.code = 'PAYMENT_DETAILS_MISMATCH';
+          throw error;
+        }
+        const customerCode = text(transaction?.customer?.customer_code);
+        const authorizationCode = text(transaction?.authorization?.authorization_code);
+        const subscriptionCode = text(transaction?.subscription_code);
+        await client.query(
+          "UPDATE payments SET status = 'success', paystack_transaction_id = $2, paystack_customer_code = $3, paystack_authorization_code = $4, paystack_subscription_code = $5, raw_event = $6, paid_at = NOW() WHERE id = $1",
+          [payment.id, transaction.id ?? null, customerCode || null, authorizationCode || null, subscriptionCode || null, transaction],
+        );
+        await client.query(
+          "UPDATE subscriptions SET plan_code = $2, status = 'active', current_period_start = NOW(), current_period_end = NOW() + INTERVAL '1 month', paystack_customer_code = COALESCE($3, paystack_customer_code), paystack_authorization_code = COALESCE($4, paystack_authorization_code), paystack_subscription_code = COALESCE($5, paystack_subscription_code), updated_at = NOW() WHERE user_id = $1 AND status IN ('active', 'past_due')",
+          [payment.user_id, payment.plan_code, customerCode || null, authorizationCode || null, subscriptionCode || null],
+        );
+        await client.query('COMMIT');
+        return { applied: true, planCode: payment.plan_code };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    async updateSubscriptionFromPaystack(event) {
+      const data = event?.data ?? {};
+      const subscriptionCode = text(data.subscription_code ?? data.subscription?.subscription_code);
+      const customerCode = text(data.customer?.customer_code);
+      const email = text(data.customer?.email).toLowerCase();
+      if (subscriptionCode === '' && customerCode === '' && email === '') return { applied: false };
+      const status = event.event === 'invoice.payment_failed' ? 'past_due' : event.event === 'subscription.disable' ? 'expired' : event.event === 'subscription.not_renew' ? 'cancelled' : 'active';
+      const periodSql = event.event === 'charge.success'
+        ? ", current_period_start = NOW(), current_period_end = NOW() + INTERVAL '1 month'"
+        : '';
+      const result = await pool.query(
+        `UPDATE subscriptions s SET status = $1, paystack_subscription_code = COALESCE($2, s.paystack_subscription_code), paystack_customer_code = COALESCE($3, s.paystack_customer_code), updated_at = NOW()${periodSql} FROM users u WHERE s.user_id = u.id AND s.status IN ('active', 'past_due') AND ($2 IS NOT NULL AND s.paystack_subscription_code = $2 OR $3 IS NOT NULL AND s.paystack_customer_code = $3 OR $4 <> '' AND u.email = $4) RETURNING s.id`,
+        [status, subscriptionCode || null, customerCode || null, email],
+      );
+      return { applied: result.rowCount > 0 };
+    },
+    async getBilling(userId) {
+      const subscriptionResult = await pool.query(
+        'SELECT s.id, s.plan_code, s.status, s.current_period_start, s.current_period_end, s.paystack_subscription_code, p.name AS plan_name, p.monthly_tokens FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.user_id = $1 AND s.status IN (\'active\', \'past_due\', \'cancelled\') ORDER BY s.updated_at DESC LIMIT 1',
+        [userId],
+      );
+      const payments = await pool.query(
+        'SELECT reference, plan_code, amount_kobo, currency, status, paid_at, created_at FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20',
+        [userId],
+      );
+      return { subscription: subscriptionResult.rows[0] ?? null, payments: payments.rows };
     },
     async revokeSession(tokenHash) {
       await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);

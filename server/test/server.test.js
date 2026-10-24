@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { createHmac } from 'node:crypto';
 import { handleRequest, createApp } from '../src/app.js';
 import { canConsume, usageStatus } from '../src/usage.js';
 import { createAuthService, hashSessionToken, normalizeGoogleProfile } from '../src/auth.js';
 import { createRequestLimiter, limitsForPlan } from '../src/limits.js';
+import { verifyPaystackSignature } from '../src/paystack.js';
 
 const fixedNow = () => new Date('2026-10-24T12:00:00.000Z');
 const health = await handleRequest(new Request('https://cloud.example.com/api/health'), { now: fixedNow });
@@ -33,6 +35,19 @@ for (let index = 1; index < 10; index += 1) {
 assert.equal(limiter.acquire('user-1', limitsForPlan('free')).reason, 'rate_limit');
 clock = 60_000;
 assert.equal(limiter.acquire('user-1', limitsForPlan('free')).allowed, true);
+const webhookSecret = 'paystack-test-secret';
+const paystackCalls = [];
+const paystack = {
+  async initializeTransaction(request) {
+    paystackCalls.push(request);
+    return { authorization_url: 'https://checkout.paystack.com/test', access_code: 'access-test' };
+  },
+  async verifyTransaction(reference) {
+    return { id: 123, status: 'success', reference, amount: 250_000, currency: 'NGN', customer: { email: user.email }, authorization: { authorization_code: 'AUTH_test' }, subscription_code: 'SUB_test' };
+  },
+};
+assert.equal(verifyPaystackSignature('body', createHmac('sha512', webhookSecret).update('body').digest('hex'), webhookSecret), true);
+assert.equal(verifyPaystackSignature('body', 'invalid', webhookSecret), false);
 assert.deepEqual(normalizeGoogleProfile({ sub: 'workspace-1', email: 'person@company.example', name: 'Company User', email_verified: true }), {
   googleSubject: 'workspace-1',
   email: 'person@company.example',
@@ -49,6 +64,11 @@ const repository = {
   async reserveUsage() { return { id: 'reservation-1', reservedTokens: 9000 }; },
   async commitUsage() {},
   async releaseUsage() {},
+  async createPayment(details) { return { id: 'payment-1', ...details, status: 'initialized' }; },
+  async markPaymentFailed() {},
+  async applySuccessfulPayment() { return { applied: true, planCode: 'starter' }; },
+  async updateSubscriptionFromPaystack() { return { applied: true }; },
+  async getBilling() { return { subscription: { planCode: 'free' }, payments: [] }; },
   async revokeSession(tokenHash) { sessions.delete(tokenHash); },
 };
 const auth = createAuthService({ repository, verifyGoogleCredential: async () => ({ googleSubject: 'google-1', email: user.email, displayName: 'User' }), now: fixedNow, random: () => Buffer.from('session-token') });
@@ -64,6 +84,9 @@ const app = createApp({
     providerCalls.push(request);
     return { model: request.model, content: 'Cloud reply', usage: { inputTokens: 12, outputTokens: 8 } };
   },
+  paystack,
+  paystackSecretKey: webhookSecret,
+  paystackPlanCodes: { starter: 'PLN_starter' },
 });
 const googleRoute = await app(new Request('https://cloud.example.com/api/auth/google', {
   method: 'POST',
@@ -93,6 +116,31 @@ const invalidChat = await app(new Request('https://cloud.example.com/api/chat', 
   body: JSON.stringify({ messages: [] }),
 }));
 assert.equal(invalidChat.status, 400);
+const checkout = await app(new Request('https://cloud.example.com/api/billing/checkout', {
+  method: 'POST',
+  headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
+  body: JSON.stringify({ planCode: 'starter' }),
+}));
+assert.equal(checkout.status, 200);
+assert.equal((await checkout.json()).data.authorizationUrl, 'https://checkout.paystack.com/test');
+assert.equal(paystackCalls[0].amountKobo, 250_000);
+const verified = await app(new Request('https://cloud.example.com/api/billing/verify?reference=zuri-test-ref'));
+assert.equal(verified.status, 200);
+const invalidWebhook = await app(new Request('https://cloud.example.com/api/paystack/webhook', {
+  method: 'POST',
+  headers: { 'x-paystack-signature': 'invalid' },
+  body: JSON.stringify({ event: 'charge.success', data: { reference: 'zuri-test-ref' } }),
+}));
+assert.equal(invalidWebhook.status, 401);
+const webhookBody = JSON.stringify({ event: 'subscription.disable', data: { subscription_code: 'SUB_test' } });
+const webhook = await app(new Request('https://cloud.example.com/api/paystack/webhook', {
+  method: 'POST',
+  headers: { 'x-paystack-signature': createHmac('sha512', webhookSecret).update(webhookBody).digest('hex') },
+  body: webhookBody,
+}));
+assert.equal(webhook.status, 200);
+const billing = await app(new Request('https://cloud.example.com/api/me/billing', { headers: { authorization: `Bearer ${signedIn.token}` } }));
+assert.equal(billing.status, 200);
 const quotaApp = createApp({
   auth,
   repository: {

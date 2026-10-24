@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { PLANS, publicPlan } from './plans.js';
+import { findPlan, PLANS, publicPlan } from './plans.js';
 import { usageStatus } from './usage.js';
 import { createRequestLimiter, limitsForPlan } from './limits.js';
+import { verifyPaystackSignature } from './paystack.js';
 
 const JSON_HEADERS = Object.freeze({
   'content-type': 'application/json; charset=utf-8',
@@ -9,6 +10,7 @@ const JSON_HEADERS = Object.freeze({
 });
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_CHAT_BODY_BYTES = 256 * 1024;
+const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 // Keep the lease longer than the provider timeout so a slow request cannot be
 // released while it is still in flight and allow another request to overspend.
 const RESERVATION_TTL_MS = 5 * 60 * 1000;
@@ -40,6 +42,17 @@ async function readJson(request, maxBytes = MAX_BODY_BYTES) {
     error.code = 'INVALID_JSON';
     throw error;
   }
+}
+
+/** @param {Request} request @param {number} maxBytes @returns {Promise<string>} */
+async function readRawBody(request, maxBytes) {
+  const raw = await request.text();
+  if (new TextEncoder().encode(raw).byteLength > maxBytes) {
+    const error = new Error('The request body is too large.');
+    error.code = 'BODY_TOO_LARGE';
+    throw error;
+  }
+  return raw;
 }
 
 /** @param {Request} request @returns {string} */
@@ -159,7 +172,105 @@ export function createApp(dependencies = {}) {
       }
     }
 
-    if (url.pathname === '/api/me' || url.pathname === '/api/me/usage' || url.pathname === '/api/me/limits' || url.pathname === '/api/auth/sign-out') {
+    if (request.method === 'POST' && url.pathname === '/api/billing/checkout') {
+      if (!dependencies.auth || !dependencies.repository?.createPayment || !dependencies.repository?.markPaymentFailed || !dependencies.paystack) {
+        return response(503, { ok: false, error: { code: 'BILLING_NOT_CONFIGURED', message: 'Paystack billing is not configured yet.' } });
+      }
+      const token = bearerToken(request);
+      const session = await dependencies.auth.authenticate(token);
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      try {
+        const body = await readJson(request);
+        const plan = findPlan(body.planCode);
+        if (!plan || plan.code === 'free') return response(400, { ok: false, error: { code: 'INVALID_PLAN', message: 'Choose a paid plan to start checkout.' } });
+        const paystackPlanCode = dependencies.paystackPlanCodes?.[plan.code] ?? '';
+        if (paystackPlanCode === '') return response(503, { ok: false, error: { code: 'PAYSTACK_PLAN_NOT_CONFIGURED', message: 'This paid plan is not configured for recurring billing yet.' } });
+        const reference = `zuri-${randomUUID()}`;
+        await dependencies.repository.createPayment({ userId: session.user.id, planCode: plan.code, reference, amountKobo: plan.amountKobo });
+        try {
+          const checkout = await dependencies.paystack.initializeTransaction({
+            email: session.user.email,
+            amountKobo: plan.amountKobo,
+            reference,
+            planCode: paystackPlanCode,
+            callbackUrl: dependencies.paystackCallbackUrl,
+          });
+          return response(200, { ok: true, data: { reference, plan: publicPlan(plan), authorizationUrl: checkout.authorization_url, accessCode: checkout.access_code } });
+        } catch (error) {
+          await dependencies.repository.markPaymentFailed(reference, { code: error?.code ?? 'PAYSTACK_REQUEST_FAILED' }).catch((markError) => console.error('[zuri-cloud] mark payment failed', markError?.message ?? markError));
+          throw error;
+        }
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'PAYSTACK_REQUEST_FAILED') return response(502, { ok: false, error: { code: error.code, message: error.message } });
+        console.error('[zuri-cloud] checkout', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'CHECKOUT_FAILED', message: 'Checkout could not be started.' } });
+      }
+    }
+
+    if (request.method === 'GET' && (url.pathname === '/api/billing/verify' || url.pathname === '/api/billing/callback')) {
+      const reference = url.searchParams.get('reference')?.trim() ?? '';
+      if (!/^[A-Za-z0-9.=-]{8,100}$/.test(reference)) return response(400, { ok: false, error: { code: 'INVALID_REFERENCE', message: 'A valid payment reference is required.' } });
+      if (!dependencies.paystack || !dependencies.repository?.applySuccessfulPayment) return response(503, { ok: false, error: { code: 'BILLING_NOT_CONFIGURED', message: 'Paystack billing is not configured yet.' } });
+      try {
+        const transaction = await dependencies.paystack.verifyTransaction(reference);
+        if (transaction?.status !== 'success') {
+          await dependencies.repository.markPaymentFailed?.(reference, transaction);
+          return response(400, { ok: false, error: { code: 'PAYMENT_NOT_CONFIRMED', message: 'Paystack did not confirm this payment.' } });
+        }
+        const result = await dependencies.repository.applySuccessfulPayment({ reference, transaction });
+        return response(200, { ok: true, data: { reference, ...result } });
+      } catch (error) {
+        if (error?.code === 'PAYMENT_NOT_CONFIRMED' || error?.code === 'PAYMENT_DETAILS_MISMATCH') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'PAYMENT_NOT_FOUND') return response(404, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'PAYSTACK_REQUEST_FAILED') return response(502, { ok: false, error: { code: error.code, message: error.message } });
+        console.error('[zuri-cloud] verify payment', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'PAYMENT_VERIFICATION_FAILED', message: 'The payment could not be verified.' } });
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/paystack/webhook') {
+      if (!dependencies.paystackSecretKey || !dependencies.repository?.applySuccessfulPayment || !dependencies.repository?.updateSubscriptionFromPaystack || !dependencies.repository?.markPaymentFailed) {
+        return response(503, { ok: false, error: { code: 'BILLING_NOT_CONFIGURED', message: 'Paystack billing is not configured yet.' } });
+      }
+      try {
+        const rawBody = await readRawBody(request, MAX_WEBHOOK_BODY_BYTES);
+        if (!verifyPaystackSignature(rawBody, request.headers.get('x-paystack-signature'), dependencies.paystackSecretKey)) {
+          return response(401, { ok: false, error: { code: 'WEBHOOK_SIGNATURE_INVALID', message: 'The webhook signature is invalid.' } });
+        }
+        let event;
+        try {
+          event = JSON.parse(rawBody);
+        } catch {
+          return response(400, { ok: false, error: { code: 'INVALID_JSON', message: 'Send a valid webhook JSON object.' } });
+        }
+        if (!event || typeof event !== 'object' || typeof event.event !== 'string') return response(400, { ok: false, error: { code: 'INVALID_WEBHOOK', message: 'The webhook event is incomplete.' } });
+        let result = { applied: false };
+        if (event.event === 'charge.success') {
+          const reference = typeof event.data?.reference === 'string' ? event.data.reference : '';
+          if (reference === '') return response(400, { ok: false, error: { code: 'WEBHOOK_REFERENCE_MISSING', message: 'The payment reference is missing.' } });
+          try {
+            result = await dependencies.repository.applySuccessfulPayment({ reference, transaction: event.data });
+          } catch (error) {
+            if (error?.code !== 'PAYMENT_NOT_FOUND') throw error;
+            result = await dependencies.repository.updateSubscriptionFromPaystack(event);
+          }
+        } else if (event.event === 'charge.failed') {
+          const reference = typeof event.data?.reference === 'string' ? event.data.reference : '';
+          if (reference !== '') await dependencies.repository.markPaymentFailed(reference, event.data);
+        } else if (['subscription.create', 'subscription.disable', 'subscription.not_renew', 'invoice.payment_failed'].includes(event.event)) {
+          result = await dependencies.repository.updateSubscriptionFromPaystack(event);
+        }
+        return response(200, { ok: true, data: { received: true, ...result } });
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'PAYMENT_NOT_FOUND') return response(200, { ok: true, data: { received: true, applied: false } });
+        console.error('[zuri-cloud] paystack webhook', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'WEBHOOK_PROCESSING_FAILED', message: 'The webhook could not be processed.' } });
+      }
+    }
+
+    if (url.pathname === '/api/me' || url.pathname === '/api/me/usage' || url.pathname === '/api/me/limits' || url.pathname === '/api/me/billing' || url.pathname === '/api/auth/sign-out') {
       if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
       const token = bearerToken(request);
       const session = await dependencies.auth.authenticate(token);
@@ -170,6 +281,10 @@ export function createApp(dependencies = {}) {
       }
       if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for this account endpoint.' } });
       if (url.pathname === '/api/me') return response(200, { ok: true, data: session });
+      if (url.pathname === '/api/me/billing') {
+        if (!dependencies.repository?.getBilling) return response(503, { ok: false, error: { code: 'BILLING_NOT_CONFIGURED', message: 'Billing data is not configured yet.' } });
+        return response(200, { ok: true, data: await dependencies.repository.getBilling(session.user.id) });
+      }
       if (!dependencies.repository?.getUsage) return response(503, { ok: false, error: { code: 'USAGE_NOT_CONFIGURED', message: 'Usage data is not configured yet.' } });
       const usage = await dependencies.repository.getUsage(session.user.id, session.subscription.currentPeriodStart, session.subscription);
       if (url.pathname === '/api/me/limits') {
