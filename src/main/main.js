@@ -313,6 +313,11 @@ const HANDLERS = new Map([
   ['zuri:settings:addin-remove', handleSettingsAddinRemove],
   ['zuri:cloud:config', handleCloudConfig],
   ['zuri:cloud:sign-in', handleCloudSignIn],
+  ['zuri:cloud:sign-up', handleCloudSignUp],
+  ['zuri:cloud:sign-in-password', handleCloudSignInPassword],
+  ['zuri:cloud:forgot-password', handleCloudForgotPassword],
+  ['zuri:cloud:reset-password', handleCloudResetPassword],
+  ['zuri:cloud:set-password', handleCloudSetPassword],
   ['zuri:cloud:account', handleCloudAccount],
   ['zuri:cloud:plans', handleCloudPlans],
   ['zuri:cloud:checkout', handleCloudCheckout],
@@ -734,6 +739,82 @@ async function handleCloudSignIn(payload) {
   const stored = await writeCloudSession(result.data?.token, result.data?.expiresAt);
   if (!stored.ok) return stored;
   return { ok: true, data: { user: result.data?.user, usage: result.data?.usage, expiresAt: result.data?.expiresAt } };
+}
+
+/**
+ * Sign-up and sign-in differ only in the path and the fields, and both hand back
+ * a new session, so one function keeps the two from drifting apart.
+ * @param {string} pathname
+ * @param {object} body
+ * @returns {Promise<object>}
+ */
+async function cloudCreateSession(pathname, body) {
+  const result = await cloudFetch(pathname, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  if (!result.ok) return result;
+  const stored = await writeCloudSession(result.data?.token, result.data?.expiresAt);
+  if (!stored.ok) return stored;
+  return { ok: true, data: { user: result.data?.user, subscription: result.data?.subscription, expiresAt: result.data?.expiresAt } };
+}
+
+/** @param {unknown} value @returns {string} */
+function textOf(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+async function handleCloudSignUp(payload) {
+  const email = textOf(payload?.email);
+  const password = typeof payload?.password === 'string' ? payload.password : '';
+  if (email === '') return { ok: false, error: { code: 'CLOUD_EMAIL_REQUIRED', message: 'Enter your email address.' } };
+  if (password === '') return { ok: false, error: { code: 'CLOUD_PASSWORD_REQUIRED', message: 'Choose a password.' } };
+  return cloudCreateSession('/api/auth/sign-up', { email, password, displayName: textOf(payload?.displayName) });
+}
+
+async function handleCloudSignInPassword(payload) {
+  const email = textOf(payload?.email);
+  const password = typeof payload?.password === 'string' ? payload.password : '';
+  // One message for both missing fields: the form asks for them side by side.
+  if (email === '' || password === '') {
+    return { ok: false, error: { code: 'CLOUD_CREDENTIALS_REQUIRED', message: 'Enter your email address and password.' } };
+  }
+  return cloudCreateSession('/api/auth/sign-in', { email, password });
+}
+
+async function handleCloudForgotPassword(payload) {
+  const email = textOf(payload?.email);
+  if (email === '') return { ok: false, error: { code: 'CLOUD_EMAIL_REQUIRED', message: 'Enter your email address.' } };
+  const result = await cloudFetch('/api/auth/forgot-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
+  if (!result.ok) {
+    // No mail provider on the server is a setup gap, not a mistake the person
+    // made, so it is spelled out as something they can act on.
+    if (result.error?.code === 'MAIL_NOT_CONFIGURED') {
+      return { ok: false, error: { code: 'MAIL_NOT_CONFIGURED', message: 'This Zuri Cloud server cannot send email yet. Ask support to reset your password for you.' } };
+    }
+    return result;
+  }
+  return { ok: true, data: { sent: result.data?.sent === true } };
+}
+
+async function handleCloudResetPassword(payload) {
+  const token = textOf(payload?.token);
+  const password = typeof payload?.password === 'string' ? payload.password : '';
+  if (token === '') return { ok: false, error: { code: 'CLOUD_RESET_TOKEN_REQUIRED', message: 'Paste the reset code from your email.' } };
+  if (password === '') return { ok: false, error: { code: 'CLOUD_PASSWORD_REQUIRED', message: 'Choose a new password.' } };
+  const result = await cloudFetch('/api/auth/reset-password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, password }) });
+  if (!result.ok) return result;
+  return { ok: true, data: { reset: result.data?.reset === true } };
+}
+
+async function handleCloudSetPassword(payload) {
+  const password = typeof payload?.password === 'string' ? payload.password : '';
+  if (password === '') return { ok: false, error: { code: 'CLOUD_PASSWORD_REQUIRED', message: 'Choose a password.' } };
+  const body = { password };
+  // Only sent when the account already has a password to confirm; a Google-only
+  // account has nothing to re-enter.
+  const currentPassword = typeof payload?.currentPassword === 'string' ? payload.currentPassword : '';
+  if (currentPassword !== '') body.currentPassword = currentPassword;
+  const result = await cloudFetch('/api/auth/password', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, true);
+  if (!result.ok) return result;
+  return { ok: true, data: { hasPassword: result.data?.hasPassword === true } };
 }
 
 async function handleCloudAccount() {

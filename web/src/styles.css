@@ -510,6 +510,20 @@ a {
   padding: 20px;
 }
 
+/* A card's own buttons sit together at the end of its copy, one row on a wide
+   screen and stacked on a phone. */
+.card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* A form stays a readable column even when its card spans a wide screen. */
+.card .form-stack {
+  max-width: 420px;
+}
+
 .signin-card {
   display: flex;
   flex-direction: column;
@@ -1640,7 +1654,9 @@ a {
 }
 
 .auth-switch-btn {
-  min-height: 40px;
+  /* A tab is a tap target, so it keeps the house control height rather than the
+     smaller height the switch used to carry. */
+  min-height: var(--control-height);
   padding: 0 12px;
   border: 0;
   border-radius: calc(var(--radius-lg) - 2px);
@@ -1703,7 +1719,8 @@ a {
 }
 
 .auth-back {
-  min-height: 40px;
+  /* Same reason as the switch tabs: the back link is pressed with a thumb. */
+  min-height: var(--control-height);
   font-size: 13px;
 }
 
@@ -1751,6 +1768,85 @@ a {
   height: 14px;
   stroke: var(--accent);
   fill: none;
+}
+
+/* Forms ----------------------------------------------------------------- */
+
+/* One column and one control height everywhere. A field is a label wrapping its
+   input, so the two are associated without generated ids and the whole row is a
+   thumb-sized target. */
+.form-stack {
+  display: grid;
+  width: 100%;
+  gap: 12px;
+}
+
+.field {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  background: var(--field-background);
+  color: var(--text);
+  font: 400 14px/1.2 "Segoe UI", system-ui, sans-serif;
+}
+
+.field input::placeholder {
+  color: var(--faint);
+}
+
+.field input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+/* The refusal lands where the eye already is: under the fields, above the
+   button that was just pressed. */
+.form-error {
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.form-success {
+  color: var(--success);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+/* A quiet break between "use your password" and "use Google", so neither reads
+   as the only way in. */
+.form-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--faint);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.form-divider::before,
+.form-divider::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: color-mix(in srgb, var(--control-border) 62%, transparent);
 }
 
 /* Footer ---------------------------------------------------------------- */

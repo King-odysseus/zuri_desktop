@@ -5,6 +5,7 @@ import { createRequestListener } from './serve.js';
 import { createAuthService, createGoogleVerifier } from './auth.js';
 import { createDatabase, createRepository } from './db.js';
 import { createDeepSeekClient } from './deepseek.js';
+import { createMailer } from './mail.js';
 import { createPaystackClient } from './paystack.js';
 import { applySchema } from './schema.js';
 
@@ -23,11 +24,18 @@ if (pool) {
   }
 }
 const repository = pool ? createRepository(pool) : null;
-const auth = repository && config.googleClientId
-  ? createAuthService({ repository, verifyGoogleCredential: createGoogleVerifier(config.googleClientId) })
+// Password accounts need no Google client, so the auth service exists whenever
+// there is a database; Google sign-in is simply unavailable without a client id.
+const auth = repository
+  ? createAuthService({
+    repository,
+    verifyGoogleCredential: config.googleClientId ? createGoogleVerifier(config.googleClientId) : null,
+  })
   : null;
 const chatProvider = createDeepSeekClient({ apiKey: config.deepSeekApiKey, endpoint: config.deepSeekEndpoint });
 const paystack = createPaystackClient({ secretKey: config.paystackSecretKey, endpoint: config.paystackEndpoint });
+const mailer = createMailer({ apiKey: config.brevoApiKey, from: config.mailFrom, fromName: config.mailFromName });
+if (!mailer.configured) console.log('[zuri-cloud] password reset email is off: BREVO_API_KEY and MAIL_FROM are not both set');
 const app = createApp({
   auth,
   repository,
@@ -38,6 +46,10 @@ const app = createApp({
   paystackPlanCodes: config.paystackPlanCodes,
   paystackCallbackUrl: config.paystackCallbackUrl,
   googleClientId: config.googleClientId,
+  mailer,
+  // A reset link has to be absolute, so an unset SITE_URL falls back to the
+  // service's own URL rather than producing a dead relative link.
+  siteUrl: config.siteUrl || config.cloudUrl,
 });
 
 /**

@@ -12,7 +12,7 @@ import { themeLabel } from '../lib/theme.js';
  *   signedIn: boolean,
  *   onSignIn: () => void,
  *   onSignOut: () => void,
- *   onNavigate: (path: '/' | '/signin' | '/signup') => void,
+ *   onNavigate: (path: string) => void,
  * }} props
  */
 export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onSignOut, onNavigate }) {

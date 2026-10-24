@@ -212,10 +212,50 @@ function validateMessages(messages) {
   return { ok: true, data: normalized, inputTokens: Math.ceil(characters / 4) };
 }
 
-/** @param {{ auth?: object, repository?: object, now?: () => Date, googleClientId?: string }} [dependencies] @returns {(request: Request) => Promise<Response>} */
+/** @param {string} siteUrl @returns {string} */
+function siteBase(siteUrl) {
+  return typeof siteUrl === 'string' ? siteUrl.trim().replace(/\/+$/, '') : '';
+}
+
+/**
+ * Map an auth service error onto its answer, so every account route reports the
+ * same code for the same mistake. Returns null for anything unexpected, leaving
+ * the caller to log it and answer a 500.
+ * @param {unknown} error
+ * @returns {Response | null}
+ */
+function authErrorResponse(error) {
+  const code = error?.code;
+  const message = error?.message ?? 'The request could not be completed.';
+  if (code === 'INVALID_EMAIL' || code === 'INVALID_PASSWORD' || code === 'INVALID_RESET_TOKEN' || code === 'BODY_TOO_LARGE' || code === 'INVALID_JSON') {
+    return response(400, { ok: false, error: { code, message } });
+  }
+  if (code === 'INVALID_CREDENTIALS') return response(401, { ok: false, error: { code, message } });
+  if (code === 'ACCOUNT_NOT_ACTIVE') return response(403, { ok: false, error: { code, message } });
+  if (code === 'EMAIL_TAKEN' || code === 'PASSWORD_NOT_SET') return response(409, { ok: false, error: { code, message } });
+  return null;
+}
+
+/**
+ * The body every sign-in path answers with: the session plus the plan usage the
+ * dashboard shows straight away.
+ * @param {{ auth?: object, repository?: object }} dependencies
+ * @param {{ token: string }} result
+ * @returns {Promise<object>}
+ */
+async function sessionPayload(dependencies, result) {
+  const session = await dependencies.auth.authenticate(result.token);
+  const getUsage = dependencies.repository?.getUsage;
+  if (!session || typeof getUsage !== 'function') return { ...result, usage: null };
+  const usage = await getUsage(session.user.id, session.subscription.currentPeriodStart, session.subscription);
+  return { ...result, usage: usageStatus(session.subscription, usage.usedTokens) };
+}
+
+/** @param {{ auth?: object, repository?: object, mailer?: object, now?: () => Date, googleClientId?: string, siteUrl?: string }} [dependencies] @returns {(request: Request) => Promise<Response>} */
 export function createApp(dependencies = {}) {
   const now = dependencies.now ?? (() => new Date());
   const limiter = dependencies.limiter ?? createRequestLimiter({ now: () => now().getTime() });
+  const siteUrl = siteBase(dependencies.siteUrl);
 
   return async function app(request) {
     const url = new URL(request.url);
@@ -232,7 +272,14 @@ export function createApp(dependencies = {}) {
       return response(200, { ok: true, data: PLANS.map(publicPlan) });
     }
     if (request.method === 'GET' && url.pathname === '/api/public-config') {
-      return response(200, { ok: true, data: { googleClientId: typeof dependencies.googleClientId === 'string' ? dependencies.googleClientId : '' } });
+      return response(200, {
+        ok: true,
+        data: {
+          googleClientId: typeof dependencies.googleClientId === 'string' ? dependencies.googleClientId : '',
+          passwordSignIn: true,
+          siteUrl,
+        },
+      });
     }
     if (request.method === 'GET' && url.pathname === '/api/downloads') {
       return response(200, { ok: true, data: { files: await listDownloads() } });
@@ -249,16 +296,72 @@ export function createApp(dependencies = {}) {
       try {
         const body = await readJson(request);
         const result = await dependencies.auth.signInWithGoogle(body.credential);
-        const session = await dependencies.auth.authenticate(result.token);
-        const usage = session && dependencies.repository
-          ? usageStatus(session.subscription, (await dependencies.repository.getUsage(session.user.id, session.subscription.currentPeriodStart, session.subscription)).usedTokens)
-          : null;
-        return response(200, { ok: true, data: { ...result, usage } });
+        return response(200, { ok: true, data: await sessionPayload(dependencies, result) });
       } catch (error) {
-        if (error?.code === 'ACCOUNT_NOT_ACTIVE') return response(403, { ok: false, error: { code: error.code, message: error.message } });
-        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'AUTH_NOT_CONFIGURED') return response(503, { ok: false, error: { code: error.code, message: error.message } });
+        const handled = authErrorResponse(error);
+        if (handled) return handled;
         console.error('[zuri-cloud] google sign-in', error?.message ?? error);
         return response(401, { ok: false, error: { code: 'GOOGLE_SIGN_IN_FAILED', message: 'Google sign-in could not be completed.' } });
+      }
+    }
+
+    if (request.method === 'POST' && (url.pathname === '/api/auth/sign-up' || url.pathname === '/api/auth/sign-in')) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Account sign-in is not configured yet.' } });
+      const signingUp = url.pathname === '/api/auth/sign-up';
+      try {
+        const body = await readJson(request);
+        const result = signingUp
+          ? await dependencies.auth.signUpWithPassword({ email: body.email, password: body.password, displayName: body.displayName })
+          : await dependencies.auth.signInWithPassword({ email: body.email, password: body.password });
+        return response(signingUp ? 201 : 200, { ok: true, data: await sessionPayload(dependencies, result) });
+      } catch (error) {
+        const handled = authErrorResponse(error);
+        if (handled) return handled;
+        console.error('[zuri-cloud] password sign-in', error?.message ?? error);
+        return signingUp
+          ? response(500, { ok: false, error: { code: 'SIGN_UP_FAILED', message: 'The account could not be created.' } })
+          : response(500, { ok: false, error: { code: 'SIGN_IN_FAILED', message: 'The account could not be opened.' } });
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/auth/forgot-password') {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Account sign-in is not configured yet.' } });
+      if (dependencies.mailer?.configured !== true) {
+        return response(503, { ok: false, error: { code: 'MAIL_NOT_CONFIGURED', message: 'Password email is not configured yet.' } });
+      }
+      try {
+        const body = await readJson(request);
+        // SITE_URL wins so a reset link can never be built from a client-supplied
+        // Host header; the request origin is only the local-development fallback.
+        const result = await dependencies.auth.requestPasswordReset({ email: body.email, siteUrl: siteUrl || url.origin });
+        if (result.delivery) {
+          // A send failure is logged, never answered: the reply has to look the same
+          // whether or not the address belongs to an account.
+          await dependencies.mailer
+            .sendPasswordReset(result.delivery)
+            .catch((error) => console.error('[zuri-cloud] password reset email', error?.message ?? error));
+        }
+        return response(200, { ok: true, data: { sent: true } });
+      } catch (error) {
+        const handled = authErrorResponse(error);
+        if (handled) return handled;
+        console.error('[zuri-cloud] forgot password', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'PASSWORD_RESET_FAILED', message: 'The reset email could not be sent.' } });
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/auth/reset-password') {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Account sign-in is not configured yet.' } });
+      try {
+        const body = await readJson(request);
+        const result = await dependencies.auth.resetPassword({ token: body.token, password: body.password });
+        return response(200, { ok: true, data: result });
+      } catch (error) {
+        const handled = authErrorResponse(error);
+        if (handled) return handled;
+        console.error('[zuri-cloud] reset password', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'PASSWORD_RESET_FAILED', message: 'The password could not be changed.' } });
       }
     }
 
@@ -418,7 +521,7 @@ export function createApp(dependencies = {}) {
       }
     }
 
-    if (url.pathname === '/api/me' || url.pathname === '/api/me/usage' || url.pathname === '/api/me/limits' || url.pathname === '/api/me/billing' || url.pathname === '/api/auth/sign-out') {
+    if (url.pathname === '/api/me' || url.pathname === '/api/me/usage' || url.pathname === '/api/me/limits' || url.pathname === '/api/me/billing' || url.pathname === '/api/auth/sign-out' || url.pathname === '/api/auth/set-password') {
       if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
       const token = bearerToken(request);
       const session = await dependencies.auth.authenticate(token);
@@ -426,6 +529,20 @@ export function createApp(dependencies = {}) {
       if (request.method === 'POST' && url.pathname === '/api/auth/sign-out') {
         await dependencies.auth.signOut(token);
         return response(200, { ok: true, data: { signedOut: true } });
+      }
+      if (request.method === 'POST' && url.pathname === '/api/auth/set-password') {
+        try {
+          const body = await readJson(request);
+          // The id comes from the session, never from the body, so a request can
+          // only ever add a password to the account that presented the token.
+          await dependencies.auth.setPassword({ userId: session.user.id, password: body.password });
+          return response(200, { ok: true, data: { updated: true } });
+        } catch (error) {
+          const handled = authErrorResponse(error);
+          if (handled) return handled;
+          console.error('[zuri-cloud] set password', error?.message ?? error);
+          return response(500, { ok: false, error: { code: 'PASSWORD_SAVE_FAILED', message: 'The password could not be saved.' } });
+        }
       }
       if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for this account endpoint.' } });
       if (url.pathname === '/api/me') return response(200, { ok: true, data: session });

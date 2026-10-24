@@ -65,7 +65,10 @@ export default function GoogleSignIn({ theme, onCredential, onError }) {
       {status === 'unconfigured' && (
         <div className="google-notice" role="status">
           <strong>Google sign-in is not set up on this server yet.</strong>
-          <p>Add GOOGLE_CLIENT_ID in Railway and redeploy. This card becomes the sign-in button as soon as that is set.</p>
+          <p>
+            Add GOOGLE_CLIENT_ID in Railway and redeploy. The Google button appears here as soon as
+            that is set. Your email and password work either way.
+          </p>
         </div>
       )}
       {status === 'failed' && <p className="google-hint is-error">{message}</p>}

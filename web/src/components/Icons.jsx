@@ -16,6 +16,7 @@ import {
   Shield,
   Sparkles,
   Sun,
+  User,
   X,
   Zap,
 } from 'lucide-react';
@@ -63,4 +64,5 @@ export const CardIcon = (props) => <CreditCard {...base} {...props} />;
 export const ChartIcon = (props) => <BarChart3 {...base} {...props} />;
 export const GridIcon = (props) => <LayoutGrid {...base} {...props} />;
 export const ReceiptIcon = (props) => <Receipt {...base} {...props} />;
+export const UserIcon = (props) => <User {...base} {...props} />;
 export const CloseIcon = (props) => <X {...base} {...props} />;

@@ -3,7 +3,9 @@ import NoticeBar from './components/NoticeBar.jsx';
 import TopBar from './components/TopBar.jsx';
 import AuthView from './views/AuthView.jsx';
 import Dashboard from './views/Dashboard.jsx';
+import ForgotPasswordView from './views/ForgotPasswordView.jsx';
 import Landing from './views/Landing.jsx';
+import ResetPasswordView from './views/ResetPasswordView.jsx';
 import {
   api,
   clearToken,
@@ -12,18 +14,20 @@ import {
   fetchPlans,
   readToken,
   saveToken,
+  signInWithPassword,
   signOutRequest,
+  signUpWithPassword,
   verifyPayment,
 } from './lib/api.js';
 import { applyTheme, preferredTheme } from './lib/theme.js';
 
-const VIEWS = ['overview', 'usage', 'plans', 'billing'];
-const AUTH_PATHS = ['/signin', '/signup'];
+const VIEWS = ['overview', 'usage', 'plans', 'billing', 'account'];
+const AUTH_PATHS = ['/signin', '/signup', '/forgot-password', '/reset-password'];
 
 /**
- * The three public addresses. Everything else is the landing page, so a stale
- * link or a typo lands somewhere useful instead of a blank shell.
- * @returns {{ path: '/' | '/signin' | '/signup', hash: string }}
+ * The public addresses. Everything else is the landing page, so a stale link or
+ * a typo lands somewhere useful instead of a blank shell.
+ * @returns {{ path: string, hash: string }}
  */
 function readRoute() {
   const raw = window.location.pathname.replace(/\/+$/, '') || '/';
@@ -49,7 +53,7 @@ export default function App() {
     applyTheme(theme);
   }, [theme]);
 
-  // Back and forward move between the landing page and the two account screens.
+  // Back and forward move between the landing page and the account screens.
   useEffect(() => {
     const onPop = () => setRoute(readRoute());
     window.addEventListener('popstate', onPop);
@@ -147,7 +151,7 @@ export default function App() {
         showNotice(null);
         setStatus('booting');
         await loadAccount();
-        // The account screens are only for people without a session.
+        // Straight to the dashboard; the sign-in screen has done its job.
         window.history.replaceState({}, '', '/');
         setRoute({ path: '/', hash: '' });
       } catch (error) {
@@ -158,17 +162,49 @@ export default function App() {
     [loadAccount, showNotice],
   );
 
-  const handleSignOut = useCallback(async () => {
-    await signOutRequest();
-    clearToken();
-    setAccount(null);
-    setStatus('signed-out');
-    setView('overview');
-    showNotice(null);
-    window.history.replaceState({}, '', '/');
-    setRoute({ path: '/', hash: '' });
-    window.scrollTo({ top: 0 });
-  }, [showNotice]);
+  const handlePasswordSignIn = useCallback(
+    async ({ mode, email, password, displayName }) => {
+      const result =
+        mode === 'signup'
+          ? await signUpWithPassword({ email, password, displayName })
+          : await signInWithPassword({ email, password });
+      // The Google route answers with { token, user }. Reading a nested session
+      // as well costs nothing and keeps the form working if the server wraps it.
+      const token = result?.token ?? result?.session?.token ?? '';
+      if (!token) throw new Error('The server did not send a session back. Try again.');
+      saveToken(token);
+      showNotice(null);
+      setStatus('booting');
+      try {
+        await loadAccount();
+      } catch (error) {
+        // A token that cannot load an account is no use; drop it so the form is
+        // still the thing on screen. The form unmounted while the skeleton was
+        // up, so the reason goes to the status bar rather than under the fields.
+        clearToken();
+        setStatus('signed-out');
+        showNotice('You signed in, but your account could not be loaded. Try again in a moment.', 'error');
+        throw error;
+      }
+      window.history.replaceState({}, '', '/');
+      setRoute({ path: '/', hash: '' });
+    },
+    [loadAccount, showNotice],
+  );
+
+  /** @param {string} [nextPath] Where to land afterwards; the account screens send people to sign in. */
+  const handleSignOut = useCallback(
+    async (nextPath = '/') => {
+      await signOutRequest();
+      clearToken();
+      setAccount(null);
+      setStatus('signed-out');
+      setView('overview');
+      showNotice(null);
+      navigate(typeof nextPath === 'string' ? nextPath : '/');
+    },
+    [navigate, showNotice],
+  );
 
   const handleChoose = useCallback(
     async (planCode) => {
@@ -196,6 +232,21 @@ export default function App() {
   const handleSignIn = useCallback(() => navigate('/signin'), [navigate]);
 
   const body = useMemo(() => {
+    // The two password links are reached from an email, so they render whatever
+    // the session state is: a signed-in person holding a reset link still gets
+    // the form instead of being bounced into the dashboard.
+    if (route.path === '/forgot-password') {
+      return <ForgotPasswordView onNavigate={navigate} signedIn={status === 'signed-in'} />;
+    }
+    if (route.path === '/reset-password') {
+      return (
+        <ResetPasswordView
+          onNavigate={navigate}
+          onNotify={showNotice}
+          signedIn={status === 'signed-in'}
+        />
+      );
+    }
     if (status === 'booting') {
       return (
         <main className="landing">
@@ -220,6 +271,7 @@ export default function App() {
           onViewChange={handleViewChange}
           onChoose={handleChoose}
           onSignIn={handleSignIn}
+          onSignOut={() => handleSignOut('/signin')}
         />
       );
     }
@@ -229,6 +281,7 @@ export default function App() {
           mode={route.path === '/signup' ? 'signup' : 'signin'}
           theme={theme}
           onCredential={handleCredential}
+          onPasswordSignIn={handlePasswordSignIn}
           onError={(message) => showNotice(message, 'error')}
           onNavigate={navigate}
         />
@@ -247,7 +300,9 @@ export default function App() {
     busyPlan,
     handleChoose,
     handleCredential,
+    handlePasswordSignIn,
     handleSignIn,
+    handleSignOut,
     handleViewChange,
     navigate,
     plans,
@@ -265,7 +320,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         signedIn={status === 'signed-in'}
         onSignIn={handleSignIn}
-        onSignOut={handleSignOut}
+        onSignOut={() => handleSignOut('/')}
         onNavigate={navigate}
       />
       <NoticeBar notice={notice} />

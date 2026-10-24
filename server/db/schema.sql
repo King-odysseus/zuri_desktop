@@ -17,6 +17,8 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT NOT NULL UNIQUE,
   display_name TEXT NOT NULL DEFAULT '',
   google_subject TEXT UNIQUE,
+  -- NULL means the account has no password yet: it signs in with Google only.
+  password_hash TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended', 'deleted')),
   is_admin BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -28,9 +30,25 @@ CREATE TABLE IF NOT EXISTS sessions (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   token_hash TEXT NOT NULL UNIQUE,
   expires_at TIMESTAMPTZ NOT NULL,
+  -- Idle clock: a session dies once this is more than three days old.
+  last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   revoked_at TIMESTAMPTZ
 );
+
+-- Only the sha256 of a reset token is stored, so a leaked table row cannot be
+-- turned back into a working link. used_at marks the single use.
+CREATE TABLE IF NOT EXISTS password_resets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS password_resets_user_created_idx
+  ON password_resets(user_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -99,6 +117,9 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS paystack_subscription_code TEXT;
+-- Databases created before password accounts existed get the new columns here.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
+ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_transaction_id BIGINT;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_customer_code TEXT;
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_authorization_code TEXT;

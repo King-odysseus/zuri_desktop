@@ -15,6 +15,9 @@ function publicUser(value) {
     displayName: value.display_name,
     status: value.status,
     isAdmin: value.is_admin === true,
+    // A Google-only account has no hash, which is how the sign-in screen knows to
+    // offer Google instead of a password box.
+    hasPassword: typeof value.password_hash === 'string' && value.password_hash !== '',
     createdAt: value.created_at,
   };
 }
@@ -30,6 +33,21 @@ export function createDatabase(connectionString, environment = process.env) {
 
 /** @param {import('pg').Pool} pool @returns {object} */
 export function createRepository(pool) {
+  /**
+   * Every new account starts on the free plan; without a subscription row the
+   * account cannot chat, so both sign-up paths go through here.
+   * @param {import('pg').PoolClient} client
+   * @param {string} userId
+   */
+  async function ensureFreeSubscription(client, userId) {
+    await client.query(
+      'INSERT INTO subscriptions (user_id, plan_code, status, current_period_start, current_period_end) ' +
+      "SELECT $1, 'free', 'active', NOW(), NOW() + INTERVAL '1 month' " +
+      "WHERE NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = $1 AND status IN ('active', 'past_due'))",
+      [userId],
+    );
+  }
+
   return {
     async findOrCreateGoogleUser(profile) {
       const client = await pool.connect();
@@ -55,12 +73,7 @@ export function createRepository(pool) {
           );
           user = result.rows[0];
         }
-        await client.query(
-          'INSERT INTO subscriptions (user_id, plan_code, status, current_period_start, current_period_end) ' +
-          "SELECT $1, 'free', 'active', NOW(), NOW() + INTERVAL '1 month' " +
-          "WHERE NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = $1 AND status IN ('active', 'past_due'))",
-          [user.id],
-        );
+        await ensureFreeSubscription(client, user.id);
         await client.query('COMMIT');
         return publicUser(user);
       } catch (error) {
@@ -73,18 +86,33 @@ export function createRepository(pool) {
     async createSession(userId, tokenHash, expiresAt) {
       await pool.query('INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [userId, tokenHash, expiresAt]);
     },
-    async findSessionUser(tokenHash) {
+    /**
+     * Resolve a bearer token to its user and treat the call as activity.
+     *
+     * The lookup is the only place a session is refreshed: revoked rows, rows past
+     * expires_at and rows idle for longer than the window match nothing, so a stale
+     * token can never be extended back to life. The session timestamps come back as
+     * they were read, before the touch, so the caller can apply the idle rule again.
+     * @param {string} tokenHash
+     * @param {{ now?: Date, idleTtlMs?: number }} [options]
+     */
+    async findSessionUser(tokenHash, { now = new Date(), idleTtlMs = 3 * 24 * 60 * 60 * 1000 } = {}) {
+      const at = now instanceof Date ? now : new Date(now);
+      const idleSince = new Date(at.getTime() - idleTtlMs);
+      const nextExpiry = new Date(at.getTime() + idleTtlMs);
       const result = await pool.query(
-        'SELECT u.*, s2.id AS subscription_id, s2.plan_code, s2.current_period_start, s2.current_period_end, p.name AS plan_name, p.monthly_tokens ' +
+        'SELECT u.*, s.id AS session_id, s.last_used_at AS session_last_used_at, s.expires_at AS session_expires_at, ' +
+        's2.id AS subscription_id, s2.plan_code, s2.current_period_start, s2.current_period_end, p.name AS plan_name, p.monthly_tokens ' +
         'FROM sessions s JOIN users u ON u.id = s.user_id ' +
         "JOIN subscriptions s2 ON s2.user_id = u.id AND s2.status IN ('active', 'past_due') " +
         'JOIN plans p ON p.code = s2.plan_code ' +
-        "WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > NOW() AND u.status = 'active' LIMIT 1",
-        [tokenHash],
+        "WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > $2 AND s.last_used_at >= $3 AND u.status = 'active' LIMIT 1",
+        [tokenHash, at, idleSince],
       );
       const row = result.rows[0];
       if (!row) return null;
-      await pool.query('UPDATE users SET last_seen_at = NOW() WHERE id = $1', [row.id]);
+      await pool.query('UPDATE sessions SET last_used_at = $2, expires_at = $3 WHERE id = $1', [row.session_id, at, nextExpiry]);
+      await pool.query('UPDATE users SET last_seen_at = $2 WHERE id = $1', [row.id, at]);
       return {
         user: publicUser(row),
         subscription: {
@@ -95,7 +123,78 @@ export function createRepository(pool) {
           currentPeriodStart: row.current_period_start,
           currentPeriodEnd: row.current_period_end,
         },
+        session: { lastUsedAt: row.session_last_used_at, expiresAt: row.session_expires_at },
       };
+    },
+    async createUserWithPassword({ email, passwordHash, displayName }) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        let result;
+        try {
+          result = await client.query(
+            'INSERT INTO users (email, display_name, password_hash) VALUES ($1, $2, $3) RETURNING *',
+            [email, displayName ?? '', passwordHash],
+          );
+        } catch (error) {
+          // users.email is unique and google_subject is never set here, so a unique
+          // violation means the address is taken: a normal answer, not a fault.
+          if (error?.code === '23505') {
+            const taken = new Error('An account with that email address already exists.');
+            taken.code = 'EMAIL_TAKEN';
+            throw taken;
+          }
+          throw error;
+        }
+        const user = result.rows[0];
+        await ensureFreeSubscription(client, user.id);
+        await client.query('COMMIT');
+        return publicUser(user);
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    /**
+     * @param {string} email Already normalized by the caller.
+     * @returns {Promise<{ user: object, passwordHash: string } | null>}
+     */
+    async findUserByEmail(email) {
+      const result = await pool.query('SELECT * FROM users WHERE email = $1 LIMIT 1', [email]);
+      const row = result.rows[0];
+      if (!row) return null;
+      // The hash stays beside publicUser, never inside it, so it cannot leak into a
+      // response by accident.
+      return { user: publicUser(row), passwordHash: typeof row.password_hash === 'string' ? row.password_hash : '' };
+    },
+    async updatePasswordHash(userId, passwordHash) {
+      const result = await pool.query('UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id', [userId, passwordHash]);
+      if (result.rowCount === 0) {
+        const error = new Error('That account no longer exists.');
+        error.code = 'USER_NOT_FOUND';
+        throw error;
+      }
+    },
+    async createPasswordReset({ userId, tokenHash, expiresAt }) {
+      await pool.query('INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [userId, tokenHash, expiresAt]);
+    },
+    /**
+     * Single-use in one statement: the update only matches an unused, unexpired row,
+     * so two racing requests cannot both consume the same token.
+     * @param {string} tokenHash
+     * @returns {Promise<string | null>} The user id, or null when the token is spent.
+     */
+    async consumePasswordReset(tokenHash) {
+      const result = await pool.query(
+        'UPDATE password_resets SET used_at = NOW() WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW() RETURNING user_id',
+        [tokenHash],
+      );
+      return result.rows[0]?.user_id ?? null;
+    },
+    async revokeUserSessions(userId) {
+      await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
     },
     async getUsage(userId, periodStart, subscription) {
       const result = await pool.query(

@@ -38,6 +38,10 @@ export async function api(path, options = {}) {
   if (!response.ok || !body?.ok) {
     const error = new Error(body?.error?.message ?? 'The request failed.');
     error.status = response.status;
+    // The server names its refusals (EMAIL_TAKEN, INVALID_CREDENTIALS and so on)
+    // and the screens turn those names into sentences a person can act on. A
+    // server that sends no code leaves this empty and the message is used.
+    error.code = body?.error?.code ?? '';
     throw error;
   }
   return body.data;
@@ -100,4 +104,68 @@ export async function verifyPayment(reference) {
 
 export async function signOutRequest() {
   await api('/api/auth/sign-out', { method: 'POST' }).catch(() => undefined);
+}
+
+// Every password route in one place: signing up, signing in, and the three
+// things a password can do after that. The server names them as one family, so
+// a change of prefix is a change in this one object.
+const AUTH_ROUTES = {
+  signUp: '/api/auth/sign-up',
+  signIn: '/api/auth/sign-in',
+  forgotPassword: '/api/auth/forgot-password',
+  resetPassword: '/api/auth/reset-password',
+  setPassword: '/api/auth/set-password',
+};
+
+/**
+ * Create an account with an email and a password. The reply carries the session
+ * token, exactly as the Google route does.
+ * @param {{ email: string, password: string, displayName: string }} input
+ */
+export async function signUpWithPassword({ email, password, displayName }) {
+  return api(AUTH_ROUTES.signUp, {
+    method: 'POST',
+    body: JSON.stringify({ email, password, displayName }),
+  });
+}
+
+/** @param {{ email: string, password: string }} input */
+export async function signInWithPassword({ email, password }) {
+  return api(AUTH_ROUTES.signIn, {
+    method: 'POST',
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+/**
+ * Ask for a reset link. The answer is deliberately the same whether or not the
+ * address has an account, so this tells the person to watch their inbox and
+ * nothing about who is registered.
+ * @param {string} email
+ */
+export async function requestPasswordReset(email) {
+  return api(AUTH_ROUTES.forgotPassword, {
+    method: 'POST',
+    body: JSON.stringify({ email }),
+  });
+}
+
+/** @param {{ token: string, password: string }} input */
+export async function resetPassword({ token, password }) {
+  return api(AUTH_ROUTES.resetPassword, {
+    method: 'POST',
+    body: JSON.stringify({ token, password }),
+  });
+}
+
+/**
+ * Add an email and password to the signed-in account, for people who arrived
+ * through Google and want a second way in.
+ * @param {string} password
+ */
+export async function setPassword(password) {
+  return api(AUTH_ROUTES.setPassword, {
+    method: 'POST',
+    body: JSON.stringify({ password }),
+  });
 }
