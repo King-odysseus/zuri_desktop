@@ -184,6 +184,9 @@ function createMainWindow() {
     minWidth: 940,
     minHeight: 600,
     title: 'Zuri',
+    // Shown below once the first paint is ready, so Windows never shows the
+    // 1200x800 default and then jumps to the maximised size.
+    show: false,
     // Without this the window and Alt-Tab show Electron's own logo. Windows reads
     // an ICO here; the other platforms take the PNG.
     icon: process.platform === 'win32' ? ICO_ENTRY : ICON_ENTRY,
@@ -209,6 +212,22 @@ function createMainWindow() {
       relaunchDisplayName: 'Zuri',
     });
   }
+
+  // Zuri is a workspace, not a dialog: it opens filling the screen width instead
+  // of a fixed 1200x800 box with dead space beside every column. minWidth still
+  // governs the size after the user restores it.
+  window.maximize();
+
+  // Reveal on the first paint. did-fail-load also reveals it: a renderer that
+  // cannot load must still produce a window, or the app looks like it never ran.
+  let revealed = false;
+  const revealWindow = () => {
+    if (revealed || window.isDestroyed()) return;
+    revealed = true;
+    window.show();
+  };
+  window.once('ready-to-show', revealWindow);
+  window.webContents.once('did-fail-load', revealWindow);
 
   window.loadFile(RENDERER_ENTRY);
 

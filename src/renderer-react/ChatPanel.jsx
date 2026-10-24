@@ -608,7 +608,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   }, [messages]);
 
   const hasConversation = messages.length > 0 || streamingText !== '';
-  const contentWidth = 'max-w-4xl';
+  // The window opens maximised, so a 56rem column left most of a wide screen
+  // empty. It grows in two steps while a line of text stays readable, and the
+  // floating overlay keeps the narrow width because it is a small card.
+  const contentWidth = compact ? 'max-w-4xl' : 'max-w-4xl xl:max-w-5xl 2xl:max-w-6xl';
 
   return (
     <main className={`relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground ${compact ? 'zuri-overlay-panel' : ''}`}>

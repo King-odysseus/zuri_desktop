@@ -1,6 +1,6 @@
 /** Smoke test: boot the React renderer through the real Electron main process. */
 
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, screen } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -40,6 +40,20 @@ app.whenReady().then(async () => {
   report.check('React mounts in an isolated renderer', () => {
     if (!ready.root || !ready.script) throw new Error('React root or module script is missing');
     if (ready.hasRequire || ready.hasProcess) throw new Error('Node globals leaked into the renderer');
+  });
+  // The app is a workspace, so it opens filling the screen width rather than a
+  // fixed 1200x800 box. Windows counts the resize frame in the bounds, so the
+  // window may be a few pixels wider than the work area but never narrower.
+  // The reporter's checks are synchronous, so wait for the maximised state here.
+  for (let attempt = 0; attempt < 30 && !window.isMaximized(); attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  report.check('the window opens filling the screen width', () => {
+    if (!window.isMaximized()) throw new Error('window did not open maximised');
+    const { width } = screen.getPrimaryDisplay().workAreaSize;
+    const bounds = window.getBounds();
+    if (bounds.width < width) throw new Error('window ' + bounds.width + ' narrower than work area ' + width);
+    return 'maximised, ' + bounds.width + ' wide on a ' + width + ' wide work area';
   });
   report.check('the renderer has no console errors', () => {
     if (consoleCapture.errors.length > 0) throw new Error(consoleCapture.errors.join(' | '));
