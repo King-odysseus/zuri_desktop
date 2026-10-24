@@ -8,11 +8,19 @@ import { createRequestLimiter, limitsForPlan } from './limits.js';
 import { verifyPaystackSignature } from './paystack.js';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
-// A fixed allow-list: request paths never reach the filesystem, so traversal is impossible.
-const STATIC_FILES = new Map([
-  ['/', { name: 'index.html', type: 'text/html; charset=utf-8' }],
-  ['/index.html', { name: 'index.html', type: 'text/html; charset=utf-8' }],
-  ['/dashboard.js', { name: 'dashboard.js', type: 'text/javascript; charset=utf-8' }],
+const ASSETS_DIR = `${PUBLIC_DIR}${path.sep}assets`;
+// Only these extensions are ever served from public/; anything else is a 404, so
+// stray files (source maps, editor backups) cannot leak out of the bundle.
+const STATIC_TYPES = new Map([
+  ['.html', 'text/html; charset=utf-8'],
+  ['.js', 'text/javascript; charset=utf-8'],
+  ['.css', 'text/css; charset=utf-8'],
+  ['.svg', 'image/svg+xml'],
+  ['.png', 'image/png'],
+  ['.ico', 'image/x-icon'],
+  ['.webp', 'image/webp'],
+  ['.json', 'application/json; charset=utf-8'],
+  ['.woff2', 'font/woff2'],
 ]);
 const DASHBOARD_SECURITY_HEADERS = Object.freeze({
   'content-security-policy': "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; frame-src https://accounts.google.com; connect-src 'self' https://accounts.google.com; img-src 'self' data: https:",
@@ -57,6 +65,57 @@ async function readJson(request, maxBytes = MAX_BODY_BYTES) {
     error.code = 'INVALID_JSON';
     throw error;
   }
+}
+
+/**
+ * Serve a built file from public/ (the React bundle lives there).
+ *
+ * Resolution is done against PUBLIC_DIR and anything that escapes it is refused,
+ * so a crafted '../' can never reach the server sources. Paths without an
+ * extension fall back to index.html: that keeps the dashboard working when the
+ * browser reloads a client-side route.
+ *
+ * @param {string} pathname
+ * @returns {Promise<Response | null>} null when the caller should answer 404.
+ */
+async function serveStatic(pathname) {
+  let requested;
+  try {
+    requested = decodeURIComponent(pathname).replace(/^\/+/, '') || 'index.html';
+  } catch {
+    return null; // malformed percent-encoding
+  }
+
+  const filePath = path.resolve(PUBLIC_DIR, requested);
+  const insidePublic = filePath === PUBLIC_DIR || filePath.startsWith(`${PUBLIC_DIR}${path.sep}`);
+  if (!insidePublic) return null;
+
+  const type = STATIC_TYPES.get(path.extname(filePath).toLowerCase());
+  if (!type) return null;
+
+  try {
+    const body = await readFile(filePath);
+    // Vite fingerprints everything in assets/, so those files can be cached hard.
+    const cacheControl = filePath.startsWith(`${ASSETS_DIR}${path.sep}`)
+      ? 'public, max-age=31536000, immutable'
+      : 'no-cache';
+    return new Response(body, {
+      status: 200,
+      headers: { 'content-type': type, 'cache-control': cacheControl, ...DASHBOARD_SECURITY_HEADERS },
+    });
+  } catch (error) {
+    if (error?.code !== 'ENOENT' && error?.code !== 'EISDIR') throw error;
+  }
+
+  // Missing file with no extension: hand back the app shell so client routes load.
+  if (path.extname(requested) === '') {
+    const shell = await readFile(path.join(PUBLIC_DIR, 'index.html'));
+    return new Response(shell, {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-cache', ...DASHBOARD_SECURITY_HEADERS },
+    });
+  }
+  return null;
 }
 
 /** @param {Request} request @param {number} maxBytes @returns {Promise<string>} */
@@ -104,12 +163,9 @@ export function createApp(dependencies = {}) {
   return async function app(request) {
     const url = new URL(request.url);
 
-    if ((request.method === 'GET' || request.method === 'HEAD') && STATIC_FILES.has(url.pathname)) {
-      const file = STATIC_FILES.get(url.pathname);
-      return new Response(await readFile(path.join(PUBLIC_DIR, file.name)), {
-        status: 200,
-        headers: { 'content-type': file.type, 'cache-control': 'no-cache', ...DASHBOARD_SECURITY_HEADERS },
-      });
+    if ((request.method === 'GET' || request.method === 'HEAD') && !url.pathname.startsWith('/api/')) {
+      const asset = await serveStatic(url.pathname);
+      if (asset) return asset;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
