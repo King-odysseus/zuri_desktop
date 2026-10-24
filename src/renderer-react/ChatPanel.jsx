@@ -11,6 +11,9 @@ import {
   FolderIcon,
   GlobeIcon,
   MicIcon,
+  NewChatIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   PaperclipIcon,
   PlusIcon,
   SlashCommandIcon,
@@ -174,7 +177,7 @@ function FileCard({ file, api }) {
   );
 }
 
-export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false }) {
+export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [draft, setDraft] = useState('');
   const [threadId, setThreadId] = useState(initialThreadId);
@@ -567,6 +570,36 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
   return (
     <main className={`relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground ${compact ? 'zuri-overlay-panel' : ''}`}>
+      {/* Two bare floating icons rather than one pill: the sidebar toggle keeps
+          the top-left corner it had, and starting a new chat moves to the
+          top-right where it does not crowd the toggle. Neither carries a
+          background, border or shadow of its own, so the conversation stays
+          unbroken behind them; the icon colour and a soft drop shadow keep them
+          readable once text scrolls underneath. */}
+      {!compact && onToggleSidebar && (
+        <Button
+          isIconOnly
+          variant="ghost"
+          className="zuri-chat-float zuri-chat-float-left"
+          aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          title={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          onPress={onToggleSidebar}
+        >
+          {sidebarCollapsed ? <PanelLeftOpenIcon size={19} /> : <PanelLeftCloseIcon size={19} />}
+        </Button>
+      )}
+      {!compact && onNewChat && (
+        <Button
+          isIconOnly
+          variant="ghost"
+          className="zuri-chat-float zuri-chat-float-right"
+          aria-label="New chat"
+          title="New chat"
+          onPress={onNewChat}
+        >
+          <NewChatIcon size={19} />
+        </Button>
+      )}
       <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
         {compact && (
           <div className="absolute right-3 top-3 z-10 flex gap-1">
@@ -586,7 +619,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         )}
 
         {hasConversation && (
-          <div ref={scrollRef} onScroll={handleTranscriptScroll} className={`zuri-scrollbar-hidden mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto py-4`}>
+          <div ref={scrollRef} onScroll={handleTranscriptScroll} className={`zuri-scrollbar-hidden mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto ${compact ? 'py-4' : 'pb-4 pt-14'}`}>
             {messages.map((message, index) => (
               message.role === 'user' ? (
                 <div key={messageKey(message, index)} className="min-w-0 max-w-[85%] self-end break-words rounded-2xl bg-accent px-4 py-3 text-sm text-accent-foreground">

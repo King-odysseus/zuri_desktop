@@ -36,8 +36,7 @@ export const NAV_ITEMS = [
 // The reference app pairs a narrow icon rail (where you are) with a list panel
 // (what you have). The rail carries the eight destinations; the panel is the
 // conversation list, which routing in App.jsx keeps in step with the rail.
-export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, activeThreadId, refreshKey, theme, onToggleTheme }) {
-  const [collapsed, setCollapsed] = useState(false);
+export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
 
   useEffect(() => {
@@ -63,7 +62,9 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         className="flex w-14 flex-col items-center gap-2 border-r border-border bg-background py-4"
         aria-label="Destinations"
       >
-        {collapsed && (
+        {/* The chat view carries this control as a floating button over the
+            conversation, so the rail only repeats it where that one is absent. */}
+        {collapsed && current !== 'chats' && (
           <Button
             isIconOnly
             size="sm"
@@ -71,7 +72,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             className="text-muted"
             aria-label="Expand sidebar"
             title="Expand sidebar"
-            onPress={() => setCollapsed(false)}
+            onPress={() => onToggleCollapsed(false)}
           >
             <PanelLeftOpenIcon />
           </Button>
@@ -104,16 +105,20 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             <ChevronDownIcon size={14} />
           </Button>
           <div className="flex items-center gap-1 text-muted">
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              aria-label="Collapse sidebar"
-              title="Collapse sidebar"
-              onPress={() => setCollapsed(true)}
-            >
-              <PanelLeftCloseIcon size={17} />
-            </Button>
+            {/* On the chat view the same control floats over the conversation, so
+                keeping a second copy here would give the person two toggles. */}
+            {current !== 'chats' && (
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label="Collapse sidebar"
+                title="Collapse sidebar"
+                onPress={() => onToggleCollapsed(true)}
+              >
+                <PanelLeftCloseIcon size={17} />
+              </Button>
+            )}
             <Button
               isIconOnly
               size="sm"

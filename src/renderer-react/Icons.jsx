@@ -2,6 +2,8 @@
 // while preserving the existing component names used by the page views.
 export {
   MessageSquare as ChatIcon,
+  // A chat bubble with a plus reads as "start a new conversation".
+  MessageSquarePlus as NewChatIcon,
   Cloud as CloudIcon,
   Bot as AgentIcon,
   UserPlus as UserPlusIcon,
