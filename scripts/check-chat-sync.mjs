@@ -17,7 +17,7 @@ import path from 'node:path';
 
 import { createChatSync } from '../src/main/chat-sync.js';
 import { readCloudSession, writeCloudSession } from '../src/main/cloud-session.js';
-import { appendMessage, listThreads, setStoreRoot } from '../src/main/store.js';
+import { appendMessage, createThread, listThreads, setStoreRoot } from '../src/main/store.js';
 
 let failures = 0;
 
@@ -217,6 +217,47 @@ async function main() {
   }
   check(threw === null, 'a throwing request does not escape as an exception', String(threw?.message ?? ''));
   check(brokenResult?.ok === false, 'a throwing request is turned into a failure result');
+
+  // An attachment stays on the machine that opened it. The file's own wording is
+  // folded into the message text, and so is the path it came from, so neither may
+  // reach the account; the answer to such a turn is kept back for the same reason.
+  const privateThread = await createThread({ title: 'Private budget' });
+  const privateId = privateThread?.data?.id;
+  check(typeof privateId === 'string' && privateId !== '', 'a thread was created to hold the attachment checks');
+
+  // The two ordinary turns either side of the attachment are there to prove the
+  // conversation still syncs: only the file-carrying turn and its answer are held.
+  await appendMessage(privateId, { role: 'user', content: 'What does this sheet say?' });
+  await appendMessage(privateId, { role: 'assistant', content: 'I cannot see a file yet.' });
+  const attachmentTurn = await appendMessage(privateId, {
+    role: 'user',
+    content: 'What are we paying?\n\nAttached file: salaries.xlsx (path: C:/Users/me/salaries.xlsx)\n\nName,Pay\nAda,400',
+    localOnly: true,
+  });
+  check(attachmentTurn?.data?.message?.localOnly === true, 'the attachment turn is stored as device-only');
+  const attachmentReply = await appendMessage(privateId, { role: 'assistant', content: 'Ada is paid 400.' });
+  check(attachmentReply?.data?.message?.localOnly === true, 'the answer to an attachment is marked device-only too');
+  await appendMessage(privateId, { role: 'user', content: 'Thanks, that is all.' });
+
+  await chatSync.syncThread(privateId);
+  const privateCloud = [...account.conversations.values()].find((row) => row.title === 'Private budget');
+  check(Boolean(privateCloud), 'the ordinary part of an attachment chat still reaches the account');
+  check(privateCloud?.messages.length === 3, 'only the three ordinary turns were uploaded', `saw ${privateCloud?.messages.length}`);
+  const uploaded = JSON.stringify(privateCloud?.messages ?? []);
+  check(!uploaded.includes('salaries.xlsx'), 'the attached file\'s wording never reached the account');
+  check(!uploaded.includes('C:/Users'), 'the file path never reached the account');
+  check(!uploaded.includes('Ada is paid'), 'the answer that quotes the file never reached the account');
+
+  // A chat that is nothing but attachments has nothing the account may hold, so it
+  // must not spend one of the account's conversation slots saying so.
+  const attachmentsOnly = await createThread({ title: 'Only attachments' });
+  const onlyId = attachmentsOnly?.data?.id;
+  await appendMessage(onlyId, { role: 'user', content: 'Attached folder: Payslips\n\nAda, 400', localOnly: true });
+  await appendMessage(onlyId, { role: 'assistant', content: 'Two people are on the payroll.' });
+  const beforeOnly = account.conversations.size;
+  const onlyResult = await chatSync.syncThread(onlyId);
+  check(onlyResult?.ok === true, 'a chat of only attachments is not reported as a failure', JSON.stringify(onlyResult?.error ?? null));
+  check(account.conversations.size === beforeOnly, 'a chat of only attachments opens no conversation in the account', `saw ${account.conversations.size}`);
 
   // The link written above is gone, so the thread is uploaded fresh under a new id;
   // what matters is that the run succeeded and did not keep retrying a dead id.
