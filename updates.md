@@ -1,5 +1,12 @@
 ## 2026-10-25 - Windows
 
+- A person's own prompts in the chat transcript now have a copy button, the same one Zuri's replies already carried. Only replies could be copied before, so reusing your own wording meant selecting it by hand. Both roles go through the one `copyMessage` path, so the "Copied" confirmation and the failure message behave the same for a prompt as for a reply.
+- Key files: `src/renderer-react/ChatPanel.jsx`, `scripts/selftest.js`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Claude models can now use tools. The tool list was emptied for the Anthropic path and no Anthropic tool format existed, so switching to a Claude model silently removed web search, page fetch and document creation. The request now carries `{ name, description, input_schema }`, the stream reader collects `content_block_start` plus `input_json_delta` into tool calls, and the tool loop sends `tool_use` blocks back with `tool_result` blocks in the next user turn.
 - `readFile` and `summarizeDocument` are offered in chat on every message, not only when web search is on, because they only read and so need no approval.
 - Automations ask the model instead of guessing a tool from the prompt text. A schedule with no declared steps sends its prompt through the chat pipeline with its own allowed tools, and the answer is written into the run result under a new "Answer" heading. A caller with no model available keeps the old single-call plan.

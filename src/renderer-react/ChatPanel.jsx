@@ -323,7 +323,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   async function copyMessage(message, index) {
     const copied = await copyText(String(message?.content ?? ''));
     if (!copied) {
-      setError('That reply could not be copied to the clipboard.');
+      setError('That message could not be copied to the clipboard.');
       return;
     }
     setCopiedIndex(index);
@@ -689,8 +689,25 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           <div ref={scrollRef} onScroll={handleTranscriptScroll} className={`zuri-scrollbar-hidden mb-4 flex w-full ${contentWidth} min-h-0 flex-1 flex-col gap-3 overflow-x-hidden overflow-y-auto ${compact ? 'py-4' : 'pb-4 pt-14'}`}>
             {messages.map((message, index) => (
               message.role === 'user' ? (
-                <div key={messageKey(message, index)} className="min-w-0 max-w-[85%] self-end break-words rounded-2xl bg-accent px-4 py-3 text-sm text-accent-foreground">
-                  {message.content}
+                <div key={messageKey(message, index)} className="flex min-w-0 max-w-[85%] flex-col items-end gap-1 self-end">
+                  <div className="min-w-0 break-words rounded-2xl bg-accent px-4 py-3 text-sm text-accent-foreground">
+                    {message.content}
+                  </div>
+                  {/* People reuse their own wording far more often than they retype
+                      it, so a prompt gets the same copy action as a reply. */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 rounded-lg text-muted"
+                      aria-label="Copy message"
+                      title={copiedIndex === index ? 'Copied' : 'Copy message'}
+                      onPress={() => void copyMessage(message, index)}
+                    >
+                      {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div key={messageKey(message, index)} className="flex min-w-0 max-w-[85%] flex-col items-start gap-1 self-start">
