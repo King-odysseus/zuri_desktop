@@ -7,7 +7,7 @@ const apiBaseUrl = String(process.env.VITE_API_BASE_URL ?? 'https://zuricloud-pr
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
-    cwd: process.cwd(),
+    cwd: options.cwd ?? process.cwd(),
     env: { ...process.env, ...options.env },
     stdio: 'inherit',
     shell: process.platform === 'win32',
@@ -23,9 +23,8 @@ run(npmCommand, ['vite', 'build', '--config', 'vite.web.config.mjs', '--mode', '
 run(npmCommand, ['cap', 'sync', 'android']);
 
 const gradle = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-const gradlePath = process.platform === 'win32' ? `android\\${gradle}` : `android/${gradle}`;
-if (!existsSync(gradlePath)) {
+if (!existsSync(`android/${process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'}`)) {
   console.error('Android platform is missing its Gradle wrapper. Run npx cap add android first.');
   process.exit(1);
 }
-run(gradlePath, ['assembleDebug']);
+run(gradle, ['assembleDebug'], { cwd: 'android' });
