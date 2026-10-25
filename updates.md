@@ -1,5 +1,14 @@
 ## 2026-10-25 - Windows
 
+- Version 0.2.2 is published for all three platforms. The Windows setup and the Android APK were built here (release/Zuri-0.2.2-Setup.exe, and an APK reporting versionCode 3 and versionName 0.2.2); the macOS dmg came from the "Build macOS installer" workflow run on GitHub, because a dmg can only be produced on a Mac. The download page now offers 0.2.2 for Windows, macOS and Android. Before this it offered 0.1.0 on Windows, 0.2.1 on macOS, and no Android build at all.
+- Both installers were rebuilt before publishing rather than renamed. The page reads the version from the file name, not the release tag, so publishing files built at 0.2.1 under a v0.2.2 tag would have offered a 0.2.2 download that still says 0.2.1.
+- `npm run release:publish` could not create a release. It passed the title "Zuri Desktop 0.2.2" to `gh` through a shell, the shell split it at the space, and `gh` rejected the command. The script now calls `gh` with the arguments as a list, so the title arrives whole. An upload also reported 404 after succeeding, so check the release before retrying rather than trusting that error.
+- Key files: package.json, package-lock.json, android/app/build.gradle, scripts/publish-release.mjs, README.md, release/** (installers, not tracked).
+- Other OS action: none for the published files, they serve both. If you change the site, run "npm run test && npm run web:build". Rebuilding the Windows installer needs "npm run react:build" first.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Both installers were rebuilt at 0.2.1, because neither had caught up with the code. The Windows setup sitting in release/ was still 0.1.0, so it carried none of the cloud chat, the streamed replies, the five-hour window, the extra-usage packs or the browser chat work, and there was no Android APK on disk at all. Built: release/Zuri-0.2.1-Setup.exe and release/Zuri-0.2.1.apk, the APK reporting versionCode 2 and versionName 0.2.1, packaged from a bundle that contains the styles below.
 - `npm run android:build` refused to run on this machine even though the Gradle wrapper is present in android/: "'gradlew.bat' is not recognized as an internal or external command". Windows only searches the current folder for an executable when that behaviour has not been switched off system-wide, and this machine has it switched off. The script now calls the wrapper by its full path, quoted so a project folder with a space in its name still works. Gradle fetches SDK platform 35 on the first run when it is missing, which only works because the SDK licence is already accepted.
 - Secondary text was corrected. The transcript now draws on the canvas, and the muted colour measured 3.7:1 against it, below the 4.5:1 minimum for normal-size text. It is #5f6d83 now: 4.7:1 on the canvas, 5.25:1 on white. This supersedes the note in the entry below that accepted 3.7:1 on the model caption, which was below the minimum.

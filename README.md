@@ -102,12 +102,17 @@ npm run dist
 ```
 
 The installer is written to `release\Zuri-<version>-Setup.exe` (for this version,
-`release\Zuri-0.1.0-Setup.exe`), next to an unpacked copy of the app in
+`release\Zuri-0.2.2-Setup.exe`), next to an unpacked copy of the app in
 `release\win-unpacked`. `release/` is gitignored, so a build never lands in the repository.
 
+`npm run dist` packages whatever `dist-react` already holds and does not rebuild it, so run
+`npm run react:build` after changing the interface and before building the installer. Skipping it
+ships the previous interface under the new version number, which looks right until the app opens.
+
 The packaging setup is the `build` block of `package.json`: one Windows NSIS target for x64, the icon
-at `src/main/assets/zuri-icon.ico`, and a file list of `src/main` and `src/renderer` only. Nothing
-else is copied, so the checks in `scripts/` and the plan in `.kai/` never ship inside the app. The
+at `src/main/assets/zuri-icon.ico`, and a file list of `package.json`, `src/main/**/*` and
+`dist-react/**/*` only. Nothing else is copied, so the checks in `scripts/` and the plan in `.kai/`
+never ship inside the app. The
 installer is per-user (no admin prompt), lets you choose the install folder, and creates Start menu
 and desktop shortcuts; uninstalling it leaves your data alone.
 
@@ -144,6 +149,14 @@ The release workflows build the Windows `.exe` on Windows, the universal macOS `
 macOS runner, and the Android cloud dashboard `.apk` on Ubuntu. Run a workflow manually from GitHub Actions. Set the `RELEASES_TOKEN` repository
 secret to a token that can write releases in `King-odysseus/zuri-releases`; without it, GitHub keeps
 the installer as a workflow artifact instead of publishing it.
+
+To publish builds made on this machine instead, put the installers in `release/` and run
+`npm run release:publish`. Build them at the version in `package.json` first: the page reads the
+version from the file name rather than the tag, so publishing 0.2.1 files under a v0.2.2 tag offers
+a 0.2.2 download that says 0.2.1. The script creates or reuses the `v<version>` tag and replaces an
+asset already there, so re-running it after a rebuild is safe. It calls `gh` without a shell,
+because with one a release title is split at its spaces and `gh` rejects the command. The page
+caches the release list for ten minutes, so a new upload can take that long to appear.
 
 The cloud website reads the newest published release and creates direct download links for Windows,
 macOS and Android automatically. There is no link to update by hand. The Android target is the
