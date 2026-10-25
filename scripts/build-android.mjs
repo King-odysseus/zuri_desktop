@@ -1,6 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
+
+const androidDir = path.resolve('android');
 
 const npmCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 const apiBaseUrl = String(process.env.VITE_API_BASE_URL ?? 'https://zuricloud-production.up.railway.app').replace(/\/+$/, '');
@@ -22,9 +25,15 @@ run(npmCommand, ['vite', 'build', '--config', 'vite.web.config.mjs', '--mode', '
 });
 run(npmCommand, ['cap', 'sync', 'android']);
 
-const gradle = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-if (!existsSync(`android/${process.platform === 'win32' ? 'gradlew.bat' : 'gradlew'}`)) {
+// The wrapper is called by its full path rather than by name. Windows only
+// searches the current folder for an executable when that behaviour has not been
+// switched off system-wide, and on a machine where it has, `gradlew.bat` in cwd
+// is reported as "not recognized" even though the file is right there.
+const gradleFile = path.join(androidDir, process.platform === 'win32' ? 'gradlew.bat' : 'gradlew');
+if (!existsSync(gradleFile)) {
   console.error('Android platform is missing its Gradle wrapper. Run npx cap add android first.');
   process.exit(1);
 }
-run(gradle, ['assembleDebug'], { cwd: 'android' });
+// Quoted because the folder this project sits in can contain a space.
+const gradle = process.platform === 'win32' ? `"${gradleFile}"` : './gradlew';
+run(gradle, ['assembleDebug'], { cwd: androidDir });
