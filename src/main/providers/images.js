@@ -171,7 +171,15 @@ export async function generateImage({ prompt, modelCode, providers, save } = {})
     return failure('IMAGE_UNKNOWN_MODEL', `${model.name} names a picture service Zuri does not call.`);
   }
 
-  const key = getKey(model.provider);
+  let key = null;
+  try {
+    key = getKey(model.provider);
+  } catch {
+    // A key store that cannot be read is the same dead end as no key at all, and
+    // both are fixed from Settings. Letting this throw would surface as a picture
+    // failure with no next step in it.
+    return failure('IMAGE_NO_KEY', 'Zuri could not read your ' + supplier.label + ' key. Open Settings and save it again.');
+  }
   if (key === null) {
     return failure('IMAGE_NO_KEY', `Add your ${supplier.label} key in Settings to use ${model.name}.`);
   }
