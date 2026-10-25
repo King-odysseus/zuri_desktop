@@ -2758,7 +2758,7 @@ a.download-card:hover {
   min-width: 0;
   min-height: 0;
   position: relative;
-  background: var(--surface);
+  background: var(--canvas);
 }
 
 /* The desktop chat puts two bare icons over the transcript rather than a header bar.

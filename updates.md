@@ -1,5 +1,15 @@
 ## 2026-10-25 - Windows
 
+- Dark mode was checked on the chat for the first time and is correct: the transcript sits on the dark canvas, the reply bubble on a slightly lighter surface with a hairline, the composer and the navigation all keep their contrast, and nothing scrolls sideways. The prompt bubble in dark uses the light accent with dark text, which is the same pairing the desktop app uses.
+- One colour corrected. The chat area had been painted white to give the reply bubble something to sit against, but the desktop paints it with its own background colour, which is the site's canvas. On white the reply bubble was clearer than in the app; on the canvas it reads the desktop does. The hairline stays, because the desktop's own bubble has no border and the two colours there are within a few points of each other.
+- Measured contrast after the change: the reply text is 14:1, the model caption 3.7:1 (it was 1.95:1 against white), the prompt text 4.2:1. The caption figure matches the desktop, whose caption uses the same muted colour on the same background.
+- The Android bundle was rebuilt after these styles, so the next APK carries the corrected colours and nothing from the old bottom bar.
+- Key files: web/src/styles.css, server/public/** (rebuilt), dist-android/** and android/app/src/main/assets/public/** (rebuilt, not tracked).
+- Other OS action: run "npm run test && npm run web:build", then "npm run android:build" for an APK.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Every icon control in the web chat is now the site's own Flowbite button: copy, back, new chat, send and stop, rename and delete. A new shared IconButton in the components file wraps Flowbite's Button, requires a label so an icon is never anonymous to a screen reader, and carries the site's 44px target, radius and colours. Before this the chat drew its own bare buttons with their own CSS.
 - Icons all come from lucide, through the shared icon set or straight from the package, so the chat and the rest of the site draw the same family.
 - Padding is fixed throughout the chat. Text was sitting against the edge of its container: a reply now has 14px above and below its text and 18px at the sides, the transcript has a 20px gutter and 24px under the last message, the composer has 16px before the field, and the conversation rows, the navigation and the opening screen all gained room.
