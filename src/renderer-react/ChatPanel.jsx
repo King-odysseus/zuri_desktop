@@ -376,6 +376,30 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     return () => { active = false; };
   }, [api, initialThreadId]);
 
+  /**
+   * Follow turns another surface wrote into this thread.
+   *
+   * A chat continued in the browser is synced into chats.json by the main process,
+   * which then announces area 'chats'. Nothing else re-reads the open transcript, so
+   * without this the reply someone just wrote in the browser would stay missing until
+   * the chat was closed and reopened. Only a longer stored thread replaces what is on
+   * screen: a shorter one means a reply here is still being written, and swapping it
+   * out would swallow the person's own text.
+   */
+  useEffect(() => {
+    const stopListening = api?.state?.onChanged?.((change) => {
+      if (change?.area !== 'chats' || threadId === '' || replying) return;
+      void (async () => {
+        const result = await api.chats.list();
+        const thread = result?.ok ? result.data?.find((entry) => entry?.id === threadId) : null;
+        if (!thread || !Array.isArray(thread.messages)) return;
+        setMessages((previous) => (thread.messages.length > previous.length ? thread.messages : previous));
+      })();
+    });
+    return () => { stopListening?.(); };
+  }, [api, threadId, replying]);
+
+
   // A brand new chat starts from Settings again rather than inheriting the model of
   // whichever chat happened to be open before it.
   useEffect(() => {

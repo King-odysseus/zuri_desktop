@@ -1,5 +1,17 @@
 ## 2026-10-25 - Windows
 
+- The phone layout of the site and the Android app no longer has a bottom bar at all. Navigation is a floating round button in the top-left corner that reveals the sidebar, which is how the assistant apps do it. It sits under the top bar, over the page, and the page content starts below it so nothing is covered.
+- A chat is now one sidebar, not three columns. The destinations, the account and the conversation list share a single column, so the chat itself gets the width the desktop app gives it: 896px, widening to 1024 and 1152 on larger screens. Before, the site showed a navigation sidebar, a chat list and the thread side by side and the answer column was squeezed.
+- The chat's header bar is gone. Two bare icons float over the transcript instead, the way the desktop chat draws them: back to the chat list on a phone at the left, new chat at the right. The chat sits on the app background rather than a raised panel.
+- The reply caption names the model above the bubble, outside it, and the copy control is the same small icon button the desktop transcript carries, on both the prompt and the reply.
+- The opening line is at the desktop's scale: a 30px greeting and one 16px line.
+- The Android bundle in the project was rebuilt, so the next APK carries this. The installed app still shows the old bottom bar until a new build is installed.
+- Key files: web/src/views/ChatView.jsx, web/src/views/Dashboard.jsx, web/src/components/TopBar.jsx, web/src/App.jsx, web/src/styles.css, scripts/selftest.js, server/public/** (rebuilt), dist-android/** and android/app/src/main/assets/public/** (rebuilt, not tracked).
+- Other OS action: run "npm run test && npm run web:build", and run "npm run android:build" to produce an APK with the new navigation.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - The browser chat now mirrors the desktop one instead of approximating it. A reply is drawn by the desktop app's own markdown component, imported rather than copied, so code blocks, lists, tables and links read the same on both surfaces and there is only one set of rules to keep right. A prompt still shows exactly what was typed.
 - Both a prompt and a reply carry the same copy action the transcript has in the app, as an icon that confirms with "Copied" and clears itself. Before this only the reply had one, because the web chat drew its own bubbles.
 - The opening screen is the desktop's: the app mark, "Good morning, Ada" and one line about what can be asked, instead of a bare line of text. A chat also reopens on the model it was started with, read from the conversation rather than from whatever this tab last had picked, so a thread begun on Zuri Pro is not answered by Flash because someone changed the chip elsewhere.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Dropdown, DropdownItem, Textarea } from 'flowbite-react';
 import {
   ArrowUp,
@@ -110,7 +110,7 @@ function failureOf(error, fallback) {
  * Below 900px only one pane is on screen at a time, because a 390px window has no
  * room for both, and the open chat carries a back button to the list.
  */
-export default function ChatView({ onSignIn, userName = '' }) {
+export default function ChatView({ onSignIn, userName = '', navigation = null }) {
   const [conversations, setConversations] = useState([]);
   const [listStatus, setListStatus] = useState('loading');
   const [listError, setListError] = useState(null);
@@ -479,6 +479,9 @@ export default function ChatView({ onSignIn, userName = '' }) {
         * and the thread keeps its own back control.
         */}
       <aside className="chat-recents" aria-label="Saved chats">
+        {/* The same navigation panel the other pages show, so a chat has one sidebar
+            holding both the destinations and the conversations. */}
+        {navigation && <div className="chat-nav">{navigation}</div>}
         <div className="chat-recents-head">
           <Button variant="secondary" block className="chat-new" onClick={startNewChat}>
             <Plus size={16} aria-hidden="true" />
@@ -571,15 +574,31 @@ export default function ChatView({ onSignIn, userName = '' }) {
       </aside>
 
       <main className="chat-thread">
-        <header className="chat-thread-head">
-          <button type="button" className="chat-icon-btn chat-back" aria-label="Back to saved chats" onClick={backToList}>
-            <ChevronLeft size={18} aria-hidden="true" />
-          </button>
-          <div className="chat-thread-title">
-            <h1>{title}</h1>
-            <p>{streaming ? 'Zuri is answering...' : 'Saved to your account'}</p>
+        {/*
+          * Two bare floating icons, as the desktop chat draws them, rather than a
+          * header bar: the chat list on the left (or the back control on a phone) and
+          * starting a new chat on the right. The transcript scrolls underneath them.
+          */}
+        <div className="chat-floats">
+          {/* On a phone the left corner is the way back to the chat list. A wide screen
+              has the list permanently beside the thread, so only the new-chat icon shows. */}
+          {showThread && (
+            <button type="button" className="chat-icon-btn chat-back" aria-label="Back to saved chats" onClick={backToList}>
+              <ChevronLeft size={18} aria-hidden="true" />
+            </button>
+          )}
+          <div className="chat-floats-end">
+            <button
+              type="button"
+              className="chat-icon-btn"
+              aria-label="New chat"
+              title="New chat"
+              onClick={startNewChat}
+            >
+              <Plus size={18} aria-hidden="true" />
+            </button>
           </div>
-        </header>
+        </div>
 
         <div ref={messagesRef} onScroll={onMessagesScroll} className="chat-transcript">
           {!showThread && (
@@ -613,32 +632,34 @@ export default function ChatView({ onSignIn, userName = '' }) {
           )}
 
           {thread.messages.map((message, index) => (
-            <article key={`${index}-${message.role}`} className={`chat-bubble chat-bubble-${message.role}`}>
+            <Fragment key={`${index}-${message.role}`}>
+              {/* The desktop prints the model above the reply, outside the bubble. */}
               {message.role === 'assistant' && index === lastAnswerIndex && (
                 <span className="chat-bubble-role">{modelName}</span>
               )}
-              {/* A prompt is shown exactly as typed. A reply goes through the desktop's
-                  own renderer, so code, lists, tables and links read the same on both. */}
-              {message.role === 'assistant'
-                ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
-                : <p className="chat-text">{message.content}</p>}
-              <div className="chat-bubble-actions">
-                <button
-                  type="button"
-                  className="chat-copy"
-                  aria-label={copiedIndex === index ? 'Copied' : message.role === 'user' ? 'Copy your message' : "Copy Zuri's reply"}
-                  title={copiedIndex === index ? 'Copied' : 'Copy'}
-                  onClick={() => void copyMessage(message, index)}
-                >
-                  {copiedIndex === index ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                </button>
-              </div>
-            </article>
+              <article className={`chat-bubble chat-bubble-${message.role}`}>
+                {/* A prompt is shown exactly as typed. A reply goes through the desktop's
+                    own renderer, so code, lists, tables and links read the same on both. */}
+                {message.role === 'assistant'
+                  ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
+                  : <p className="chat-text">{message.content}</p>}
+                <div className="chat-bubble-actions">
+                  <button
+                    type="button"
+                    className="chat-copy"
+                    aria-label={copiedIndex === index ? 'Copied' : message.role === 'user' ? 'Copy your message' : "Copy Zuri's reply"}
+                    title={copiedIndex === index ? 'Copied' : 'Copy'}
+                    onClick={() => void copyMessage(message, index)}
+                  >
+                    {copiedIndex === index ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                  </button>
+                </div>
+              </article>
+            </Fragment>
           ))}
 
           {streaming && (
             <article className="chat-bubble chat-bubble-assistant is-streaming">
-              <span className="chat-bubble-role">{modelName}</span>
               {streamReply
                 ? <div className="chat-answer"><FormattedMessage content={streamReply} /></div>
                 : <p className="chat-text">Zuri is thinking...</p>}

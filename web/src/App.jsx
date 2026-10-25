@@ -77,6 +77,22 @@ export default function App() {
     applyTheme(theme);
   }, [theme]);
 
+  // Escape closes the navigation drawer, the way every side panel on the web does,
+  // and the page behind it cannot scroll while it is open.
+  useEffect(() => {
+    if (!navOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === 'Escape') setNavOpen(false);
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [navOpen]);
+
   // Back and forward move between the landing page and the account screens.
   useEffect(() => {
     const onPop = () => setRoute(readRoute());
@@ -334,6 +350,7 @@ export default function App() {
           onSignIn={handleSignIn}
           onSignOut={() => handleSignOut('/signin')}
           navOpen={navOpen}
+          onOpenNav={() => setNavOpen(true)}
           onCloseNav={() => setNavOpen(false)}
         />
       );
@@ -390,7 +407,6 @@ export default function App() {
         onSignIn={handleSignIn}
         onSignOut={() => handleSignOut('/')}
         onNavigate={navigate}
-        onOpenNav={status === 'signed-in' ? () => setNavOpen(true) : undefined}
       />
       <NoticeBar notice={notice} />
       {body}

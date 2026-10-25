@@ -1,6 +1,6 @@
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
-import { ChartIcon, CardIcon, CloseIcon, GridIcon, MessageIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
+import { ChartIcon, CardIcon, CloseIcon, GridIcon, MenuIcon, MessageIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
@@ -37,16 +37,16 @@ function NavList({ view, onViewChange, isAdmin }) {
 }
 
 /**
- * Signed-in shell. The navigation is a sidebar on a wide screen and a drawer behind
- * the top bar's menu button below 900px, so no bottom bar covers the chat composer.
+ * The navigation panel: the account, the destinations and the download link.
+ *
+ * The chat renders this inside its own list column, so a chat has one sidebar holding
+ * both the destinations and the conversations, the way the desktop app does. Every
+ * other page renders it as the docked sidebar, or the drawer on a phone.
  */
-export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn, navOpen, onCloseNav }) {
-  const user = account.me?.user ?? {};
-  const name = user.displayName || user.email || 'Zuri user';
-
+function SidebarContents({ user, name, view, onViewChange, onCloseNav, withAccount = true }) {
   return (
-    <div className="app">
-      <aside className={`sidebar${navOpen ? ' is-open' : ''}`} aria-label="Dashboard navigation">
+    <>
+      {withAccount && (
         <div className="account-card">
           <span className="avatar">{initialsFor(user.displayName, user.email)}</span>
           <span style={{ minWidth: 0 }}>
@@ -58,25 +58,59 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
             </span>
           </span>
         </div>
-        {/* The bar already names the app once the panel is docked, so only the drawer shows this. */}
-        <div className="sidebar-drawer-head">
-          <span className="brand-name">Zuri Cloud</span>
-          <button type="button" className="icon-btn" onClick={onCloseNav} aria-label="Close navigation">
-            <CloseIcon />
-          </button>
-        </div>
-        <nav className="nav" aria-label="Dashboard sections">
-          <NavList view={view} onViewChange={onViewChange} isAdmin={user.isAdmin === true} />
-        </nav>
-        <p className="stat-meta" style={{ marginTop: 'auto' }}>
-          Signed in to Zuri Cloud.
-        </p>
-        <DownloadLink className="sidebar-download" />
-      </aside>
+      )}
+      {/* The bar already names the app once the panel is docked, so only the drawer shows this. */}
+      <div className="sidebar-drawer-head">
+        <span className="brand-name">Zuri Cloud</span>
+        <button type="button" className="icon-btn" onClick={onCloseNav} aria-label="Close navigation">
+          <CloseIcon />
+        </button>
+      </div>
+      <nav className="nav" aria-label="Dashboard sections">
+        <NavList view={view} onViewChange={onViewChange} isAdmin={user.isAdmin === true} />
+      </nav>
+      <p className="stat-meta sidebar-note">Signed in to Zuri Cloud.</p>
+      <DownloadLink className="sidebar-download" />
+    </>
+  );
+}
 
-      <main className={`app-main${view === 'chat' ? ' is-chat' : ''}`}>
+/**
+ * Signed-in shell. The navigation is a sidebar on a wide screen and a drawer behind a
+ * floating button below 900px, so no bottom bar covers the chat composer. The chat
+ * carries the navigation itself, which is why the docked sidebar is skipped there.
+ */
+export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn, navOpen, onOpenNav, onCloseNav }) {
+  const user = account.me?.user ?? {};
+  const name = user.displayName || user.email || 'Zuri user';
+  const isChat = view === 'chat';
+  const navigation = (
+    <SidebarContents
+      user={user}
+      name={name}
+      view={view}
+      onViewChange={onViewChange}
+      onCloseNav={onCloseNav}
+    />
+  );
+
+  return (
+    <div className="app">
+      {!isChat && (
+        <aside className={`sidebar${navOpen ? ' is-open' : ''}`} aria-label="Dashboard navigation">
+          {navigation}
+        </aside>
+      )}
+
+      <main className={`app-main${isChat ? ' is-chat' : ''}`}>
         <div className="app-content">
-          {view === 'chat' && <ChatView onSignIn={onSignIn} userName={user.displayName ?? ''} />}
+          {isChat && (
+            <ChatView
+              onSignIn={onSignIn}
+              userName={user.displayName ?? ''}
+              navigation={navigation}
+            />
+          )}
           {view === 'overview' && <OverviewView me={account.me} usage={account.usage} />}
           {view === 'usage' && (
             <UsageView
@@ -101,15 +135,32 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           )}
           {view === 'admin' && user.isAdmin === true && <AdminView />}
 
-          <div className="app-foot">
-            <Footer compact />
-          </div>
+          {!isChat && (
+            <div className="app-foot">
+              <Footer compact />
+            </div>
+          )}
         </div>
       </main>
 
-      {/* A tap outside the drawer closes it. The scrim is hidden once the sidebar
-          is docked at the wide breakpoint. */}
-      {navOpen && (
+      {/* Below the sidebar breakpoint the navigation is a drawer opened by this floating
+          button. The chat draws its own controls, and the drawer is not used there
+          because its list column already carries the navigation. */}
+      {!isChat && !navOpen && (
+        <button
+          type="button"
+          className="nav-fab"
+          onClick={onOpenNav}
+          aria-label="Open navigation"
+          aria-expanded="false"
+        >
+          <MenuIcon />
+        </button>
+      )}
+
+      {/* A tap outside the drawer closes it. The scrim is hidden once the sidebar is
+          docked at the wide breakpoint. */}
+      {!isChat && navOpen && (
         <button type="button" className="nav-scrim" aria-label="Close navigation" onClick={onCloseNav} />
       )}
     </div>

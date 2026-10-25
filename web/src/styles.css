@@ -970,32 +970,40 @@ a {
   padding: 0 4px 4px;
 }
 
-/* The menu button beside the brand, shown only while the navigation is a drawer. */
-.topbar-menu {
+/*
+ * The phone's way into the navigation: one floating round button over the page,
+ * which is how the assistant apps offer the same drawer. It hangs under the top
+ * bar on the left, clear of the thumb's resting place and of the composer, and it
+ * is hidden entirely once the sidebar docks at the wide breakpoint.
+ */
+.nav-fab {
+  position: fixed;
+  top: calc(var(--bar-height) + 10px);
+  left: 10px;
+  z-index: 40;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: 40px;
-  height: 40px;
-  margin-right: 2px;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--radius-lg);
-  background: transparent;
-  color: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--text);
+  box-shadow: 0 6px 18px rgba(9, 18, 33, 0.16);
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
   cursor: pointer;
 }
 
-.topbar-menu:hover {
-  border-color: var(--hairline);
-  background: var(--surface-secondary);
-  color: var(--text);
+.nav-fab:hover {
+  background: var(--surface);
 }
 
-.topbar-menu:focus-visible {
+.nav-fab:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .app-main {
@@ -1350,7 +1358,7 @@ a {
     display: none;
   }
 
-  .topbar-menu,
+  .nav-fab,
   .sidebar-drawer-head {
     display: none;
   }
@@ -1368,6 +1376,30 @@ a {
   .view-head {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  /* The floating menu button hangs under the bar on the left, so the content below
+     it starts under the button rather than beside it. */
+  .app-main {
+    padding-top: 68px;
+  }
+
+  .app-main.is-chat {
+    padding-top: 0;
+  }
+}
+
+@media (min-width: 1280px) {
+  .chat-transcript,
+  .chat-composer-wrap {
+    max-width: 1024px;
+  }
+}
+
+@media (min-width: 1536px) {
+  .chat-transcript,
+  .chat-composer-wrap {
+    max-width: 1152px;
   }
 }
 
@@ -2544,6 +2576,25 @@ a.download-card:hover {
   padding: 0 2px;
 }
 
+/* The navigation travels inside this column, so the panel and the conversation list
+   read as one sidebar rather than three side-by-side tracks. */
+.chat-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--control-border) 45%, transparent);
+}
+
+.chat-nav .sidebar-note,
+.chat-nav .sidebar-download {
+  margin-top: 0;
+}
+
+.chat-nav .sidebar-drawer-head {
+  display: none;
+}
+
 .chat-recents .chat-new {
   justify-content: flex-start;
   gap: 8px;
@@ -2716,38 +2767,34 @@ a.download-card:hover {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  background: var(--surface);
+  position: relative;
+  background: var(--background);
 }
 
-.chat-thread-head {
+/* The desktop chat puts two bare icons over the transcript rather than a header bar.
+   They float, so the conversation scrolls underneath them. */
+.chat-floats {
+  position: absolute;
+  top: 8px;
+  left: 0;
+  right: 0;
+  z-index: 5;
   display: flex;
   align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-  width: 100%;
-  max-width: 56rem;
-  margin: 0 auto;
-  padding: 10px 12px;
+  justify-content: space-between;
+  padding: 0 8px;
+  pointer-events: none;
 }
 
-.chat-thread-title {
-  min-width: 0;
+.chat-floats-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
 
-.chat-thread-title h1 {
-  margin: 0;
-  overflow: hidden;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chat-thread-title p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
+.chat-floats .chat-icon-btn {
+  pointer-events: auto;
 }
 
 .chat-icon-btn {
@@ -2783,9 +2830,9 @@ a.download-card:hover {
   flex: 1 1 auto;
   min-height: 0;
   width: 100%;
-  max-width: 56rem;
+  max-width: 896px;
   margin: 0 auto;
-  padding: 8px 16px 16px;
+  padding: 56px 16px 16px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -2820,11 +2867,9 @@ a.download-card:hover {
 }
 
 .chat-bubble-role {
+  padding: 0 4px;
   color: var(--muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: 12px;
 }
 
 .chat-bubble-user .chat-text {
@@ -2935,7 +2980,7 @@ a.download-card:hover {
 .chat-opening h2 {
   margin: 4px 0 0;
   color: var(--text);
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 500;
   letter-spacing: -0.02em;
 }
@@ -2944,7 +2989,7 @@ a.download-card:hover {
   margin: 0;
   max-width: 32rem;
   color: var(--muted);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.55;
 }
 
@@ -2959,7 +3004,7 @@ a.download-card:hover {
 .chat-composer-wrap {
   flex: 0 0 auto;
   width: 100%;
-  max-width: 56rem;
+  max-width: 896px;
   margin: 0 auto;
   padding: 0 16px calc(16px + env(safe-area-inset-bottom));
 }
@@ -3105,6 +3150,16 @@ a.download-card:hover {
     flex: 1 1 auto;
     border-right: 0;
   }
+
+  .chat-thread-head {
+    padding-top: 62px;
+  }
+
+  /* The saved-chats pane starts under the floating button rather than beside it, so
+     the New chat pill keeps its full width instead of being squeezed into a gap. */
+  .chat-recents {
+    padding-top: 62px;
+  }
 }
 
 @media (min-width: 900px) {
@@ -3113,7 +3168,6 @@ a.download-card:hover {
     width: 264px;
   }
 
-  .chat-recents-actions,
   .chat-recent-actions {
     opacity: 0;
     transition: opacity 0.12s ease;

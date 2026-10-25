@@ -1055,29 +1055,28 @@ check('the signed-in shell has no bottom tab bar', () => {
   return 'navigation is a sidebar, not a bottom bar';
 });
 
-check('a phone reaches the navigation through a drawer with a menu button and a scrim', () => {
+check('a phone reaches the navigation through a drawer with a floating button and a scrim', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
-  const topBar = read('web/src/components/TopBar.jsx');
   const styles = read('web/src/styles.css');
-  for (const required of ['sidebar${navOpen ? ', 'className="nav-scrim"', 'onClick={onCloseNav}']) {
+  for (const required of ['sidebar${navOpen ? ', 'className="nav-scrim"', 'onClick={onCloseNav}', 'className="nav-fab"']) {
     if (!dashboard.includes(required)) throw new Error('the shell is missing ' + required);
   }
-  if (!topBar.includes('onOpenNav') || !topBar.includes('aria-label="Open navigation"')) {
-    throw new Error('the top bar has no menu button');
-  }
+  // The button floats over the page: it is not a bar row, and it is round.
+  if (!/\.nav-fab \{[^}]*position: fixed;/.test(styles)) throw new Error('the menu button does not float');
+  if (!/\.nav-fab \{[^}]*border-radius: 999px;/.test(styles)) throw new Error('the floating button is not round');
   // The closed drawer must be off-screen, and the open one must actually slide in.
   if (!/\.sidebar \{[^}]*transform: translateX\(-100%\);/.test(styles)) {
     throw new Error('the closed drawer still sits on the page');
   }
   if (!/\.sidebar\.is-open \{[^}]*transform: none;/.test(styles)) throw new Error('the drawer does not slide in');
   if (!/\.nav-scrim \{[^}]*position: fixed;/.test(styles)) throw new Error('the scrim does not cover the page');
-  return 'menu button, slide-in sidebar and a scrim that closes it';
+  return 'floating button, slide-in sidebar and a scrim that closes it';
 });
 
 check('the chat takes the whole window and only the transcript scrolls', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
   const styles = read('web/src/styles.css');
-  if (!dashboard.includes("view === 'chat' ? ' is-chat' : ''")) throw new Error('the chat view does not mark the shell');
+  if (!dashboard.includes("isChat ? ' is-chat' : ''")) throw new Error('the chat view does not mark the shell');
   if (!/\.app-main\.is-chat \.app-content \{[^}]*height: calc\(100dvh - var\(--bar-height\)\)/.test(styles)) {
     throw new Error('the chat does not fill the window under the bar');
   }
@@ -1102,7 +1101,24 @@ check('a chat continued in the browser refreshes the desktop without a restart',
   if (!main.includes("(Number(result.data?.appended) || 0) > 0) announceState({ area: 'chats' })")) {
     throw new Error('pulled messages do not announce a change');
   }
-  return 'background sync announces the pulled turns';
+  // Announcing is only half of it: the transcript on screen has to re-read too, or
+  // the turns someone just wrote in the browser stay invisible in an open chat.
+  const panel = read('src/renderer-react/ChatPanel.jsx');
+  if (!panel.includes("change?.area !== 'chats' || threadId === '' || replying")) {
+    throw new Error('the open transcript does not listen for pulled messages');
+  }
+  if (!panel.includes('thread.messages.length > previous.length ? thread.messages : previous')) {
+    throw new Error('a refresh could drop a reply that is still being written');
+  }
+  return 'background sync announces, and the open transcript re-reads';
+});
+
+check('the navigation drawer closes on Escape and locks the page behind it', () => {
+  const app = read('web/src/App.jsx');
+  if (!app.includes("if (event.key === 'Escape') setNavOpen(false);")) throw new Error('Escape does not close the drawer');
+  if (!app.includes("document.body.style.overflow = 'hidden'")) throw new Error('the page scrolls behind the open drawer');
+  if (!app.includes('document.body.style.overflow = previousOverflow')) throw new Error('the scroll lock is never released');
+  return 'Escape closes, the page behind is locked, and the lock is restored';
 });
 
 await Promise.all(pendingChecks);

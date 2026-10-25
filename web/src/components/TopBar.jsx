@@ -1,4 +1,4 @@
-import { LogoMark, MenuIcon, MoonIcon, SunIcon } from './Icons.jsx';
+import { LogoMark, MoonIcon, SunIcon } from './Icons.jsx';
 import { Button } from './ui.jsx';
 import { themeLabel } from '../lib/theme.js';
 
@@ -13,20 +13,12 @@ import { themeLabel } from '../lib/theme.js';
  *   onSignIn: () => void,
  *   onSignOut: () => void,
  *   onNavigate: (path: string) => void,
- *   onOpenNav?: () => void,
  * }} props
  */
-export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onSignOut, onNavigate, onOpenNav }) {
+export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onSignOut, onNavigate }) {
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        {/* Only a signed-in page has a navigation panel, and only below the sidebar
-            breakpoint does the button show: the CSS hides it once the panel is docked. */}
-        {onOpenNav && (
-          <button type="button" className="topbar-menu" onClick={onOpenNav} aria-label="Open navigation">
-            <MenuIcon />
-          </button>
-        )}
         <button type="button" className="brand" onClick={() => onNavigate('/')} aria-label="Zuri Cloud home">
           <span className="brand-mark">
             <LogoMark size={20} />
