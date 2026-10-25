@@ -27,6 +27,31 @@ export function formatDate(value) {
   return date.toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/**
+ * How long ago a conversation was touched, in words short enough for a list row:
+ * "Just now", "12 min ago", "3 hr ago", "2 days ago", then a plain date once a
+ * week is no longer a useful measure.
+ * @param {unknown} value
+ */
+export function formatRelativeTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 28) {
+    const weeks = Math.floor(days / 7);
+    return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+  }
+  return formatDate(date);
+}
+
 /** @param {string} [displayName] @param {string} [email] */
 export function initialsFor(displayName, email) {
   const source = (displayName || email || 'Z').trim();

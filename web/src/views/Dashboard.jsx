@@ -1,14 +1,16 @@
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
-import { ChartIcon, CardIcon, GridIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
+import { ChartIcon, CardIcon, GridIcon, MessageIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
+import ChatView from './ChatView.jsx';
 import OverviewView from './OverviewView.jsx';
 import UsageView from './UsageView.jsx';
 import PlansView from './PlansView.jsx';
 import BillingView from './BillingView.jsx';
 
 export const NAV_ITEMS = [
+  { id: 'chat', label: 'Chat', short: 'Chat', icon: <MessageIcon /> },
   { id: 'overview', label: 'Overview', short: 'Overview', icon: <GridIcon /> },
   { id: 'usage', label: 'Usage and limits', short: 'Usage', icon: <ChartIcon /> },
   { id: 'plans', label: 'Plans', short: 'Plans', icon: <CardIcon /> },
@@ -36,7 +38,7 @@ function NavList({ view, onViewChange, compact, isAdmin }) {
 
 /**
  * Signed-in shell. Sidebar on wide screens, a fixed bottom tab bar below 900px
- * so the four destinations stay reachable with a thumb.
+ * so every destination stays reachable with a thumb.
  */
 export default function Dashboard({ account, plans, view, busy, onViewChange, onChoose, onSignIn }) {
   const user = account.me?.user ?? {};
@@ -67,6 +69,7 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
 
       <main className="app-main">
         <div className="app-content">
+          {view === 'chat' && <ChatView onSignIn={onSignIn} />}
           {view === 'overview' && <OverviewView me={account.me} usage={account.usage} />}
           {view === 'usage' && <UsageView usage={account.usage} limits={account.limits} />}
           {view === 'plans' && (

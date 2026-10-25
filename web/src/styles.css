@@ -1203,6 +1203,8 @@ a {
   justify-content: center;
   gap: 4px;
   min-height: 52px;
+  /* Six destinations for an admin at 390px: the label gives way, not the bar. */
+  min-width: 0;
   padding: 4px;
   border: 0;
   border-radius: var(--radius-lg);
@@ -1220,6 +1222,13 @@ a {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.tab span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tab.is-active {
@@ -2441,6 +2450,346 @@ a.download-card:hover {
   min-height: 44px;
   color: var(--accent-text);
   font-size: 14px;
+}
+
+/* Chat: the account's saved conversations beside the open one. The message list is
+   the only thing that scrolls, so the composer keeps its place under the thumb. */
+.chat-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 12px;
+}
+
+.chat-list-pane,
+.chat-thread-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+  box-shadow: var(--shadow-soft);
+}
+
+.chat-pane-head,
+.chat-thread-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chat-pane-title {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.chat-thread-title {
+  flex: 1 1 12ch;
+  min-width: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.chat-alert-action {
+  display: inline-flex;
+  margin-left: 8px;
+}
+
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A row is one 52px target: title on top, how long ago underneath. The title is
+   clipped rather than wrapped so a long name never widens the pane. */
+.chat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-row:hover {
+  background: color-mix(in srgb, var(--selected) 46%, transparent);
+}
+
+.chat-row.is-active {
+  background: var(--selected);
+  color: var(--selected-foreground);
+}
+
+.chat-row-title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-row-time {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.chat-row.is-active .chat-row-time {
+  color: var(--selected-foreground);
+}
+
+.chat-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 2px 4px;
+}
+
+.chat-row-actions .btn {
+  min-height: 44px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.chat-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 2px 0 6px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--danger-soft);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.chat-rename {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 4px 2px;
+}
+
+.chat-rename-input {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  background: var(--field-background);
+  color: var(--text);
+  font: 400 14px/1.2 "Segoe UI", system-ui, sans-serif;
+}
+
+.chat-rename-input:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  max-height: 58dvh;
+  padding: 4px 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chat-messages:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.chat-bubble {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-self: flex-start;
+  max-width: min(100%, 44rem);
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.chat-bubble-user {
+  align-self: flex-end;
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+}
+
+.chat-bubble-role {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* A reply is not markup: line breaks are kept and nothing else is interpreted, so
+   no answer the model writes can inject anything into the page. */
+.chat-text {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+}
+
+.chat-draft {
+  width: 100%;
+  min-height: 88px;
+  max-height: 30dvh;
+  padding: 10px 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  background: var(--field-background);
+  color: var(--text);
+  font: 400 14px/1.5 "Segoe UI", system-ui, sans-serif;
+  resize: vertical;
+}
+
+.chat-draft::placeholder {
+  color: var(--faint);
+}
+
+.chat-draft:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.chat-composer-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.chat-model {
+  min-width: 140px;
+  max-width: 220px;
+}
+
+.chat-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.chat-empty-pane p {
+  margin: 0;
+}
+
+.chat-empty-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 220px;
+  padding: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Below the sidebar breakpoint the two panes never share the width: the list, or
+   the open chat with a back button to it. */
+@media (max-width: 899px) {
+  .chat-shell[data-pane='thread'] .chat-list-pane {
+    display: none;
+  }
+
+  .chat-shell[data-pane='list'] .chat-thread-pane {
+    display: none;
+  }
+
+  /* On a phone the shell is what stays inside the screen, so the message list is
+     the only thing that scrolls and Send never drops below the tab bar. Without
+     the bound the card grows with the conversation and the composer lands off
+     screen once a reply arrives. */
+  .chat-shell {
+    height: calc(100dvh - var(--bar-height) - 214px);
+    min-height: 320px;
+  }
+
+  .chat-list-pane,
+  .chat-thread-pane {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .chat-messages {
+    flex: 1 1 auto;
+    max-height: none;
+  }
+}
+
+@media (min-width: 900px) {
+  .chat-shell {
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  }
+
+  .chat-list-pane,
+  .chat-thread-pane {
+    height: calc(100dvh - var(--bar-height) - 190px);
+    min-height: 380px;
+    max-height: 820px;
+  }
+
+  .chat-list-pane {
+    overflow-y: auto;
+  }
+
+  .chat-messages {
+    flex: 1 1 auto;
+    max-height: none;
+  }
+
+  .chat-back {
+    display: none;
+  }
 }
 
 .foot-legal {

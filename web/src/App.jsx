@@ -22,7 +22,8 @@ import {
 } from './lib/api.js';
 import { applyTheme, preferredTheme } from './lib/theme.js';
 
-const VIEWS = ['overview', 'usage', 'plans', 'billing', 'account', 'admin'];
+const VIEWS = ['chat', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
+const CHAT_PATH = '/chat';
 const LEGAL_PATHS = ['/privacy', '/terms'];
 const AUTH_PATHS = ['/signin', '/signup', '/forgot-password', '/reset-password', ...LEGAL_PATHS];
 
@@ -39,6 +40,17 @@ function readRoute() {
   };
 }
 
+/**
+ * The dashboard section a pathname asks for. Sections live in the shell's own view
+ * state rather than the URL, so only Chat has an address worth honouring: a link
+ * shared as /chat opens on Chat, and every other path keeps the usual start.
+ * @param {string} pathname
+ * @returns {string}
+ */
+function viewFromPath(pathname) {
+  return pathname.replace(/\/+$/, '') === CHAT_PATH ? 'chat' : 'overview';
+}
+
 export default function App() {
   const [theme, setTheme] = useState(preferredTheme);
   const [plans, setPlans] = useState([]);
@@ -47,7 +59,7 @@ export default function App() {
   const [status, setStatus] = useState('booting');
   const [account, setAccount] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [view, setView] = useState('overview');
+  const [view, setView] = useState(() => viewFromPath(window.location.pathname));
   const [busyPlan, setBusyPlan] = useState('');
   const [route, setRoute] = useState(readRoute);
 
@@ -223,7 +235,13 @@ export default function App() {
   );
 
   const handleViewChange = useCallback((next) => {
-    setView(VIEWS.includes(next) ? next : 'overview');
+    const section = VIEWS.includes(next) ? next : 'overview';
+    setView(section);
+    // Chat is the one section with an address, so a reload or a shared /chat link
+    // lands back on it; the rest stay in view state. replaceState rather than
+    // pushState, because the single popstate handler only knows the public routes
+    // and would not move between views.
+    window.history.replaceState({}, '', section === 'chat' ? CHAT_PATH : '/');
     window.scrollTo({ top: 0 });
   }, []);
 

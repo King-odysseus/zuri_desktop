@@ -49,6 +49,143 @@ const adminOverview = {
   ],
 };
 
+// Sample saved chats, so the signed-in chat screen can be reviewed without a
+// database. Kept in memory: the preview server is a look, not a store.
+let conversations = [
+  {
+    id: 'c1',
+    title: 'Draft a launch email for the starter plan',
+    model: 'zuri-pro',
+    origin: 'web',
+    createdAt: '2026-10-24T09:12:00.000Z',
+    updatedAt: '2026-10-24T09:40:00.000Z',
+    messages: [
+      { id: 'm1', role: 'user', content: 'Write a short launch email for the Starter plan.', createdAt: '2026-10-24T09:12:00.000Z' },
+      { id: 'm2', role: 'assistant', content: 'Subject: Zuri Starter is here\n\nHi there,\n\nStarter gives you 2 million tokens a month, enough for everyday work, and it costs N2,500.\n\nReply if you would like a walkthrough.', createdAt: '2026-10-24T09:40:00.000Z' },
+    ],
+  },
+  {
+    id: 'c2',
+    title: 'Why is my reply slow on Power?',
+    model: 'zuri-flash',
+    origin: 'desktop',
+    createdAt: '2026-10-23T16:02:00.000Z',
+    updatedAt: '2026-10-23T16:05:00.000Z',
+    messages: [
+      { id: 'm3', role: 'user', content: 'Why is my reply slow on Power?', createdAt: '2026-10-23T16:02:00.000Z' },
+      { id: 'm4', role: 'assistant', content: 'Longer answers take longer to stream. Try a shorter question, or pick a faster model.', createdAt: '2026-10-23T16:05:00.000Z' },
+    ],
+  },
+  {
+    id: 'c3',
+    title: 'New chat',
+    model: 'zuri-flash',
+    origin: 'web',
+    createdAt: '2026-10-22T11:00:00.000Z',
+    updatedAt: '2026-10-22T11:00:00.000Z',
+    messages: [],
+  },
+];
+
+/** @param {object} row @returns {object} */
+function conversationSummary(row) {
+  const { messages, ...rest } = row;
+  return { ...rest, messageCount: messages.length };
+}
+
+/**
+ * The saved-chat endpoints, as the real server serves them, plus a streamed reply
+ * so the chat screen can be looked at end to end.
+ * @returns {Promise<boolean>} whether the request was handled here
+ */
+async function conversationRoute(request, response, url) {
+  const match = url.pathname.match(/^\/api\/me\/conversations(?:\/([^/]+))?(?:\/(messages))?$/);
+  if (!match) return false;
+  const [, id, action] = match;
+  const found = conversations.find((row) => row.id === id);
+
+  if (!id && request.method === 'GET') {
+    const summary = [...conversations]
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(conversationSummary);
+    json(response, { conversations: summary });
+    return true;
+  }
+
+  if (!id && request.method === 'POST') {
+    const body = JSON.parse(await readBody(request));
+    const now = new Date().toISOString();
+    const created = {
+      id: `c${conversations.length + 1}`,
+      title: body.title || 'New chat',
+      model: body.model || 'zuri-flash',
+      origin: 'web',
+      createdAt: now,
+      updatedAt: now,
+      messages: [],
+    };
+    conversations.push(created);
+    json(response, { conversation: conversationSummary(created) });
+    return true;
+  }
+
+  if (!found) {
+    response.writeHead(404, { 'content-type': 'application/json; charset=utf-8' });
+    response.end(JSON.stringify({ ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That chat does not exist.' } }));
+    return true;
+  }
+
+  if (request.method === 'GET' && !action) {
+    json(response, { conversation: conversationSummary(found), messages: found.messages });
+    return true;
+  }
+
+  if (request.method === 'POST' && action === 'messages') {
+    const body = JSON.parse(await readBody(request));
+    const message = { id: `m${Math.floor(Math.random() * 1e6)}`, role: body.role, content: body.content, createdAt: new Date().toISOString() };
+    found.messages.push(message);
+    found.updatedAt = message.createdAt;
+    if (found.title === 'New chat' && body.role === 'user') found.title = body.content.slice(0, 60);
+    json(response, { message, conversation: conversationSummary(found) });
+    return true;
+  }
+
+  if (request.method === 'PATCH') {
+    const body = JSON.parse(await readBody(request));
+    found.title = String(body.title || '').trim().slice(0, 60) || found.title;
+    json(response, { conversation: conversationSummary(found) });
+    return true;
+  }
+
+  if (request.method === 'DELETE') {
+    conversations = conversations.filter((row) => row.id !== id);
+    json(response, { deleted: true });
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * A streamed reply in the same event shape the real server sends, so the chat
+ * screen's reader is exercised rather than stubbed.
+ */
+function streamChatRoute(response) {
+  response.writeHead(200, { 'content-type': 'text/event-stream; charset=utf-8', 'cache-control': 'no-cache' });
+  const words = ['Here', ' is', ' a', ' sample', ' streamed', ' reply', ' from', ' the', ' preview', ' server', '.'];
+  let index = 0;
+  const timer = setInterval(() => {
+    if (index < words.length) {
+      response.write(`data: ${JSON.stringify({ type: 'delta', text: words[index] })}\n\n`);
+      index += 1;
+      return;
+    }
+    response.write(`data: ${JSON.stringify({ type: 'done', data: { content: words.join(''), model: 'zuri-flash', modelName: 'Zuri Flash' } })}\n\n`);
+    clearInterval(timer);
+    response.end();
+  }, 40);
+}
+
 async function readBody(request) {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
@@ -79,7 +216,13 @@ createServer(async (request, response) => {
   });
   if (url.pathname === '/api/billing/checkout') return json(response, { authorizationUrl: '#' });
 
-  const name = url.pathname === '/' ? 'index.html' : url.pathname.replace(/^\//, '');
+  if (url.pathname === '/api/chat' && request.method === 'POST') { streamChatRoute(response); return; }
+  if (await conversationRoute(request, response, url)) return;
+
+  // An extensionless path is an app address such as /chat, which the real server
+  // answers with the shell; without this the preview 404s on a shared chat link.
+  const isAppAddress = path.extname(url.pathname) === '';
+  const name = url.pathname === '/' || isAppAddress ? 'index.html' : url.pathname.replace(/^\//, '');
   const filePath = path.resolve(ROOT, name);
   if (!filePath.startsWith(`${ROOT}${path.sep}`)) {
     response.writeHead(400).end('bad path');

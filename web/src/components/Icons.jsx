@@ -2,6 +2,7 @@
 // import. One stroke weight, one size default, so a new icon cannot arrive with
 // its own look.
 import {
+  ArrowLeft,
   ArrowRight,
   Brain,
   Check,
@@ -10,6 +11,7 @@ import {
   Globe,
   LayoutGrid,
   Lock,
+  MessageSquare,
   MonitorSmartphone,
   Moon,
   Receipt,
@@ -66,3 +68,5 @@ export const GridIcon = (props) => <LayoutGrid {...base} {...props} />;
 export const ReceiptIcon = (props) => <Receipt {...base} {...props} />;
 export const UserIcon = (props) => <User {...base} {...props} />;
 export const CloseIcon = (props) => <X {...base} {...props} />;
+export const MessageIcon = (props) => <MessageSquare {...base} {...props} />;
+export const BackIcon = (props) => <ArrowLeft {...base} {...props} />;
