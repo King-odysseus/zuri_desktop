@@ -350,3 +350,39 @@ export async function revokeAuthenticatedSession({ authStore, request }) {
   const token = parseCookies(request.headers.get('cookie'))[SESSION_COOKIE];
   if (token) await authStore.revokeSession(hashSessionToken(token));
 }
+
+/**
+ * Create or promote the administrator named by ADMIN_EMAIL.
+ *
+ * Called once at boot so a deployment needs no SQL console. It is idempotent: the
+ * account is created the first time and promoted on every later boot. The password
+ * only ever travels as a scrypt hash, and an empty ADMIN_PASSWORD leaves whatever
+ * hash the row already holds, so removing the variable cannot lock out an
+ * administrator who signs in with Google.
+ *
+ * Returned messages name the variable but never repeat its value, because they end
+ * up in the deploy log.
+ * @param {{ repository?: object, email?: string, password?: string }} [options]
+ * @returns {Promise<{ skipped: string } | { created: boolean, user: object, passwordSet: boolean }>}
+ */
+export async function provisionAdminAccount({ repository, email, password } = {}) {
+  const address = normalizeEmail(email);
+  if (address === '') return { skipped: 'ADMIN_EMAIL is not a valid email address.' };
+  if (!repository || typeof repository.ensureAdminAccount !== 'function') {
+    return { skipped: 'this database cannot store an administrator.' };
+  }
+  const secret = typeof password === 'string' ? password : '';
+  if (secret !== '') {
+    const check = validatePassword(secret);
+    if (!check.ok) return { skipped: 'ADMIN_PASSWORD is unusable: ' + check.message };
+  }
+  const canLookUp = typeof repository.findUserByEmail === 'function';
+  const existing = canLookUp ? await repository.findUserByEmail(address) : null;
+  const passwordHash = secret === '' ? '' : await hashPassword(secret);
+  const user = await repository.ensureAdminAccount({ email: address, passwordHash });
+  return {
+    created: canLookUp ? existing === null : false,
+    user,
+    passwordSet: passwordHash !== '' || (existing?.passwordHash ?? '') !== '',
+  };
+}

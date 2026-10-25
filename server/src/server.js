@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readConfig } from './config.js';
 import { createApp } from './app.js';
 import { createRequestListener } from './serve.js';
-import { createAuthService, createGoogleVerifier } from './auth.js';
+import { createAuthService, createGoogleVerifier, provisionAdminAccount } from './auth.js';
 import { createDatabase, createRepository } from './db.js';
 import { createAnthropicClient, createDeepSeekClient } from './deepseek.js';
 import { createMailer } from './mail.js';
@@ -32,6 +32,23 @@ const auth = repository
     verifyGoogleCredential: config.googleClientId ? createGoogleVerifier(config.googleClientId) : null,
   })
   : null;
+// The first administrator comes from ADMIN_EMAIL rather than from a SQL console. A
+// failure is logged, not thrown, for the same reason a schema failure is: the API
+// should still start, and the real error reaches whoever tries to sign in.
+if (repository) {
+  try {
+    const adminSetup = await provisionAdminAccount({ repository, email: config.adminEmail, password: config.adminPassword });
+    if (adminSetup.skipped) {
+      // Quiet on a deployment that never asked for an administrator.
+      if (config.adminEmail !== '') console.log(`[zuri-cloud] admin account not set up: ${adminSetup.skipped}`);
+    } else {
+      const note = adminSetup.passwordSet ? '' : '; no password set, so sign in with Google or set ADMIN_PASSWORD';
+      console.log(`[zuri-cloud] admin account ready for ${adminSetup.user.email}: ${adminSetup.created ? 'created' : 'existing account promoted'}${note}`);
+    }
+  } catch (error) {
+    console.error('[zuri-cloud] admin account setup failed:', error?.message ?? error);
+  }
+}
 // One client per supplier that has a key. A Zuri model names its supplier, and a
 // model whose supplier has no key fails with a clear error instead of falling
 // back to a different (and differently priced) supplier.

@@ -1,5 +1,15 @@
 ## 2026-10-25 - Windows
 
+- The admin dashboard can now be reached without touching SQL. Setting `ADMIN_EMAIL` and `ADMIN_PASSWORD` in Railway creates that account, or promotes an account that already exists, on every start; the Admin tab in the dashboard then appears for that account and nobody else.
+- The password is rewritten from the variable on each boot, so changing the variable is how it rotates. Leaving `ADMIN_PASSWORD` empty keeps the hash already stored, which is what an administrator who signs in with Google needs. The value is never logged and never sent to the browser: only the scrypt hash reaches the database.
+- A new account also gets the Starter subscription sign-up hands out, because an account with no subscription cannot resolve a session, and the administrator would have signed in to an empty page.
+- A failed setup is logged and the server keeps serving, the same way a failed schema step behaves, so a bad variable cannot stop a deploy.
+- Key files: `server/src/config.js`, `server/src/auth.js`, `server/src/db.js`, `server/src/server.js`, `server/README.md`, `server/test/admin.test.js`.
+- Other OS action: run `npm run test`. No schema change and nothing to rebuild; the server reads the variables on its next start.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Zuri Code is now Zuri Core. The row never did anything a coding feature would: it is an OpenAI general model priced exactly like Zuri Reason (2 dollars in, 10 out per million tokens, weight 10 and 30), so the name promised work the app cannot do while the model underneath answers general questions. Pricing, quota, plan gate and supplier are untouched, so no customer bill moves.
 - The internal code stays zuri-code. Past usage records and saved settings files already name it, and rewriting the key would orphan that history without changing anything a person sees. A comment on the row records why the code and the name no longer match, and the schema migration moves only the seeded name, so a name an operator chose in the dashboard is never overwritten.
 - The desktop picker also stopped naming gpt-5.3-codex, which OpenAI marks Deprecated. That row now asks for gpt-6.1-sol, the id the server catalogue has sold since the deprecation, and cloud-chat.js maps both ids to zuri-code so a settings file written before either change still answers.

@@ -4,7 +4,7 @@ const DEFAULT_PORT = 8080;
  * Read the small set of configuration values the Railway service needs before
  * database and authentication wiring is added.
  * @param {NodeJS.ProcessEnv} [environment]
- * @returns {{ port: number, nodeEnv: string, databaseUrl: string, googleClientId: string, googleClientSecret: string, googleRedirectUri: string, cloudUrl: string, siteUrl: string, brevoApiKey: string, mailFrom: string, mailFromName: string, deepSeekApiKey: string, deepSeekEndpoint: string, deepSeekModel: string, paystackSecretKey: string, paystackEndpoint: string, paystackCallbackUrl: string, paystackPlanCodes: Record<string, string> }}
+ * @returns {{ port: number, nodeEnv: string, databaseUrl: string, googleClientId: string, googleClientSecret: string, googleRedirectUri: string, cloudUrl: string, siteUrl: string, adminEmail: string, adminPassword: string, brevoApiKey: string, mailFrom: string, mailFromName: string, deepSeekApiKey: string, deepSeekEndpoint: string, deepSeekModel: string, paystackSecretKey: string, paystackEndpoint: string, paystackCallbackUrl: string, paystackPlanCodes: Record<string, string> }}
  */
 export function readConfig(environment = process.env) {
   const parsedPort = Number(environment.PORT ?? DEFAULT_PORT);
@@ -32,6 +32,11 @@ export function readConfig(environment = process.env) {
     googleRedirectUri: typeof environment.GOOGLE_REDIRECT_URI === 'string' ? environment.GOOGLE_REDIRECT_URI.trim() : '',
     cloudUrl,
     siteUrl,
+    // The first administrator comes from variables, not from SQL: Railway can set
+    // these two and the server promotes that account on every boot. The password is
+    // kept exactly as given, because trimming would silently change a secret.
+    adminEmail: typeof environment.ADMIN_EMAIL === 'string' ? environment.ADMIN_EMAIL.trim() : '',
+    adminPassword: typeof environment.ADMIN_PASSWORD === 'string' ? environment.ADMIN_PASSWORD : '',
     brevoApiKey: typeof environment.BREVO_API_KEY === 'string' ? environment.BREVO_API_KEY.trim() : '',
     mailFrom: typeof environment.MAIL_FROM === 'string' ? environment.MAIL_FROM.trim() : '',
     mailFromName: typeof environment.MAIL_FROM_NAME === 'string' ? environment.MAIL_FROM_NAME.trim() : '',

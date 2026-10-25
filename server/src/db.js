@@ -201,6 +201,38 @@ export function createRepository(pool) {
         throw error;
       }
     },
+    /**
+     * Create the administrator account, or promote the one that already exists.
+     *
+     * One statement rather than a read then a write, so two boots racing each other
+     * cannot both insert: the loser lands on the conflict clause. An empty
+     * passwordHash keeps whatever hash the row holds. A new account also gets the
+     * Starter subscription sign-up hands out, because a user with no subscription
+     * resolves no session, and the administrator would sign in to an empty page.
+     * @param {{ email: string, passwordHash?: string }} request Email normalised by the caller.
+     * @returns {Promise<object>} The public user, carrying isAdmin.
+     */
+    async ensureAdminAccount({ email, passwordHash = '' }) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const result = await client.query(
+          "INSERT INTO users (email, password_hash, is_admin) VALUES ($1, NULLIF($2, ''), TRUE) " +
+          "ON CONFLICT (email) DO UPDATE SET is_admin = TRUE, password_hash = COALESCE(NULLIF($2, ''), users.password_hash) " +
+          'RETURNING *',
+          [email, passwordHash],
+        );
+        const user = result.rows[0];
+        await ensureStarterSubscription(client, user.id);
+        await client.query('COMMIT');
+        return publicUser(user);
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
     async createPasswordReset({ userId, tokenHash, expiresAt }) {
       await pool.query('INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)', [userId, tokenHash, expiresAt]);
     },
