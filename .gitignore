@@ -23,3 +23,6 @@ dist-android/
 # past GitHub's 100 MB per-file limit, so git cannot carry it: `npm run
 # cloud:deploy` uploads the folder with the server instead.
 server/downloads/
+
+# Screenshots captured while checking the UI; regenerated, never shipped.
+.shots/
