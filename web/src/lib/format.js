@@ -26,12 +26,18 @@ export function initialsFor(displayName, email) {
   return initials || 'Z';
 }
 
-/** Feature bullets shown on each plan card. */
+/*
+ * These bullets must agree with two server tables, so a customer is never sold
+ * a limit the API will refuse: the model weights in `server/src/models.js`
+ * (1, 5, 12, 10, 10 and 20) and the per-plan guardrails in
+ * `server/src/limits.js`. Max holds the highest limits, which is why Power
+ * does not claim to.
+ */
 const PLAN_FEATURES = {
-  starter: ['Everyday questions and longer conversations', 'Zuri Flash uses 1x allowance', 'Two requests at a time'],
-  pro: ['Zuri Max uses 12x allowance', 'Zuri Code and Zuri Reason use 10x', 'Higher per-minute limits'],
-  power: ['The largest input and output limits', 'More room for weighted models', 'Built for heavy workloads'],
-  max: ['Zuri Elite uses 20x allowance', 'Every Zuri model is available', 'The highest limits we offer'],
+  starter: ['Zuri Flash uses 1x allowance', 'Zuri Pro uses 5x', '2 requests at a time, 30 a minute'],
+  pro: ['Zuri Max uses 12x allowance', 'Zuri Code and Zuri Reason use 10x', '3 requests at a time, 60 a minute'],
+  power: ['Every model except Zuri Elite', '4 requests at a time, 120 a minute', 'Up to 64,000 input and 8,000 output tokens per request'],
+  max: ['Zuri Elite uses 20x allowance', 'Every Zuri model is available', '8 requests at a time, 240 a minute'],
 };
 
 /** @param {string} code */
