@@ -18,13 +18,14 @@ const BLANK_MODEL = Object.freeze({
   inputUsdPerMillion: 0,
   outputUsdPerMillion: 0,
   quotaWeight: 1,
+  outputQuotaWeight: 0,
   minPlan: 'starter',
   rateFactor: 1,
   isActive: true,
   sortOrder: 100,
 });
 
-const NUMBER_FIELDS = ['inputUsdPerMillion', 'outputUsdPerMillion', 'usdPerImage', 'quotaTokensPerImage', 'quotaWeight', 'rateFactor', 'sortOrder'];
+const NUMBER_FIELDS = ['inputUsdPerMillion', 'outputUsdPerMillion', 'usdPerImage', 'quotaTokensPerImage', 'quotaWeight', 'outputQuotaWeight', 'rateFactor', 'sortOrder'];
 
 /** Naira for a dollar price, so the operator sees what a model costs per million tokens at today's rate. */
 function nairaPerMillion(usd, rate) {
@@ -173,7 +174,10 @@ export default function AdminView() {
                     <td>{model.name}<small>{model.code}{model.isActive ? '' : ' (off)'}</small></td>
                     <td>{model.supplier}<small>{model.supplierModel}</small></td>
                     <td>{model.minPlan}</td>
-                    <td>{model.quotaWeight}x</td>
+                    <td>
+                      {model.quotaWeight}x
+                      <small>replies {(model.outputQuotaWeight > 0 ? model.outputQuotaWeight : model.quotaWeight)}x</small>
+                    </td>
                     <td>{Math.round(model.rateFactor * 100)}%</td>
                     <td>
                       {model.kind === 'image' ? (
@@ -203,8 +207,10 @@ export default function AdminView() {
           </table>
         </div>
         <p className="stat-meta">
-          Weight is how fast the model uses a customer's monthly allowance. Rate is the share of the plan's
-          requests per minute that the model gets.
+          Weight is how fast the model uses a customer's monthly allowance. Suppliers charge the reply at
+          several times the prompt's rate, so replies carry their own weight: keep it at or above three times
+          the output price per million, or a month spent on replies costs more than the plan earns. Rate is the
+          share of the plan's requests per minute that the model gets.
         </p>
       </article>
 
@@ -255,8 +261,11 @@ export default function AdminView() {
                 </label>
               </>
             )}
-            <label className="field"><span>Quota weight</span>
+            <label className="field"><span>Quota weight (prompts)</span>
               <input type="number" min="0.1" max="100" step="0.1" value={draft.quotaWeight} onChange={(event) => edit('quotaWeight', event.target.value)} />
+            </label>
+            <label className="field"><span>Quota weight (replies, 0 = same as prompts)</span>
+              <input type="number" min="0" max="100" step="0.1" value={draft.outputQuotaWeight ?? 0} onChange={(event) => edit('outputQuotaWeight', event.target.value)} />
             </label>
             <label className="field"><span>Rate factor (0.05 to 1)</span>
               <input type="number" min="0.05" max="1" step="0.05" value={draft.rateFactor} onChange={(event) => edit('rateFactor', event.target.value)} />

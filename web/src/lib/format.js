@@ -38,15 +38,20 @@ export function initialsFor(displayName, email) {
 /*
  * These bullets must agree with two server tables, so a customer is never sold
  * a limit the API will refuse: the model weights in `server/src/models.js`
- * (1, 5, 12, 10, 10 and 20) and the per-plan guardrails in
- * `server/src/limits.js`. Max holds the highest limits, which is why Power
- * does not claim to.
+ * (prompts and replies, in that order: 1/1, 5/8, 12/18, 10/42, 10/30 and 20/60)
+ * and the per-plan guardrails in `server/src/limits.js`. Max holds the highest
+ * limits, which is why Power does not claim to.
+ *
+ * Replies are named separately because they are charged separately: a supplier
+ * bills the reply at four to eight times the prompt's rate, so a plan's allowance
+ * lasts fewer replies than prompts. Stating one number for both would be selling
+ * an allowance the account cannot actually reach.
  */
 const PLAN_FEATURES = {
-  starter: ['Zuri Flash uses 1x allowance', 'Zuri Pro uses 5x', '2 requests at a time, 30 a minute'],
-  pro: ['Zuri Max uses 12x allowance', 'Zuri Code and Zuri Reason use 10x', '3 requests at a time, 60 a minute'],
-  power: ['Every model except Zuri Elite', '4 requests at a time, 120 a minute', 'Up to 64,000 input and 8,000 output tokens per request'],
-  max: ['Zuri Elite uses 20x allowance', 'Every Zuri model is available', '8 requests at a time, 240 a minute'],
+  starter: ['Zuri Flash: prompts 1x, replies 1x', 'Zuri Pro: prompts 5x, replies 8x', '2 requests at a time, 30 a minute'],
+  pro: ['Zuri Max: prompts 12x, replies 18x', 'Zuri Code and Zuri Reason: prompts 10x, replies 30x', '3 requests at a time, 60 a minute'],
+  power: ['Every model except Zuri Elite', 'The same model weights as Pro', '4 requests at a time, 120 a minute', 'Up to 64,000 input and 8,000 output tokens per request'],
+  max: ['Zuri Elite: prompts 20x, replies 60x', 'Every Zuri model is available', '8 requests at a time, 240 a minute'],
 };
 
 /** @param {string} code */
