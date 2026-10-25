@@ -6,7 +6,8 @@ import { handleRequest, createApp } from '../src/app.js';
 import { createRequestListener } from '../src/serve.js';
 import { canConsume, usageStatus } from '../src/usage.js';
 import { createAuthService, hashSessionToken, normalizeGoogleProfile, PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../src/auth.js';
-import { createRequestLimiter, limitsForPlan } from '../src/limits.js';
+import { createRequestLimiter, limitsForPlan, QUOTA_WINDOW_HOURS, WINDOW_TOKENS, windowTokensForPlan } from '../src/limits.js';
+import { findTopupPack, TOPUP_PACKS } from '../src/topups.js';
 import { verifyPaystackSignature } from '../src/paystack.js';
 import { downloadsFromReleases } from '../src/downloads.js';
 import { createMailer } from '../src/mail.js';
@@ -44,7 +45,52 @@ const preflight = await androidCors(new Request('https://cloud.example.com/api/a
 assert.equal(preflight.status, 204);
 assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://localhost');
 const usage = usageStatus({ code: 'starter', monthlyTokens: 2_000_000 }, 1_650_001);
-assert.deepEqual(usage, { planCode: 'starter', monthlyTokens: 2_000_000, usedTokens: 1_650_001, remainingTokens: 349_999, percentUsed: 83, overQuota: false, nearLimit: true });
+assert.deepEqual(usage, { planCode: 'starter', monthlyTokens: 2_000_000, extraTokens: 0, usedTokens: 1_650_001, remainingTokens: 349_999, percentUsed: 83, overQuota: false, nearLimit: true });
+// Bought tokens raise the period ceiling instead of replacing it, so the plan
+// allowance and the packs are one number to the customer.
+const withCredits = usageStatus({ code: 'starter', monthlyTokens: 2_000_000 }, 1_650_001, { creditTokens: 500_000 });
+assert.equal(withCredits.monthlyTokens, 2_500_000);
+assert.equal(withCredits.extraTokens, 500_000);
+assert.equal(withCredits.remainingTokens, 849_999);
+assert.equal(withCredits.overQuota, false);
+// Five hours after the oldest request in the window, its own tokens come back.
+const windowed = usageStatus({ code: 'starter', monthlyTokens: 2_000_000 }, 40_000, {
+  windowUsedTokens: 240_000,
+  windowOldestAt: '2026-10-24T10:00:00.000Z',
+});
+assert.deepEqual(windowed.window, {
+  hours: 5,
+  planTokens: 250_000,
+  tokens: 250_000,
+  usedTokens: 240_000,
+  remainingTokens: 10_000,
+  percentUsed: 96,
+  overWindow: false,
+  resetsAt: '2026-10-24T15:00:00.000Z',
+});
+// A caller that never measured the window gets no window, not a zero.
+const unmeasured = usageStatus({ code: 'starter', monthlyTokens: 2_000_000 }, 40_000);
+assert.equal(unmeasured.window, undefined);
+// Purchased tokens also raise the burst ceiling, so a paid request is not
+// refused by the window it was bought to get around.
+const windowedWithCredits = usageStatus({ code: 'starter', monthlyTokens: 2_000_000 }, 40_000, {
+  windowUsedTokens: 240_000,
+  creditTokens: 500_000,
+});
+assert.equal(windowedWithCredits.window.tokens, 750_000);
+assert.equal(windowedWithCredits.window.overWindow, false);
+const fullWindow = usageStatus({ code: 'pro', monthlyTokens: 6_000_000 }, 900_000, { windowUsedTokens: 750_000 });
+assert.equal(fullWindow.window.overWindow, true);
+assert.equal(fullWindow.window.remainingTokens, 0);
+assert.equal(fullWindow.window.resetsAt, null);
+// The catalogue is server-side truth: an unknown code buys nothing.
+assert.equal(findTopupPack('topup-small').tokens, 1_000_000);
+assert.equal(findTopupPack('TOPUP-MEDIUM').amountKobo, 420_000);
+assert.equal(findTopupPack('topup-huge'), null);
+assert.deepEqual(TOPUP_PACKS.map((pack) => pack.code), ['topup-small', 'topup-medium', 'topup-large']);
+assert.ok(TOPUP_PACKS.every((pack) => pack.tokens > 0 && pack.amountKobo > 0 && pack.validDays > 0));
+// Every pack must cost enough to cover Paystack fees on a one-off charge.
+assert.ok(TOPUP_PACKS.every((pack) => pack.amountKobo >= 100_000));
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 349_999), { allowed: true, reason: 'ok' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 350_000), { allowed: false, reason: 'quota_exceeded' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 'bad'), { allowed: false, reason: 'invalid_tokens' });
@@ -88,17 +134,20 @@ assert.deepEqual(normalizeGoogleProfile({ sub: 'workspace-1', email: 'person@com
 
 const user = { id: 'user-1', email: 'user@example.com', status: 'active' };
 const sessions = new Map();
+const paymentCalls = [];
 const repository = {
   async findOrCreateGoogleUser() { return user; },
   async createSession(userId, tokenHash, expiresAt) { sessions.set(tokenHash, { userId, expiresAt }); },
   // The idle check reads the session row itself, so the stored record travels
   // back with the user.
   async findSessionUser(tokenHash) { const session = sessions.get(tokenHash); return session ? { user, subscription: { id: 'subscription-1', planCode: 'starter', monthlyTokens: 2_000_000, currentPeriodStart: fixedNow(), currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z') }, session: { expiresAt: session.expiresAt, lastUsedAt: fixedNow(), revoked: false } } : null; },
-  async getUsage() { return { usedTokens: 125 }; },
+  // The window and the credits travel with the period total, because both the
+  // dashboard and the refusal path read the same measurement.
+  async getUsage() { return { usedTokens: 125, windowUsedTokens: 60_000, windowOldestAt: fixedNow().toISOString(), creditTokens: 0 }; },
   async reserveUsage() { return { id: 'reservation-1', reservedTokens: 9000 }; },
   async commitUsage() {},
   async releaseUsage() {},
-  async createPayment(details) { return { id: 'payment-1', ...details, status: 'initialized' }; },
+  async createPayment(details) { paymentCalls.push(details); return { id: 'payment-' + paymentCalls.length, ...details, status: 'initialized' }; },
   async markPaymentFailed() {},
   async applySuccessfulPayment() { return { applied: true, planCode: 'starter' }; },
   async updateSubscriptionFromPaystack() { return { applied: true }; },
@@ -135,6 +184,17 @@ assert.equal((await me.json()).data.user.id, user.id);
 const limits = await app(new Request('https://cloud.example.com/api/me/limits', { headers: { authorization: `Bearer ${signedIn.token}` } }));
 assert.equal(limits.status, 200);
 assert.deepEqual((await limits.json()).data.limits, { requestsPerMinute: 30, maxConcurrent: 2, maxInputTokens: 16_000, maxOutputTokens: 2_000 });
+const usageRoute = await app(new Request('https://cloud.example.com/api/me/usage', { headers: { authorization: 'Bearer ' + signedIn.token } }));
+assert.equal(usageRoute.status, 200);
+const usageBody = (await usageRoute.json()).data;
+assert.equal(usageBody.usedTokens, 125);
+assert.equal(usageBody.extraTokens, 0);
+// The five-hour window is reported next to the period total, so a customer can
+// see the pause coming instead of meeting it as a refusal.
+assert.equal(usageBody.window.hours, 5);
+assert.equal(usageBody.window.usedTokens, 60_000);
+assert.equal(usageBody.window.planTokens, 250_000);
+assert.equal(usageBody.window.resetsAt, '2026-10-24T17:00:00.000Z');
 const chat = await app(new Request('https://cloud.example.com/api/chat', {
   method: 'POST',
   headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
@@ -202,6 +262,47 @@ const checkout = await app(new Request('https://cloud.example.com/api/billing/ch
 assert.equal(checkout.status, 200);
 assert.equal((await checkout.json()).data.authorizationUrl, 'https://checkout.paystack.com/test');
 assert.equal(paystackCalls[0].amountKobo, 249_900);
+
+// Extra usage is bought as a pack, not as a plan change. The catalogue decides
+// both the price and the token count, so a client cannot pay for one and ask
+// for the other.
+const packs = await app(new Request('https://cloud.example.com/api/topups'));
+assert.equal(packs.status, 200);
+assert.deepEqual((await packs.json()).data.map((pack) => pack.code), ['topup-small', 'topup-medium', 'topup-large']);
+const anonymousTopup = await app(new Request('https://cloud.example.com/api/billing/topup', {
+  method: 'POST',
+  headers: { 'content-type': 'application/json' },
+  body: JSON.stringify({ packCode: 'topup-small' }),
+}));
+assert.equal(anonymousTopup.status, 401);
+const unknownPack = await app(new Request('https://cloud.example.com/api/billing/topup', {
+  method: 'POST',
+  headers: { authorization: 'Bearer ' + signedIn.token, 'content-type': 'application/json' },
+  body: JSON.stringify({ packCode: 'topup-huge' }),
+}));
+assert.equal(unknownPack.status, 400);
+const topup = await app(new Request('https://cloud.example.com/api/billing/topup', {
+  method: 'POST',
+  headers: { authorization: 'Bearer ' + signedIn.token, 'content-type': 'application/json' },
+  body: JSON.stringify({ packCode: 'topup-medium' }),
+}));
+assert.equal(topup.status, 200);
+const topupBody = (await topup.json()).data;
+assert.equal(topupBody.authorizationUrl, 'https://checkout.paystack.com/test');
+assert.equal(topupBody.pack.tokens, 3_000_000);
+assert.equal(topupBody.pack.amountKobo, 420_000);
+const topupPayment = paymentCalls.at(-1);
+assert.equal(topupPayment.kind, 'topup');
+assert.equal(topupPayment.packCode, 'topup-medium');
+assert.equal(topupPayment.tokensGranted, 3_000_000);
+assert.equal(topupPayment.amountKobo, 420_000);
+assert.equal(topupPayment.planCode, undefined, 'a top-up does not change plan');
+assert.match(topupPayment.reference, /^zuri-topup-/, 'the reference is recognisable in the Paystack dashboard');
+// The charge itself must not carry a Paystack plan, or it would start a second
+// recurring subscription alongside the one the customer already pays for.
+const topupCharge = paystackCalls.at(-1);
+assert.equal(topupCharge.amountKobo, 420_000);
+assert.equal(topupCharge.planCode, undefined);
 const verified = await app(new Request('https://cloud.example.com/api/billing/verify?reference=zuri-test-ref'));
 assert.equal(verified.status, 200);
 const invalidWebhook = await app(new Request('https://cloud.example.com/api/paystack/webhook', {
@@ -771,6 +872,36 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
   assert.match(refused.headers.get('content-type') ?? '', /application\/json/);
   assert.equal((await refused.json()).error.code, 'QUOTA_EXCEEDED');
   assert.equal(leases.length, 0);
+}
+
+// The short window is a pause with a time on it, not a dead end. The client gets
+// retry-after so it can say when to try again instead of failing silently.
+{
+  const windowSession = await auth.signInWithGoogle('credential');
+  const windowApp = createApp({
+    auth,
+    repository: {
+      ...repository,
+      async reserveUsage() {
+        const error = new Error('This request needs more than the 5-hour allowance has left.');
+        error.code = 'WINDOW_EXCEEDED';
+        error.retryAfterSeconds = 1234;
+        throw error;
+      },
+    },
+    now: fixedNow,
+    chatProvider: async () => ({ model: 'x', content: 'never reached', usage: { inputTokens: 1, outputTokens: 1 } }),
+  });
+  const paused = await windowApp(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: 'Bearer ' + windowSession.token, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', messages: [{ role: 'user', content: 'Hi' }] }),
+  }));
+  assert.equal(paused.status, 429);
+  assert.equal(paused.headers.get('retry-after'), '1234');
+  const pausedBody = await paused.json();
+  assert.equal(pausedBody.error.code, 'WINDOW_EXCEEDED');
+  assert.equal(pausedBody.error.retryAfterSeconds, 1234);
 }
 
 // Act mode tools run on the persons own computer, so the account route cannot

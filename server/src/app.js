@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findPlan, PLANS, publicPlan } from './plans.js';
+import { findTopupPack, publicTopupPack, TOPUP_PACKS } from './topups.js';
 import { usageStatus } from './usage.js';
 import { createRequestLimiter, limitsForPlan, PLAN_LIMITS } from './limits.js';
 import { DEFAULT_MODELS, canUseModel, findModel, imagePriceKobo, imageSupplierCostMicroUsd, isImageModel, limitsForModel, microUsdToKobo, publicImageModel, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
@@ -319,6 +320,22 @@ function authErrorResponse(error) {
 }
 
 /**
+ * The usage options every signed-in answer shares: tokens bought on top of the
+ * plan, and the rolling window when the repository measured one. Callers that
+ * do not measure the window (the admin listing) pass nothing, and no window is
+ * reported rather than a confident zero.
+ * @param {{ creditTokens?: unknown, windowUsedTokens?: unknown, windowOldestAt?: unknown }} usage
+ */
+function usageOptions(usage) {
+  const options = { creditTokens: usage?.creditTokens ?? 0 };
+  if (typeof usage?.windowUsedTokens === 'number') {
+    options.windowUsedTokens = usage.windowUsedTokens;
+    options.windowOldestAt = usage.windowOldestAt;
+  }
+  return options;
+}
+
+/**
  * The body every sign-in path answers with: the session plus the plan usage the
  * dashboard shows straight away.
  * @param {{ auth?: object, repository?: object }} dependencies
@@ -330,7 +347,7 @@ async function sessionPayload(dependencies, result) {
   const getUsage = dependencies.repository?.getUsage;
   if (!session || typeof getUsage !== 'function') return { ...result, usage: null };
   const usage = await getUsage(session.user.id, session.subscription.currentPeriodStart, session.subscription);
-  return { ...result, usage: usageStatus(session.subscription, usage.usedTokens) };
+  return { ...result, usage: usageStatus(session.subscription, usage.usedTokens, usageOptions(usage)) };
 }
 
 /** @param {unknown} value @returns {string} */
@@ -426,6 +443,11 @@ export function createApp(dependencies = {}) {
     }
     if (request.method === 'GET' && url.pathname === '/api/plans') {
       return response(200, { ok: true, data: PLANS.map(publicPlan) });
+    }
+    // Extra-usage packs are public for the same reason plans are: the dashboard
+    // quotes the price before anybody commits to paying it.
+    if (request.method === 'GET' && url.pathname === '/api/topups') {
+      return response(200, { ok: true, data: TOPUP_PACKS.map(publicTopupPack) });
     }
     if (request.method === 'GET' && url.pathname === '/api/public-config') {
       return response(200, {
@@ -605,6 +627,16 @@ export function createApp(dependencies = {}) {
          */
         const failureFor = (error) => {
           if (error?.code === 'QUOTA_EXCEEDED') return { status: 429, body: { ok: false, error: { code: error.code, message: error.message } } };
+          // The short window is a pause rather than a refusal, so the answer says
+          // when the oldest request in the window ages out and frees the tokens.
+          if (error?.code === 'WINDOW_EXCEEDED') {
+            const seconds = Math.max(60, Math.floor(Number(error.retryAfterSeconds) || 300));
+            return {
+              status: 429,
+              headers: { 'retry-after': String(seconds) },
+              body: { ok: false, error: { code: error.code, message: error.message, retryAfterSeconds: seconds } },
+            };
+          }
           if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'PROVIDER_RESPONSE_INVALID') return { status: 502, body: { ok: false, error: { code: error.code, message: error.message } } };
           return { status: 500, body: { ok: false, error: { code: 'CHAT_FAILED', message: 'The chat request could not be completed.' } } };
         };
@@ -626,7 +658,7 @@ export function createApp(dependencies = {}) {
           const mapped = failureFor(error);
           // A quota refusal is an answer, not a fault, so it is not logged as one.
           if (mapped.status !== 429) console.error('[zuri-cloud] reserve usage', error?.message ?? error);
-          return response(mapped.status, mapped.body);
+          return response(mapped.status, mapped.body, mapped.headers);
         }
 
         // A request that offers tools is answered whole, not streamed. The point of
@@ -782,6 +814,51 @@ export function createApp(dependencies = {}) {
         if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
         if (error?.code === 'PAYSTACK_REQUEST_FAILED') return response(502, { ok: false, error: { code: error.code, message: error.message } });
         console.error('[zuri-cloud] checkout', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'CHECKOUT_FAILED', message: 'Checkout could not be started.' } });
+      }
+    }
+
+    // One-off purchase of extra tokens. Deliberately not a subscription: the
+    // customer stays on the same plan and the pack adds to the allowance until
+    // it expires, so nothing about their monthly billing changes.
+    if (request.method === 'POST' && url.pathname === '/api/billing/topup') {
+      if (!dependencies.auth || !dependencies.repository?.createPayment || !dependencies.repository?.markPaymentFailed || !dependencies.paystack) {
+        return response(503, { ok: false, error: { code: 'BILLING_NOT_CONFIGURED', message: 'Paystack billing is not configured yet.' } });
+      }
+      const token = bearerToken(request);
+      const session = await dependencies.auth.authenticate(token);
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      try {
+        const body = await readJson(request);
+        const pack = findTopupPack(body.packCode);
+        if (!pack) return response(400, { ok: false, error: { code: 'INVALID_PACK', message: 'Choose a valid extra-usage pack to start checkout.' } });
+        const reference = 'zuri-topup-' + randomUUID();
+        // The amount and the token count are both taken from the server catalogue,
+        // never from the request, so a client cannot buy more than it pays for.
+        await dependencies.repository.createPayment({
+          userId: session.user.id,
+          reference,
+          amountKobo: pack.amountKobo,
+          kind: 'topup',
+          packCode: pack.code,
+          tokensGranted: pack.tokens,
+        });
+        try {
+          const checkout = await dependencies.paystack.initializeTransaction({
+            email: session.user.email,
+            amountKobo: pack.amountKobo,
+            reference,
+            callbackUrl: dependencies.paystackCallbackUrl,
+          });
+          return response(200, { ok: true, data: { reference, pack: publicTopupPack(pack), authorizationUrl: checkout.authorization_url, accessCode: checkout.access_code } });
+        } catch (error) {
+          await dependencies.repository.markPaymentFailed(reference, { code: error?.code ?? 'PAYSTACK_REQUEST_FAILED' }).catch((markError) => console.error('[zuri-cloud] mark payment failed', markError?.message ?? markError));
+          throw error;
+        }
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'PAYSTACK_REQUEST_FAILED') return response(502, { ok: false, error: { code: error.code, message: error.message } });
+        console.error('[zuri-cloud] topup checkout', error?.message ?? error);
         return response(500, { ok: false, error: { code: 'CHECKOUT_FAILED', message: 'Checkout could not be started.' } });
       }
     }
@@ -948,11 +1025,11 @@ export function createApp(dependencies = {}) {
           data: {
             planCode: session.subscription.planCode,
             limits: limitsForPlan(session.subscription.planCode),
-            usage: usageStatus(session.subscription, usage.usedTokens),
+            usage: usageStatus(session.subscription, usage.usedTokens, usageOptions(usage)),
           },
         });
       }
-      return response(200, { ok: true, data: usageStatus(session.subscription, usage.usedTokens) });
+      return response(200, { ok: true, data: usageStatus(session.subscription, usage.usedTokens, usageOptions(usage)) });
     }
 
     // Saved chat history for the web, desktop and Android clients. It sits behind no

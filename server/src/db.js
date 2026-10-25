@@ -1,4 +1,6 @@
 import pg from 'pg';
+import { QUOTA_WINDOW_HOURS, windowTokensForPlan } from './limits.js';
+import { findTopupPack, TOPUP_VALID_DAYS } from './topups.js';
 
 /** @param {unknown} value @returns {string} */
 function text(value) {
@@ -296,7 +298,23 @@ export function createRepository(pool) {
         'WHERE user_id = $1 AND created_at >= $2 AND created_at < $3',
         [userId, periodStart, subscription.currentPeriodEnd],
       );
-      return { usedTokens: Number(result.rows[0]?.used_tokens ?? 0), subscription };
+      // The window is measured separately because it spans period boundaries:
+      // the last five hours do not care where the billing month starts.
+      const windowResult = await pool.query(
+        "SELECT COALESCE(SUM(COALESCE(quota_tokens, total_tokens)), 0)::BIGINT AS used_tokens, MIN(created_at) AS oldest_at FROM usage_events WHERE user_id = $1 AND created_at > NOW() - ($2::INT * INTERVAL '1 hour')",
+        [userId, QUOTA_WINDOW_HOURS],
+      );
+      const creditResult = await pool.query(
+        'SELECT COALESCE(SUM(tokens), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
+        [userId],
+      );
+      return {
+        usedTokens: Number(result.rows[0]?.used_tokens ?? 0),
+        windowUsedTokens: Number(windowResult.rows[0]?.used_tokens ?? 0),
+        windowOldestAt: windowResult.rows[0]?.oldest_at ?? null,
+        creditTokens: Number(creditResult.rows[0]?.tokens ?? 0),
+        subscription,
+      };
     },
     async reserveUsage({ userId, subscriptionId, requestedTokens, expiresAt }) {
       const requested = Number(requestedTokens);
@@ -309,7 +327,7 @@ export function createRepository(pool) {
       try {
         await client.query('BEGIN');
         const subscriptionResult = await client.query(
-          "SELECT s.id, s.current_period_start, s.current_period_end, p.monthly_tokens FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.id = $1 AND s.user_id = $2 AND s.status IN ('active', 'past_due') FOR UPDATE",
+          "SELECT s.id, s.plan_code, s.current_period_start, s.current_period_end, p.monthly_tokens FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.id = $1 AND s.user_id = $2 AND s.status IN ('active', 'past_due') FOR UPDATE",
           [subscriptionId, userId],
         );
         const subscription = subscriptionResult.rows[0];
@@ -327,9 +345,37 @@ export function createRepository(pool) {
           [userId, subscription.current_period_start, subscription.current_period_end, subscription.id],
         );
         const committedTokens = Number(usageResult.rows[0]?.committed_tokens ?? 0);
-        if (!Number.isSafeInteger(committedTokens) || committedTokens + requested > Number(subscription.monthly_tokens)) {
+        // Purchased tokens raise the ceiling for this period. They expire on
+        // their own clock, so the filter is on expires_at, not on the period.
+        const creditResult = await client.query(
+          'SELECT COALESCE(SUM(tokens), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
+          [userId],
+        );
+        const creditTokens = Number(creditResult.rows[0]?.tokens ?? 0) || 0;
+        const allowance = Number(subscription.monthly_tokens) + creditTokens;
+        if (!Number.isSafeInteger(committedTokens) || committedTokens + requested > allowance) {
           const error = new Error('This request would exceed the plan quota.');
           error.code = 'QUOTA_EXCEEDED';
+          throw error;
+        }
+        // The same request on the short clock. Reservations still inside the
+        // window count as spent, so a burst of parallel requests cannot slip
+        // past the ceiling before any of them records its usage.
+        const windowResult = await client.query(
+          "SELECT COALESCE((SELECT SUM(COALESCE(quota_tokens, total_tokens)) FROM usage_events WHERE user_id = $1 AND created_at > NOW() - ($3::INT * INTERVAL '1 hour')), 0) + COALESCE((SELECT SUM(reserved_tokens) FROM usage_reservations WHERE user_id = $1 AND subscription_id = $2 AND status = 'reserved' AND expires_at > NOW() AND created_at > NOW() - ($3::INT * INTERVAL '1 hour')), 0) AS window_tokens, (SELECT MIN(created_at) FROM usage_events WHERE user_id = $1 AND created_at > NOW() - ($3::INT * INTERVAL '1 hour')) AS oldest_at",
+          [userId, subscription.id, QUOTA_WINDOW_HOURS],
+        );
+        const windowCommitted = Number(windowResult.rows[0]?.window_tokens ?? 0) || 0;
+        const windowAllowance = windowTokensForPlan(subscription.plan_code) + creditTokens;
+        if (windowCommitted + requested > windowAllowance) {
+          // The window frees up when its oldest event ages out, so that is the
+          // earliest moment a refused request can succeed.
+          const oldestAt = windowResult.rows[0]?.oldest_at ? new Date(windowResult.rows[0].oldest_at).getTime() : 0;
+          const error = new Error('This request needs more than the ' + QUOTA_WINDOW_HOURS + '-hour allowance has left. Try again once older usage leaves the window.');
+          error.code = 'WINDOW_EXCEEDED';
+          error.retryAfterSeconds = oldestAt > 0
+            ? Math.max(60, Math.ceil((oldestAt + QUOTA_WINDOW_HOURS * 3_600_000 - Date.now()) / 1000))
+            : 300;
           throw error;
         }
         const reservationResult = await client.query(
@@ -440,10 +486,12 @@ export function createRepository(pool) {
     async releaseUsage(reservationId, userId) {
       await pool.query("UPDATE usage_reservations SET status = 'released' WHERE id = $1 AND user_id = $2 AND status = 'reserved'", [reservationId, userId]);
     },
-    async createPayment({ userId, planCode, reference, amountKobo }) {
+    async createPayment({ userId, planCode = null, reference, amountKobo, kind = 'subscription', packCode = null, tokensGranted = null }) {
+      // plan_code is null for a top-up: buying tokens does not change plan, so
+      // the checkout fills kind, pack_code and tokens_granted instead.
       const result = await pool.query(
-        "INSERT INTO payments (user_id, plan_code, reference, amount_kobo, currency, status) VALUES ($1, $2, $3, $4, 'NGN', 'initialized') RETURNING id, reference, status",
-        [userId, planCode, reference, amountKobo],
+        "INSERT INTO payments (user_id, plan_code, reference, amount_kobo, currency, status, kind, pack_code, tokens_granted) VALUES ($1, $2, $3, $4, 'NGN', 'initialized', $5, $6, $7) RETURNING id, reference, status",
+        [userId, planCode, reference, amountKobo, kind, packCode, tokensGranted],
       );
       return result.rows[0];
     },
@@ -487,6 +535,22 @@ export function createRepository(pool) {
           "UPDATE payments SET status = 'success', paystack_transaction_id = $2, paystack_customer_code = $3, paystack_authorization_code = $4, paystack_subscription_code = $5, raw_event = $6, paid_at = NOW() WHERE id = $1",
           [payment.id, transaction.id ?? null, customerCode || null, authorizationCode || null, subscriptionCode || null, transaction],
         );
+        // A pack is granted once: the payment row was locked above, and a
+        // payment that had already succeeded returned before this point.
+        if (payment.kind === 'topup') {
+          const tokens = Number(payment.tokens_granted);
+          if (!Number.isSafeInteger(tokens) || tokens < 1 || !payment.pack_code) {
+            const error = new Error('This top-up has no token count.');
+            error.code = 'PAYMENT_DETAILS_MISMATCH';
+            throw error;
+          }
+          await client.query(
+            "INSERT INTO usage_credits (user_id, payment_id, pack_code, tokens, expires_at) VALUES ($1, $2, $3, $4, NOW() + ($5::INT * INTERVAL '1 day'))",
+            [payment.user_id, payment.id, payment.pack_code, tokens, TOPUP_VALID_DAYS],
+          );
+          await client.query('COMMIT');
+          return { applied: true, planCode: null, packCode: payment.pack_code, tokensGranted: tokens };
+        }
         await client.query(
           "UPDATE subscriptions SET plan_code = $2, status = 'active', current_period_start = NOW(), current_period_end = NOW() + INTERVAL '1 month', paystack_customer_code = COALESCE($3, paystack_customer_code), paystack_authorization_code = COALESCE($4, paystack_authorization_code), paystack_subscription_code = COALESCE($5, paystack_subscription_code), updated_at = NOW() WHERE user_id = $1 AND status IN ('active', 'past_due')",
           [payment.user_id, payment.plan_code, customerCode || null, authorizationCode || null, subscriptionCode || null],
@@ -522,10 +586,20 @@ export function createRepository(pool) {
         [userId],
       );
       const payments = await pool.query(
-        'SELECT reference, plan_code, amount_kobo, currency, status, paid_at, created_at FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20',
+        'SELECT reference, plan_code, kind, pack_code, tokens_granted, amount_kobo, currency, status, paid_at, created_at FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20',
         [userId],
       );
-      return { subscription: subscriptionResult.rows[0] ?? null, payments: payments.rows };
+      const credits = await pool.query(
+        'SELECT COALESCE(SUM(tokens), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
+        [userId],
+      );
+      return {
+        subscription: subscriptionResult.rows[0] ?? null,
+        // The pack name travels with its code so the history reads without a
+        // second request; a pack withdrawn from sale still shows its old name.
+        payments: payments.rows.map((row) => ({ ...row, packName: findTopupPack(row.pack_code)?.name ?? null })),
+        extraTokens: Number(credits.rows[0]?.tokens ?? 0),
+      };
     },
     /**
      * The signed-in account's threads, most recently used first.

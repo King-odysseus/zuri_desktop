@@ -1,9 +1,34 @@
 import { Alert, DataRow, ProgressBar } from '../components/DataRow.jsx';
-import { formatTokens } from '../lib/format.js';
+import { Button } from '../components/ui.jsx';
+import { formatNaira, formatTokens } from '../lib/format.js';
 
-/** Allowance and the guardrails the server enforces for this plan. */
-export default function UsageView({ usage, limits }) {
+/** A local clock time, e.g. "14:35", or the empty string for a missing timestamp. */
+function clockTime(value) {
+  // A null resetsAt means the window is empty, and new Date(null) would be 1970,
+  // so the missing value is rejected before the date is built.
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-NG', { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Allowance and the guardrails the server enforces for this plan.
+ *
+ * Two allowances are shown because the server counts two: the billing period's
+ * tokens (`usage`) and the rolling 5-hour window inside it (`usage.window`). The
+ * top-up packs arrive as props, so a server that sells none renders no shop.
+ */
+export default function UsageView({ usage, limits, topups = [], busyTopup = '', onTopUp }) {
   const planLimits = limits?.limits ?? {};
+  const rolling = usage?.window ?? {};
+  const packs = Array.isArray(topups) ? topups : [];
+  const extraTokens = Math.max(0, Math.floor(Number(usage?.extraTokens) || 0));
+  const rollingPercent = Math.round(Number(rolling.percentUsed) || 0);
+  // The window ceiling is the plan burst allowance plus anything bought, so show
+  // the difference rather than repeating the plan number back to the reader.
+  const windowExtra = Math.max(0, Math.floor(Number(rolling.tokens) || 0) - Math.floor(Number(rolling.planTokens) || 0));
+  const resetsAt = clockTime(rolling.resetsAt);
 
   return (
     <section className="view">
@@ -30,6 +55,30 @@ export default function UsageView({ usage, limits }) {
         <p className="stat-meta">{usage.percentUsed}% of this period's allowance used.</p>
       </article>
 
+      <article className="card">
+        <p className="stat-label">Last 5 hours</p>
+        <p className="stat-value">
+          {Number(rolling.tokens) > 0
+            ? `${formatTokens(rolling.usedTokens)} of ${formatTokens(rolling.tokens)} tokens`
+            : `${formatTokens(rolling.usedTokens)} tokens in the last 5 hours`}
+        </p>
+        <ProgressBar percent={rollingPercent} warn={Boolean(rolling.overWindow)} />
+        <p className="stat-meta">
+          {rollingPercent}% of the 5-hour allowance used.{' '}
+          {resetsAt ? `Usage frees up again from ${resetsAt}.` : 'Nothing has been used in this window yet.'}
+        </p>
+        {windowExtra > 0 && (
+          <p className="stat-meta">
+            Your purchased tokens raise this window too, so a pack can be spent straight away instead of
+            waiting for older usage to age out.
+          </p>
+        )}
+        <p className="stat-meta">
+          This rolling window protects the service from sudden bursts of traffic, and it refills on its
+          own as older requests age out of the 5 hours.
+        </p>
+      </article>
+
       <div className="stat-grid">
         <article className="card">
           <p className="stat-label">Remaining tokens</p>
@@ -41,7 +90,57 @@ export default function UsageView({ usage, limits }) {
           <p className="stat-value">{usage.percentUsed}%</p>
           <p className="stat-meta">Calculated from the tokens on your plan.</p>
         </article>
+        {extraTokens > 0 && (
+          <article className="card">
+            <p className="stat-label">Extra tokens purchased</p>
+            <p className="stat-value">{formatTokens(extraTokens)}</p>
+            <p className="stat-meta">
+              Counted in the period allowance above, so they spend like plan tokens until they expire.
+            </p>
+          </article>
+        )}
       </div>
+
+      {packs.length > 0 && (
+        <article className="card">
+          <p className="stat-label">Buy extra usage</p>
+          <p className="stat-meta" style={{ marginTop: 4 }}>
+            Tokens you buy are added to the current period's allowance. Each pack stays valid for the
+            number of days shown on it.
+          </p>
+          <div className="row-list" style={{ marginTop: 8 }}>
+            {packs.map((pack) => {
+              const busy = busyTopup === pack.code;
+              const validDays = Math.max(0, Math.floor(Number(pack.validDays) || 0));
+              // Built as one string so the comma never drifts away from the count.
+              const validity = validDays > 0
+                ? `, valid for ${validDays} ${validDays === 1 ? 'day' : 'days'}`
+                : '';
+              return (
+                <div className="row" key={pack.code}>
+                  <div>
+                    <div>{pack.name}</div>
+                    <div className="row-meta">
+                      {formatTokens(pack.tokens)} tokens{validity}
+                    </div>
+                  </div>
+                  <div className="row-meta" style={{ textAlign: 'right' }}>
+                    <div>{formatNaira(pack.amountKobo)}</div>
+                    <Button
+                      variant="secondary"
+                      disabled={busy}
+                      aria-label={`Buy ${pack.name}`}
+                      onClick={() => onTopUp?.(pack.code)}
+                    >
+                      {busy ? 'Opening checkout...' : 'Buy'}
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </article>
+      )}
 
       <article className="card">
         <p className="stat-label">Request limits for your plan</p>

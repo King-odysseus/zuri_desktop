@@ -40,7 +40,7 @@ function NavList({ view, onViewChange, compact, isAdmin }) {
  * Signed-in shell. Sidebar on wide screens, a fixed bottom tab bar below 900px
  * so every destination stays reachable with a thumb.
  */
-export default function Dashboard({ account, plans, view, busy, onViewChange, onChoose, onSignIn }) {
+export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn }) {
   const user = account.me?.user ?? {};
   const name = user.displayName || user.email || 'Zuri user';
 
@@ -71,7 +71,15 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
         <div className="app-content">
           {view === 'chat' && <ChatView onSignIn={onSignIn} />}
           {view === 'overview' && <OverviewView me={account.me} usage={account.usage} />}
-          {view === 'usage' && <UsageView usage={account.usage} limits={account.limits} />}
+          {view === 'usage' && (
+            <UsageView
+              usage={account.usage}
+              limits={account.limits}
+              topups={topups}
+              busyTopup={busyTopup}
+              onTopUp={onTopUp}
+            />
+          )}
           {view === 'plans' && (
             <PlansView
               plans={plans}
@@ -81,7 +89,9 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
               onSignIn={onSignIn}
             />
           )}
-          {view === 'billing' && <BillingView me={account.me} billing={account.billing} />}
+          {view === 'billing' && (
+            <BillingView me={account.me} billing={account.billing} usage={account.usage} />
+          )}
           {view === 'admin' && user.isAdmin === true && <AdminView />}
 
           <div className="app-foot">

@@ -269,3 +269,27 @@ VALUES
   ('zuri-canvas', 'Zuri Canvas', 'openai', 'gpt-image-2', 'image', 0.07, 264000, 'medium', 0, 0, 1, 0, 'pro', 0.3, 8),
   ('zuri-studio', 'Zuri Studio', 'openai', 'gpt-image-2', 'image', 0.19, 720000, 'high', 0, 0, 1, 0, 'max', 0.2, 9)
 ON CONFLICT (code) DO NOTHING;
+
+-- Extra usage is bought as a one-off pack, not as a bigger subscription, so a
+-- payment row can now exist without a plan. kind keeps the two flows apart
+-- while both keep sharing one payment history.
+ALTER TABLE payments ALTER COLUMN plan_code DROP NOT NULL;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'subscription';
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS pack_code TEXT;
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS tokens_granted BIGINT;
+
+-- Purchased tokens are a ceiling, not a wallet: the allowance for a period is
+-- the plan's tokens plus every pack that has not expired, and usage_events
+-- keeps doing the counting. Nothing has to be decremented per request, which
+-- is what makes a refund or an expiry safe to interrupt at any moment.
+CREATE TABLE IF NOT EXISTS usage_credits (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
+  pack_code TEXT NOT NULL,
+  tokens BIGINT NOT NULL CHECK (tokens > 0),
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS usage_credits_user_expiry_idx ON usage_credits (user_id, expires_at);

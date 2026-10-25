@@ -11,8 +11,10 @@ import {
   api,
   clearToken,
   createCheckout,
+  createTopupCheckout,
   fetchAccount,
   fetchPlans,
+  fetchTopups,
   readToken,
   saveToken,
   signInWithPassword,
@@ -61,6 +63,10 @@ export default function App() {
   const [notice, setNotice] = useState(null);
   const [view, setView] = useState(() => viewFromPath(window.location.pathname));
   const [busyPlan, setBusyPlan] = useState('');
+  // The extra-usage packs, loaded once. Kept apart from the plan busy flag so a
+  // checkout started here never disables the plan buttons on another section.
+  const [topups, setTopups] = useState([]);
+  const [busyTopup, setBusyTopup] = useState('');
   const [route, setRoute] = useState(readRoute);
 
   useEffect(() => {
@@ -109,6 +115,11 @@ export default function App() {
 
     (async () => {
       try {
+        // Extra-usage packs load alongside the plans. fetchTopups never rejects,
+        // so a server without the endpoint just shows no top-up section.
+        fetchTopups().then((packs) => {
+          if (!cancelled) setTopups(packs);
+        });
         const loaded = await fetchPlans();
         if (!cancelled) setPlans(loaded);
       } catch (error) {
@@ -123,7 +134,9 @@ export default function App() {
         showNotice('Confirming your payment...');
         try {
           await verifyPayment(reference);
-          showNotice('Payment confirmed. Your new plan is active.', 'success');
+          // Paystack returns the same reference for a plan and for an extra-usage
+          // pack, so the confirmation names neither.
+          showNotice('Payment confirmed. Your account is up to date.', 'success');
         } catch (error) {
           showNotice(error.message, 'error');
         }
@@ -234,6 +247,22 @@ export default function App() {
     [showNotice],
   );
 
+  // Buys tokens rather than a plan. The server names the pack and Paystack
+  // returns the link, so this only carries the code across.
+  const handleTopUp = useCallback(
+    async (packCode) => {
+      setBusyTopup(packCode);
+      try {
+        const url = await createTopupCheckout(packCode);
+        window.location.assign(url);
+      } catch (error) {
+        showNotice(error.message, 'error');
+        setBusyTopup('');
+      }
+    },
+    [showNotice],
+  );
+
   const handleViewChange = useCallback((next) => {
     const section = VIEWS.includes(next) ? next : 'overview';
     setView(section);
@@ -293,6 +322,9 @@ export default function App() {
           busy={busyPlan}
           onViewChange={handleViewChange}
           onChoose={handleChoose}
+          topups={topups}
+          busyTopup={busyTopup}
+          onTopUp={handleTopUp}
           onSignIn={handleSignIn}
           onSignOut={() => handleSignOut('/signin')}
         />
@@ -321,7 +353,9 @@ export default function App() {
   }, [
     account,
     busyPlan,
+    busyTopup,
     handleChoose,
+    handleTopUp,
     handleCredential,
     handlePasswordSignIn,
     handleSignIn,
@@ -329,6 +363,7 @@ export default function App() {
     handleViewChange,
     navigate,
     plans,
+    topups,
     route.path,
     showNotice,
     status,

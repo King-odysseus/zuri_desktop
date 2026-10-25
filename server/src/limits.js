@@ -79,3 +79,31 @@ export function createRequestLimiter({ now = () => Date.now(), windowMs = 60_000
     },
   };
 }
+
+/**
+ * Length of the rolling burst window. A monthly quota alone lets an account
+ * spend a whole month of headroom in one afternoon, which is what a short
+ * window prevents; the monthly quota still decides what the month costs.
+ */
+export const QUOTA_WINDOW_HOURS = 5;
+
+/**
+ * Tokens each plan may spend inside one window, in quota tokens (the same
+ * weighted unit usage_events stores). Roughly an eighth of the monthly
+ * allowance: enough for a long working session, not enough to empty the month.
+ *
+ * Kept out of PLAN_LIMITS because those are per-request guardrails the desktop
+ * app applies locally; this ceiling is enforced only by the server.
+ */
+export const WINDOW_TOKENS = Object.freeze({
+  starter: 250_000,
+  pro: 750_000,
+  power: 1_500_000,
+  max: 5_000_000,
+});
+
+/** @param {unknown} planCode @returns {number} */
+export function windowTokensForPlan(planCode) {
+  const key = typeof planCode === 'string' ? planCode.trim().toLowerCase() : '';
+  return WINDOW_TOKENS[key] ?? WINDOW_TOKENS.starter;
+}

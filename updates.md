@@ -1,5 +1,17 @@
 ## 2026-10-25 - Windows
 
+- The allowance now has a second clock. Besides the monthly tokens, every plan has a five-hour rolling allowance (Starter 250,000, Pro 750,000, Power 1,500,000, Max 5,000,000 quota tokens), measured from usage_events. Before calling a model, the server adds up the last five hours of committed usage plus any reservation still open, so a burst of parallel requests cannot spend the month in one afternoon.
+- A refusal from that window answers 429 WINDOW_EXCEEDED with retry-after and the message names the reason, so a client can say when to try again instead of looking broken. The window is a pause, not a ban: it clears itself as older requests age out.
+- Customers can buy extra usage without changing plan. Three one-off packs (1,000,000 tokens for NGN 1,500, 3,000,000 for NGN 4,200, 8,000,000 for NGN 10,000) are sold through Paystack and add to the period allowance for 90 days. The price and the token count both come from the server catalogue, never from the request.
+- A top-up is a payment row with kind topup, a pack code and a token count, and no plan code, so the subscription is left alone and the billing history still reads in one list. The tokens live in a new usage_credits table as a ceiling rather than a wallet: nothing is decremented per request, which is what makes an expiry or a failed grant safe at any moment.
+- Purchased tokens raise the five-hour ceiling as well as the monthly one, because otherwise a pack bought to get unstuck would still sit behind the window it was bought to get past. The ceiling stays finite because the tokens were paid for.
+- The Usage page shows the window with the time it frees up, the purchased tokens, and the packs with a Buy button; Billing shows the extra balance and marks top-up rows in the history.
+- Key files: server/src/limits.js, server/src/topups.js (new), server/src/usage.js, server/src/db.js, server/db/schema.sql, server/src/app.js, server/test/server.test.js, server/test/db.test.js, web/src/views/UsageView.jsx, web/src/views/BillingView.jsx, web/src/views/Dashboard.jsx, web/src/App.jsx, web/src/lib/api.js, server/public/** (rebuilt).
+- Other OS action: run "npm install && npm run test && npm run web:build". No manual migration: the schema step adds the columns and the usage_credits table on the next server start, and ALTER TABLE ... ADD COLUMN IF NOT EXISTS makes a second run harmless.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - A message that carries an attachment now stays on the device that opened it. The file's own wording is folded into the message text before it is stored, and so is the path it came from, so uploading the message put a private document into a chat history the browser can read. Those turns are marked localOnly and the sync skips them.
 - The answer to such a turn is marked the same way, because a reply about a document quotes it straight back. Holding back only the question would have leaked the file through the answer.
 - The rest of the conversation still syncs. A chat with an attachment in the middle keeps its ordinary turns in the account; only the file-carrying turn and its answer are held back, which is the point of the browser chat: continue the conversation, never ship the files.

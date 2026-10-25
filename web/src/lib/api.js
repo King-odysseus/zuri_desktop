@@ -76,6 +76,25 @@ export async function fetchImagePrices() {
 }
 
 /**
+ * The extra-usage packs sold on top of a plan, priced in kobo on the server so a
+ * rate change needs no redeploy of the site.
+ *
+ * Like the image catalogue this never throws: a server that has not shipped the
+ * endpoint yet (a 404) leaves the top-up section off the page instead of
+ * replacing the usage numbers with an error about a shop that is closed.
+ * @returns {Promise<Array<{ code: string, name: string, tokens: number, amountKobo: number, validDays: number }>>}
+ */
+export async function fetchTopups() {
+  try {
+    const data = await api('/api/topups');
+    return Array.isArray(data) ? data : [];
+  } catch {
+    // Deliberately silent: an empty list renders no top-up section at all.
+    return [];
+  }
+}
+
+/**
  * Load everything the dashboard shows in one round trip.
  * Billing is optional: a server without Paystack answers 503 there, and the
  * dashboard should still render plans and usage.
@@ -114,6 +133,22 @@ export async function createCheckout(planCode) {
   const data = await api('/api/billing/checkout', {
     method: 'POST',
     body: JSON.stringify({ planCode }),
+  });
+  if (!data?.authorizationUrl) throw new Error('Paystack did not return a checkout link.');
+  return data.authorizationUrl;
+}
+
+/**
+ * Start a Paystack checkout for one extra-usage pack and hand back the URL to
+ * visit. The route answers 503 while the server has no Paystack key, and the
+ * thrown error keeps that status so the notice can say what is missing.
+ * @param {string} packCode
+ * @returns {Promise<string>}
+ */
+export async function createTopupCheckout(packCode) {
+  const data = await api('/api/billing/topup', {
+    method: 'POST',
+    body: JSON.stringify({ packCode }),
   });
   if (!data?.authorizationUrl) throw new Error('Paystack did not return a checkout link.');
   return data.authorizationUrl;

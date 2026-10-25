@@ -1,5 +1,5 @@
 import { DataRow } from '../components/DataRow.jsx';
-import { formatDate, formatNaira } from '../lib/format.js';
+import { formatDate, formatNaira, formatTokens } from '../lib/format.js';
 
 function statusChip(status) {
   const value = String(status ?? '').toLowerCase();
@@ -12,9 +12,15 @@ function statusChip(status) {
 }
 
 /** Subscription state plus the last 20 payments. */
-export default function BillingView({ me, billing }) {
+export default function BillingView({ me, billing, usage }) {
   const subscription = me?.subscription ?? {};
   const payments = billing?.payments ?? [];
+  // Purchased tokens that have not expired yet; they sit inside the period
+  // allowance the Usage screen counts, so they are shown next to the plan.
+  const extraTokens = Math.max(0, Math.floor(Number(usage?.extraTokens) || 0));
+  // A plan with no period yet reads better as one sentence than as two "Not set" dates.
+  const periodStart = subscription.currentPeriodStart ?? billing?.subscription?.current_period_start;
+  const periodEnd = subscription.currentPeriodEnd ?? billing?.subscription?.current_period_end;
 
   return (
     <section className="view">
@@ -28,11 +34,16 @@ export default function BillingView({ me, billing }) {
       <article className="card">
         <p className="stat-label">Subscription</p>
         <div className="row-list" style={{ marginTop: 8 }}>
-          <DataRow label="Plan">{subscription.planName ?? 'Starter'}</DataRow>
-          <DataRow label="Status">{statusChip(billing?.subscription?.status ?? 'active')}</DataRow>
+          <DataRow label="Plan">{subscription.planName ?? billing?.subscription?.plan_name ?? 'Starter'}</DataRow>
+          <DataRow label="Status">{statusChip(billing?.subscription?.status ?? subscription.status ?? 'active')}</DataRow>
           <DataRow label="Current period">
-            {formatDate(subscription.currentPeriodStart)} to {formatDate(subscription.currentPeriodEnd)}
+            {periodEnd ? `${formatDate(periodStart)} to ${formatDate(periodEnd)}` : 'Your plan renews every month'}
           </DataRow>
+          {extraTokens > 0 && (
+            <DataRow label="Extra tokens">
+              {formatTokens(extraTokens)} tokens, counted in this period's allowance
+            </DataRow>
+          )}
         </div>
       </article>
 
@@ -48,8 +59,17 @@ export default function BillingView({ me, billing }) {
               <div className="row" key={payment.reference ?? payment.created_at}>
                 <div>
                   <div>{formatNaira(payment.amount_kobo)}</div>
+                  {/* Older records carry no kind, so only a top-up adds this line. */}
+                  {payment.kind === 'topup' && (
+                    <div className="row-meta">
+                      {payment.packName ?? 'Extra usage'}
+                      {Number(payment.tokensGranted) > 0
+                        ? ` - ${formatTokens(payment.tokensGranted)} tokens`
+                        : ''}
+                    </div>
+                  )}
                   <div className="row-meta">
-                    {payment.plan_code ?? 'plan'} - {payment.reference ?? ''}
+                    {payment.plan_code ?? (payment.kind === 'topup' ? 'Top-up' : 'plan')} - {payment.reference ?? ''}
                   </div>
                 </div>
                 <div className="row-meta" style={{ textAlign: 'right' }}>
