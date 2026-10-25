@@ -1042,7 +1042,8 @@ check("both the person's prompts and Zuri's replies carry a copy action", () => 
   const roleBranch = source.indexOf('message.role === \'assistant\'');
   if (roleBranch < 0 || copyAt < roleBranch) throw new Error('the copy action sits inside one role only');
   if (!source.includes('copyMessage(message, index)')) throw new Error('the copy action does not copy the message');
-  if (!source.includes('aria-label={copiedIndex === index ? \'Copied\'')) throw new Error('the copy action never confirms');
+  // The control is the shared Flowbite IconButton, which names itself through label.
+  if (!source.includes("label={copiedIndex === index ? 'Copied'")) throw new Error('the copy action never confirms');
   return 'one copy path for prompts and replies';
 });
 
@@ -1119,6 +1120,36 @@ check('the navigation drawer closes on Escape and locks the page behind it', () 
   if (!app.includes("document.body.style.overflow = 'hidden'")) throw new Error('the page scrolls behind the open drawer');
   if (!app.includes('document.body.style.overflow = previousOverflow')) throw new Error('the scroll lock is never released');
   return 'Escape closes, the page behind is locked, and the lock is restored';
+});
+
+check('the web chat is built from Flowbite components and lucide icons', () => {
+  const chat = read('web/src/views/ChatView.jsx');
+  const dashboard = read('web/src/views/Dashboard.jsx');
+  const ui = read('web/src/components/ui.jsx');
+
+  // Icons come from lucide, either through the shared set or straight from the package.
+  if (!chat.includes("from 'lucide-react'")) throw new Error('the chat does not draw lucide icons');
+  const shared = read('web/src/components/Icons.jsx');
+  if (!shared.includes("from 'lucide-react'")) throw new Error('the shared icon set is not lucide');
+
+  // Every icon control goes through the one wrapper, so a raw button with an icon
+  // cannot creep back in beside the components.
+  if (!ui.includes('export function IconButton(')) throw new Error('there is no shared IconButton');
+  if (!ui.includes('aria-label={label}')) throw new Error('the icon button is unnamed for screen readers');
+  for (const [name, source] of [['chat', chat], ['shell', dashboard]]) {
+    const raw = (source.match(/<button[\s>]/g) ?? []).length;
+    // The chat keeps one plain button: a conversation row is a list row with two
+    // controls beside it, which no Flowbite item models without nesting a button
+    // inside a button. Everything else must be a component.
+    const allowed = name === 'chat' ? 1 : 2;
+    if (raw > allowed) throw new Error(`${name} still draws ${raw} raw buttons`);
+  }
+
+  // The composer and the model menu are Flowbite, not reimplemented.
+  if (!chat.includes('Textarea')) throw new Error('the composer is not a Flowbite textarea');
+  if (!chat.includes('Dropdown')) throw new Error('the model menu is not a Flowbite dropdown');
+
+  return 'Flowbite controls, lucide icons, one copy path';
 });
 
 await Promise.all(pendingChecks);

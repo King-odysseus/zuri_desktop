@@ -162,11 +162,15 @@ async function main() {
 
   // A reply written in the browser arrives on the desktop.
   account.addFromBrowser(cloud.id, 'Pick the third of November.');
-  await chatSync.syncThread('thread-1');
+  const pullRun = await chatSync.syncThread('thread-1');
   [local] = await storedThreads();
   const pulled = local.messages.find((message) => message.content === 'Pick the third of November.');
   check(Boolean(pulled), 'a reply written in the browser is pulled into the desktop thread');
   check(pulled?.cloudId === cloud.messages.at(-1).id, 'the pulled message carries the server id, so it is never sent back');
+  // The count is what tells the window to re-read the open chat: main.js announces a
+  // change only when this is above zero, so a pull that reported nothing would leave
+  // the answer invisible until the chat was reopened.
+  check(pullRun?.data?.appended === 1, 'a pull reports the message it added, so the window can refresh', `saw ${pullRun?.data?.appended}`);
 
   await chatSync.syncThread('thread-1');
   check(cloud.messages.length === 3, 'pulling a message does not push it back as a new one', `saw ${cloud.messages.length}`);

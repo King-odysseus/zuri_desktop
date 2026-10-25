@@ -11,7 +11,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { Button, InlineAlert } from '../components/ui.jsx';
+import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
 import { LogoMark } from '../components/Icons.jsx';
 // The reply renderer and the clipboard fallback are the desktop app's own modules,
 // imported rather than copied: an answer is then drawn by one set of markdown rules
@@ -464,7 +464,6 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   };
 
   const sessionExpired = listError?.status === 401 || threadError?.status === 401 || streamError?.status === 401;
-  const title = thread.title || 'New chat';
   const modelName = modelNameFor(model);
   // The newest reply carries the caption, as the desktop transcript does: repeating
   // the model above every bubble would say the same thing down the whole page.
@@ -515,17 +514,16 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                     onChange={(event) => setRenameDraft(event.target.value)}
                     autoFocus
                   />
-                  <button type="submit" className="chat-row-action" aria-label="Save name" disabled={renameDraft.trim() === ''}>
+                  <IconButton type="submit" size="sm" label="Save name" disabled={renameDraft.trim() === ''}>
                     <Check size={14} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="chat-row-action"
-                    aria-label="Cancel renaming"
+                  </IconButton>
+                  <IconButton
+                    size="sm"
+                    label="Cancel renaming"
                     onClick={() => { setRenamingId(null); setRenameDraft(''); }}
                   >
                     <X size={14} aria-hidden="true" />
-                  </button>
+                  </IconButton>
                 </form>
               ) : (
                 <>
@@ -540,18 +538,17 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                     <span className="chat-recent-meta">{formatRelativeTime(stamp(conversation) || undefined)}</span>
                   </button>
                   <span className="chat-recent-actions">
-                    <button
-                      type="button"
-                      className="chat-row-action"
-                      aria-label={`Rename ${conversation.title || 'chat'}`}
+                    <IconButton
+                      size="sm"
+                      label={`Rename ${conversation.title || 'chat'}`}
                       onClick={() => { setRenamingId(conversation.id); setRenameDraft(conversation.title ?? ''); }}
                     >
                       <Pencil size={14} aria-hidden="true" />
-                    </button>
-                    <button
-                      type="button"
-                      className={`chat-row-action${confirmId === conversation.id ? ' is-danger' : ''}`}
-                      aria-label={confirmId === conversation.id
+                    </IconButton>
+                    <IconButton
+                      size="sm"
+                      tone={confirmId === conversation.id ? 'danger' : 'quiet'}
+                      label={confirmId === conversation.id
                         ? `Confirm deleting ${conversation.title || 'chat'}`
                         : `Delete ${conversation.title || 'chat'}`}
                       onClick={() => {
@@ -562,7 +559,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                       }}
                     >
                       <Trash2 size={14} aria-hidden="true" />
-                    </button>
+                    </IconButton>
                   </span>
                 </>
               )}
@@ -583,20 +580,14 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
           {/* On a phone the left corner is the way back to the chat list. A wide screen
               has the list permanently beside the thread, so only the new-chat icon shows. */}
           {showThread && (
-            <button type="button" className="chat-icon-btn chat-back" aria-label="Back to saved chats" onClick={backToList}>
+            <IconButton label="Back to saved chats" className="chat-back" onClick={backToList}>
               <ChevronLeft size={18} aria-hidden="true" />
-            </button>
+            </IconButton>
           )}
           <div className="chat-floats-end">
-            <button
-              type="button"
-              className="chat-icon-btn"
-              aria-label="New chat"
-              title="New chat"
-              onClick={startNewChat}
-            >
+            <IconButton label="New chat" onClick={startNewChat}>
               <Plus size={18} aria-hidden="true" />
-            </button>
+            </IconButton>
           </div>
         </div>
 
@@ -644,15 +635,14 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                   ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
                   : <p className="chat-text">{message.content}</p>}
                 <div className="chat-bubble-actions">
-                  <button
-                    type="button"
+                  <IconButton
+                    size="sm"
                     className="chat-copy"
-                    aria-label={copiedIndex === index ? 'Copied' : message.role === 'user' ? 'Copy your message' : "Copy Zuri's reply"}
-                    title={copiedIndex === index ? 'Copied' : 'Copy'}
+                    label={copiedIndex === index ? 'Copied' : message.role === 'user' ? 'Copy your message' : "Copy Zuri's reply"}
                     onClick={() => void copyMessage(message, index)}
                   >
                     {copiedIndex === index ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
-                  </button>
+                  </IconButton>
                 </div>
               </article>
             </Fragment>
@@ -716,13 +706,13 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
             </div>
 
             {streaming ? (
-              <Button type="button" variant="secondary" className="chat-send is-stop" aria-label="Stop reply" onClick={stop}>
+              <IconButton label="Stop reply" className="chat-send" onClick={stop}>
                 <Square size={14} aria-hidden="true" />
-              </Button>
+              </IconButton>
             ) : (
-              <Button type="submit" className="chat-send" aria-label="Send" disabled={draft.trim() === ''}>
+              <IconButton type="submit" label="Send" className="chat-send" disabled={draft.trim() === ''}>
                 <ArrowUp size={18} aria-hidden="true" />
-              </Button>
+              </IconButton>
             )}
           </form>
         </div>

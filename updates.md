@@ -1,5 +1,17 @@
 ## 2026-10-25 - Windows
 
+- Every icon control in the web chat is now the site's own Flowbite button: copy, back, new chat, send and stop, rename and delete. A new shared IconButton in the components file wraps Flowbite's Button, requires a label so an icon is never anonymous to a screen reader, and carries the site's 44px target, radius and colours. Before this the chat drew its own bare buttons with their own CSS.
+- Icons all come from lucide, through the shared icon set or straight from the package, so the chat and the rest of the site draw the same family.
+- Padding is fixed throughout the chat. Text was sitting against the edge of its container: a reply now has 14px above and below its text and 18px at the sides, the transcript has a 20px gutter and 24px under the last message, the composer has 16px before the field, and the conversation rows, the navigation and the opening screen all gained room.
+- A reply had no visible container at all. The chat area was painted with a token that only exists in the desktop theme, so on the web it resolved to nothing and the area fell back to the page colour, which is nearly the same as the reply bubble. The area is white now and the bubble carries a hairline, so an answer reads as a card again.
+- On a phone the chat's sidebar no longer wastes the top of the screen: the account card, the signed-in line and the download link are hidden there, because they belong to the wide panel and pushed the conversations below the fold.
+- Two checks added: the chat is built from Flowbite controls with lucide icons and one copy path, and the drawer's floating button floats. Another existing check was updated for the copy control's new label.
+- Key files: web/src/components/ui.jsx, web/src/views/ChatView.jsx, web/src/views/Dashboard.jsx, web/src/styles.css, scripts/selftest.js, server/public/** (rebuilt), dist-android/** and android/app/src/main/assets/public/** (rebuilt, not tracked).
+- Other OS action: run "npm run test && npm run web:build", then "npm run android:build" for an APK carrying this.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - The phone layout of the site and the Android app no longer has a bottom bar at all. Navigation is a floating round button in the top-left corner that reveals the sidebar, which is how the assistant apps do it. It sits under the top bar, over the page, and the page content starts below it so nothing is covered.
 - A chat is now one sidebar, not three columns. The destinations, the account and the conversation list share a single column, so the chat itself gets the width the desktop app gives it: 896px, widening to 1024 and 1152 on larger screens. Before, the site showed a navigation sidebar, a chat list and the thread side by side and the answer column was squeezed.
 - The chat's header bar is gone. Two bare icons float over the transcript instead, the way the desktop chat draws them: back to the chat list on a phone at the left, new chat at the right. The chat sits on the app background rather than a raised panel.

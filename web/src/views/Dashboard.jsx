@@ -1,5 +1,6 @@
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
+import { IconButton } from '../components/ui.jsx';
 import { ChartIcon, CardIcon, CloseIcon, GridIcon, MenuIcon, MessageIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
@@ -62,9 +63,9 @@ function SidebarContents({ user, name, view, onViewChange, onCloseNav, withAccou
       {/* The bar already names the app once the panel is docked, so only the drawer shows this. */}
       <div className="sidebar-drawer-head">
         <span className="brand-name">Zuri Cloud</span>
-        <button type="button" className="icon-btn" onClick={onCloseNav} aria-label="Close navigation">
+        <IconButton label="Close navigation" size="sm" onClick={onCloseNav}>
           <CloseIcon />
-        </button>
+        </IconButton>
       </div>
       <nav className="nav" aria-label="Dashboard sections">
         <NavList view={view} onViewChange={onViewChange} isAdmin={user.isAdmin === true} />
@@ -147,15 +148,14 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           button. The chat draws its own controls, and the drawer is not used there
           because its list column already carries the navigation. */}
       {!isChat && !navOpen && (
-        <button
-          type="button"
+        <IconButton
           className="nav-fab"
-          onClick={onOpenNav}
-          aria-label="Open navigation"
+          label="Open navigation"
           aria-expanded="false"
+          onClick={onOpenNav}
         >
           <MenuIcon />
-        </button>
+        </IconButton>
       )}
 
       {/* A tap outside the drawer closes it. The scrim is hidden once the sidebar is

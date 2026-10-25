@@ -23,6 +23,37 @@ export function Button({ variant = 'primary', block = false, className = '', ...
   return <FlowbiteButton className={classes} color="gray" {...props} />;
 }
 
+/**
+ * A square control that holds one icon: copy, close, delete, send.
+ *
+ * Flowbite's Button keeps the semantics (a real button, the pressed and disabled
+ * states) while the site's own class keeps the 44px target, the radius and the
+ * colour. An icon alone has no readable name, so the label is required rather than
+ * optional, and it becomes both the accessible name and the hover title.
+ *
+ * @param {{
+ *   label: string,
+ *   tone?: 'quiet' | 'danger' | 'primary',
+ *   size?: 'sm' | 'md',
+ *   className?: string,
+ *   children: import('react').ReactNode,
+ * }} props
+ */
+export function IconButton({ label, tone = 'quiet', size = 'md', className = '', children, ...props }) {
+  const classes = [
+    'icon-btn',
+    tone === 'danger' ? 'is-danger' : '',
+    tone === 'primary' ? 'is-primary' : '',
+    size === 'sm' ? 'is-sm' : '',
+    className,
+  ].filter(Boolean).join(' ');
+  return (
+    <FlowbiteButton className={classes} color="gray" aria-label={label} title={label} {...props}>
+      {children}
+    </FlowbiteButton>
+  );
+}
+
 /** A pill label: the plan tile's "Current plan", the hero's eyebrow and the preview chip. */
 export function Chip({ tone = 'default', className = '', children }) {
   return (
