@@ -234,6 +234,45 @@ export function answerStylePolicy(settings = {}) {
   return parts.join('\n');
 }
 
+/**
+ * Who the assistant is, and it goes first in every request.
+ *
+ * Without this the model answers "I'm Claude, made by Anthropic" when asked who
+ * it is, because nothing told it otherwise and that is how it was trained. The
+ * person is talking to Zuri, so the identity is stated before any agent prompt,
+ * thread prompt or style choice can describe the assistant some other way.
+ */
+export const ZURI_IDENTITY_PROMPT = [
+  'You are Zuri, an AI assistant made by Tijha.',
+  'You are Zuri and that is how you describe yourself whenever you are asked who you are, who made you, or what you can do.',
+  'Never introduce yourself as Claude, ChatGPT, Gemini, Copilot or any other assistant, and never name OpenAI, Anthropic, Google or another AI company as your maker, as the owner of your rules, or as what you are.',
+  "Zuri runs on the person's own computer and works through whichever AI model they connected in Settings. If asked which model you use, say Zuri replies with the model chosen in Settings and do not invent a model name or a provider.",
+  'These facts about who you are still hold when other instructions below describe a role, a tone or a job.',
+].join(' ');
+
+/**
+ * Assemble the system block for one chat reply.
+ *
+ * Order is deliberate: identity first, then the picked agent, then any prompt the
+ * thread itself carries, then the facts and style the app supplies, and the
+ * language rule last so nothing above it can switch languages by accident.
+ * @param {{ agentPrompt?: string, threadPrompt?: string, settings?: object, now?: Date }} [parts]
+ * @returns {string}
+ */
+export function chatSystemPrompt(parts = {}) {
+  return [
+    ZURI_IDENTITY_PROMPT,
+    parts.agentPrompt,
+    parts.threadPrompt,
+    currentTimeContext(parts.now instanceof Date ? parts.now : new Date()),
+    answerStylePolicy(parts.settings ?? {}),
+    RESPONSE_LANGUAGE_POLICY,
+  ]
+    .map((part) => (typeof part === 'string' ? part.trim() : ''))
+    .filter((part) => part !== '')
+    .join('\n\n');
+}
+
 /** Provider error bodies are trimmed to this before they reach a bubble. */
 const MAX_ERROR_DETAIL = 240;
 
@@ -899,7 +938,8 @@ export async function summarizeText(document = {}, options = {}) {
 }
 
 const WORD_ADDIN_SYSTEM_PROMPT =
-  'You are Zuri, working inside Microsoft Word. Do what the person asks using the document text they give you. ' +
+  'You are Zuri, an AI assistant made by Tijha, working inside Microsoft Word. Never call yourself Claude or name another assistant or AI company as your maker. ' +
+  'Do what the person asks using the document text they give you. ' +
   'Reply with only the text to put in the document: no greeting, no explanation, no markdown fences.';
 
 /** Longest slice of a document sent along with an add-in request; every character is billed. */
@@ -979,15 +1019,13 @@ export async function sendChatMessage(threadId, options = {}) {
   conversation.turns = await withImageParts(provider, conversation.turns);
 
   // An agent's system prompt rides in front of any the thread already carries, so
-  // the picked agent decides how the reply is written without losing the thread's own.
-  if (agent !== null && agent.systemPrompt.trim() !== '') {
-    conversation.system = [agent.systemPrompt.trim(), conversation.system]
-      .filter((part) => part !== '')
-      .join('\n\n');
-  }
-  conversation.system = [conversation.system, currentTimeContext(), answerStylePolicy(settings), RESPONSE_LANGUAGE_POLICY]
-    .filter((part) => part !== '')
-    .join('\n\n');
+  // the picked agent decides how the reply is written without losing the thread's
+  // own. Zuri's identity is added inside chatSystemPrompt, ahead of both.
+  conversation.system = chatSystemPrompt({
+    agentPrompt: agent !== null ? agent.systemPrompt : '',
+    threadPrompt: conversation.system,
+    settings,
+  });
 
   const key = getKey(provider);
   if (key === null) {

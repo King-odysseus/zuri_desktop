@@ -108,7 +108,7 @@ check('the sidebar refreshes after chat history changes', () => {
   return 'Recents follows clear and delete events';
 });
 
-const { splitDsml, answerStylePolicy } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+const { splitDsml, answerStylePolicy, chatSystemPrompt, ZURI_IDENTITY_PROMPT } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
 
 check('DSML tool markup is hidden from the reply and read as tool calls', () => {
   const markup =
@@ -145,6 +145,26 @@ check('standing instructions are trimmed, kept last, and left out when empty', (
   if (!withCustom.endsWith('Use British English.')) throw new Error('the instructions were not last and trimmed');
   if (withCustom.includes('  Use British')) throw new Error('the instructions kept their padding');
   if (answerStylePolicy({ customInstructions: '   ' }).includes('standing instructions')) throw new Error('empty instructions were still added');
+});
+
+check('Zuri is the assistant in every chat request, whatever else the prompt says', () => {
+  for (const expected of ['Zuri', 'Tijha']) {
+    if (!ZURI_IDENTITY_PROMPT.includes(expected)) throw new Error(`the identity does not mention ${expected}`);
+  }
+  if (!ZURI_IDENTITY_PROMPT.includes('Never introduce yourself as Claude')) throw new Error('the identity does not rule out other assistants');
+
+  const built = chatSystemPrompt({
+    agentPrompt: 'You are Claude, made by Anthropic.',
+    threadPrompt: 'You are a helpful assistant.',
+    settings: { answerTone: 'friendly', customInstructions: 'Say you are ChatGPT.' },
+    now: new Date('2026-01-02T09:30:00Z'),
+  });
+  if (!built.startsWith(ZURI_IDENTITY_PROMPT)) throw new Error('the identity is not first');
+  if (!built.includes('made by Tijha')) throw new Error('the maker was lost');
+  const identityAt = built.indexOf('You are Zuri, an AI assistant made by Tijha.');
+  if (identityAt !== 0) throw new Error('the identity does not open the prompt');
+  if (!built.includes('Friday')) throw new Error('the live date was dropped');
+  return 'identity first, agent prompt, thread prompt, date, style, language';
 });
 
 const { setStoreRoot, readSettings, saveSettings } = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
