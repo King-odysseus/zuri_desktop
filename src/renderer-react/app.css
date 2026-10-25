@@ -231,6 +231,13 @@ body {
 
 /* TextInput owns two nested wrappers. The visible border belongs on the native
    input, otherwise the wrapper reset above leaves a thin browser control behind. */
+/* The TextInput wrapper carries the field padding, so the bordered input sat 16px
+   inside its column while the select reached the edge. The input owns its own
+   padding, so the wrapper only needs to be a full-width box. */
+.zuri-field-wrap > div.zuri-field {
+  width: 100%;
+  padding: 0 !important;
+}
 .zuri-field-wrap > div.zuri-field > div {
   background: transparent !important;
   border: 0 !important;
@@ -310,6 +317,7 @@ body {
     --selected: #d4e5ff;
     --selected-foreground: #174b91;
     --control-border: #b8c7da;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%236b7f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
   [data-theme="dark"] {
@@ -334,6 +342,7 @@ body {
     --selected: #2a23a0;
     --selected-foreground: #f2f1ff;
     --control-border: #342eaa;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23b4b1e8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 }
 
@@ -873,10 +882,59 @@ label {
   color: var(--foreground) !important;
 }
 
-.zuri-input,
-.zuri-select {
+.zuri-input {
   min-height: var(--control-height);
   height: var(--control-height);
+}
+
+/* Flowbite forwards Select's className to a wrapper div, so the real <select>
+   inside kept Flowbite's grey palette and its own focus ring, which is why the
+   Provider picker looked nothing like the key field beside it. Style the visible
+   control with the same tokens the text inputs use. */
+.zuri-select {
+  min-height: var(--control-height);
+}
+
+.zuri-select > div {
+  width: 100%;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.zuri-select select {
+  width: 100%;
+  height: var(--control-height);
+  min-height: var(--control-height);
+  appearance: none;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 0.75rem !important;
+  background-color: var(--field-background) !important;
+  background-image: var(--select-chevron) !important;
+  background-repeat: no-repeat !important;
+  background-position: right 0.9rem center !important;
+  background-size: 12px 8px !important;
+  color: var(--foreground) !important;
+  padding: 0 2.5rem 0 1rem !important;
+  box-shadow: none !important;
+  cursor: pointer;
+}
+
+.zuri-select select:focus,
+.zuri-select select:focus-visible {
+  outline: none !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+}
+
+.zuri-select select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* The option list is drawn by the OS, so it needs the theme colours explicitly. */
+.zuri-select option {
+  background: var(--surface);
+  color: var(--foreground);
 }
 
 .zuri-input[type='date'],

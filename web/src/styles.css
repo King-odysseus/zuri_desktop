@@ -1608,9 +1608,9 @@ a {
     linear-gradient(
       180deg,
       rgba(8, 20, 38, 0.74) 0%,
-      rgba(8, 20, 38, 0.26) 20%,
-      rgba(10, 28, 56, 0.5) 55%,
-      rgba(8, 20, 38, 0.86) 100%
+      rgba(8, 20, 38, 0.34) 20%,
+      rgba(8, 20, 38, 0.66) 55%,
+      rgba(8, 20, 38, 0.9) 100%
     ),
     url("/img/auth-backdrop.jpg");
   background-size: cover;
@@ -2063,8 +2063,12 @@ a.download-card:hover {
     min-height: 320px;
   }
 
+  /* The card column is a narrow rail and the photograph carries the page: a
+     50/50 split left the form floating in half an empty window. It is 30% of
+     the width, but never thinner than the card can be typed in comfortably,
+     which is what happens on a 900px laptop window (30% would be 270px). */
   .auth-page {
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 30%);
     align-items: stretch;
     min-height: calc(100dvh - var(--bar-height));
   }
@@ -2098,10 +2102,10 @@ a.download-card:hover {
 
   .auth-aside-inner p {
     max-width: 40ch;
-    color: rgba(255, 255, 255, 0.84);
+    color: rgba(255, 255, 255, 0.92);
     font-size: 15px;
     line-height: 1.6;
-    text-shadow: 0 1px 14px rgba(4, 12, 28, 0.3);
+    text-shadow: 0 1px 14px rgba(4, 12, 28, 0.45);
   }
 
   .auth-brand {
@@ -2110,9 +2114,12 @@ a.download-card:hover {
     left: 48px;
   }
 
+  /* The rail is narrow, so its gutter is smaller than the aside's: the card
+     keeps its 460px ceiling where there is room and stays typable where there
+     is not. */
   .auth-panel {
     justify-content: center;
-    padding: 48px 32px;
+    padding: 48px 24px;
   }
 }
 
