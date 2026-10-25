@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, Chip, Input, Textarea } from './ui.jsx';
+import SelectField from './SelectField.jsx';
 
 const PREVIEW_TOOLS = [
   { name: 'webSearch', label: 'Search the web' },
@@ -26,6 +27,20 @@ const PREVIEW_AGENTS = [
   },
 ];
 
+// Ids match PROVIDERS in secrets.js; the empty value follows the provider chosen in Settings.
+const PROVIDER_OPTIONS = [
+  { value: '', label: 'Zuri default (from Settings)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'moonshot', label: 'Kimi (Moonshot)' },
+  { value: 'zai', label: 'Z.ai (GLM)' },
+];
+
+function providerLabel(value) {
+  return PROVIDER_OPTIONS.find((option) => option.value === value)?.label ?? PROVIDER_OPTIONS[0].label;
+}
+
 function cloneAgents(agents) {
   return Array.isArray(agents)
     ? agents.map((agent) => ({
@@ -35,6 +50,7 @@ function cloneAgents(agents) {
         allowedTools: Array.isArray(agent?.allowedTools)
           ? agent.allowedTools.filter((tool) => typeof tool === 'string')
           : [],
+        provider: PROVIDER_OPTIONS.some((option) => option.value === agent?.provider) ? agent.provider : '',
       }))
     : [];
 }
@@ -109,7 +125,7 @@ export default function AgentsView() {
   }
 
   function addAgent() {
-    const agent = { id: newAgentId(), name: 'New agent', systemPrompt: '', allowedTools: [] };
+    const agent = { id: newAgentId(), name: 'New agent', systemPrompt: '', allowedTools: [], provider: '' };
     setAgents((current) => [...current, agent]);
     setSelectedId(agent.id);
     setMessage('Unsaved changes');
@@ -175,7 +191,7 @@ export default function AgentsView() {
                       <span className="flex min-w-0 flex-1 flex-col items-start">
                         <span className="w-full truncate text-sm">{agent.name || 'Untitled agent'}</span>
                         <span className="text-xs text-muted">
-                          {agent.allowedTools.length} {agent.allowedTools.length === 1 ? 'tool' : 'tools'}
+                          {providerLabel(agent.provider)} - {agent.allowedTools.length} {agent.allowedTools.length === 1 ? 'tool' : 'tools'}
                         </span>
                       </span>
                     </Button>
@@ -205,6 +221,13 @@ export default function AgentsView() {
                       Use this agent in chat
                     </Checkbox>
                   </div>
+
+                  <SelectField
+                    label="Provider"
+                    value={selected.provider}
+                    options={PROVIDER_OPTIONS}
+                    onChange={(value) => updateSelected({ provider: value })}
+                  />
 
                   <Textarea
                     label="System prompt"

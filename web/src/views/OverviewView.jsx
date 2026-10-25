@@ -15,7 +15,7 @@ export default function OverviewView({ me, usage }) {
           <h1>Welcome back, {(name.split(' ')[0] || 'friend').trim()}</h1>
           <p>Signed in as {user.email ?? 'your Google account'}</p>
         </div>
-        <span className={`chip${chipTone}`}>{subscription.planName ?? 'Free'} plan</span>
+        <span className={`chip${chipTone}`}>{subscription.planName ?? 'Starter'} plan</span>
       </div>
 
       {usage.overQuota && (
@@ -31,7 +31,7 @@ export default function OverviewView({ me, usage }) {
       <div className="stat-grid">
         <article className="card">
           <p className="stat-label">Current plan</p>
-          <p className="stat-value">{subscription.planName ?? 'Free'}</p>
+          <p className="stat-value">{subscription.planName ?? 'Starter'}</p>
           <p className="stat-meta">{formatTokens(usage.monthlyTokens)} tokens each month</p>
         </article>
         <article className="card">

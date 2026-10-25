@@ -4,7 +4,7 @@ import { createApp } from './app.js';
 import { createRequestListener } from './serve.js';
 import { createAuthService, createGoogleVerifier } from './auth.js';
 import { createDatabase, createRepository } from './db.js';
-import { createDeepSeekClient } from './deepseek.js';
+import { createAnthropicClient, createDeepSeekClient } from './deepseek.js';
 import { createMailer } from './mail.js';
 import { createPaystackClient } from './paystack.js';
 import { applySchema } from './schema.js';
@@ -32,7 +32,25 @@ const auth = repository
     verifyGoogleCredential: config.googleClientId ? createGoogleVerifier(config.googleClientId) : null,
   })
   : null;
-const chatProvider = createDeepSeekClient({ apiKey: config.deepSeekApiKey, endpoint: config.deepSeekEndpoint });
+// One client per supplier that has a key. A Zuri model names its supplier, and a
+// model whose supplier has no key fails with a clear error instead of falling
+// back to a different (and differently priced) supplier.
+const supplierClients = {
+  deepseek: createDeepSeekClient({ apiKey: config.deepSeekApiKey, endpoint: config.deepSeekEndpoint }),
+  moonshot: createDeepSeekClient({ apiKey: config.moonshotApiKey, endpoint: 'https://api.moonshot.ai/v1/chat/completions' }),
+  zai: createDeepSeekClient({ apiKey: config.zaiApiKey, endpoint: 'https://api.z.ai/api/paas/v4/chat/completions' }),
+  openai: createDeepSeekClient({ apiKey: config.openaiApiKey, endpoint: 'https://api.openai.com/v1/chat/completions' }),
+  anthropic: createAnthropicClient({ apiKey: config.anthropicApiKey }),
+};
+const chatProvider = async (request) => {
+  const client = supplierClients[request.supplier];
+  if (!client) {
+    const error = new Error('This model is not switched on yet.');
+    error.code = 'PROVIDER_REQUEST_FAILED';
+    throw error;
+  }
+  return client(request);
+};
 const paystack = createPaystackClient({ secretKey: config.paystackSecretKey, endpoint: config.paystackEndpoint });
 const mailer = createMailer({ apiKey: config.brevoApiKey, from: config.mailFrom, fromName: config.mailFromName });
 if (!mailer.configured) console.log('[zuri-cloud] password reset email is off: BREVO_API_KEY and MAIL_FROM are not both set');
@@ -40,7 +58,7 @@ const app = createApp({
   auth,
   repository,
   chatProvider,
-  defaultModel: config.deepSeekModel,
+  nairaPerUsd: config.nairaPerUsd,
   paystack,
   paystackSecretKey: config.paystackSecretKey,
   paystackPlanCodes: config.paystackPlanCodes,

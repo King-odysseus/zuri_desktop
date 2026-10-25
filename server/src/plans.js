@@ -1,13 +1,14 @@
 /**
- * Nigerian starter plans. Prices are stored in kobo because Paystack expects
+ * Nigerian plans. Prices are stored in kobo because Paystack expects
  * the smallest currency unit. Allowances are deliberately configuration data,
- * so pricing can be changed without rewriting quota logic.
+ * so pricing can be changed without rewriting quota logic. Order matters: it is
+ * the price ladder that a model's minimum plan is checked against.
  */
 export const PLANS = Object.freeze([
-  Object.freeze({ code: 'free', name: 'Free', amountKobo: 0, monthlyTokens: 100_000 }),
   Object.freeze({ code: 'starter', name: 'Starter', amountKobo: 250_000, monthlyTokens: 2_000_000 }),
   Object.freeze({ code: 'pro', name: 'Pro', amountKobo: 600_000, monthlyTokens: 6_000_000 }),
   Object.freeze({ code: 'power', name: 'Power', amountKobo: 1_500_000, monthlyTokens: 12_000_000 }),
+  Object.freeze({ code: 'max', name: 'Max', amountKobo: 4_000_000, monthlyTokens: 40_000_000 }),
 ]);
 
 /**

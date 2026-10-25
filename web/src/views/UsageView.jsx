@@ -52,6 +52,15 @@ export default function UsageView({ usage, limits }) {
           <DataRow label="Largest reply">{formatTokens(planLimits.maxOutputTokens)} tokens</DataRow>
         </div>
       </article>
+
+      <article className="card">
+        <p className="stat-label">How your allowance is counted</p>
+        <p className="stat-meta">
+          Each request counts input tokens plus output tokens. More expensive Zuri models have a higher
+          weight, so they use more of the monthly allowance. Your subscription price is charged in Naira
+          through Paystack; messages do not create a separate per-request charge.
+        </p>
+      </article>
     </section>
   );
 }

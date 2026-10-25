@@ -30,7 +30,7 @@ assert.equal(health.status, 200);
 assert.deepEqual(await health.json(), { ok: true, service: 'zuri-cloud', time: '2026-10-24T12:00:00.000Z' });
 const plans = await handleRequest(new Request('https://cloud.example.com/api/plans'));
 assert.equal(plans.status, 200);
-assert.deepEqual((await plans.json()).data.map((plan) => plan.code), ['free', 'starter', 'pro', 'power']);
+assert.deepEqual((await plans.json()).data.map((plan) => plan.code), ['starter', 'pro', 'power', 'max']);
 const publicConfig = await handleRequest(new Request('https://cloud.example.com/api/public-config'), { googleClientId: 'client-id' });
 // The site needs to know a password form exists and where to send reset links,
 // so both travel with the Google client id.
@@ -41,22 +41,25 @@ assert.deepEqual(usage, { planCode: 'starter', monthlyTokens: 2_000_000, usedTok
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 349_999), { allowed: true, reason: 'ok' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 350_000), { allowed: false, reason: 'quota_exceeded' });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 'bad'), { allowed: false, reason: 'invalid_tokens' });
-assert.deepEqual(limitsForPlan('free'), { requestsPerMinute: 10, maxConcurrent: 1, maxInputTokens: 8_000, maxOutputTokens: 1_000 });
-assert.equal(limitsForPlan('unknown').requestsPerMinute, 10);
+assert.deepEqual(limitsForPlan('starter'), { requestsPerMinute: 30, maxConcurrent: 2, maxInputTokens: 16_000, maxOutputTokens: 2_000 });
+assert.equal(limitsForPlan('unknown').requestsPerMinute, 30);
 let clock = 0;
 const limiter = createRequestLimiter({ now: () => clock });
-const first = limiter.acquire('user-1', limitsForPlan('free'));
+const first = limiter.acquire('user-1', limitsForPlan('starter'));
 assert.equal(first.allowed, true);
-assert.equal(limiter.acquire('user-1', limitsForPlan('free')).reason, 'concurrency_limit');
+const second = limiter.acquire('user-1', limitsForPlan('starter'));
+assert.equal(second.allowed, true);
+assert.equal(limiter.acquire('user-1', limitsForPlan('starter')).reason, 'concurrency_limit');
 first.release();
-for (let index = 1; index < 10; index += 1) {
-  const request = limiter.acquire('user-1', limitsForPlan('free'));
+second.release();
+for (let index = 2; index < 30; index += 1) {
+  const request = limiter.acquire('user-1', limitsForPlan('starter'));
   assert.equal(request.allowed, true);
   request.release();
 }
-assert.equal(limiter.acquire('user-1', limitsForPlan('free')).reason, 'rate_limit');
+assert.equal(limiter.acquire('user-1', limitsForPlan('starter')).reason, 'rate_limit');
 clock = 60_000;
-assert.equal(limiter.acquire('user-1', limitsForPlan('free')).allowed, true);
+assert.equal(limiter.acquire('user-1', limitsForPlan('starter')).allowed, true);
 const webhookSecret = 'paystack-test-secret';
 const paystackCalls = [];
 const paystack = {
@@ -83,7 +86,7 @@ const repository = {
   async createSession(userId, tokenHash, expiresAt) { sessions.set(tokenHash, { userId, expiresAt }); },
   // The idle check reads the session row itself, so the stored record travels
   // back with the user.
-  async findSessionUser(tokenHash) { const session = sessions.get(tokenHash); return session ? { user, subscription: { id: 'subscription-1', planCode: 'free', monthlyTokens: 1000, currentPeriodStart: fixedNow(), currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z') }, session: { expiresAt: session.expiresAt, lastUsedAt: fixedNow(), revoked: false } } : null; },
+  async findSessionUser(tokenHash) { const session = sessions.get(tokenHash); return session ? { user, subscription: { id: 'subscription-1', planCode: 'starter', monthlyTokens: 2_000_000, currentPeriodStart: fixedNow(), currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z') }, session: { expiresAt: session.expiresAt, lastUsedAt: fixedNow(), revoked: false } } : null; },
   async getUsage() { return { usedTokens: 125 }; },
   async reserveUsage() { return { id: 'reservation-1', reservedTokens: 9000 }; },
   async commitUsage() {},
@@ -92,7 +95,7 @@ const repository = {
   async markPaymentFailed() {},
   async applySuccessfulPayment() { return { applied: true, planCode: 'starter' }; },
   async updateSubscriptionFromPaystack() { return { applied: true }; },
-  async getBilling() { return { subscription: { planCode: 'free' }, payments: [] }; },
+  async getBilling() { return { subscription: { planCode: 'starter' }, payments: [] }; },
   async revokeSession(tokenHash) { sessions.delete(tokenHash); },
 };
 const auth = createAuthService({ repository, verifyGoogleCredential: async () => ({ googleSubject: 'google-1', email: user.email, displayName: 'User' }), now: fixedNow, random: () => Buffer.from('session-token') });
@@ -124,7 +127,7 @@ assert.equal(me.status, 200);
 assert.equal((await me.json()).data.user.id, user.id);
 const limits = await app(new Request('https://cloud.example.com/api/me/limits', { headers: { authorization: `Bearer ${signedIn.token}` } }));
 assert.equal(limits.status, 200);
-assert.deepEqual((await limits.json()).data.limits, { requestsPerMinute: 10, maxConcurrent: 1, maxInputTokens: 8_000, maxOutputTokens: 1_000 });
+assert.deepEqual((await limits.json()).data.limits, { requestsPerMinute: 30, maxConcurrent: 2, maxInputTokens: 16_000, maxOutputTokens: 2_000 });
 const chat = await app(new Request('https://cloud.example.com/api/chat', {
   method: 'POST',
   headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
@@ -133,13 +136,53 @@ const chat = await app(new Request('https://cloud.example.com/api/chat', {
 assert.equal(chat.status, 200);
 assert.equal((await chat.json()).data.content, 'Cloud reply');
 assert.equal(providerCalls.length, 1);
-assert.equal(providerCalls[0].maxTokens, 1000);
+assert.equal(providerCalls[0].maxTokens, 2000);
 const invalidChat = await app(new Request('https://cloud.example.com/api/chat', {
   method: 'POST',
   headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
   body: JSON.stringify({ messages: [] }),
 }));
 assert.equal(invalidChat.status, 400);
+{
+  const headers = { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' };
+  const ask = (model) => app(new Request('https://cloud.example.com/api/chat', { method: 'POST', headers, body: JSON.stringify({ model, messages: [{ role: 'user', content: 'Hi' }] }) }));
+  const calls = providerCalls.length;
+  const tooHigh = await ask('zuri-max');
+  assert.equal(tooHigh.status, 403, 'a Starter plan cannot use a Max model');
+  assert.equal((await tooHigh.json()).error.code, 'PLAN_UPGRADE_REQUIRED');
+  assert.equal((await ask('no-such-model')).status, 400);
+  assert.equal(providerCalls.length, calls, 'a refused model never reaches a supplier');
+  const allowed = await (await ask('zuri-flash')).json();
+  assert.equal(allowed.data.model, 'zuri-flash');
+  assert.equal(providerCalls.at(-1).supplier, 'deepseek');
+  assert.ok(!JSON.stringify(allowed).includes('deepseek'), 'the supplier name never reaches the customer');
+  const listed = await (await app(new Request('https://cloud.example.com/api/models', { headers }))).json();
+  assert.deepEqual(listed.data.map((model) => [model.code, model.available]), [
+    ['zuri-flash', true],
+    ['zuri-pro', true],
+    ['zuri-max', false],
+    ['zuri-code', false],
+    ['zuri-reason', false],
+    ['zuri-elite', false],
+  ]);
+  assert.ok(!JSON.stringify(listed).includes('supplier'));
+  assert.equal((await app(new Request('https://cloud.example.com/api/admin/overview', { headers }))).status, 403, 'admin pages are admin-only');
+  assert.equal((await app(new Request('https://cloud.example.com/api/admin/models', { method: 'PUT', headers, body: '{}' }))).status, 403);
+}
+{
+  const { DEFAULT_MODELS, canUseModel, quotaTokens, supplierCostMicroUsd, microUsdToKobo, limitsForModel, validateModelInput } = await import('../src/models.js');
+  const [flash, pro, max] = DEFAULT_MODELS;
+  assert.equal(canUseModel(max, 'starter'), false);
+  assert.equal(canUseModel(pro, 'power'), true);
+  assert.equal(canUseModel(max, 'unknown'), false);
+  assert.equal(quotaTokens(pro, 100, 50), 750, 'a dearer model burns quota faster');
+  assert.equal(supplierCostMicroUsd(flash, 1_000_000, 1_000_000), 420_000);
+  assert.equal(microUsdToKobo(1_000_000, 1600), 160_000);
+  assert.equal(limitsForModel({ requestsPerMinute: 10, maxConcurrent: 2 }, max).requestsPerMinute, 2);
+  assert.equal(validateModelInput({ ...pro }).ok, true);
+  assert.equal(validateModelInput({ ...pro, supplier: 'nobody' }).ok, false);
+  assert.equal(validateModelInput({ ...pro, rateFactor: 5 }).ok, false);
+}
 const checkout = await app(new Request('https://cloud.example.com/api/billing/checkout', {
   method: 'POST',
   headers: { authorization: `Bearer ${signedIn.token}`, 'content-type': 'application/json' },
@@ -244,6 +287,7 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
   const mapped = downloadsFromReleases([
     {
       tag_name: 'v0.3.0',
+      html_url: 'https://github.com/King-odysseus/zuri-releases/releases/tag/v0.3.0',
       draft: false,
       prerelease: false,
       assets: [
@@ -270,6 +314,7 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
   assert.equal(windowsRelease.version, '0.3.0', 'the newest published release wins over older, draft and prerelease builds');
   assert.equal(windowsRelease.url, 'https://github.com/o/r/releases/download/v0.3.0/Zuri-0.3.0-Setup.exe');
   assert.equal(windowsRelease.size, 300, 'the size the page prints comes from here');
+  assert.equal(windowsRelease.releaseUrl, 'https://github.com/King-odysseus/zuri-releases/releases/tag/v0.3.0');
   assert.equal(macRelease.version, '0.2.0', 'macOS falls back to the newest release that actually carries a dmg');
   assert.equal(macRelease.url, 'https://example.test/Zuri-0.2.0.dmg');
   assert.ok(!mapped.some((file) => /\.blockmap$|\.yml$/.test(file.name)), 'updater side files are never a download');
@@ -386,9 +431,9 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
         user: publicPasswordUser(record),
         subscription: {
           id: 'password-subscription',
-          planCode: 'free',
-          planName: 'Free',
-          monthlyTokens: 250_000,
+          planCode: 'starter',
+          planName: 'Starter',
+          monthlyTokens: 2_000_000,
           currentPeriodStart: fixedNow(),
           currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z'),
         },

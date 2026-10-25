@@ -1,3 +1,37 @@
+## 2026-10-25 - Windows
+
+- Fixed PostgreSQL usage events so model code, supplier, weighted quota tokens and supplier cost are stored for admin reporting. Added a repository regression test. Desktop Settings now lets users choose the local provider and model without editing the data folder, and the landing page correctly says there are four plans.
+- Key files: `server/src/db.js`, `server/test/db.test.js`, `server/package.json`, `src/renderer-react/SettingsView.jsx`, `web/src/views/Landing.jsx`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Removed the Free cloud plan. Starter is now the paid entry plan and every new account starts with Starter; Zuri Flash (DeepSeek) is available from Starter. Existing database rows on Free are migrated to Starter before the retired plan is deleted.
+- Updated plan limits, model gating, sign-up and landing copy, account fallbacks, desktop cloud plan display, preview data, and server tests so no customer-facing free tier remains.
+- Key files: `server/src/plans.js`, `server/src/limits.js`, `server/src/db.js`, `server/src/models.js`, `server/db/schema.sql`, `web/src/**`, `src/renderer-react/CloudView.jsx`, `scripts/preview-web.mjs`, `server/test/**`.
+- Other OS action: run `npm run web:build && npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Added the privacy and data page (/privacy) and the terms and AI disclaimer page (/terms) to the web app, linked from every footer and from the sign-up and sign-in screens, and a data notice in desktop Settings under Providers and keys. They state that messages go to AI providers some of which operate in China and the United States, what Zuri Cloud stores (no message text), and that AI can be wrong. The wording is a plain-language draft and needs a lawyer's review, plus a real contact address, before launch.
+- Key files: `web/src/views/LegalView.jsx`, `web/src/App.jsx`, `web/src/components/Footer.jsx`, `web/src/views/AuthView.jsx`, `src/renderer-react/SettingsView.jsx`.
+- Other OS action: run `npm run web:build` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Zuri cloud models: customers pick Zuri-branded models (Zuri Flash, Zuri Pro, Zuri Max) and never see the supplier. The catalogue is a new `models` table (seeded once, then edited in the dashboard) mapping each Zuri name to a supplier, a supplier model, a dollar price per million tokens, a quota weight, a lowest plan and a rate factor. The supplier prices in the seed are placeholders: check them against each supplier price list before charging customers.
+- `POST /api/chat` now takes a Zuri model code, refuses a model above the plan (403 PLAN_UPGRADE_REQUIRED), counts weighted tokens against the monthly quota, scales requests per minute by the model rate factor, and records the supplier cost of every request (`usage_events.cost_micro_usd`, `quota_tokens`, `model_code`). New `GET /api/models` lists models for the signed-in plan.
+- New Max plan (NGN 40,000, 40M tokens, 240 requests per minute). Paystack needs a plan code in `PAYSTACK_PLAN_MAX` before it can be bought.
+- New admin dashboard (Admin tab, shown to `users.is_admin` accounts only): revenue, supplier cost at `USD_NGN_RATE` (default 1600), margin, spend per model, model editor, and plan limits. Routes: `GET /api/admin/overview`, `PUT /api/admin/models`.
+- Suppliers: set `MOONSHOT_API_KEY`, `ZAI_API_KEY` and `OPENAI_API_KEY` next to `DEEPSEEK_API_KEY` to switch on the other suppliers. A model whose supplier has no key fails instead of falling back to another supplier.
+- Desktop agents also gained a per-agent provider setting (`src/main/store.js`, `src/main/providers/chat.js`, `src/renderer-react/AgentsView.jsx`); the next step is to replace the supplier names there with the Zuri model names.
+- Key files: `server/src/models.js`, `server/src/app.js`, `server/src/db.js`, `server/src/server.js`, `server/src/config.js`, `server/db/schema.sql`, `server/test/models.test.js`, `web/src/views/AdminView.jsx`, `scripts/preview-web.mjs` (PREVIEW_ADMIN=1 shows the dashboard with sample data).
+- Other OS action: run `npm run web:build && cd server && npm test` after syncing; the schema upgrades itself on the next server start.
+- Done on: Windows
+
 ## 2026-10-24 - Windows
 
 - The web app now wears the real Zuri icon (the same `zuri-icon.png` the desktop build ships) in the top bar, the hero badge, the account screens and the browser tab, and the landing page gained a motion layer: a three.js point globe and a tsparticles field over a Pexels texture, both lazy loaded and both paused when off screen or when reduced motion is requested.
@@ -510,4 +544,30 @@
 - Started the separate Railway Zuri Cloud package with health and plan endpoints, Nigerian NGN plan definitions, quota calculation helpers, and a PostgreSQL schema for users, sessions, subscriptions, usage events, and Paystack payments.
 - Key files: `server/package.json`, `server/src/app.js`, `server/src/plans.js`, `server/src/usage.js`, `server/src/server.js`, `server/db/schema.sql`, `server/test/server.test.js`.
 - Other OS action: run `npm --prefix server test`.
+- Done on: Windows
+## 2026-10-25 - Windows
+
+- Removed the free cloud plan. New accounts start on paid Starter, Zuri Flash requires Starter, and all plan limits, checkout copy, account fallbacks, model gating, schema migration, and tests now use the four paid plans.
+- Key files: `server/src/plans.js`, `server/src/limits.js`, `server/src/db.js`, `server/db/schema.sql`, `server/src/models.js`, `web/src/views/Landing.jsx`, `web/src/views/AuthView.jsx`, `web/src/components/PlanCard.jsx`.
+- Other OS action: run `npm run web:build` and `npm run server:test` after syncing.
+- Done on: Windows
+## 2026-10-25 - Windows
+
+- Kept the existing Kimi and GLM-backed Zuri models and added Zuri Code (OpenAI Codex), Zuri Reason (Claude Sonnet), and Zuri Elite (Claude Opus). Added the Anthropic Messages API adapter and `ANTHROPIC_API_KEY` configuration. Customer pages now explain weighted token consumption and show the monthly NGN plan prices.
+- Key files: `server/src/models.js`, `server/src/deepseek.js`, `server/src/server.js`, `server/src/config.js`, `server/db/schema.sql`, `web/src/views/Landing.jsx`, `web/src/views/UsageView.jsx`, `web/src/lib/format.js`.
+- Other OS action: run `npm run web:build && npm --prefix server test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Improved release downloads by highlighting the visitor's likely desktop platform, showing the published installer version, selecting the matching installer in footer links, and linking to the GitHub release notes.
+- Key files: `server/src/downloads.js`, `server/test/server.test.js`, `web/src/lib/downloads.js`, `web/src/components/DownloadList.jsx`, `web/src/components/DownloadLink.jsx`, `web/src/styles.css`.
+- Other OS action: run `npm run react:build && npm run server:test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Added a manual GitHub Actions workflow that builds and publishes the Windows installer alongside the existing macOS workflow. Documented the release secret and the fact that Android needs a separate application target before an APK or AAB can be published.
+- Key files: `.github/workflows/build-windows.yml`, `README.md`.
+- Other OS action: no source build required; run the workflow after syncing when `RELEASES_TOKEN` is configured.
 - Done on: Windows

@@ -10,6 +10,21 @@ const PROVIDERS = [
   ['zai', 'Z.ai (GLM)'],
 ];
 
+const MODEL_OPTIONS = {
+  openai: [
+    ['gpt-4o-mini', 'GPT-4o mini'],
+    ['gpt-4o', 'GPT-4o'],
+    ['gpt-5', 'GPT-5'],
+  ],
+  anthropic: [
+    ['claude-3-5-haiku-latest', 'Claude Haiku'],
+    ['claude-sonnet-4-5', 'Claude Sonnet'],
+  ],
+  deepseek: [['deepseek-flash', 'DeepSeek Flash']],
+  moonshot: [['kimi-k3', 'Kimi K3']],
+  zai: [['glm-5.3', 'GLM 5.3']],
+};
+
 // The ids match store.js ANSWER_STYLE_CHOICES, which refuses anything else; the
 // labels are here because the renderer cannot import main-process code.
 const ANSWER_STYLE_OPTIONS = {
@@ -264,12 +279,25 @@ export default function SettingsView() {
 
           <section className="rounded-xl border border-border bg-surface p-5">
             <h2 className="text-lg font-medium">Model and overlay</h2>
-            <p className="mt-1 text-sm text-muted">The model Zuri answers with, and the floating quick-ask window.</p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <span className="text-sm text-muted">Default model</span>
-              <Chip>{String(current.model ?? 'gpt-4o')}</Chip>
+            <p className="mt-1 text-sm text-muted">Choose the provider and model used for local desktop replies.</p>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <SelectField
+                label="Provider"
+                value={String(current.provider ?? 'openai')}
+                options={PROVIDERS.map(([value, label]) => ({ value, label }))}
+                onChange={(value) => {
+                  const nextModel = MODEL_OPTIONS[value]?.[0]?.[0] ?? '';
+                  void savePatch({ provider: value, model: nextModel }, `Using ${value} with ${nextModel}.`);
+                }}
+              />
+              <SelectField
+                label="Model"
+                value={String(current.model ?? MODEL_OPTIONS[String(current.provider ?? 'openai')]?.[0]?.[0] ?? 'gpt-4o-mini')}
+                options={(MODEL_OPTIONS[String(current.provider ?? 'openai')] ?? MODEL_OPTIONS.openai).map(([value, label]) => ({ value, label }))}
+                onChange={(value) => void savePatch({ model: value }, `Model set to ${value}.`)}
+              />
             </div>
-            <p className="mt-1 text-sm text-muted">Chosen during setup. To change it, open the Zuri data folder.</p>
+            <p className="mt-2 text-xs text-muted">Your selected provider key is stored only on this computer. Cloud model usage and allowance are separate from local provider usage.</p>
             <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
           </section>
 
@@ -311,6 +339,13 @@ export default function SettingsView() {
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
             <h2 className="text-lg font-medium">Providers and keys</h2>
             <p className="mt-1 text-sm text-muted">Keys are stored on this computer. Zuri only knows whether one is saved.</p>
+            <p className="mt-1 text-sm text-muted">Your messages, and the text of any file you attach, are sent to the provider you pick to write replies. Some providers are outside Nigeria. AI can be wrong, so check anything important. Read the privacy and terms notices at the Zuri Cloud site (/privacy and /terms).</p>
+            <p role="note" className="mt-3 rounded-xl border border-border bg-surface-secondary px-4 py-3 text-sm text-muted">
+              Your messages are sent to the AI company behind the model you use, so it can write a reply. Some of these
+              companies operate outside Nigeria, including in China and the United States, and handle data under their own
+              policies. Do not send passwords, card details, ID numbers or confidential information you may not share.
+              AI can be wrong: check anything important. Your chats, tasks and files stay on this computer.
+            </p>
             <form onSubmit={submitKey} className="mt-4 flex flex-col gap-3">
               <div className="flex flex-wrap items-end gap-3">
                 <SelectField label="Provider" value={provider} options={PROVIDERS.map(([value, label]) => ({ value, label }))} onChange={(value) => { setProvider(value); void refreshKeyStatus(value); }} />

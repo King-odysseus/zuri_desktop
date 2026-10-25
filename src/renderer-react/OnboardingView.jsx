@@ -217,6 +217,8 @@ export default function OnboardingView({ onDone }) {
               <p className="mt-3 text-sm leading-6 text-muted">
                 Zuri writes its replies through a model provider. Paste a key for one of these
                 services, or skip and add it from Settings when you have it.
+                Your messages go to the company behind the model to write replies, and some of
+                these companies are outside Nigeria. AI can be wrong, so check anything important.
               </p>
 
               <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>

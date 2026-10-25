@@ -28,7 +28,7 @@ const COPY = {
 };
 
 const BENEFITS = [
-  { icon: <CheckIcon />, text: 'The free plan starts with 100,000 tokens every month.' },
+  { icon: <CheckIcon />, text: 'Starter includes 2 million tokens every month.' },
   { icon: <CheckIcon />, text: 'Company, school and custom-domain Google accounts work too.' },
   { icon: <CheckIcon />, text: 'Same quota and history on the desktop app and in the browser.' },
 ];
@@ -118,7 +118,7 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
       asideTitle={mode === 'signup' ? 'Your AI command centre, in the cloud.' : 'Good to see you again.'}
       asideCopy={
         mode === 'signup'
-          ? 'One account for the assistant on your desktop and this dashboard. Start free, move up a plan when the work grows.'
+          ? 'One account for the assistant on your desktop and this dashboard. Start with Starter, then move up a plan when the work grows.'
           : 'Your threads, your files and your plan are waiting on the other side of this form.'
       }
       onNavigate={onNavigate}
@@ -242,9 +242,10 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
       </p>
 
       <p className="auth-terms">
-        By continuing you agree to Zuri Cloud keeping your account, usage and payment records so the
-        dashboard can show them. A password is stored only as a one-way hash, and Zuri never posts to
-        your Google account.
+        By continuing you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms and AI disclaimer</a> and
+        the <a href="/privacy" target="_blank" rel="noreferrer">Privacy and data</a> notice. Your messages are sent to
+        AI providers, some outside Nigeria, to write replies. AI can be wrong. A password is stored only as a
+        one-way hash, and Zuri never posts to your Google account.
       </p>
 
       <Button variant="ghost" block className="auth-back" onClick={() => onNavigate('/')}>

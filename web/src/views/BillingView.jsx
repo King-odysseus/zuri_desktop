@@ -28,7 +28,7 @@ export default function BillingView({ me, billing }) {
       <article className="card">
         <p className="stat-label">Subscription</p>
         <div className="row-list" style={{ marginTop: 8 }}>
-          <DataRow label="Plan">{subscription.planName ?? 'Free'}</DataRow>
+          <DataRow label="Plan">{subscription.planName ?? 'Starter'}</DataRow>
           <DataRow label="Status">{statusChip(billing?.subscription?.status ?? 'active')}</DataRow>
           <DataRow label="Current period">
             {formatDate(subscription.currentPeriodStart)} to {formatDate(subscription.currentPeriodEnd)}

@@ -88,7 +88,7 @@ export default function AccountView({ me, onSignOut }) {
         <div className="row-list" style={{ marginTop: 8 }}>
           <DataRow label="Name">{name}</DataRow>
           <DataRow label="Email">{user.email ?? 'Not set'}</DataRow>
-          <DataRow label="Plan">{subscription.planName ?? 'Free'}</DataRow>
+          <DataRow label="Plan">{subscription.planName ?? 'Starter'}</DataRow>
           <DataRow label="Status">{statusLabel(user.status)}</DataRow>
           <DataRow label="Member since">{formatDate(user.createdAt)}</DataRow>
           {reportsPassword && (

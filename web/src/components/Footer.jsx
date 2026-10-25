@@ -17,6 +17,10 @@ export default function Footer({ compact = false }) {
       </span>
       {!compact && <span>The online half of the Zuri desktop app. Payments by Paystack, prices in Naira.</span>}
       <DownloadLink />
+      <nav className="foot-legal" aria-label="Legal">
+        <a href="/privacy">Privacy and data</a>
+        <a href="/terms">Terms and AI disclaimer</a>
+      </nav>
       <span className="foot-powered">
         Powered by <strong>Tijha</strong>
       </span>
