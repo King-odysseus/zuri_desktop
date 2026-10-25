@@ -23,8 +23,10 @@ The schema is ready for PostgreSQL. Set `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `DEE
 
 The account endpoints use `Authorization: Bearer <token>`. The sign-in response returns the token once, plus the current subscription and usage summary. Keep the token in the desktop client's protected storage and call sign-out when the user disconnects. A session lasts while it is used: every authenticated call moves `last_used_at` forward and pushes the expiry out by three days, and three quiet days end it. Passwords are hashed with scrypt, a reset token is stored only as a SHA-256 hash and works once within 60 minutes, and a reset revokes every session of that account.
 
-The free plan is limited to 100,000 tokens per billing period, 10 requests per minute,
-one active request at a time, 8,000 input tokens, and 1,000 output tokens per request.
+The Starter plan is the entry plan. It includes 2,000,000 tokens per billing period,
+30 requests per minute, two active requests at a time, 16,000 input tokens, and 2,000
+output tokens per request. Zuri Flash is available from Starter; more expensive models
+require higher plans.
 The chat proxy reserves the full allowed request envelope in PostgreSQL before calling
 DeepSeek, then records actual usage or releases the reservation on failure. The request
 limiter is process-local for the initial single-service deployment. Move it to a shared

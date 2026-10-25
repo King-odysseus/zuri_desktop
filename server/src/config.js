@@ -42,6 +42,14 @@ export function readConfig(environment = process.env) {
     deepSeekModel: typeof environment.DEEPSEEK_MODEL === 'string' && environment.DEEPSEEK_MODEL.trim() !== ''
       ? environment.DEEPSEEK_MODEL.trim()
       : 'deepseek-chat',
+    // Other suppliers behind the Zuri model names. Each speaks the OpenAI chat
+    // dialect, so a key is all that is needed to switch one on.
+    moonshotApiKey: typeof environment.MOONSHOT_API_KEY === 'string' ? environment.MOONSHOT_API_KEY.trim() : '',
+    zaiApiKey: typeof environment.ZAI_API_KEY === 'string' ? environment.ZAI_API_KEY.trim() : '',
+    openaiApiKey: typeof environment.OPENAI_API_KEY === 'string' ? environment.OPENAI_API_KEY.trim() : '',
+    // Supplier prices are in dollars and customers pay in naira, so the admin
+    // cost and margin figures need a rate the operator keeps current.
+    nairaPerUsd: Number(environment.USD_NGN_RATE) > 0 ? Number(environment.USD_NGN_RATE) : 1600,
     paystackSecretKey: typeof environment.PAYSTACK_SECRET_KEY === 'string' ? environment.PAYSTACK_SECRET_KEY.trim() : '',
     paystackEndpoint: typeof environment.PAYSTACK_ENDPOINT === 'string' && environment.PAYSTACK_ENDPOINT.trim() !== ''
       ? environment.PAYSTACK_ENDPOINT.trim().replace(/\/$/, '')
@@ -51,6 +59,7 @@ export function readConfig(environment = process.env) {
       starter: typeof environment.PAYSTACK_PLAN_STARTER === 'string' ? environment.PAYSTACK_PLAN_STARTER.trim() : '',
       pro: typeof environment.PAYSTACK_PLAN_PRO === 'string' ? environment.PAYSTACK_PLAN_PRO.trim() : '',
       power: typeof environment.PAYSTACK_PLAN_POWER === 'string' ? environment.PAYSTACK_PLAN_POWER.trim() : '',
+      max: typeof environment.PAYSTACK_PLAN_MAX === 'string' ? environment.PAYSTACK_PLAN_MAX.trim() : '',
     },
   };
 }

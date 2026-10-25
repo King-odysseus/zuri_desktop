@@ -2155,3 +2155,160 @@ a.download-card:hover {
     display: none;
   }
 }
+
+/* Admin dashboard: model catalogue, spend and plan tables. */
+.field select {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height);
+  padding: 0 12px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-lg);
+  background: var(--field-background);
+  color: var(--text);
+  font: 400 14px/1.2 "Segoe UI", system-ui, sans-serif;
+}
+
+.field select:focus-visible {
+  border-color: var(--accent);
+  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline-offset: 1px;
+}
+
+.admin-window {
+  min-width: 160px;
+}
+
+.admin-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-scroll {
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border, var(--control-border));
+  text-align: left;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.admin-table th {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.admin-table td small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.admin-table tr.is-off td {
+  opacity: 0.55;
+}
+
+.admin-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.admin-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  font-size: 14px;
+}
+
+/* Privacy and terms pages: one readable column of plain text. */
+.legal {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 32px var(--gutter) 64px;
+}
+
+.legal-page {
+  max-width: 760px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.legal-page h1 {
+  font-size: clamp(26px, 4vw, 34px);
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.legal-page h2 {
+  margin-top: 16px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.legal-page ul {
+  display: grid;
+  gap: 8px;
+  padding-left: 20px;
+  list-style: disc;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.legal-updated,
+.legal-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.legal-intro {
+  padding: 14px 16px;
+  border: 1px solid color-mix(in srgb, var(--control-border) 70%, transparent);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.legal-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.legal-links a,
+.foot-legal a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent-text);
+  font-size: 14px;
+}
+
+.foot-legal {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}

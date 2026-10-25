@@ -5,6 +5,7 @@ import AuthView from './views/AuthView.jsx';
 import Dashboard from './views/Dashboard.jsx';
 import ForgotPasswordView from './views/ForgotPasswordView.jsx';
 import Landing from './views/Landing.jsx';
+import LegalView from './views/LegalView.jsx';
 import ResetPasswordView from './views/ResetPasswordView.jsx';
 import {
   api,
@@ -21,8 +22,9 @@ import {
 } from './lib/api.js';
 import { applyTheme, preferredTheme } from './lib/theme.js';
 
-const VIEWS = ['overview', 'usage', 'plans', 'billing', 'account'];
-const AUTH_PATHS = ['/signin', '/signup', '/forgot-password', '/reset-password'];
+const VIEWS = ['overview', 'usage', 'plans', 'billing', 'account', 'admin'];
+const LEGAL_PATHS = ['/privacy', '/terms'];
+const AUTH_PATHS = ['/signin', '/signup', '/forgot-password', '/reset-password', ...LEGAL_PATHS];
 
 /**
  * The public addresses. Everything else is the landing page, so a stale link or
@@ -235,6 +237,9 @@ export default function App() {
     // The two password links are reached from an email, so they render whatever
     // the session state is: a signed-in person holding a reset link still gets
     // the form instead of being bounced into the dashboard.
+    if (LEGAL_PATHS.includes(route.path)) {
+      return <LegalView path={route.path} onNavigate={navigate} />;
+    }
     if (route.path === '/forgot-password') {
       return <ForgotPasswordView onNavigate={navigate} signedIn={status === 'signed-in'} />;
     }

@@ -1,6 +1,7 @@
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
-import { ChartIcon, CardIcon, GridIcon, ReceiptIcon } from '../components/Icons.jsx';
+import { ChartIcon, CardIcon, GridIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
+import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
 import OverviewView from './OverviewView.jsx';
 import UsageView from './UsageView.jsx';
@@ -14,8 +15,12 @@ export const NAV_ITEMS = [
   { id: 'billing', label: 'Billing', short: 'Billing', icon: <ReceiptIcon /> },
 ];
 
-function NavList({ view, onViewChange, compact }) {
-  return NAV_ITEMS.map((item) => (
+// Shown only to administrators; the server refuses the data to anyone else.
+const ADMIN_ITEM = { id: 'admin', label: 'Admin', short: 'Admin', icon: <ShieldIcon /> };
+
+function NavList({ view, onViewChange, compact, isAdmin }) {
+  const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
+  return items.map((item) => (
     <button
       key={item.id}
       type="button"
@@ -52,7 +57,7 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
           </span>
         </div>
         <nav className="nav" aria-label="Dashboard sections">
-          <NavList view={view} onViewChange={onViewChange} />
+          <NavList view={view} onViewChange={onViewChange} isAdmin={user.isAdmin === true} />
         </nav>
         <p className="stat-meta" style={{ marginTop: 'auto' }}>
           Signed in to Zuri Cloud.
@@ -74,6 +79,7 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
             />
           )}
           {view === 'billing' && <BillingView me={account.me} billing={account.billing} />}
+          {view === 'admin' && user.isAdmin === true && <AdminView />}
 
           <div className="app-foot">
             <Footer compact />
@@ -82,7 +88,7 @@ export default function Dashboard({ account, plans, view, busy, onViewChange, on
       </main>
 
       <nav className="tabbar" aria-label="Dashboard sections">
-        <NavList view={view} onViewChange={onViewChange} compact />
+        <NavList view={view} onViewChange={onViewChange} compact isAdmin={user.isAdmin === true} />
       </nav>
     </div>
   );

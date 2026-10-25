@@ -1,19 +1,19 @@
 /**
  * Per-plan request guardrails. Token quotas remain authoritative in the
- * database; these limits stop a free account from creating a burst of
+ * database; these limits stop an account from creating a burst of
  * expensive provider calls before the usage event is recorded.
  */
 export const PLAN_LIMITS = Object.freeze({
-  free: Object.freeze({ requestsPerMinute: 10, maxConcurrent: 1, maxInputTokens: 8_000, maxOutputTokens: 1_000 }),
   starter: Object.freeze({ requestsPerMinute: 30, maxConcurrent: 2, maxInputTokens: 16_000, maxOutputTokens: 2_000 }),
   pro: Object.freeze({ requestsPerMinute: 60, maxConcurrent: 3, maxInputTokens: 32_000, maxOutputTokens: 4_000 }),
   power: Object.freeze({ requestsPerMinute: 120, maxConcurrent: 4, maxInputTokens: 64_000, maxOutputTokens: 8_000 }),
+  max: Object.freeze({ requestsPerMinute: 240, maxConcurrent: 8, maxInputTokens: 128_000, maxOutputTokens: 16_000 }),
 });
 
 /** @param {unknown} planCode @returns {object} */
 export function limitsForPlan(planCode) {
   const key = typeof planCode === 'string' ? planCode.trim().toLowerCase() : '';
-  return { ...(PLAN_LIMITS[key] ?? PLAN_LIMITS.free) };
+  return { ...(PLAN_LIMITS[key] ?? PLAN_LIMITS.starter) };
 }
 
 /** @param {unknown} value @returns {number} */

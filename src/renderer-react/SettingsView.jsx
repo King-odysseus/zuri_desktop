@@ -311,6 +311,13 @@ export default function SettingsView() {
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
             <h2 className="text-lg font-medium">Providers and keys</h2>
             <p className="mt-1 text-sm text-muted">Keys are stored on this computer. Zuri only knows whether one is saved.</p>
+            <p className="mt-1 text-sm text-muted">Your messages, and the text of any file you attach, are sent to the provider you pick to write replies. Some providers are outside Nigeria. AI can be wrong, so check anything important. Read the privacy and terms notices at the Zuri Cloud site (/privacy and /terms).</p>
+            <p role="note" className="mt-3 rounded-xl border border-border bg-surface-secondary px-4 py-3 text-sm text-muted">
+              Your messages are sent to the AI company behind the model you use, so it can write a reply. Some of these
+              companies operate outside Nigeria, including in China and the United States, and handle data under their own
+              policies. Do not send passwords, card details, ID numbers or confidential information you may not share.
+              AI can be wrong: check anything important. Your chats, tasks and files stay on this computer.
+            </p>
             <form onSubmit={submitKey} className="mt-4 flex flex-col gap-3">
               <div className="flex flex-wrap items-end gap-3">
                 <SelectField label="Provider" value={provider} options={PROVIDERS.map(([value, label]) => ({ value, label }))} onChange={(value) => { setProvider(value); void refreshKeyStatus(value); }} />

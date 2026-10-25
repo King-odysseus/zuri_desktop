@@ -30,7 +30,7 @@ const FEATURES = [
   {
     icon: <CardIcon />,
     title: 'Naira plans, Paystack checkout',
-    body: 'Free, Starter, Pro or Power. Pay in Naira and move up a plan the moment you need more room.',
+    body: 'Starter, Pro, Power or Max. Pay in Naira and move up a plan the moment you need more room.',
   },
   {
     icon: <ChartIcon />,
@@ -55,9 +55,9 @@ const FEATURES = [
 ];
 
 const STATS = [
-  { value: '100k', label: 'free tokens each month' },
-  { value: '4', label: 'plans, priced in Naira' },
-  { value: '5', label: 'model providers, one account' },
+  { value: '2m', label: 'Starter tokens each month' },
+  { value: '5', label: 'plans, priced in Naira' },
+  { value: '3', label: 'Zuri models, one account' },
 ];
 
 /**
@@ -85,7 +85,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
 
           <div className="hero-cta">
             <Button size="lg" onClick={() => onNavigate('/signup')}>
-              Create free account
+              Create Starter account
               <ArrowRightIcon />
             </Button>
             <Button size="lg" variant="outline" onClick={() => onNavigate('/signin')}>

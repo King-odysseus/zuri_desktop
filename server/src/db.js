@@ -22,6 +22,23 @@ function publicUser(value) {
   };
 }
 
+/** @param {object} row @returns {object} */
+function publicModelRow(row) {
+  return {
+    code: row.code,
+    name: row.name,
+    supplier: row.supplier,
+    supplierModel: row.supplier_model,
+    inputUsdPerMillion: Number(row.input_usd_per_million),
+    outputUsdPerMillion: Number(row.output_usd_per_million),
+    quotaWeight: Number(row.quota_weight),
+    minPlan: row.min_plan,
+    rateFactor: Number(row.rate_factor),
+    isActive: row.is_active === true,
+    sortOrder: row.sort_order,
+  };
+}
+
 /** @param {string} connectionString @param {NodeJS.ProcessEnv} [environment] @returns {import('pg').Pool} */
 export function createDatabase(connectionString, environment = process.env) {
   return new Pool({
@@ -34,15 +51,15 @@ export function createDatabase(connectionString, environment = process.env) {
 /** @param {import('pg').Pool} pool @returns {object} */
 export function createRepository(pool) {
   /**
-   * Every new account starts on the free plan; without a subscription row the
+   * Every new account starts on the paid Starter plan; without a subscription row the
    * account cannot chat, so both sign-up paths go through here.
    * @param {import('pg').PoolClient} client
    * @param {string} userId
    */
-  async function ensureFreeSubscription(client, userId) {
+  async function ensureStarterSubscription(client, userId) {
     await client.query(
       'INSERT INTO subscriptions (user_id, plan_code, status, current_period_start, current_period_end) ' +
-      "SELECT $1, 'free', 'active', NOW(), NOW() + INTERVAL '1 month' " +
+      "SELECT $1, 'starter', 'active', NOW(), NOW() + INTERVAL '1 month' " +
       "WHERE NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = $1 AND status IN ('active', 'past_due'))",
       [userId],
     );
@@ -73,7 +90,7 @@ export function createRepository(pool) {
           );
           user = result.rows[0];
         }
-        await ensureFreeSubscription(client, user.id);
+        await ensureStarterSubscription(client, user.id);
         await client.query('COMMIT');
         return publicUser(user);
       } catch (error) {
@@ -147,7 +164,7 @@ export function createRepository(pool) {
           throw error;
         }
         const user = result.rows[0];
-        await ensureFreeSubscription(client, user.id);
+        await ensureStarterSubscription(client, user.id);
         await client.query('COMMIT');
         return publicUser(user);
       } catch (error) {
@@ -198,7 +215,7 @@ export function createRepository(pool) {
     },
     async getUsage(userId, periodStart, subscription) {
       const result = await pool.query(
-        'SELECT COALESCE(SUM(total_tokens), 0)::BIGINT AS used_tokens FROM usage_events ' +
+        'SELECT COALESCE(SUM(COALESCE(quota_tokens, total_tokens)), 0)::BIGINT AS used_tokens FROM usage_events ' +
         'WHERE user_id = $1 AND created_at >= $2 AND created_at < $3',
         [userId, periodStart, subscription.currentPeriodEnd],
       );
@@ -229,7 +246,7 @@ export function createRepository(pool) {
           [userId],
         );
         const usageResult = await client.query(
-          "SELECT COALESCE((SELECT SUM(total_tokens) FROM usage_events WHERE user_id = $1 AND created_at >= $2 AND created_at < $3), 0) + COALESCE((SELECT SUM(reserved_tokens) FROM usage_reservations WHERE user_id = $1 AND subscription_id = $4 AND status = 'reserved' AND expires_at > NOW()), 0) AS committed_tokens",
+          "SELECT COALESCE((SELECT SUM(COALESCE(quota_tokens, total_tokens)) FROM usage_events WHERE user_id = $1 AND created_at >= $2 AND created_at < $3), 0) + COALESCE((SELECT SUM(reserved_tokens) FROM usage_reservations WHERE user_id = $1 AND subscription_id = $4 AND status = 'reserved' AND expires_at > NOW()), 0) AS committed_tokens",
           [userId, subscription.current_period_start, subscription.current_period_end, subscription.id],
         );
         const committedTokens = Number(usageResult.rows[0]?.committed_tokens ?? 0);
@@ -251,7 +268,7 @@ export function createRepository(pool) {
         client.release();
       }
     },
-    async commitUsage({ reservationId, userId, model, inputTokens, outputTokens, requestId }) {
+    async commitUsage({ reservationId, userId, model, inputTokens, outputTokens, requestId, modelCode = null, quotaTokens = null, costMicroUsd = 0, supplier = 'deepseek' }) {
       const input = Number(inputTokens);
       const output = Number(outputTokens);
       if (![input, output].every((value) => Number.isSafeInteger(value) && value >= 0)) {
@@ -273,7 +290,8 @@ export function createRepository(pool) {
           return;
         }
         if (reservation.status !== 'reserved') throw new Error('The usage reservation is no longer available.');
-        if (input + output > Number(reservation.reserved_tokens)) {
+        const counted = Number.isSafeInteger(quotaTokens) ? quotaTokens : input + output;
+        if (counted > Number(reservation.reserved_tokens)) {
           const error = new Error('The provider usage exceeded the reserved budget.');
           error.code = 'RESERVATION_EXCEEDED';
           throw error;
@@ -290,6 +308,56 @@ export function createRepository(pool) {
       } finally {
         client.release();
       }
+    },
+    async listModels() {
+      const result = await pool.query('SELECT * FROM models ORDER BY sort_order, code');
+      return result.rows.map(publicModelRow);
+    },
+    async saveModel(model) {
+      const result = await pool.query(
+        'INSERT INTO models (code, name, supplier, supplier_model, input_usd_per_million, output_usd_per_million, quota_weight, min_plan, rate_factor, is_active, sort_order) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ' +
+        'ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, supplier = EXCLUDED.supplier, supplier_model = EXCLUDED.supplier_model, ' +
+        'input_usd_per_million = EXCLUDED.input_usd_per_million, output_usd_per_million = EXCLUDED.output_usd_per_million, quota_weight = EXCLUDED.quota_weight, ' +
+        'min_plan = EXCLUDED.min_plan, rate_factor = EXCLUDED.rate_factor, is_active = EXCLUDED.is_active, sort_order = EXCLUDED.sort_order, updated_at = NOW() RETURNING *',
+        [model.code, model.name, model.supplier, model.supplierModel, model.inputUsdPerMillion, model.outputUsdPerMillion, model.quotaWeight, model.minPlan, model.rateFactor, model.isActive, model.sortOrder],
+      );
+      return publicModelRow(result.rows[0]);
+    },
+    /** Spend, revenue and customers for the admin dashboard; `days` is the look-back window. */
+    async adminOverview(days = 30) {
+      const window = Math.min(366, Math.max(1, Math.floor(Number(days) || 30)));
+      const [byModel, plans, revenue, totals] = await Promise.all([
+        pool.query(
+          "SELECT COALESCE(model_code, model) AS model_code, COUNT(*)::INT AS requests, COALESCE(SUM(input_tokens), 0)::BIGINT AS input_tokens, " +
+          "COALESCE(SUM(output_tokens), 0)::BIGINT AS output_tokens, COALESCE(SUM(quota_tokens), 0)::BIGINT AS quota_tokens, COALESCE(SUM(cost_micro_usd), 0)::BIGINT AS cost_micro_usd " +
+          "FROM usage_events WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL GROUP BY 1 ORDER BY 6 DESC",
+          [String(window)],
+        ),
+        pool.query(
+          "SELECT p.code, p.name, p.amount_kobo, p.monthly_tokens, COUNT(s.id)::INT AS subscribers FROM plans p " +
+          "LEFT JOIN subscriptions s ON s.plan_code = p.code AND s.status IN ('active', 'past_due') GROUP BY p.code ORDER BY p.amount_kobo",
+        ),
+        pool.query(
+          "SELECT COALESCE(SUM(amount_kobo), 0)::BIGINT AS revenue_kobo FROM payments WHERE status = 'success' AND paid_at >= NOW() - ($1 || ' days')::INTERVAL",
+          [String(window)],
+        ),
+        pool.query("SELECT COUNT(*)::INT AS users FROM users WHERE status = 'active'"),
+      ]);
+      return {
+        days: window,
+        users: totals.rows[0]?.users ?? 0,
+        revenueKobo: Number(revenue.rows[0]?.revenue_kobo ?? 0),
+        byModel: byModel.rows.map((row) => ({
+          modelCode: row.model_code,
+          requests: row.requests,
+          inputTokens: Number(row.input_tokens),
+          outputTokens: Number(row.output_tokens),
+          quotaTokens: Number(row.quota_tokens),
+          costMicroUsd: Number(row.cost_micro_usd),
+        })),
+        plans: plans.rows.map((row) => ({ code: row.code, name: row.name, amountKobo: Number(row.amount_kobo), monthlyTokens: Number(row.monthly_tokens), subscribers: row.subscribers })),
+      };
     },
     async releaseUsage(reservationId, userId) {
       await pool.query("UPDATE usage_reservations SET status = 'released' WHERE id = $1 AND user_id = $2 AND status = 'reserved'", [reservationId, userId]);

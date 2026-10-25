@@ -217,6 +217,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   // The rewrite a person has now used often enough to be worth offering as their default.
   const [styleOffer, setStyleOffer] = useState(null);
   const [menuView, setMenuView] = useState('');
+  const [answerLength, setAnswerLength] = useState('balanced');
   // On by default for current answers, then remembered when the person changes it.
   const [webSearch, setWebSearch] = useState(readWebSearchPreference);
   const menuRef = useRef(null);
@@ -245,6 +246,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       const result = await api?.settings?.get?.();
       if (!active || !result?.ok) return;
       if (typeof result.data?.name === 'string') setPersonName(result.data.name);
+      if (typeof result.data?.answerLength === 'string') setAnswerLength(result.data.answerLength);
     };
     void loadName();
     return () => { active = false; };
@@ -582,6 +584,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     await runTurn(adjustment.text, adjustment.text);
   }
 
+  async function chooseAnswerLength(value) {
+    const saved = await api?.settings?.save?.({ answerLength: value });
+    if (saved?.ok !== true) {
+      setError(saved?.error?.message ?? 'That preference could not be saved.');
+      return;
+    }
+    setAnswerLength(value);
+  }
+
   async function saveStyleDefault() {
     if (styleOffer === null) return;
     const saved = await api?.settings?.save?.({ [styleOffer.field]: styleOffer.value });
@@ -758,11 +769,23 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                         <span className="flex-1">Search the web</span>
                         {webSearch && <CheckIcon size={16} />}
                       </button>
+                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => setMenuView('length')}>
+                        <SlashCommandIcon size={16} />
+                        <span className="flex-1">Reply length</span>
+                        <span className="text-xs text-muted capitalize">{answerLength}</span>
+                      </button>
                       <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => setMenuView('commands')}>
                         <SlashCommandIcon size={16} />
                         <span>Slash commands</span>
                       </button>
                     </>
+                  ) : menuView === 'length' ? (
+                    [['concise', 'Concise'], ['balanced', 'Balanced'], ['detailed', 'Detailed']].map(([value, label]) => (
+                      <button key={value} type="button" role="menuitemradio" aria-checked={answerLength === value} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseAnswerLength(value))}>
+                        <span className="flex-1">{label}</span>
+                        {answerLength === value && <CheckIcon size={16} />}
+                      </button>
+                    ))
                   ) : (
                     SLASH_COMMANDS.map((command) => (
                       <button key={command.label} type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => insertCommand(command.text))}>

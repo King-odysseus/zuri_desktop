@@ -102,6 +102,20 @@ export async function verifyPayment(reference) {
   return api(`/api/billing/verify?reference=${encodeURIComponent(reference)}`);
 }
 
+/**
+ * Spend, revenue and model settings for the admin dashboard. The server answers
+ * 403 for anyone who is not an administrator.
+ * @param {number} [days] Look-back window.
+ */
+export async function fetchAdminOverview(days = 30) {
+  return api(`/api/admin/overview?days=${encodeURIComponent(days)}`);
+}
+
+/** @param {object} model One catalogue entry, in the shape the overview returns. */
+export async function saveAdminModel(model) {
+  return api('/api/admin/models', { method: 'PUT', body: JSON.stringify(model) });
+}
+
 export async function signOutRequest() {
   await api('/api/auth/sign-out', { method: 'POST' }).catch(() => undefined);
 }

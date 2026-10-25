@@ -119,7 +119,7 @@ export const CHAT_STREAM_CHANNEL = 'chat:stream';
 const REQUEST_TIMEOUT_MS = 120_000;
 
 /** Reply cap for providers that require one (Anthropic does; OpenAI defaults it). */
-const MAX_REPLY_TOKENS = 4096;
+const MAX_REPLY_TOKENS = 8192;
 
 /**
  * Longest document body sent for a summary. A 200k-character read is well inside
@@ -164,8 +164,8 @@ const RESPONSE_LANGUAGE_POLICY = [
 
 const ANSWER_LENGTH_RULES = Object.freeze({
   concise: 'Length: as short as the question allows. Answer in one or two sentences, then at most three short bullets, and leave out background nobody asked for.',
-  balanced: 'Length: a short paragraph or a few bullets. The direct answer first, then only the detail needed to act on it.',
-  detailed: 'Length: thorough. The direct answer first, then the reasoning, steps, caveats and examples that support it. Use headings once the answer has more than three sections.',
+  balanced: 'Length: complete but not padded. The direct answer first, then the reasoning, the key steps or an example, and any caveat that changes what the person should do. Greetings and simple factual questions still get a short reply.',
+  detailed: 'Length: thorough. The direct answer first, then the reasoning, steps, caveats, alternatives and worked examples that support it. Use headings once the answer has more than three sections.',
 });
 
 const ANSWER_TONE_RULES = Object.freeze({
@@ -186,6 +186,15 @@ const ANSWER_LAYOUT_RULES = Object.freeze({
   plain: 'Layout: plain prose only. No headings, bullets, numbered lists, tables or code blocks unless the person explicitly asks for one.',
   structured: 'Layout: structure every answer. A one-line summary first, then short headings or bullets, and a table whenever two or more things are compared.',
 });
+
+/** Thinking rules that hold whatever length was chosen; brevity must not cost correctness. */
+const ANSWER_QUALITY_POLICY = [
+  'Quality:',
+  'Work out the answer step by step before you write it, and check any figures, code or claims once before sending.',
+  'Answer what the person is really trying to achieve, not only the literal words, and mention a better approach when you see one.',
+  'If the request is ambiguous in a way that changes the answer, state your assumption or ask one short question.',
+  'Give concrete examples, exact commands or working code rather than general advice. Never invent facts, names, links or quotes.',
+].join(' ');
 
 /** Formatting rules that hold whatever layout was chosen. */
 const ANSWER_FORMAT_POLICY = [
@@ -214,6 +223,7 @@ export function answerStylePolicy(settings = {}) {
     pick(settings?.answerTone, ANSWER_TONE_RULES, 'neutral'),
     pick(settings?.answerDetail, ANSWER_DETAIL_RULES, 'standard'),
     pick(settings?.answerLayout, ANSWER_LAYOUT_RULES, 'auto'),
+    ANSWER_QUALITY_POLICY,
     ANSWER_FORMAT_POLICY,
   ];
   const custom = typeof settings?.customInstructions === 'string' ? settings.customInstructions.trim() : '';
@@ -958,13 +968,18 @@ export async function sendChatMessage(threadId, options = {}) {
   }
 
   const settings = (await readStore('settings')).data;
-  const { provider, model } = resolveChatTarget(settings);
+  const agent = findAgent(settings, options.agentId);
+  // An agent's own provider wins over Settings; its model then falls back to that
+  // provider's default because the saved model belongs to the Settings provider.
+  const agentProvider = agent !== null && PROVIDERS.includes(agent.provider) ? agent.provider : null;
+  const { provider, model } = resolveChatTarget(
+    agentProvider === null ? settings : { ...settings, provider: agentProvider },
+  );
   const config = PROVIDER_CONFIG[provider];
   conversation.turns = await withImageParts(provider, conversation.turns);
 
   // An agent's system prompt rides in front of any the thread already carries, so
   // the picked agent decides how the reply is written without losing the thread's own.
-  const agent = findAgent(settings, options.agentId);
   if (agent !== null && agent.systemPrompt.trim() !== '') {
     conversation.system = [agent.systemPrompt.trim(), conversation.system]
       .filter((part) => part !== '')

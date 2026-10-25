@@ -128,14 +128,55 @@ ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_subscription_code TEXT;
 CREATE INDEX IF NOT EXISTS subscriptions_paystack_code_idx
   ON subscriptions(paystack_subscription_code);
 
+-- The Zuri-branded models customers pick from. The supplier columns are private:
+-- only the admin dashboard reads them. Rows are seeded once and then edited in the
+-- dashboard, so the seed below never overwrites an admin change.
+CREATE TABLE IF NOT EXISTS models (
+  code TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  supplier TEXT NOT NULL,
+  supplier_model TEXT NOT NULL,
+  input_usd_per_million NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (input_usd_per_million >= 0),
+  output_usd_per_million NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (output_usd_per_million >= 0),
+  quota_weight NUMERIC(8, 2) NOT NULL DEFAULT 1 CHECK (quota_weight > 0),
+  min_plan TEXT NOT NULL REFERENCES plans(code),
+  rate_factor NUMERIC(4, 2) NOT NULL DEFAULT 1 CHECK (rate_factor > 0 AND rate_factor <= 1),
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INTEGER NOT NULL DEFAULT 100,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- quota_tokens is what counts against the monthly allowance (raw tokens times the
+-- model's weight); cost_micro_usd is what the supplier charged us for the request.
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS model_code TEXT;
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS quota_tokens BIGINT;
+ALTER TABLE usage_events ADD COLUMN IF NOT EXISTS cost_micro_usd BIGINT NOT NULL DEFAULT 0;
+UPDATE usage_events SET quota_tokens = total_tokens WHERE quota_tokens IS NULL;
+
+CREATE INDEX IF NOT EXISTS usage_events_created_idx ON usage_events(created_at DESC);
+
 INSERT INTO plans (code, name, amount_kobo, monthly_tokens)
 VALUES
-  ('free', 'Free', 0, 100000),
   ('starter', 'Starter', 250000, 2000000),
   ('pro', 'Pro', 600000, 6000000),
-  ('power', 'Power', 1500000, 12000000)
+  ('power', 'Power', 1500000, 12000000),
+  ('max', 'Max', 4000000, 40000000)
 ON CONFLICT (code) DO UPDATE
 SET name = EXCLUDED.name,
     amount_kobo = EXCLUDED.amount_kobo,
     monthly_tokens = EXCLUDED.monthly_tokens,
     updated_at = NOW();
+
+-- Accounts created before the paid-only catalogue keep their history but move
+-- to Starter before the retired plan row is removed from the foreign-key graph.
+UPDATE subscriptions SET plan_code = 'starter' WHERE plan_code = 'free';
+UPDATE models SET min_plan = 'starter' WHERE min_plan = 'free';
+DELETE FROM plans WHERE code = 'free';
+
+INSERT INTO models (code, name, supplier, supplier_model, input_usd_per_million, output_usd_per_million, quota_weight, min_plan, rate_factor, sort_order)
+VALUES
+  ('zuri-flash', 'Zuri Flash', 'deepseek', 'deepseek-flash', 0.14, 0.28, 1, 'starter', 1, 1),
+  ('zuri-pro', 'Zuri Pro', 'moonshot', 'kimi-k3', 0.6, 2.5, 5, 'starter', 0.5, 2),
+  ('zuri-max', 'Zuri Max', 'zai', 'glm-5.3', 1.5, 6, 12, 'pro', 0.25, 3)
+ON CONFLICT (code) DO NOTHING;

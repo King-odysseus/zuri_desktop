@@ -28,10 +28,10 @@ export function initialsFor(displayName, email) {
 
 /** Feature bullets shown on each plan card. */
 const PLAN_FEATURES = {
-  free: ['Everyday questions and short drafts', 'One request at a time'],
-  starter: ['Longer conversations', 'Two requests at a time', 'Priority over the free plan'],
+  starter: ['Everyday questions and longer conversations', 'Two requests at a time', 'Zuri Flash included'],
   pro: ['Large documents in one go', 'Three requests at a time', 'Higher per-minute limits'],
   power: ['The largest input and output limits', 'Four requests at a time', 'Built for team workloads'],
+  max: ['Every Zuri model, including Zuri Max', 'Eight requests at a time', 'The highest limits we offer'],
 };
 
 /** @param {string} code */

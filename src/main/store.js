@@ -337,7 +337,7 @@ export async function saveSettings(patch, options = {}) {
 }
 
 /**
- * One agent record out of settings.json: `{ id, name, systemPrompt, allowedTools }`.
+ * One agent record out of settings.json: `{ id, name, systemPrompt, allowedTools, provider }`.
  *
  * The chat adapter and the tool registry both want this normalised shape rather
  * than the raw entry: a record with no prompt still has to be trimmable, and one
@@ -347,7 +347,7 @@ export async function saveSettings(patch, options = {}) {
  * behaviour.
  * @param {object} settings
  * @param {string} [agentId] Defaults to `settings.activeAgentId`.
- * @returns {{ id: string, name: string, systemPrompt: string, allowedTools: string[] } | null}
+ * @returns {{ id: string, name: string, systemPrompt: string, allowedTools: string[], provider: string } | null}
  */
 export function findAgent(settings, agentId = '') {
   const agents = Array.isArray(settings?.agents) ? settings.agents : [];
@@ -364,6 +364,8 @@ export function findAgent(settings, agentId = '') {
     allowedTools: Array.isArray(found.allowedTools)
       ? found.allowedTools.filter((tool) => typeof tool === 'string')
       : [],
+    // Empty means "use the provider chosen in Settings"; chat validates the name.
+    provider: typeof found.provider === 'string' ? found.provider : '',
   };
 }
 

@@ -4,7 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findPlan, PLANS, publicPlan } from './plans.js';
 import { usageStatus } from './usage.js';
-import { createRequestLimiter, limitsForPlan } from './limits.js';
+import { createRequestLimiter, limitsForPlan, PLAN_LIMITS } from './limits.js';
+import { DEFAULT_MODELS, canUseModel, findModel, limitsForModel, microUsdToKobo, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
 import { verifyPaystackSignature } from './paystack.js';
 import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
 
@@ -40,6 +41,14 @@ const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 // Keep the lease longer than the provider timeout so a slow request cannot be
 // released while it is still in flight and allow another request to overspend.
 const RESERVATION_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_NAIRA_PER_USD = 1600;
+
+/** The model catalogue: the database when it has one, the built-in defaults otherwise. */
+async function loadModels(dependencies) {
+  return typeof dependencies.repository?.listModels === 'function'
+    ? dependencies.repository.listModels()
+    : DEFAULT_MODELS.map((model) => ({ ...model }));
+}
 
 /** @param {unknown} value @returns {string} */
 function json(value) {
@@ -376,38 +385,49 @@ export function createApp(dependencies = {}) {
         const body = await readJson(request, MAX_CHAT_BODY_BYTES);
         const messages = validateMessages(body.messages);
         if (!messages.ok) return response(400, { ok: false, error: { code: 'INVALID_MESSAGES', message: messages.message } });
-        const limits = limitsForPlan(session.subscription.planCode);
+        const catalogue = await loadModels(dependencies);
+        const zuriModel = findModel(catalogue, body.model);
+        if (!zuriModel) return response(400, { ok: false, error: { code: 'UNKNOWN_MODEL', message: 'That model is not available.' } });
+        if (!canUseModel(zuriModel, session.subscription.planCode)) {
+          return response(403, { ok: false, error: { code: 'PLAN_UPGRADE_REQUIRED', message: `${zuriModel.name} needs a higher plan. Upgrade to use it.` } });
+        }
+        const limits = limitsForModel(limitsForPlan(session.subscription.planCode), zuriModel);
         if (messages.inputTokens > limits.maxInputTokens) {
           return response(413, { ok: false, error: { code: 'INPUT_TOO_LARGE', message: `Keep the conversation below ${limits.maxInputTokens} input tokens.` } });
         }
-        const lease = limiter.acquire(session.user.id, limits);
+        // The limiter key includes the model so a dear model's smaller allowance
+        // cannot be spent by cheap requests, and the other way round.
+        const lease = limiter.acquire(`${session.user.id}:${zuriModel.code}`, limits);
         if (!lease.allowed) {
           return response(429, { ok: false, error: { code: lease.reason === 'concurrency_limit' ? 'CONCURRENCY_LIMIT' : 'RATE_LIMITED', message: 'This account has reached its request limit. Try again shortly.' } }, { 'retry-after': String(lease.retryAfterSeconds) });
         }
         let reservation;
         const requestId = randomUUID();
         try {
-          // Reserve the full allowed request envelope. This is conservative,
-          // but prevents tokenizer differences from overspending the quota.
+          // Reserve the full allowed request envelope, weighted for the model.
+          // This is conservative, but prevents tokenizer differences from
+          // overspending the quota.
           reservation = await dependencies.repository.reserveUsage({
             userId: session.user.id,
             subscriptionId: session.subscription.id,
-            requestedTokens: limits.maxInputTokens + limits.maxOutputTokens,
+            requestedTokens: quotaTokens(zuriModel, limits.maxInputTokens, limits.maxOutputTokens),
             expiresAt: new Date(now().getTime() + RESERVATION_TTL_MS),
           });
-          const model = typeof body.model === 'string' && /^[A-Za-z0-9._-]{1,80}$/.test(body.model.trim())
-            ? body.model.trim()
-            : (dependencies.defaultModel ?? 'deepseek-chat');
-          const result = await dependencies.chatProvider({ messages: messages.data, model, maxTokens: limits.maxOutputTokens, signal: AbortSignal.timeout(120_000) });
+          const result = await dependencies.chatProvider({ messages: messages.data, model: zuriModel.supplierModel, supplier: zuriModel.supplier, maxTokens: limits.maxOutputTokens, signal: AbortSignal.timeout(120_000) });
           await dependencies.repository.commitUsage({
             reservationId: reservation.id,
             userId: session.user.id,
             model: result.model,
+            modelCode: zuriModel.code,
+            supplier: zuriModel.supplier,
+            quotaTokens: quotaTokens(zuriModel, result.usage.inputTokens, result.usage.outputTokens),
+            costMicroUsd: supplierCostMicroUsd(zuriModel, result.usage.inputTokens, result.usage.outputTokens),
             inputTokens: result.usage.inputTokens,
             outputTokens: result.usage.outputTokens,
             requestId,
           });
-          return response(200, { ok: true, data: { requestId, model: result.model, content: result.content, usage: result.usage } });
+          // The supplier's model name stays server-side; customers see the Zuri name.
+          return response(200, { ok: true, data: { requestId, model: zuriModel.code, modelName: zuriModel.name, content: result.content, usage: result.usage } });
         } catch (error) {
           if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
           if (error?.code === 'QUOTA_EXCEEDED') return response(429, { ok: false, error: { code: error.code, message: error.message } });
@@ -433,7 +453,7 @@ export function createApp(dependencies = {}) {
       try {
         const body = await readJson(request);
         const plan = findPlan(body.planCode);
-        if (!plan || plan.code === 'free') return response(400, { ok: false, error: { code: 'INVALID_PLAN', message: 'Choose a paid plan to start checkout.' } });
+        if (!plan) return response(400, { ok: false, error: { code: 'INVALID_PLAN', message: 'Choose a valid plan to start checkout.' } });
         const paystackPlanCode = dependencies.paystackPlanCodes?.[plan.code] ?? '';
         if (paystackPlanCode === '') return response(503, { ok: false, error: { code: 'PAYSTACK_PLAN_NOT_CONFIGURED', message: 'This paid plan is not configured for recurring billing yet.' } });
         const reference = `zuri-${randomUUID()}`;
@@ -519,6 +539,54 @@ export function createApp(dependencies = {}) {
         console.error('[zuri-cloud] paystack webhook', error?.message ?? error);
         return response(500, { ok: false, error: { code: 'WEBHOOK_PROCESSING_FAILED', message: 'The webhook could not be processed.' } });
       }
+    }
+
+    if (url.pathname === '/api/models' || url.pathname === '/api/admin/overview' || url.pathname === '/api/admin/models') {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const token = bearerToken(request);
+      const session = await dependencies.auth.authenticate(token);
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+
+      if (url.pathname === '/api/models') {
+        if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for this endpoint.' } });
+        const catalogue = (await loadModels(dependencies)).filter((model) => model.isActive);
+        return response(200, { ok: true, data: catalogue.map((model) => publicModel(model, session.subscription.planCode)) });
+      }
+
+      if (session.user.isAdmin !== true) return response(403, { ok: false, error: { code: 'ADMIN_ONLY', message: 'This area is for Zuri administrators.' } });
+      const nairaPerUsd = Number(dependencies.nairaPerUsd) > 0 ? Number(dependencies.nairaPerUsd) : DEFAULT_NAIRA_PER_USD;
+
+      if (url.pathname === '/api/admin/models') {
+        if (request.method !== 'PUT' || typeof dependencies.repository?.saveModel !== 'function') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use PUT to save a model.' } });
+        try {
+          const checked = validateModelInput(await readJson(request));
+          if (!checked.ok) return response(400, { ok: false, error: { code: 'INVALID_MODEL', message: checked.message } });
+          return response(200, { ok: true, data: await dependencies.repository.saveModel(checked.model) });
+        } catch (error) {
+          if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+          throw error;
+        }
+      }
+
+      if (request.method !== 'GET' || typeof dependencies.repository?.adminOverview !== 'function') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for the overview.' } });
+      const overview = await dependencies.repository.adminOverview(url.searchParams.get('days'));
+      const catalogue = await loadModels(dependencies);
+      const spendByModel = overview.byModel.map((row) => ({ ...row, costKobo: microUsdToKobo(row.costMicroUsd, nairaPerUsd) }));
+      const costKobo = spendByModel.reduce((sum, row) => sum + row.costKobo, 0);
+      return response(200, {
+        ok: true,
+        data: {
+          days: overview.days,
+          nairaPerUsd,
+          users: overview.users,
+          revenueKobo: overview.revenueKobo,
+          costKobo,
+          marginKobo: overview.revenueKobo - costKobo,
+          models: catalogue,
+          spendByModel,
+          plans: overview.plans.map((plan) => ({ ...plan, limits: PLAN_LIMITS[plan.code] ?? null })),
+        },
+      });
     }
 
     if (url.pathname === '/api/me' || url.pathname === '/api/me/usage' || url.pathname === '/api/me/limits' || url.pathname === '/api/me/billing' || url.pathname === '/api/auth/sign-out' || url.pathname === '/api/auth/set-password') {

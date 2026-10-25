@@ -123,7 +123,7 @@ check('DSML tool markup is hidden from the reply and read as tool calls', () => 
 
 check('the reply policy follows the saved answer style', () => {
   const defaults = answerStylePolicy({});
-  for (const expected of ['a short paragraph or a few bullets', 'neutral and plain', 'an informed adult', 'choose what fits the answer']) {
+  for (const expected of ['complete but not padded', 'neutral and plain', 'an informed adult', 'choose what fits the answer']) {
     if (!defaults.includes(expected)) throw new Error(`the default block is missing "${expected}"`);
   }
   const chosen = answerStylePolicy({ answerLength: 'concise', answerTone: 'friendly', answerDetail: 'expert', answerLayout: 'structured' });
@@ -136,7 +136,7 @@ check('the reply policy follows the saved answer style', () => {
 
 check('an unknown or older answer style falls back instead of failing', () => {
   const stale = answerStylePolicy({ answerLength: 'essay', answerTone: '', answerDetail: null });
-  if (!stale.includes('a short paragraph or a few bullets')) throw new Error('a bad length did not fall back');
+  if (!stale.includes('complete but not padded')) throw new Error('a bad length did not fall back');
   if (!stale.includes('neutral and plain')) throw new Error('a bad tone did not fall back');
 });
 

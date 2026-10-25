@@ -2,8 +2,8 @@ import { formatNaira, formatTokens, planFeatures } from '../lib/format.js';
 import { Button, Chip } from './ui.jsx';
 
 /**
- * One pricing tile. The current plan shows a disabled badge, the free plan
- * points at support, and everything else starts a Paystack checkout - or asks
+ * One pricing tile. The current plan shows a disabled badge, and every other
+ * plan starts a Paystack checkout - or asks
  * the visitor to sign in first when there is no session.
  */
 export default function PlanCard({ plan, currentPlan, signedIn, busy, onChoose, onSignIn }) {
@@ -16,8 +16,6 @@ export default function PlanCard({ plan, currentPlan, signedIn, busy, onChoose, 
         Your plan
       </Button>
     );
-  } else if (plan.code === 'free') {
-    action = <p className="stat-meta">Contact support to move back to Free.</p>;
   } else if (!signedIn) {
     action = <Button onClick={onSignIn}>Sign in to choose</Button>;
   } else {
@@ -35,8 +33,8 @@ export default function PlanCard({ plan, currentPlan, signedIn, busy, onChoose, 
         {isCurrent && <Chip>Current plan</Chip>}
       </div>
       <p className="plan-price">
-        {plan.amountKobo === 0 ? 'Free' : formatNaira(plan.amountKobo)}
-        {plan.amountKobo > 0 && <span> / month</span>}
+        {formatNaira(plan.amountKobo)}
+        <span> / month</span>
       </p>
       <p className="plan-tokens">{formatTokens(plan.monthlyTokens)} tokens each month</p>
       <ul className="plan-list">
