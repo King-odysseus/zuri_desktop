@@ -157,7 +157,14 @@ assert.equal(invalidChat.status, 400);
   assert.equal(providerCalls.at(-1).supplier, 'deepseek');
   assert.ok(!JSON.stringify(allowed).includes('deepseek'), 'the supplier name never reaches the customer');
   const listed = await (await app(new Request('https://cloud.example.com/api/models', { headers }))).json();
-  assert.deepEqual(listed.data.map((model) => [model.code, model.available]), [['zuri-flash', true], ['zuri-pro', true], ['zuri-max', false]]);
+  assert.deepEqual(listed.data.map((model) => [model.code, model.available]), [
+    ['zuri-flash', true],
+    ['zuri-pro', true],
+    ['zuri-max', false],
+    ['zuri-code', false],
+    ['zuri-reason', false],
+    ['zuri-elite', false],
+  ]);
   assert.ok(!JSON.stringify(listed).includes('supplier'));
   assert.equal((await app(new Request('https://cloud.example.com/api/admin/overview', { headers }))).status, 403, 'admin pages are admin-only');
   assert.equal((await app(new Request('https://cloud.example.com/api/admin/models', { method: 'PUT', headers, body: '{}' }))).status, 403);

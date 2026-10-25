@@ -4,7 +4,7 @@ import { createApp } from './app.js';
 import { createRequestListener } from './serve.js';
 import { createAuthService, createGoogleVerifier } from './auth.js';
 import { createDatabase, createRepository } from './db.js';
-import { createDeepSeekClient } from './deepseek.js';
+import { createAnthropicClient, createDeepSeekClient } from './deepseek.js';
 import { createMailer } from './mail.js';
 import { createPaystackClient } from './paystack.js';
 import { applySchema } from './schema.js';
@@ -40,6 +40,7 @@ const supplierClients = {
   moonshot: createDeepSeekClient({ apiKey: config.moonshotApiKey, endpoint: 'https://api.moonshot.ai/v1/chat/completions' }),
   zai: createDeepSeekClient({ apiKey: config.zaiApiKey, endpoint: 'https://api.z.ai/api/paas/v4/chat/completions' }),
   openai: createDeepSeekClient({ apiKey: config.openaiApiKey, endpoint: 'https://api.openai.com/v1/chat/completions' }),
+  anthropic: createAnthropicClient({ apiKey: config.anthropicApiKey }),
 };
 const chatProvider = async (request) => {
   const client = supplierClients[request.supplier];

@@ -544,3 +544,9 @@
 - Key files: `server/src/plans.js`, `server/src/limits.js`, `server/src/db.js`, `server/db/schema.sql`, `server/src/models.js`, `web/src/views/Landing.jsx`, `web/src/views/AuthView.jsx`, `web/src/components/PlanCard.jsx`.
 - Other OS action: run `npm run web:build` and `npm run server:test` after syncing.
 - Done on: Windows
+## 2026-10-25 - Windows
+
+- Kept the existing Kimi and GLM-backed Zuri models and added Zuri Code (OpenAI Codex), Zuri Reason (Claude Sonnet), and Zuri Elite (Claude Opus). Added the Anthropic Messages API adapter and `ANTHROPIC_API_KEY` configuration. Customer pages now explain weighted token consumption and show the monthly NGN plan prices.
+- Key files: `server/src/models.js`, `server/src/deepseek.js`, `server/src/server.js`, `server/src/config.js`, `server/db/schema.sql`, `web/src/views/Landing.jsx`, `web/src/views/UsageView.jsx`, `web/src/lib/format.js`.
+- Other OS action: run `npm run web:build && npm --prefix server test` after syncing.
+- Done on: Windows

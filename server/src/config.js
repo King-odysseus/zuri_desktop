@@ -47,6 +47,7 @@ export function readConfig(environment = process.env) {
     moonshotApiKey: typeof environment.MOONSHOT_API_KEY === 'string' ? environment.MOONSHOT_API_KEY.trim() : '',
     zaiApiKey: typeof environment.ZAI_API_KEY === 'string' ? environment.ZAI_API_KEY.trim() : '',
     openaiApiKey: typeof environment.OPENAI_API_KEY === 'string' ? environment.OPENAI_API_KEY.trim() : '',
+    anthropicApiKey: typeof environment.ANTHROPIC_API_KEY === 'string' ? environment.ANTHROPIC_API_KEY.trim() : '',
     // Supplier prices are in dollars and customers pay in naira, so the admin
     // cost and margin figures need a rate the operator keeps current.
     nairaPerUsd: Number(environment.USD_NGN_RATE) > 0 ? Number(environment.USD_NGN_RATE) : 1600,

@@ -178,5 +178,8 @@ INSERT INTO models (code, name, supplier, supplier_model, input_usd_per_million,
 VALUES
   ('zuri-flash', 'Zuri Flash', 'deepseek', 'deepseek-flash', 0.14, 0.28, 1, 'starter', 1, 1),
   ('zuri-pro', 'Zuri Pro', 'moonshot', 'kimi-k3', 0.6, 2.5, 5, 'starter', 0.5, 2),
-  ('zuri-max', 'Zuri Max', 'zai', 'glm-5.3', 1.5, 6, 12, 'pro', 0.25, 3)
+  ('zuri-max', 'Zuri Max', 'zai', 'glm-5.3', 1.5, 6, 12, 'pro', 0.25, 3),
+  ('zuri-code', 'Zuri Code', 'openai', 'gpt-5.3-codex', 1.75, 14, 10, 'pro', 0.4, 4),
+  ('zuri-reason', 'Zuri Reason', 'anthropic', 'claude-sonnet-5-5', 2, 10, 10, 'pro', 0.4, 5),
+  ('zuri-elite', 'Zuri Elite', 'anthropic', 'claude-opus-5-5', 4, 20, 20, 'max', 0.2, 6)
 ON CONFLICT (code) DO NOTHING;

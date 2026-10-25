@@ -22,7 +22,10 @@ const adminOverview = {
   models: [
     { code: 'zuri-flash', name: 'Zuri Flash', supplier: 'deepseek', supplierModel: 'deepseek-flash', inputUsdPerMillion: 0.14, outputUsdPerMillion: 0.28, quotaWeight: 1, minPlan: 'starter', rateFactor: 1, isActive: true, sortOrder: 1 },
     { code: 'zuri-pro', name: 'Zuri Pro', supplier: 'moonshot', supplierModel: 'kimi-k3', inputUsdPerMillion: 0.6, outputUsdPerMillion: 2.5, quotaWeight: 5, minPlan: 'starter', rateFactor: 0.5, isActive: true, sortOrder: 2 },
-    { code: 'zuri-max', name: 'Zuri Max', supplier: 'zai', supplierModel: 'glm-5.3', inputUsdPerMillion: 1.5, outputUsdPerMillion: 6, quotaWeight: 12, minPlan: 'pro', rateFactor: 0.25, isActive: false, sortOrder: 3 },
+    { code: 'zuri-max', name: 'Zuri Max', supplier: 'zai', supplierModel: 'glm-5.3', inputUsdPerMillion: 1.5, outputUsdPerMillion: 6, quotaWeight: 12, minPlan: 'pro', rateFactor: 0.25, isActive: true, sortOrder: 3 },
+    { code: 'zuri-code', name: 'Zuri Code', supplier: 'openai', supplierModel: 'gpt-5.3-codex', inputUsdPerMillion: 1.75, outputUsdPerMillion: 14, quotaWeight: 10, minPlan: 'pro', rateFactor: 0.4, isActive: true, sortOrder: 4 },
+    { code: 'zuri-reason', name: 'Zuri Reason', supplier: 'anthropic', supplierModel: 'claude-sonnet-5-5', inputUsdPerMillion: 2, outputUsdPerMillion: 10, quotaWeight: 10, minPlan: 'pro', rateFactor: 0.4, isActive: true, sortOrder: 5 },
+    { code: 'zuri-elite', name: 'Zuri Elite', supplier: 'anthropic', supplierModel: 'claude-opus-5-5', inputUsdPerMillion: 4, outputUsdPerMillion: 20, quotaWeight: 20, minPlan: 'max', rateFactor: 0.2, isActive: true, sortOrder: 6 },
   ],
   spendByModel: [
     { modelCode: 'zuri-pro', requests: 5200, inputTokens: 9_000_000, outputTokens: 3_000_000, quotaTokens: 60_000_000, costMicroUsd: 1_900_000_000, costKobo: 3_040_000 },

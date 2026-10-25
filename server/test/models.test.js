@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createApp } from '../src/app.js';
+import { createAnthropicClient } from '../src/deepseek.js';
 import { PLANS } from '../src/plans.js';
 import { limitsForPlan } from '../src/limits.js';
 import {
@@ -17,6 +18,23 @@ import {
 const flash = DEFAULT_MODELS.find((model) => model.code === 'zuri-flash');
 const pro = DEFAULT_MODELS.find((model) => model.code === 'zuri-pro');
 const max = DEFAULT_MODELS.find((model) => model.code === 'zuri-max');
+const code = DEFAULT_MODELS.find((model) => model.code === 'zuri-code');
+const reason = DEFAULT_MODELS.find((model) => model.code === 'zuri-reason');
+const elite = DEFAULT_MODELS.find((model) => model.code === 'zuri-elite');
+
+let anthropicRequest;
+const anthropic = createAnthropicClient({
+  apiKey: 'test-key',
+  fetchImpl: async (_url, request) => {
+    anthropicRequest = { ...request, body: JSON.parse(request.body) };
+    return new Response(JSON.stringify({ id: 'msg_test', model: 'claude-sonnet-5-5', content: [{ type: 'text', text: 'hello' }], usage: { input_tokens: 9, output_tokens: 4 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  },
+});
+const anthropicResult = await anthropic({ messages: [{ role: 'system', content: 'Be concise.' }, { role: 'user', content: 'Hi' }], model: 'claude-sonnet-5-5', maxTokens: 100 });
+assert.equal(anthropicResult.content, 'hello');
+assert.deepEqual(anthropicResult.usage, { inputTokens: 9, outputTokens: 4 });
+assert.equal(anthropicRequest.headers['x-api-key'], 'test-key');
+assert.equal(anthropicRequest.body.system, 'Be concise.');
 
 // Plans: a Max plan exists, is the dearest, and has request limits of its own.
 assert.equal(PLANS.at(-1).code, 'max');
@@ -32,12 +50,18 @@ assert.equal(microUsdToKobo(1_000_000, 1600), 160_000);
 assert.equal(quotaTokens(flash, 100, 50), 150);
 assert.equal(quotaTokens(pro, 100, 50), 750);
 assert.equal(quotaTokens(max, 100, 50), 1800);
+assert.equal(quotaTokens(code, 100, 50), 1500);
+assert.equal(quotaTokens(elite, 100, 50), 3000);
 
 // Plan gating follows the price ladder.
 assert.equal(canUseModel(flash, 'starter'), true);
 assert.equal(canUseModel(pro, 'starter'), true);
 assert.equal(canUseModel(max, 'starter'), false);
 assert.equal(canUseModel(max, 'pro'), true);
+assert.equal(canUseModel(code, 'pro'), true);
+assert.equal(canUseModel(reason, 'pro'), true);
+assert.equal(canUseModel(elite, 'pro'), false);
+assert.equal(canUseModel(elite, 'max'), true);
 assert.equal(canUseModel(max, 'nonsense'), false);
 
 // Rate limits shrink for dear models, and never reach zero.
@@ -62,6 +86,7 @@ assert.equal(publicModel(pro, 'starter').available, true);
 // Admin edits are validated.
 const good = { ...pro, supplier: 'openai', supplierModel: 'gpt-4o-mini' };
 assert.equal(validateModelInput(good).ok, true);
+assert.equal(validateModelInput({ ...reason, supplier: 'anthropic' }).ok, true);
 assert.equal(validateModelInput({ ...good, code: 'Bad Code' }).ok, false);
 assert.equal(validateModelInput({ ...good, supplier: 'unknown' }).ok, false);
 assert.equal(validateModelInput({ ...good, minPlan: 'platinum' }).ok, false);
@@ -100,7 +125,7 @@ assert.equal((await call(customer, '/api/admin/overview')).status, 403);
 assert.equal((await call(customer, '/api/admin/models', { method: 'PUT', body: JSON.stringify(good) })).status, 403);
 
 const listed = await (await call(customer, '/api/models')).json();
-assert.equal(listed.data.length, 3);
+assert.equal(listed.data.length, 6);
 assert.ok(!JSON.stringify(listed).includes('deepseek'));
 
 const admin = appFor('starter', true);
@@ -108,7 +133,7 @@ const overview = (await (await call(admin, '/api/admin/overview')).json()).data;
 assert.equal(overview.costKobo, 150_000);
 assert.equal(overview.marginKobo, 850_000);
 assert.equal(overview.spendByModel[0].costKobo, 150_000);
-assert.equal(overview.models.length, 3);
+assert.equal(overview.models.length, 6);
 
 const edit = await call(admin, '/api/admin/models', { method: 'PUT', body: JSON.stringify(good) });
 assert.equal(edit.status, 200);

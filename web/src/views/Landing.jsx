@@ -57,7 +57,7 @@ const FEATURES = [
 const STATS = [
   { value: '2m', label: 'Starter tokens each month' },
   { value: '5', label: 'plans, priced in Naira' },
-  { value: '3', label: 'Zuri models, one account' },
+  { value: '6', label: 'Zuri models, one account' },
 ];
 
 /**
@@ -236,6 +236,27 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="section pricing-notes" id="usage">
+        <div className="section-head">
+          <h2>How tokens are used</h2>
+          <p>Your plan price is charged in Naira once per month. You do not receive a separate bill for each message.</p>
+        </div>
+        <div className="feature-grid">
+          <article className="card feature">
+            <h3>Every request uses tokens</h3>
+            <p>Tokens are the small pieces of your prompt and the reply. Zuri counts both input and output tokens after each request.</p>
+          </article>
+          <article className="card feature">
+            <h3>Premium models use more allowance</h3>
+            <p>Each model has a weight. For example, 1,000 raw tokens on a weight-10 model uses 10,000 allowance tokens. This keeps the plans predictable.</p>
+          </article>
+          <article className="card feature">
+            <h3>What you pay in Naira</h3>
+            <p>Starter is NGN 2,500, Pro is NGN 6,000, Power is NGN 15,000, and Max is NGN 40,000 per month. Your dashboard shows the remaining allowance.</p>
+          </article>
+        </div>
       </section>
 
       <Footer />

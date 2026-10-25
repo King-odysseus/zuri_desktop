@@ -3,7 +3,7 @@ import { Alert } from '../components/DataRow.jsx';
 import { fetchAdminOverview, saveAdminModel } from '../lib/api.js';
 import { formatNaira, formatTokens } from '../lib/format.js';
 
-const SUPPLIERS = ['deepseek', 'moonshot', 'zai', 'openai'];
+const SUPPLIERS = ['deepseek', 'moonshot', 'zai', 'openai', 'anthropic'];
 const WINDOWS = [7, 30, 90];
 
 const BLANK_MODEL = Object.freeze({
