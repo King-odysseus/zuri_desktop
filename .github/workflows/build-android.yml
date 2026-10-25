@@ -36,7 +36,8 @@ jobs:
       - name: Give the APK a release name
         run: |
           mkdir -p release
-          cp android/app/build/outputs/apk/debug/app-debug.apk "release/Zuri-$(node -p \"require('./package.json').version\").apk"
+          VERSION=$(node -p "require('./package.json').version")
+          cp android/app/build/outputs/apk/debug/app-debug.apk "release/Zuri-${VERSION}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
