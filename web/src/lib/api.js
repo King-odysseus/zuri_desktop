@@ -1,6 +1,7 @@
 // Talks to the Zuri Cloud API. The bearer token lives in sessionStorage so it
 // disappears when the tab closes; it is never written to localStorage.
 const TOKEN_KEY = 'zuri-cloud-token';
+const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
 /** @returns {string} */
 export function readToken() {
@@ -26,7 +27,7 @@ export function clearToken() {
  */
 export async function api(path, options = {}) {
   const token = readToken();
-  const response = await fetch(path, {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
       'content-type': 'application/json',

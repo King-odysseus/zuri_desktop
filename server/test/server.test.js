@@ -36,6 +36,13 @@ const publicConfig = await handleRequest(new Request('https://cloud.example.com/
 // so both travel with the Google client id.
 assert.deepEqual(await publicConfig.json(), { ok: true, data: { googleClientId: 'client-id', passwordSignIn: true, siteUrl: '' } });
 assert.equal((await handleRequest(new Request('https://cloud.example.com/api/unknown'))).status, 404);
+const androidCors = createApp({ corsOrigins: ['https://localhost'] });
+const preflight = await androidCors(new Request('https://cloud.example.com/api/auth/sign-in', {
+  method: 'OPTIONS',
+  headers: { origin: 'https://localhost' },
+}));
+assert.equal(preflight.status, 204);
+assert.equal(preflight.headers.get('access-control-allow-origin'), 'https://localhost');
 const usage = usageStatus({ code: 'starter', monthlyTokens: 2_000_000 }, 1_650_001);
 assert.deepEqual(usage, { planCode: 'starter', monthlyTokens: 2_000_000, usedTokens: 1_650_001, remainingTokens: 349_999, percentUsed: 83, overQuota: false, nearLimit: true });
 assert.deepEqual(canConsume({ monthlyTokens: 2_000_000 }, 1_650_001, 349_999), { allowed: true, reason: 'ok' });
@@ -292,6 +299,7 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
       prerelease: false,
       assets: [
         { name: 'Zuri-0.3.0-Setup.exe', size: 300, browser_download_url: 'https://github.com/o/r/releases/download/v0.3.0/Zuri-0.3.0-Setup.exe' },
+        { name: 'Zuri-0.3.0.apk', size: 280, browser_download_url: 'https://github.com/o/r/releases/download/v0.3.0/Zuri-0.3.0.apk' },
         { name: 'Zuri-0.3.0-Setup.exe.blockmap', size: 2, browser_download_url: 'https://example.test/blockmap' },
         { name: 'latest.yml', size: 1, browser_download_url: 'https://example.test/latest.yml' },
       ],
@@ -309,14 +317,15 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
     { tag_name: 'v0.5.0', draft: false, prerelease: true, assets: [{ name: 'Zuri-0.5.0-Setup.exe', size: 500, browser_download_url: 'https://example.test/pre.exe' }] },
   ]);
 
-  assert.deepEqual(mapped.map((file) => file.platform), ['windows', 'macos'], 'Windows first, one card per platform');
-  const [windowsRelease, macRelease] = mapped;
+  assert.deepEqual(mapped.map((file) => file.platform), ['windows', 'macos', 'android'], 'Windows first, one card per platform');
+  const [windowsRelease, macRelease, androidRelease] = mapped;
   assert.equal(windowsRelease.version, '0.3.0', 'the newest published release wins over older, draft and prerelease builds');
   assert.equal(windowsRelease.url, 'https://github.com/o/r/releases/download/v0.3.0/Zuri-0.3.0-Setup.exe');
   assert.equal(windowsRelease.size, 300, 'the size the page prints comes from here');
   assert.equal(windowsRelease.releaseUrl, 'https://github.com/King-odysseus/zuri-releases/releases/tag/v0.3.0');
   assert.equal(macRelease.version, '0.2.0', 'macOS falls back to the newest release that actually carries a dmg');
   assert.equal(macRelease.url, 'https://example.test/Zuri-0.2.0.dmg');
+  assert.equal(androidRelease.version, '0.3.0', 'Android uses the newest published APK');
   assert.ok(!mapped.some((file) => /\.blockmap$|\.yml$/.test(file.name)), 'updater side files are never a download');
   assert.deepEqual(downloadsFromReleases([]), [], 'nothing published means nothing offered, not an error');
 }
@@ -334,7 +343,7 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
   assert.equal(files.length, onDisk.filter((name) => /\.(exe|dmg)$/i.test(name)).length);
 
   for (const file of files) {
-    assert.ok(['windows', 'macos'].includes(file.platform), 'each file needs a known platform');
+    assert.ok(['windows', 'macos', 'android'].includes(file.platform), 'each file needs a known platform');
     assert.match(file.url, /^\/downloads\//, 'a file on disk is served by this server');
     assert.ok(file.size > 0, 'the size the page prints comes from here');
 

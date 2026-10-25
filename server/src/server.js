@@ -68,6 +68,9 @@ const app = createApp({
   // A reset link has to be absolute, so an unset SITE_URL falls back to the
   // service's own URL rather than producing a dead relative link.
   siteUrl: config.siteUrl || config.cloudUrl,
+  // Capacitor serves the bundled Android dashboard from https://localhost.
+  // Keep this list narrow so the API is not opened to arbitrary browser origins.
+  corsOrigins: ['https://localhost', 'capacitor://localhost'],
 });
 
 /**

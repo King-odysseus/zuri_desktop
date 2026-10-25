@@ -8,6 +8,7 @@ import { api } from './api.js';
 export const DOWNLOAD_PLATFORMS = [
   { platform: 'windows', label: 'Windows', detail: 'Windows 10 or 11, 64-bit' },
   { platform: 'macos', label: 'macOS', detail: 'macOS 12 or later' },
+  { platform: 'android', label: 'Android', detail: 'Android 6 or later' },
 ];
 
 // One request per page load. The landing grid, the footer and the dashboard

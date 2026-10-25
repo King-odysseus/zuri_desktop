@@ -17,6 +17,7 @@ secrets.json
 
 # React/HeroUI migration build output
 dist-react/
+dist-android/
 
 # Desktop installers served by the cloud site. The Windows build is 140 MB,
 # past GitHub's 100 MB per-file limit, so git cannot carry it: `npm run

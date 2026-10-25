@@ -21,7 +21,9 @@ export default defineConfig({
   // component primitives as the desktop app instead of two divergent systems.
   plugins: [react(), tailwindcss()],
   build: {
-    outDir: resolve(projectDir, 'server', 'public'),
+    outDir: process.env.VITE_ANDROID_BUILD === '1'
+      ? resolve(projectDir, 'dist-android')
+      : resolve(projectDir, 'server', 'public'),
     emptyOutDir: true,
   },
 });
