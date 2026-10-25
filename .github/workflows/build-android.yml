@@ -34,7 +34,9 @@ jobs:
       - name: Build the Android debug APK
         run: npm run android:build
       - name: Give the APK a release name
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk "release/Zuri-$(node -p \"require('./package.json').version\").apk"
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/debug/app-debug.apk "release/Zuri-$(node -p \"require('./package.json').version\").apk"
 
       - uses: actions/upload-artifact@v4
         with:
