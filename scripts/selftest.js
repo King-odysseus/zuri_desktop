@@ -126,7 +126,30 @@ check('own prompts carry a copy action, not only replies', () => {
   return 'prompts and replies both copy through one path';
 });
 
-const { splitDsml, answerStylePolicy, chatSystemPrompt, ZURI_IDENTITY_PROMPT } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+const { splitDsml, answerStylePolicy, chatSystemPrompt, ZURI_IDENTITY_PROMPT, resolveChatTarget } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+
+// The desktop app showed supplier ids (gpt-4o-mini) while the product sells Zuri
+// names, so the picker now offers the catalogue. Each row still stores the real
+// supplier id, which makes "does this id belong to this provider?" a real risk:
+// chat.js silently swaps a foreign id for the provider's default, so a wrong row
+// would answer with a different model than its Zuri name promises.
+check('every Zuri model in the desktop picker answers with the id it names', () => {
+  const source = read('src/renderer-react/SettingsView.jsx');
+  const rows = [...source.matchAll(/\{ provider: '([a-z]+)', model: '([^']+)', name: '(Zuri [^']+)'/g)].map((match) => ({
+    provider: match[1],
+    model: match[2],
+    name: match[3],
+  }));
+  if (rows.length !== 6) throw new Error(`the picker lists ${rows.length} Zuri models, expected 6`);
+  for (const row of rows) {
+    const target = resolveChatTarget({ provider: row.provider, model: row.model });
+    if (target.provider !== row.provider || target.model !== row.model) {
+      throw new Error(`${row.name} would really answer as ${target.provider}/${target.model}`);
+    }
+  }
+  if (source.includes('gpt-4o-mini')) throw new Error('a supplier model id is still offered by name');
+  return `${rows.length} Zuri names, each on its own provider`;
+});
 
 check('DSML tool markup is hidden from the reply and read as tool calls', () => {
   const markup =
@@ -456,6 +479,24 @@ check('an automation with no model available still runs its single-call plan', (
   if (offlineMarkdown.includes('## Answer')) throw new Error('a model answer was invented');
   if (ranWithoutModel.data.run.stepsTotal !== 1) throw new Error('the plan was not kept');
   if (ranWithoutModel.data.run.status !== 'completed') throw new Error('the planned step did not run');
+});
+
+/* The overlay card's shadow is painted by CSS inside a transparent window, and CSS
+   cannot draw outside the window: a shadow wider than the window's transparent
+   margin is cut off, leaving a grey box with sharp corners around a round card.
+   The window margin and the card's padding are meant to be the same number. */
+check('the overlay window leaves room for the card shadow', () => {
+  const margin = Number(read('src/main/overlay.js').match(/const MARGIN = (\d+);/)?.[1]);
+  if (!Number.isFinite(margin)) throw new Error('overlay.js has no MARGIN');
+  const css = read('src/renderer-react/app.css');
+  const padding = Number(css.match(/\.zuri-overlay-root\s*\{[^}]*padding:\s*(\d+)px/)?.[1]);
+  if (!Number.isFinite(padding)) throw new Error('.zuri-overlay-root has no pixel padding');
+  if (padding !== margin) throw new Error(`card padding is ${padding}px but the window margin is ${margin}px`);
+  const shadow = css.match(/\.zuri-overlay-panel\s*\{[^}]*box-shadow:\s*0 (\d+)px (\d+)px/);
+  if (!shadow) throw new Error('.zuri-overlay-panel has no y-offset box shadow');
+  const reach = Number(shadow[1]) + Number(shadow[2]);
+  if (reach > margin) throw new Error(`the shadow reaches ${reach}px but the window margin is only ${margin}px`);
+  return `margin ${margin}px, shadow reaches ${reach}px`;
 });
 
 await Promise.all(pendingChecks);

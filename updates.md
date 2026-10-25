@@ -1,5 +1,13 @@
 ## 2026-10-25 - Windows
 
+- Settings now lists the Zuri models instead of supplier ids: Zuri Flash, Zuri Pro, Zuri Max, Zuri Code, Zuri Reason and Zuri Elite. Each one saves the provider key it runs on together with the model, so the model and the key that pays for it cannot drift apart. A model saved before this list existed still shows, marked "(current)", rather than appearing under a Zuri name it is not.
+- Repaired two breaks in `server/src/app.js` that stopped the cloud server loading at all: the admin overview declared the model catalogue twice, and the chat handler lost its catalogue lookup entirely, so every signed-in chat would have thrown. Neither is a behaviour change. This file also carries unrelated in-progress image-model work, so it is not part of this change.
+- Key files: `src/renderer-react/SettingsView.jsx`, `scripts/selftest.js`, `server/src/app.js`.
+- Other OS action: run `npm run react:build && npm run selftest` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - A person's own prompts in the chat transcript now have a copy button, the same one Zuri's replies already carried. Only replies could be copied before, so reusing your own wording meant selecting it by hand. Both roles go through the one `copyMessage` path, so the "Copied" confirmation and the failure message behave the same for a prompt as for a reply.
 - Key files: `src/renderer-react/ChatPanel.jsx`, `scripts/selftest.js`.
 - Other OS action: run `npm run test` after syncing.

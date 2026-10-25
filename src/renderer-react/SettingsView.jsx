@@ -10,20 +10,28 @@ const PROVIDERS = [
   ['zai', 'Z.ai (GLM)'],
 ];
 
-const MODEL_OPTIONS = {
-  openai: [
-    ['gpt-4o-mini', 'GPT-4o mini'],
-    ['gpt-4o', 'GPT-4o'],
-    ['gpt-5', 'GPT-5'],
-  ],
-  anthropic: [
-    ['claude-3-5-haiku-latest', 'Claude Haiku'],
-    ['claude-sonnet-4-5', 'Claude Sonnet'],
-  ],
-  deepseek: [['deepseek-flash', 'DeepSeek Flash']],
-  moonshot: [['kimi-k3', 'Kimi K3']],
-  zai: [['glm-5.3', 'GLM 5.3']],
-};
+/**
+ * The same catalogue the cloud sells, so a person meets one product name (Zuri
+ * Flash) instead of a supplier model id (deepseek-flash).
+ *
+ * Each row still carries the real supplier id, because that is what the provider
+ * API is asked for and what providers/chat.js checks the saved model against. The
+ * provider travels with the model because a supplier id is only valid on its own
+ * API, so choosing a model also chooses the key that pays for it.
+ */
+const ZURI_MODELS = [
+  { provider: 'deepseek', model: 'deepseek-flash', name: 'Zuri Flash', note: 'Cheap and quick for everyday questions.' },
+  { provider: 'moonshot', model: 'kimi-k3', name: 'Zuri Pro', note: 'Balanced, and good with long documents.' },
+  { provider: 'zai', model: 'glm-5.3', name: 'Zuri Max', note: 'Strong general reasoning.' },
+  { provider: 'openai', model: 'gpt-5.3-codex', name: 'Zuri Code', note: 'Code, scripts and technical work.' },
+  { provider: 'anthropic', model: 'claude-sonnet-5-5', name: 'Zuri Reason', note: 'Careful step-by-step analysis.' },
+  { provider: 'anthropic', model: 'claude-opus-5-5', name: 'Zuri Elite', note: 'The deepest answers, and the dearest.' },
+];
+
+/** The person-facing name of the provider whose key a model spends. */
+function providerLabel(provider) {
+  return PROVIDERS.find(([value]) => value === provider)?.[1] ?? provider;
+}
 
 // The ids match store.js ANSWER_STYLE_CHOICES, which refuses anything else; the
 // labels are here because the renderer cannot import main-process code.
@@ -256,6 +264,16 @@ export default function SettingsView() {
 
   const current = settings ?? {};
 
+  // What the picker shows. A model saved before this list existed, or one set
+  // elsewhere, keeps its own row rather than being displayed under a Zuri name
+  // that is not what would be sent, which would misreport the active model.
+  const savedModel = typeof current.model === 'string' ? current.model : '';
+  const zuriModel = ZURI_MODELS.find((entry) => entry.model === savedModel) ?? null;
+  const modelOptions = [
+    ...ZURI_MODELS.map((entry) => ({ value: entry.model, label: entry.name })),
+    ...(zuriModel === null && savedModel !== '' ? [{ value: savedModel, label: `${savedModel} (current)` }] : []),
+  ];
+
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
@@ -279,24 +297,26 @@ export default function SettingsView() {
 
           <section className="rounded-xl border border-border bg-surface p-5">
             <h2 className="text-lg font-medium">Model and overlay</h2>
-            <p className="mt-1 text-sm text-muted">Choose the provider and model used for local desktop replies.</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <SelectField
-                label="Provider"
-                value={String(current.provider ?? 'openai')}
-                options={PROVIDERS.map(([value, label]) => ({ value, label }))}
-                onChange={(value) => {
-                  const nextModel = MODEL_OPTIONS[value]?.[0]?.[0] ?? '';
-                  void savePatch({ provider: value, model: nextModel }, `Using ${value} with ${nextModel}.`);
-                }}
-              />
+            <p className="mt-1 text-sm text-muted">Choose the Zuri model that writes your local desktop replies. Each one runs on one provider key.</p>
+            <div className="mt-4">
               <SelectField
                 label="Model"
-                value={String(current.model ?? MODEL_OPTIONS[String(current.provider ?? 'openai')]?.[0]?.[0] ?? 'gpt-4o-mini')}
-                options={(MODEL_OPTIONS[String(current.provider ?? 'openai')] ?? MODEL_OPTIONS.openai).map(([value, label]) => ({ value, label }))}
-                onChange={(value) => void savePatch({ model: value }, `Model set to ${value}.`)}
+                value={zuriModel?.model ?? savedModel}
+                options={modelOptions}
+                onChange={(value) => {
+                  const picked = ZURI_MODELS.find((entry) => entry.model === value);
+                  // Saved together: a supplier id is only valid on its own API,
+                  // so the model and the key that pays for it never drift apart.
+                  if (picked === undefined) void savePatch({ model: value }, `Model set to ${value}.`);
+                  else void savePatch({ provider: picked.provider, model: picked.model }, `Model set to ${picked.name}.`);
+                }}
               />
             </div>
+            <p className="mt-2 text-xs text-muted">
+              {zuriModel === null
+                ? 'This model was chosen outside the Zuri list, so it is shown by its provider id.'
+                : `${zuriModel.name}: ${zuriModel.note} It answers through your ${providerLabel(zuriModel.provider)} key.`}
+            </p>
             <p className="mt-2 text-xs text-muted">Your selected provider key is stored only on this computer. Cloud model usage and allowance are separate from local provider usage.</p>
             <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
           </section>
