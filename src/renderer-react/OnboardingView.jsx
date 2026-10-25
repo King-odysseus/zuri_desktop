@@ -1,21 +1,8 @@
-import { useState } from 'react';
-import { Button, Input, Label, Select } from './ui.jsx';
-import { AgentIcon, MoonIcon, SunIcon, UserPlusIcon } from './Icons.jsx';
-
-// Same ids and labels as PROVIDERS in src/main/secrets.js. That module opens the
-// secrets file with node:fs, so the renderer cannot import it; SettingsView keeps
-// the same copy for the same reason.
-const PROVIDERS = [
-  ['openai', 'OpenAI'],
-  ['anthropic', 'Anthropic'],
-  ['deepseek', 'DeepSeek'],
-  ['moonshot', 'Kimi (Moonshot)'],
-  ['zai', 'Z.ai (GLM)'],
-];
-
-// DEFAULT_PROVIDER in secrets.js. Named separately so reordering the list above
-// cannot quietly change which provider a key is filed under.
-const DEFAULT_PROVIDER = 'openai';
+import { useEffect, useState } from 'react';
+import { Button, Input } from './ui.jsx';
+import { CloudIcon, MoonIcon, SunIcon, UserPlusIcon } from './Icons.jsx';
+import CloudAuthForm from './CloudAuthForm.jsx';
+import GoogleSignInButton from './GoogleSignInButton.jsx';
 
 // Mirrors SETUP_NAME_MAX_LENGTH in onboarding.js, so the obvious mistakes are
 // answered without a round trip. Main still has the final word.
@@ -39,9 +26,18 @@ function nameProblem(name) {
 }
 
 /**
- * First run, in two screens: who you are and which theme you want, then the
- * provider key. The name and theme are required, the key is not, and main stores
- * them through a different channel depending on whether a key came with them.
+ * First run, in two screens: who you are and which theme you want, then the Zuri
+ * account.
+ *
+ * The account replaced the old provider-key screen. It is what carries the plan,
+ * the monthly allowance and the usage figures, so asking for an OpenAI or
+ * Anthropic key on launch made the first minute of the product look like a
+ * developer tool. A key is still supported, but it now belongs in Settings, where
+ * a person who wants to pay a provider directly can add one.
+ *
+ * Signing in is offered, not forced: "Skip for now" still writes the name and
+ * theme, so a person who is offline or has no account yet is not stuck on this
+ * screen.
  *
  * @param {{ onDone?: (saved: any) => void }} props
  */
@@ -50,8 +46,10 @@ export default function OnboardingView({ onDone }) {
   const [step, setStep] = useState(1);
   const [name, setName] = useState('');
   const [theme, setTheme] = useState(currentTheme);
-  const [provider, setProvider] = useState(DEFAULT_PROVIDER);
-  const [key, setKey] = useState('');
+  const [googleClientId, setGoogleClientId] = useState('');
+  // Creating an account and recovering a password happen inside this card too, so
+  // the shared form's own buttons are never dead ends.
+  const [authMode, setAuthMode] = useState('sign-in');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -60,17 +58,30 @@ export default function OnboardingView({ onDone }) {
   // Main's refusal wins; before one arrives, the field explains itself as soon as
   // something has been typed, so an empty box is not shouted at.
   const nameError = error || (trimmedName === '' ? '' : problem);
-  const providerLabel = PROVIDERS.find(([id]) => id === provider)?.[1] ?? provider;
+
+  useEffect(() => {
+    // The client id comes from the cloud server, and reaches this page before the
+    // Google button can be drawn. A missing id is not an error: the email and
+    // password form below works without it.
+    if (step !== 2 || typeof api?.cloud?.config !== 'function') return;
+    let active = true;
+    void api.cloud.config().then((result) => {
+      if (active && result?.ok) setGoogleClientId(result.data?.googleClientId ?? '');
+    });
+    return () => {
+      active = false;
+    };
+  }, [step, api]);
 
   function chooseTheme(next) {
     setTheme(next);
     // This card is the whole window, so the choice has to be visible before it is
-    // stored: paint the tokens now and save them with the rest on Continue.
+    // stored: paint the tokens now and save them with the rest on finish.
     document.documentElement.dataset.theme = next;
     document.documentElement.classList.toggle('dark', next === 'dark');
   }
 
-  function continueToKey() {
+  function continueToAccount() {
     if (problem !== '') {
       setError(problem);
       return;
@@ -79,61 +90,51 @@ export default function OnboardingView({ onDone }) {
     setStep(2);
   }
 
-  async function finish(event) {
-    event.preventDefault();
-    if (busy) return;
+  /**
+   * Store the two answers this card owns and close setup.
+   *
+   * No key travels with them any more, which is why main's onboarding channel now
+   * accepts a payload without one. The account session, when there is one, was
+   * already written by the cloud sign-in calls.
+   * @returns {Promise<boolean>} true when setup was saved and the caller can stop.
+   */
+  async function finishSetup() {
     if (typeof api?.onboarding?.complete !== 'function') {
       setError('Setup can only be finished inside the Zuri app.');
-      return;
-    }
-    if (key.trim() === '') {
-      setError('Paste a provider key, or choose "Skip for now" and add it in Settings when you have it.');
-      return;
+      return false;
     }
     setBusy(true);
     setError('');
     try {
-      // One channel for both answers: main writes the name and theme, then hands
-      // the key to secrets.js. Nothing sends the key back.
-      const result = await api.onboarding.complete({
-        name: trimmedName,
-        theme,
-        provider,
-        key: key.trim(),
-      });
+      const result = await api.onboarding.complete({ name: trimmedName, theme });
       if (result?.ok) {
         onDone?.(result.data);
-        return;
+        return true;
       }
       setError(result?.error?.message ?? 'Setup could not be saved. Try again.');
     } catch (failure) {
       setError(failure?.message ?? 'Setup could not be saved. Try again.');
     }
     setBusy(false);
+    return false;
   }
 
-  async function skip() {
-    if (busy) return;
-    if (typeof api?.settings?.save !== 'function') {
-      setError('Setup can only be finished inside the Zuri app.');
-      return;
-    }
+  async function signInWithGoogle(credential) {
+    if (busy || typeof api?.cloud?.signIn !== 'function') return;
     setBusy(true);
     setError('');
     try {
-      // onboarding.complete always passes its key to secrets.js, which refuses an
-      // empty one, so skipping saves the two answers that are actually ready and
-      // leaves the key for Settings.
-      const result = await api.settings.save({ name: trimmedName, theme });
-      if (result?.ok) {
-        onDone?.(result.data);
+      const result = await api.cloud.signIn({ credential });
+      if (!result?.ok) {
+        setError(result?.error?.message ?? 'Google sign-in could not be completed.');
+        setBusy(false);
         return;
       }
-      setError(result?.error?.message ?? 'Setup could not be saved. Try again.');
+      await finishSetup();
     } catch (failure) {
-      setError(failure?.message ?? 'Setup could not be saved. Try again.');
+      setError(failure?.message ?? 'Google sign-in could not be completed.');
+      setBusy(false);
     }
-    setBusy(false);
   }
 
   return (
@@ -145,7 +146,7 @@ export default function OnboardingView({ onDone }) {
         >
           <p className="text-xs font-medium uppercase tracking-wide text-muted">Step {step} of 2</p>
           <div className="mt-4 flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
-            {step === 1 ? <UserPlusIcon size={22} /> : <AgentIcon size={22} />}
+            {step === 1 ? <UserPlusIcon size={22} /> : <CloudIcon size={22} />}
           </div>
 
           {step === 1 ? (
@@ -158,7 +159,7 @@ export default function OnboardingView({ onDone }) {
                 computer and can be changed again from Settings.
               </p>
 
-              <form className="mt-6 flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); continueToKey(); }}>
+              <form className="mt-6 flex flex-col gap-4" onSubmit={(event) => { event.preventDefault(); continueToAccount(); }}>
                 <div>
                   <Input
                     label="Your name"
@@ -212,79 +213,59 @@ export default function OnboardingView({ onDone }) {
           ) : (
             <>
               <h1 id="onboarding-title" className="mt-5 text-3xl font-medium tracking-tight">
-                Connect a model
+                Sign in to Zuri
               </h1>
               <p className="mt-3 text-sm leading-6 text-muted">
-                Zuri writes its replies through a model provider. Paste a key for one of these
-                services, or skip and add it from Settings when you have it.
-                Your messages go to the company behind the model to write replies, and some of
-                these companies are outside Nigeria. AI can be wrong, so check anything important.
+                Your Zuri account holds your plan, your monthly allowance and your usage. Sign in
+                with Google, or with an email and password if you made one.
+              </p>
+              <p className="mt-2 text-xs leading-5 text-muted">
+                No account yet? Choose "Create an account" below and you can start on the Starter
+                plan. Signing in is optional: you can skip this and sign in later from Zuri Cloud
+                in the sidebar.
               </p>
 
-              <form className="mt-6 flex flex-col gap-4" onSubmit={finish}>
-                <div>
-                  <Label htmlFor="onboarding-provider" className="zuri-field-label mb-2 block text-sm font-medium text-foreground">
-                    Provider
-                  </Label>
-                  <Select
-                    id="onboarding-provider"
-                    value={provider}
-                    onChange={(event) => setProvider(event.target.value)}
-                  >
-                    {PROVIDERS.map(([id, label]) => (
-                      <option key={id} value={id}>
-                        {label}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
+              <div className="mt-6">
+                <GoogleSignInButton
+                  clientId={googleClientId}
+                  onCredential={(credential) => void signInWithGoogle(credential)}
+                  onError={setError}
+                />
+              </div>
 
-                <div>
-                  <Input
-                    type="password"
-                    label={`${providerLabel} API key`}
-                    value={key}
-                    onChange={(event) => {
-                      setKey(event.target.value);
-                      if (error !== '') setError('');
-                    }}
-                    placeholder="Paste the key from your provider dashboard"
-                    autoComplete="off"
-                    spellCheck={false}
-                    fullWidth
-                  />
-                  <p className="mt-2 text-xs leading-5 text-muted">
-                    The key is stored on this computer only, in a file only your user account can
-                    read, and Zuri uses it to call {providerLabel} from this app.
-                  </p>
-                </div>
+              <p className="mt-5 text-center text-xs uppercase tracking-wide text-muted">or</p>
 
-                {error !== '' && (
-                  <p role="alert" className="text-sm text-danger">
-                    {error}
-                  </p>
-                )}
+              <CloudAuthForm
+                mode={authMode}
+                onModeChange={setAuthMode}
+                onSignedIn={() => void finishSetup()}
+                api={api}
+              />
 
-                <div className="flex flex-wrap items-center gap-3">
-                  <Button type="submit" variant="primary" isDisabled={busy}>
-                    {busy ? 'Saving...' : 'Finish setup'}
-                  </Button>
-                  <Button type="button" variant="secondary" isDisabled={busy} onPress={() => void skip()}>
-                    Skip for now
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    isDisabled={busy}
-                    onPress={() => {
-                      setError('');
-                      setStep(1);
-                    }}
-                  >
-                    Back
-                  </Button>
-                </div>
-              </form>
+              {error !== '' && (
+                <p role="alert" className="mt-4 text-sm text-danger">
+                  {error}
+                </p>
+              )}
+
+              {busy && <p className="mt-3 text-sm text-muted">Signing you in...</p>}
+
+              <div className="mt-5 flex flex-wrap items-center gap-3">
+                <Button type="button" variant="secondary" isDisabled={busy} onPress={() => void finishSetup()}>
+                  Skip for now
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  isDisabled={busy}
+                  onPress={() => {
+                    setError('');
+                    setStep(1);
+                  }}
+                >
+                  Back
+                </Button>
+              </div>
             </>
           )}
         </section>

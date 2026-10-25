@@ -1,27 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Chip, Input } from './ui.jsx';
 import { CheckIcon, CloudIcon, LogOutIcon, UserPlusIcon } from './Icons.jsx';
 import CloudAuthForm from './CloudAuthForm.jsx';
-
-function loadGoogleIdentityScript() {
-  if (window.google?.accounts?.id) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector('script[data-google-identity]');
-    if (existing) {
-      existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', reject, { once: true });
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.dataset.googleIdentity = 'true';
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('Google sign-in could not be loaded.'));
-    document.head.appendChild(script);
-  });
-}
+import GoogleSignInButton from './GoogleSignInButton.jsx';
 
 function dateLabel(value) {
   if (!value) return 'Not available';
@@ -31,7 +12,6 @@ function dateLabel(value) {
 
 export default function CloudView({ onNavigate }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
-  const googleButtonRef = useRef(null);
   const [config, setConfig] = useState(null);
   const [account, setAccount] = useState(null);
   const [plans, setPlans] = useState([]);
@@ -81,25 +61,6 @@ export default function CloudView({ onNavigate }) {
     void load();
     return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    if (status !== 'signed-out' || authMode !== 'sign-in' || !config?.googleClientId || !googleButtonRef.current) return undefined;
-    let active = true;
-    void loadGoogleIdentityScript().then(() => {
-      if (!active || !window.google?.accounts?.id || !googleButtonRef.current) return;
-      window.google.accounts.id.initialize({
-        client_id: config.googleClientId,
-        callback: (response) => { void signIn(response?.credential); },
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-      googleButtonRef.current.replaceChildren();
-      window.google.accounts.id.renderButton(googleButtonRef.current, { theme: 'outline', size: 'large', text: 'continue_with', width: 320 });
-    }).catch((error) => {
-      if (active) setMessage(error?.message ?? 'Google sign-in could not be loaded.');
-    });
-    return () => { active = false; };
-  }, [status, authMode, config?.googleClientId]);
 
   async function signIn(credential) {
     setBusy(true);
@@ -186,8 +147,9 @@ export default function CloudView({ onNavigate }) {
           />
           {authMode === 'sign-in' && <>
             <p className="mt-6 text-center text-xs uppercase tracking-wide text-muted">or</p>
-            {!config?.googleClientId && <p className="mt-3 text-sm text-muted">Google sign-in is not configured on this cloud server yet.</p>}
-            <div ref={googleButtonRef} className="mt-3 min-h-10" aria-label="Continue with Google" />
+            <div className="mt-3">
+              <GoogleSignInButton clientId={config?.googleClientId ?? ''} onCredential={(credential) => void signIn(credential)} onError={setMessage} />
+            </div>
             {busy && <p className="mt-3 text-sm text-muted">Signing you in...</p>}
           </>}
         </section>}
