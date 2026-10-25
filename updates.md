@@ -1,5 +1,13 @@
 ## 2026-10-25 - Windows
 
+- The Android APK is now on the live site. `server/src/downloads.js` already accepted `.apk`, but the deployed bundle predated that change, so `/api/downloads` returned only Windows and macOS. Rebuilt `server/public` and redeployed: the site now lists all three installers (`Zuri-0.1.0-Setup.exe`, `Zuri-0.1.0.dmg`, `Zuri-0.1.0.apk`) straight from the v0.1.0 GitHub release.
+- Corrected the Power plan card: it claimed "the largest input and output limits", but Max holds the higher limits (128k input, 16k output, 240 requests a minute). Each card now states its real model weight and request guardrails from `server/src/models.js` and `server/src/limits.js`. Prices were already read from `/api/plans` and needed no change.
+- Key files: `web/src/lib/format.js`, `server/public/**`.
+- Other OS action: run `npm run web:build && npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Fixed PostgreSQL usage events so model code, supplier, weighted quota tokens and supplier cost are stored for admin reporting. Added a repository regression test. Desktop Settings now lets users choose the local provider and model without editing the data folder, and the landing page correctly says there are four plans.
 - Key files: `server/src/db.js`, `server/test/db.test.js`, `server/package.json`, `src/renderer-react/SettingsView.jsx`, `web/src/views/Landing.jsx`.
 - Other OS action: run `npm run test` after syncing.
