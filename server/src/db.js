@@ -297,8 +297,8 @@ export function createRepository(pool) {
           throw error;
         }
         await client.query(
-          'INSERT INTO usage_events (user_id, subscription_id, model, input_tokens, output_tokens, request_id) VALUES ($1, $2, $3, $4, $5, $6)',
-          [userId, reservation.subscription_id, model, input, output, requestId],
+          'INSERT INTO usage_events (user_id, subscription_id, provider, model, model_code, input_tokens, output_tokens, quota_tokens, cost_micro_usd, request_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+          [userId, reservation.subscription_id, supplier, model, modelCode, input, output, counted, costMicroUsd, requestId],
         );
         await client.query("UPDATE usage_reservations SET status = 'committed', committed_at = NOW() WHERE id = $1", [reservation.id]);
         await client.query('COMMIT');

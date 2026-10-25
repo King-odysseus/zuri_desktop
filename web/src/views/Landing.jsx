@@ -56,7 +56,7 @@ const FEATURES = [
 
 const STATS = [
   { value: '2m', label: 'Starter tokens each month' },
-  { value: '5', label: 'plans, priced in Naira' },
+  { value: '4', label: 'plans, priced in Naira' },
   { value: '6', label: 'Zuri models, one account' },
 ];
 

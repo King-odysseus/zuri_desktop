@@ -1,5 +1,12 @@
 ## 2026-10-25 - Windows
 
+- Fixed PostgreSQL usage events so model code, supplier, weighted quota tokens and supplier cost are stored for admin reporting. Added a repository regression test. Desktop Settings now lets users choose the local provider and model without editing the data folder, and the landing page correctly says there are four plans.
+- Key files: `server/src/db.js`, `server/test/db.test.js`, `server/package.json`, `src/renderer-react/SettingsView.jsx`, `web/src/views/Landing.jsx`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Removed the Free cloud plan. Starter is now the paid entry plan and every new account starts with Starter; Zuri Flash (DeepSeek) is available from Starter. Existing database rows on Free are migrated to Starter before the retired plan is deleted.
 - Updated plan limits, model gating, sign-up and landing copy, account fallbacks, desktop cloud plan display, preview data, and server tests so no customer-facing free tier remains.
 - Key files: `server/src/plans.js`, `server/src/limits.js`, `server/src/db.js`, `server/src/models.js`, `server/db/schema.sql`, `web/src/**`, `src/renderer-react/CloudView.jsx`, `scripts/preview-web.mjs`, `server/test/**`.
