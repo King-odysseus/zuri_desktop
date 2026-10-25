@@ -42,6 +42,20 @@ const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 // released while it is still in flight and allow another request to overspend.
 const RESERVATION_TTL_MS = 5 * 60 * 1000;
 const DEFAULT_NAIRA_PER_USD = 1600;
+// A saved conversation is one line in a list column and one line in a header, so 60
+// characters is what both surfaces can show without cutting the words off mid-sentence.
+const CONVERSATION_TITLE_MAX_LENGTH = 60;
+const CONVERSATION_DEFAULT_TITLE = 'New chat';
+const CONVERSATION_DEFAULT_MODEL = 'zuri-flash';
+const CONVERSATION_MODEL_MAX_LENGTH = 64;
+const CONVERSATION_ORIGINS = new Set(['web', 'desktop', 'android']);
+const MESSAGE_ROLES = new Set(['user', 'assistant', 'system']);
+const MESSAGE_MAX_LENGTH = 100000;
+// readJson refuses an oversized body before any field is read, so this cap has to sit
+// well above one maximum-length message once it is encoded as JSON. Otherwise an
+// oversized message would come back as BODY_TOO_LARGE instead of MESSAGE_TOO_LARGE.
+const MAX_MESSAGE_BODY_BYTES = 1024 * 1024;
+const CONVERSATIONS_PATH = '/api/me/conversations';
 
 /** The model catalogue: the database when it has one, the built-in defaults otherwise. */
 async function loadModels(dependencies) {
@@ -319,6 +333,79 @@ async function sessionPayload(dependencies, result) {
   return { ...result, usage: usageStatus(session.subscription, usage.usedTokens) };
 }
 
+/** @param {unknown} value @returns {string} */
+function trimmedText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Read a conversation title out of a request body.
+ *
+ * An absent or blank title takes the fallback, which is 'New chat' for a new thread and
+ * an empty string for a rename, where a blank title is a refusal rather than a default.
+ * @param {unknown} value
+ * @param {string} fallback
+ * @returns {string}
+ */
+function conversationTitle(value, fallback) {
+  return trimmedText(value).slice(0, CONVERSATION_TITLE_MAX_LENGTH) || fallback;
+}
+
+/**
+ * The model is recorded for display only, so a label the catalogue no longer lists is
+ * kept rather than refused: a thread stays readable after its model is retired. The cap
+ * only stops a bad client from storing a wall of text in the column.
+ * @param {unknown} value
+ * @returns {string}
+ */
+function conversationModel(value) {
+  return trimmedText(value).slice(0, CONVERSATION_MODEL_MAX_LENGTH) || CONVERSATION_DEFAULT_MODEL;
+}
+
+/** @param {unknown} value @returns {string} */
+function conversationOrigin(value) {
+  const origin = trimmedText(value).toLowerCase();
+  return CONVERSATION_ORIGINS.has(origin) ? origin : 'web';
+}
+
+/**
+ * @param {object} body
+ * @returns {{ ok: true, role: string, content: string } | { ok: false, code: string, message: string }}
+ */
+function checkedMessage(body) {
+  const role = trimmedText(body?.role);
+  if (!MESSAGE_ROLES.has(role)) {
+    return { ok: false, code: 'INVALID_MESSAGE', message: 'A message role is user, assistant or system.' };
+  }
+  const content = typeof body?.content === 'string' ? body.content : '';
+  if (content.trim() === '') return { ok: false, code: 'INVALID_MESSAGE', message: 'A message needs some text.' };
+  // The length is measured on the text as sent, because that is the text that is stored.
+  if (content.length > MESSAGE_MAX_LENGTH) {
+    return { ok: false, code: 'MESSAGE_TOO_LARGE', message: `A message can be at most ${MESSAGE_MAX_LENGTH} characters.` };
+  }
+  return { ok: true, role, content };
+}
+
+/**
+ * Map a refusal from the conversation repository to its response.
+ *
+ * A thread owned by another account arrives here as CONVERSATION_NOT_FOUND, and it is
+ * answered exactly like a missing one: a separate "forbidden" would let a caller test
+ * whether somebody else's id exists. Anything unrecognised returns null so the caller
+ * reports a fault as a fault rather than as a missing conversation.
+ * @param {unknown} error
+ * @returns {Response | null}
+ */
+function conversationErrorResponse(error) {
+  const code = error?.code;
+  if (code === 'CONVERSATION_NOT_FOUND') return response(404, { ok: false, error: { code, message: 'That conversation does not exist.' } });
+  if (code === 'CONVERSATION_LIMIT') return response(400, { ok: false, error: { code, message: 'This account holds as many conversations as it can store. Delete one to start another.' } });
+  if (code === 'MESSAGE_LIMIT') return response(400, { ok: false, error: { code, message: 'This conversation is full. Start a new one to carry on.' } });
+  return null;
+}
+
+// The history routes take the owner from the token and name it in the query they run,
+// so an ownership check is never a separate step that a later change can skip.
 /** @param {{ auth?: object, repository?: object, mailer?: object, now?: () => Date, googleClientId?: string, siteUrl?: string, corsOrigins?: string[] }} [dependencies] @returns {(request: Request) => Promise<Response>} */
 export function createApp(dependencies = {}) {
   const now = dependencies.now ?? (() => new Date());
@@ -868,6 +955,89 @@ export function createApp(dependencies = {}) {
       return response(200, { ok: true, data: usageStatus(session.subscription, usage.usedTokens) });
     }
 
+    // Saved chat history for the web, desktop and Android clients. It sits behind no
+    // plan: every signed-in account keeps a history, and the caps below only bound its
+    // size rather than pricing it.
+    //
+    // The conversation id in the path is never the lookup key on its own: every query
+    // also carries the signed-in user's id, and a thread that belongs to somebody else
+    // answers exactly like a missing one, so ids cannot be probed from one account to
+    // the next.
+    if (url.pathname === CONVERSATIONS_PATH || url.pathname.startsWith(`${CONVERSATIONS_PATH}/`)) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const token = bearerToken(request);
+      const session = await dependencies.auth.authenticate(token);
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (!dependencies.repository?.listConversations) return response(503, { ok: false, error: { code: 'HISTORY_NOT_CONFIGURED', message: 'Chat history is not configured yet.' } });
+
+      const userId = session.user.id;
+      const [conversationId, ...remainder] = url.pathname.slice(CONVERSATIONS_PATH.length).split('/').filter(Boolean);
+      const isMessagesPath = remainder.length === 1 && remainder[0] === 'messages';
+
+      try {
+        if (!conversationId) {
+          if (request.method === 'GET') {
+            return response(200, { ok: true, data: { conversations: await dependencies.repository.listConversations(userId) } });
+          }
+          if (request.method === 'POST') {
+            const body = await readJson(request);
+            const conversation = await dependencies.repository.createConversation({
+              userId,
+              title: conversationTitle(body.title, CONVERSATION_DEFAULT_TITLE),
+              model: conversationModel(body.model),
+              origin: conversationOrigin(body.origin),
+            });
+            return response(200, { ok: true, data: { conversation } });
+          }
+          return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST for the conversation list.' } });
+        }
+
+        if (remainder.length === 0) {
+          if (request.method === 'GET') {
+            const found = await dependencies.repository.getConversation(userId, conversationId);
+            if (!found) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation does not exist.' } });
+            return response(200, { ok: true, data: found });
+          }
+          if (request.method === 'PATCH') {
+            const body = await readJson(request);
+            // A blank title is refused rather than quietly replaced with a default,
+            // because a rename to nothing is almost always an unfinished form.
+            const title = conversationTitle(body.title, '');
+            if (title === '') {
+              return response(400, { ok: false, error: { code: 'INVALID_MESSAGE', message: `Give the conversation a title of 1 to ${CONVERSATION_TITLE_MAX_LENGTH} characters.` } });
+            }
+            const conversation = await dependencies.repository.renameConversation(userId, conversationId, title);
+            if (!conversation) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation does not exist.' } });
+            return response(200, { ok: true, data: { conversation } });
+          }
+          if (request.method === 'DELETE') {
+            const deleted = await dependencies.repository.deleteConversation(userId, conversationId);
+            if (!deleted) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation does not exist.' } });
+            return response(200, { ok: true, data: { deleted: true } });
+          }
+          return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET, PATCH or DELETE for a conversation.' } });
+        }
+
+        if (isMessagesPath) {
+          if (request.method !== 'POST') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to add a message.' } });
+          const body = await readJson(request, MAX_MESSAGE_BODY_BYTES);
+          const checked = checkedMessage(body);
+          if (!checked.ok) return response(400, { ok: false, error: { code: checked.code, message: checked.message } });
+          const appended = await dependencies.repository.appendMessage({ userId, conversationId, role: checked.role, content: checked.content });
+          if (!appended) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation does not exist.' } });
+          return response(200, { ok: true, data: appended });
+        }
+
+        return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } });
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        const refused = conversationErrorResponse(error);
+        if (refused) return refused;
+        console.error('[zuri-cloud] conversations', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'HISTORY_FAILED', message: 'That conversation could not be saved.' } });
+      }
+    }
+
     return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } });
   };
 
@@ -878,7 +1048,7 @@ export function createApp(dependencies = {}) {
     const corsHeaders = {
       'access-control-allow-origin': origin,
       'access-control-allow-headers': 'authorization, content-type',
-      'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
       vary: 'Origin',
     };
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });

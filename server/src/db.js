@@ -1,7 +1,5 @@
 import pg from 'pg';
 
-const { Pool } = pg;
-
 /** @param {unknown} value @returns {string} */
 function text(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -46,9 +44,49 @@ function publicModelRow(row) {
   };
 }
 
+// History is bounded per account so one customer cannot fill the database, and per
+// conversation so a single thread stays loadable in one response.
+export const CONVERSATION_LIMIT = 200;
+export const MESSAGE_LIMIT = 500;
+export const CONVERSATION_LIST_LIMIT = 100;
+
+// Postgres raises 22P02 for an id that is not a uuid, which a handler would report as
+// a server fault. A caller that invents an id should learn nothing, so a malformed id
+// is answered exactly like a missing one and never reaches the database.
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** @param {unknown} value @returns {boolean} */
+function isUuid(value) {
+  return UUID_PATTERN.test(text(value));
+}
+
+// The message count travels with each conversation row, so the list is one query
+// rather than one query per thread.
+const CONVERSATION_COLUMNS =
+  'SELECT c.id, c.title, c.model, c.origin, c.created_at, c.updated_at, COUNT(m.id)::INT AS message_count ' +
+  'FROM conversations c LEFT JOIN conversation_messages m ON m.conversation_id = c.id ';
+
+/** @param {object} row @returns {object} */
+function publicConversation(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    model: row.model,
+    origin: row.origin,
+    messageCount: Number(row.message_count ?? 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** @param {object} row @returns {object} */
+function publicConversationMessage(row) {
+  return { id: row.id, role: row.role, content: row.content, createdAt: row.created_at };
+}
+
 /** @param {string} connectionString @param {NodeJS.ProcessEnv} [environment] @returns {import('pg').Pool} */
 export function createDatabase(connectionString, environment = process.env) {
-  return new Pool({
+  return new pg.Pool({
     connectionString,
     ssl: environment.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
     max: 10,
@@ -488,6 +526,166 @@ export function createRepository(pool) {
         [userId],
       );
       return { subscription: subscriptionResult.rows[0] ?? null, payments: payments.rows };
+    },
+    /**
+     * The signed-in account's threads, most recently used first.
+     *
+     * The owner filter is in the query rather than a check made afterwards, so there is
+     * no arrangement of arguments that reaches another account's rows. The list is
+     * capped because a client renders a sidebar, not an export.
+     * @param {string} userId
+     * @returns {Promise<Array<object>>}
+     */
+    async listConversations(userId) {
+      const result = await pool.query(
+        CONVERSATION_COLUMNS + 'WHERE c.user_id = $1 GROUP BY c.id ORDER BY c.updated_at DESC LIMIT $2',
+        [userId, CONVERSATION_LIST_LIMIT],
+      );
+      return result.rows.map(publicConversation);
+    },
+    /**
+     * Start a thread for an account.
+     *
+     * The count guard is part of the insert instead of a separate read-then-write, so
+     * two requests arriving together cannot both pass a check that only one should. No
+     * row comes back exactly when the account is at its limit, which is a normal
+     * answer for the handler rather than a database fault.
+     * @param {{ userId: string, title: string, model: string, origin: string }} details
+     * @returns {Promise<object>}
+     */
+    async createConversation({ userId, title, model, origin }) {
+      const result = await pool.query(
+        'INSERT INTO conversations (user_id, title, model, origin) ' +
+        'SELECT $1::uuid, $2::text, $3::text, $4::text ' +
+        'WHERE (SELECT COUNT(*) FROM conversations WHERE user_id = $1::uuid) < $5::integer ' +
+        'RETURNING id, title, model, origin, created_at, updated_at',
+        [userId, title, model, origin, CONVERSATION_LIMIT],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('This account already holds as many conversations as it can store.');
+        error.code = 'CONVERSATION_LIMIT';
+        throw error;
+      }
+      return publicConversation({ ...row, message_count: 0 });
+    },
+    /**
+     * One thread with its messages, oldest first.
+     *
+     * An id that is not a uuid is answered as missing before it reaches Postgres, which
+     * would raise a syntax fault on the cast. A malformed id and another account's id
+     * therefore look the same to the caller.
+     * @param {string} userId
+     * @param {string} conversationId
+     * @returns {Promise<{ conversation: object, messages: Array<object> } | null>} null when the caller does not own the thread.
+     */
+    async getConversation(userId, conversationId) {
+      if (!isUuid(conversationId)) return null;
+      const found = await pool.query(
+        CONVERSATION_COLUMNS + 'WHERE c.user_id = $1 AND c.id = $2 GROUP BY c.id',
+        [userId, conversationId],
+      );
+      const row = found.rows[0];
+      if (!row) return null;
+      // The messages carry the owner in their own WHERE clause as well, so this read
+      // cannot reach another account's thread even if it is reused somewhere else.
+      // Two turns can share a timestamp, so the id breaks the tie and keeps the order
+      // identical between two reads of the same thread.
+      const messages = await pool.query(
+        'SELECT m.id, m.role, m.content, m.created_at FROM conversation_messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.user_id = $1 AND m.conversation_id = $2 ORDER BY m.created_at, m.id',
+        [userId, conversationId],
+      );
+      return { conversation: publicConversation(row), messages: messages.rows.map(publicConversationMessage) };
+    },
+    /**
+     * Append one turn to a thread.
+     *
+     * The append, the title rule and the bumped updated_at are one transaction, and the
+     * conversation row is locked first: a second client writing at the same moment waits
+     * instead of reading a message count that is about to change, which is what keeps
+     * the cap honest and stops two first messages both naming the thread.
+     * @param {{ userId: string, conversationId: string, role: string, content: string }} details
+     * @returns {Promise<{ message: object, conversation: object } | null>} null when the caller does not own the thread.
+     */
+    async appendMessage({ userId, conversationId, role, content }) {
+      if (!isUuid(conversationId)) return null;
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const owned = await client.query('SELECT id FROM conversations WHERE id = $1 AND user_id = $2 FOR UPDATE', [conversationId, userId]);
+        if (owned.rowCount === 0) {
+          await client.query('ROLLBACK');
+          return null;
+        }
+        const counted = await client.query(
+          'SELECT COUNT(*)::INT AS message_count FROM conversation_messages m JOIN conversations c ON c.id = m.conversation_id WHERE m.conversation_id = $1 AND c.user_id = $2',
+          [conversationId, userId],
+        );
+        if (Number(counted.rows[0]?.message_count ?? 0) >= MESSAGE_LIMIT) {
+          const error = new Error('This conversation already holds as many messages as it can store.');
+          error.code = 'MESSAGE_LIMIT';
+          throw error;
+        }
+        const inserted = await client.query(
+          'INSERT INTO conversation_messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id, role, content, created_at',
+          [conversationId, role, content],
+        );
+        // A thread names itself after its first question, so the list reads like history
+        // instead of a wall of "New chat". Only the untouched default is replaced: a
+        // title the customer typed is theirs. TRIM keeps a leading newline out of the
+        // sidebar.
+        await client.query(
+          "UPDATE conversations SET title = CASE WHEN title = 'New chat' AND $2 = 'user' THEN LEFT(TRIM($3), 60) ELSE title END, updated_at = NOW() WHERE id = $1 AND user_id = $4",
+          [conversationId, role, content, userId],
+        );
+        const current = await client.query(
+          CONVERSATION_COLUMNS + 'WHERE c.user_id = $1 AND c.id = $2 GROUP BY c.id',
+          [userId, conversationId],
+        );
+        await client.query('COMMIT');
+        return { message: publicConversationMessage(inserted.rows[0]), conversation: publicConversation(current.rows[0]) };
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    /**
+     * Rename a thread.
+     *
+     * The rename moves it to the top of the history list, which is ordered by what
+     * changed last: a thread somebody just named is the one they are looking at.
+     * @param {string} userId
+     * @param {string} conversationId
+     * @param {string} title Already trimmed and capped by the caller.
+     * @returns {Promise<object | null>} null when the caller does not own the thread.
+     */
+    async renameConversation(userId, conversationId, title) {
+      if (!isUuid(conversationId)) return null;
+      const result = await pool.query(
+        'UPDATE conversations SET title = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id',
+        [conversationId, userId, title],
+      );
+      if (result.rowCount === 0) return null;
+      const current = await pool.query(
+        CONVERSATION_COLUMNS + 'WHERE c.user_id = $1 AND c.id = $2 GROUP BY c.id',
+        [userId, conversationId],
+      );
+      const row = current.rows[0];
+      return row ? publicConversation(row) : null;
+    },
+    /**
+     * Delete a thread. The schema's cascade takes its messages with it, so nothing is
+     * left behind to be read by a later query.
+     * @param {string} userId
+     * @param {string} conversationId
+     * @returns {Promise<boolean>} false when the caller does not own the thread.
+     */
+    async deleteConversation(userId, conversationId) {
+      if (!isUuid(conversationId)) return false;
+      const result = await pool.query('DELETE FROM conversations WHERE id = $1 AND user_id = $2 RETURNING id', [conversationId, userId]);
+      return result.rowCount > 0;
     },
     async revokeSession(tokenHash) {
       await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);

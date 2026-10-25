@@ -128,6 +128,43 @@ ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_subscription_code TEXT;
 CREATE INDEX IF NOT EXISTS subscriptions_paystack_code_idx
   ON subscriptions(paystack_subscription_code);
 
+-- Saved chat history, shared by the web, desktop and Android clients. It is per
+-- account rather than per device, so signing in somewhere else shows the same
+-- threads. ON DELETE CASCADE is what makes deleting an account take its history
+-- with it: no conversation can outlive the customer who wrote it.
+CREATE TABLE IF NOT EXISTS conversations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT 'New chat',
+  -- The model the thread was started on, kept for display only: a thread is not
+  -- pinned to it, so a retired model never blocks reading old messages.
+  model TEXT NOT NULL DEFAULT 'zuri-flash',
+  -- Which client started the thread, so the list can badge it without a join.
+  origin TEXT NOT NULL DEFAULT 'web' CHECK (origin IN ('web', 'desktop', 'android')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Every read of this table is "this account's threads, newest first", so the index
+-- leads with the owner and then walks updated_at backwards.
+CREATE INDEX IF NOT EXISTS conversations_user_updated_idx
+  ON conversations(user_id, updated_at DESC);
+
+-- One row per turn. Deleting a thread (or the account behind it) must not leave
+-- messages behind, so they cascade with their conversation.
+CREATE TABLE IF NOT EXISTS conversation_messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+  content TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- A thread is always read in write order for one conversation at a time, so the
+-- index pairs the two: the conversation first, then the time inside it.
+CREATE INDEX IF NOT EXISTS conversation_messages_conversation_created_idx
+  ON conversation_messages(conversation_id, created_at);
+
 -- The Zuri-branded models customers pick from. The supplier columns are private:
 -- only the admin dashboard reads them. Rows are seeded once and then edited in the
 -- dashboard, so the seed below never overwrites an admin change.
