@@ -941,7 +941,7 @@ const MESSAGE_MODES = Object.freeze(['ask', 'act', 'autopilot']);
 /**
  * Append one message to a thread, bump its `updatedAt`, and persist.
  * @param {string} threadId
- * @param {{ role?: 'user' | 'assistant', content?: string, mode?: string, model?: { provider?: string, model?: string } }} message
+ * @param {{ role?: 'user' | 'assistant', content?: string, mode?: string, model?: { provider?: string, model?: string }, localOnly?: boolean }} message
  * @param {{ root?: string }} [options]
  * @returns {Promise<{ ok: true, data: { thread: any, message: any } } | { ok: false, error: { code: string, message: string } }>}
  */
@@ -1001,6 +1001,12 @@ export async function appendMessage(threadId, message, options = {}) {
       }
       : null;
     const usedModel = claimed !== null && claimed.provider !== '' && claimed.model !== '' ? claimed : null;
+    // A turn that carries an attachment keeps its text on this machine. The file's
+    // wording is folded into `content` before the message reaches here, so uploading
+    // it would put a private document into a chat history the browser can read. The
+    // reply to such a turn is marked too, because it quotes the file straight back.
+    const previous = thread.messages[thread.messages.length - 1];
+    const localOnly = message.localOnly === true || (role === 'assistant' && previous?.localOnly === true);
     const stored = {
       id: randomUUID(),
       role,
@@ -1010,6 +1016,7 @@ export async function appendMessage(threadId, message, options = {}) {
       ...(usedModel !== null ? { model: usedModel } : {}),
       ...(role === 'user' && images.length > 0 ? { images } : {}),
       ...(role === 'assistant' && files.length > 0 ? { files } : {}),
+      ...(localOnly ? { localOnly: true } : {}),
     };
     thread.messages.push(stored);
     thread.updatedAt = now;

@@ -94,6 +94,27 @@ function messagesOf(thread) {
 }
 
 /**
+ * Whether one stored message belongs in the account.
+ *
+ * A message marked `localOnly` carries an attachment: the file's own wording was
+ * folded into its text when it was written, and so was the path it came from. That
+ * stays on this machine. The reply to such a turn is marked the same way by the
+ * store, because it quotes the file back, so a private document cannot reach the
+ * account through the answer either.
+ * @param {any} message
+ * @returns {boolean}
+ */
+function isUploadable(message) {
+  if (message?.localOnly === true) return false;
+  if (message.role !== 'user' && message.role !== 'assistant') return false;
+  // A message with no local id could never be marked as uploaded, and one that is
+  // already marked must not be sent twice.
+  if (textOf(message.id) === '' || textOf(message.cloudId) !== '') return false;
+  const content = typeof message.content === 'string' ? message.content : '';
+  return content.trim() !== '';
+}
+
+/**
  * The endpoint for one conversation, or the collection when `cloudId` is ''.
  * @param {string} cloudId
  * @param {string} [suffix] Such as '/messages'.
@@ -251,6 +272,14 @@ export function createChatSync({ request, log = defaultLog } = {}) {
    */
   async function pushThread(thread, outcome) {
     let cloudId = cloudIdOf(thread);
+    const uploadable = messagesOf(thread).filter(isUploadable);
+
+    // A thread whose every message carries an attachment has nothing the account may
+    // hold. Creating a conversation for it would spend one of the account's slots on
+    // a chat the browser could never fill in, and would say "New chat" and nothing else.
+    if (cloudId === '' && uploadable.length === 0) {
+      return { ok: true, data: { cloudId: '', skipped: 'local-only' } };
+    }
 
     if (cloudId === '') {
       const created = await post(conversationPath(''), {
@@ -271,14 +300,8 @@ export function createChatSync({ request, log = defaultLog } = {}) {
       outcome.created = true;
     }
 
-    for (const message of messagesOf(thread)) {
-      if (textOf(message.cloudId) !== '') continue;
-      if (message.role !== 'user' && message.role !== 'assistant') continue;
+    for (const message of uploadable) {
       const content = typeof message.content === 'string' ? message.content : '';
-      if (content.trim() === '') continue;
-      // A message with no local id could never be marked as uploaded, so it would be
-      // sent again on every run: leave it behind and let the rest of the thread through.
-      if (textOf(message.id) === '') continue;
 
       const pushed = await post(conversationPath(cloudId, '/messages'), { role: message.role, content });
       if (pushed.ok !== true) return pushed;

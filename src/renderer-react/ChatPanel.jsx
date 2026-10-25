@@ -690,8 +690,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
    * @param {string} content Message text.
    * @param {string} title Title for a thread this turn creates.
    * @param {{ name: string, path: string } | null} [image] Attached image, if any.
+   * @param {boolean} [localOnly] True when the turn carries an attachment: its text
+   *   then holds the file itself, so it stays on this device and is never uploaded.
    */
-  async function runTurn(content, title, image = null) {
+  async function runTurn(content, title, image = null, localOnly = false) {
     if (typeof api?.chats?.create !== 'function' || typeof api?.chats?.appendMessage !== 'function' || typeof api?.chat?.send !== 'function') {
       setError('Chat is only available when this page runs inside the Zuri app.');
       setReplying(false);
@@ -722,6 +724,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           role: 'user',
           content,
           ...(image ? { images: [image] } : {}),
+          ...(localOnly ? { localOnly: true } : {}),
         },
       });
       if (!appended?.ok) {
@@ -794,7 +797,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       content = `${content}\n\nAttached file: ${attachment.name} (path: ${attachment.path})\n\n${attachmentText}`;
     }
 
-    await runTurn(content, prompt || attachment?.name || 'New chat', image);
+    // Any attachment makes the whole turn device-only, whatever kind it is: the text
+    // above now holds the file's own wording, and the answer will quote it back.
+    await runTurn(content, prompt || attachment?.name || 'New chat', image, attachment !== null);
   }
 
   /**
@@ -1218,6 +1223,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   : formatAttachmentSize(attachment.size) && <span className="shrink-0">{formatAttachmentSize(attachment.size)}</span>}
                 <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-xs" onPress={() => setAttachment(null)} isDisabled={replying}>Remove</Button>
               </span>
+              <span className="shrink-0 text-xs text-muted">Stays on this device</span>
             </div>
           )}
 
