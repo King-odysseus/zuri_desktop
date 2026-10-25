@@ -967,7 +967,10 @@ label {
 }
 
 /* The overlay is a transparent BrowserWindow, not a second desktop shell. Keep
-   every pixel inside the fixed card so Chromium never adds document scrollbars. */
+   every pixel inside the fixed card so Chromium never adds document scrollbars.
+   The root padding below is the card's shadow room and must match MARGIN in
+   src/main/overlay.js: a transparent window clips anything drawn outside it, so a
+   shadow wider than that border is cut off into a grey box with sharp corners. */
 html:has(.zuri-overlay-root),
 html:has(.zuri-overlay-root) body,
 html:has(.zuri-overlay-root) #root {
@@ -984,7 +987,8 @@ html:has(.zuri-overlay-root) #root {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  padding: 8px;
+  /* Shadow room; keep equal to MARGIN in src/main/overlay.js. */
+  padding: 40px;
 }
 
 .zuri-overlay-panel {
@@ -995,7 +999,54 @@ html:has(.zuri-overlay-root) #root {
   border: 1px solid color-mix(in srgb, var(--control-border) 86%, transparent);
   border-radius: 24px;
   background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
-  box-shadow: 0 18px 42px color-mix(in srgb, var(--foreground) 18%, transparent);
+  /* The shadow must finish fading inside the 40px margin: 8px offset + 28px blur
+     reaches 36px, so the fade completes before the window edge. A wider blur is
+     sliced off there and shows as straight lines around an otherwise round card.
+     Two layers, both soft: a wide ambient one for depth, a tight one for contact. */
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--foreground) 16%, transparent),
+    0 2px 8px color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+/* The card is a frameless window, so its top strip is the title bar: it carries the
+   app-region drag that moves the window around the screen. Only this strip drags, so
+   text in the transcript below stays selectable. */
+.zuri-overlay-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+  padding: 0.5rem 0.5rem 0 0.75rem;
+  -webkit-app-region: drag;
+  cursor: grab;
+  user-select: none;
+}
+
+.zuri-overlay-header:active {
+  cursor: grabbing;
+}
+
+.zuri-overlay-title {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+/* A button inside a drag region never receives the click unless it opts out. */
+.zuri-overlay-window-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.25rem;
+  -webkit-app-region: no-drag;
 }
 
 .zuri-overlay-content {

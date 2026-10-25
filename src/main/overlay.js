@@ -30,9 +30,16 @@ const CARD_HEIGHT = 280;
 const MIN_CARD_WIDTH = 420;
 const MIN_CARD_HEIGHT = 180;
 
-// Space around the card inside the window, and the same inset overlay.css gives the
-// card, so the shadow has room and the card keeps the design size.
-const MARGIN = 8;
+// Space around the card inside the window, matching the padding .zuri-overlay-root
+// gives the card in app.css, so the card keeps the design size.
+//
+// The card's soft shadow is painted by CSS, and CSS cannot draw outside its own
+// window, so this margin is the shadow's room. Too small and the blur is sliced off
+// at the window edge, which reads as a grey box with sharp corners behind a round
+// card. 40 leaves room to spare for the shadow in app.css: an 8px offset plus a 28px
+// blur reaches 36px, so the fade finishes inside the window instead of being cut off
+// along a straight line.
+const MARGIN = 40;
 
 const WIDTH = CARD_WIDTH + MARGIN * 2;
 const HEIGHT = CARD_HEIGHT + MARGIN * 2;
@@ -93,8 +100,13 @@ function createOverlayWindow() {
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
-    hasShadow: true,
+    // The OS shadow is a rectangle painted behind a transparent window, so on a round
+    // card it shows as straight edges and square corners outside the CSS shadow. The
+    // card paints its own soft shadow (see .zuri-overlay-panel), so this is off.
+    hasShadow: false,
     resizable: true,
+    // Dragging happens through the card's header (-webkit-app-region: drag).
+    movable: true,
     maximizable: false,
     minimizable: false,
     fullscreenable: false,
