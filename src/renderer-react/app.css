@@ -229,8 +229,6 @@ body {
   box-shadow: none !important;
 }
 
-/* TextInput owns two nested wrappers. The visible border belongs on the native
-   input, otherwise the wrapper reset above leaves a thin browser control behind. */
 /* The TextInput wrapper carries the field padding, so the bordered input sat 16px
    inside its column while the select reached the edge. The input owns its own
    padding, so the wrapper only needs to be a full-width box. */
@@ -238,6 +236,9 @@ body {
   width: 100%;
   padding: 0 !important;
 }
+
+/* TextInput owns two nested wrappers. The visible border belongs on the native
+   input, otherwise the wrapper reset above leaves a thin browser control behind. */
 .zuri-field-wrap > div.zuri-field > div {
   background: transparent !important;
   border: 0 !important;
