@@ -1,5 +1,32 @@
 ## 2026-10-25 - Windows
 
+- The quick-ask popup no longer ends in a grey box with square corners. Its shadow is drawn by CSS inside a transparent window, and the window kept only 8px around the card, so the blur was sliced off at the window edge. The window now keeps a 24px transparent border and the shadow is sized to finish fading inside it (6px offset plus 16px blur reaches 22px). A new self-test fails if the window margin, the card padding and the shadow ever drift apart.
+- Key files: `src/main/overlay.js`, `src/renderer-react/app.css`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build && npm run selftest` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- The admin dashboard now shows what each picture model costs, what it sells for and the margin per picture, and the edit form carries the picture fields (billed as, USD per picture, allowance tokens per picture, size label). A picture is priced on the plan that sells it first: quoting every image model at the Starter rate made a Pro-only or Max-only model look cheaper than it is. With the current catalogue the margins are NGN 41, 152 and 416 a picture.
+- `/api/chat` now refuses a picture model with the code `IMAGE_MODEL`. Before, its supplier name went to the text endpoint, which cannot draw, and no charge was recorded because nothing was generated.
+- The local preview server carries the picture models and `/api/image-prices`, so the dashboard rows and the marketing picture section can be reviewed offline.
+- Server tests cover both: a picture model is refused in chat, and the dashboard figures are asserted per plan.
+- Key files: `server/src/app.js`, `web/src/views/AdminView.jsx`, `server/test/models.test.js`, `scripts/preview-web.mjs`.
+- Other OS action: run `npm run server:test && npm run web:build` after syncing.
+- Note: no picture is generated or billed yet. There is no image endpoint, so this change finishes the prices and margin only.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- First run no longer asks for a provider API key. Step two is now a Zuri account: Continue with Google, or an email and password, reusing the same CloudAuthForm the Cloud page uses. The key form moved to Settings, where a person who would rather pay a provider directly can still add one. Signing in stays optional, so "Skip for now" still writes the name and theme and opens the app.
+- A key is no longer required to finish setup: the onboarding channel stores one only when it is given, and answers hasKey false otherwise. The old code called setKey with an empty string, which setKey refuses.
+- The Google button is now one component (GoogleSignInButton) shared by first run and the Cloud page, so the client id, the callback shape and the failure wording cannot drift apart. It also loads the script on demand, so an offline launch shows the password form instead of an empty box.
+- Note: a signed-in account still does not answer chats by itself. Chat sends every request straight to a provider with a local key, and never calls the cloud /api/chat route, so a person who signs in and skips the key gets the "no key saved" reply. Routing chat through the account is the next piece of work and is not in this change.
+- Key files: src/renderer-react/OnboardingView.jsx, src/renderer-react/GoogleSignInButton.jsx, src/renderer-react/CloudView.jsx, src/main/onboarding.js, scripts/selftest.js.
+- Other OS action: run npm run test after syncing.
+- Done on: Windows
+## 2026-10-25 - Windows
+
 - Settings now lists the Zuri models instead of supplier ids: Zuri Flash, Zuri Pro, Zuri Max, Zuri Code, Zuri Reason and Zuri Elite. Each one saves the provider key it runs on together with the model, so the model and the key that pays for it cannot drift apart. A model saved before this list existed still shows, marked "(current)", rather than appearing under a Zuri name it is not.
 - Repaired two breaks in `server/src/app.js` that stopped the cloud server loading at all: the admin overview declared the model catalogue twice, and the chat handler lost its catalogue lookup entirely, so every signed-in chat would have thrown. Neither is a behaviour change. This file also carries unrelated in-progress image-model work, so it is not part of this change.
 - Key files: `src/renderer-react/SettingsView.jsx`, `scripts/selftest.js`, `server/src/app.js`.

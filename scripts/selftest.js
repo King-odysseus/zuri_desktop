@@ -223,6 +223,46 @@ check('answer style choices are validated and stored trimmed', async () => {
   return 'unknown values refused, defaults filled in';
 });
 
+// First run is a sign-in, not a developer setup screen. The card has to offer the
+// Zuri account and must not ask for a provider key; a key belongs in Settings, for
+// the person who would rather pay a provider directly.
+check('first run asks for a Zuri account, not a provider key', () => {
+  const source = read('src/renderer-react/OnboardingView.jsx');
+  for (const required of ['GoogleSignInButton', 'CloudAuthForm', 'Sign in to Zuri']) {
+    if (!source.includes(required)) throw new Error('missing ' + required);
+  }
+  for (const forbidden of ['API key', 'onboarding-provider', 'providerLabel', 'type="password"']) {
+    if (source.includes(forbidden)) throw new Error('the card still asks for ' + forbidden);
+  }
+  // The payload that closes setup carries no key either, which is what the
+  // main-process check below then proves it accepts.
+  if (!source.includes('api.onboarding.complete({ name: trimmedName, theme })')) {
+    throw new Error('setup still sends a provider key');
+  }
+  return 'name and theme, then the Zuri account';
+});
+
+check('setup completes without a provider key', async () => {
+  const { getStoreRoot } = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const onboarding = await import(pathToFileURL(path.join(root, 'src/main/onboarding.js')).href);
+  // Its own folder, then the caller's folder back, so this check cannot leave the
+  // shared settings used by the checks around it pointing somewhere else.
+  const previousRoot = getStoreRoot();
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-onboarding-'));
+  try {
+    setStoreRoot(scratch);
+    const saved = await onboarding.runOnboardingSetup({ name: 'Ada', theme: 'dark' });
+    if (saved.ok !== true) throw new Error(saved.error?.message ?? 'setup was refused');
+    if (saved.data.hasKey !== false) throw new Error('a key was reported without one being given');
+    const stored = await readSettings();
+    if (stored.data.name !== 'Ada') throw new Error('the name was not stored');
+    return 'name and theme saved, no key needed';
+  } finally {
+    setStoreRoot(previousRoot);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 const { setWorkspaceRoot, runTool } = await import(pathToFileURL(path.join(root, 'src/main/tools/index.js')).href);
 const officeWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-office-'));
 setWorkspaceRoot(officeWorkspace);
@@ -497,6 +537,46 @@ check('the overlay window leaves room for the card shadow', () => {
   const reach = Number(shadow[1]) + Number(shadow[2]);
   if (reach > margin) throw new Error(`the shadow reaches ${reach}px but the window margin is only ${margin}px`);
   return `margin ${margin}px, shadow reaches ${reach}px`;
+});
+
+// A channel the preload bridge offers and main does not answer is a button that
+// does nothing, and one main answers but nobody can reach is dead code. Both lists
+// are written by hand, so they are compared here rather than at run time.
+check('every preload channel has a main-process handler and the reverse', () => {
+  const preload = read('src/main/preload.js');
+  const start = preload.indexOf('const CHANNELS = Object.freeze([');
+  const bridge = preload.slice(start, preload.indexOf(']);', start));
+  const offered = new Set([...bridge.matchAll(/'(zuri:[a-z0-9:.-]+)'/g)].map((match) => match[1]));
+  const handlers = new Set([...read('src/main/main.js').matchAll(/\['(zuri:[a-z0-9:.-]+)'/g)].map((match) => match[1]));
+  if (offered.size === 0) throw new Error('no channels found in preload');
+  const unreachable = [...offered].filter((channel) => !handlers.has(channel));
+  const orphaned = [...handlers].filter((channel) => !offered.has(channel));
+  if (unreachable.length > 0) throw new Error(`no handler for ${unreachable.join(', ')}`);
+  if (orphaned.length > 0) throw new Error(`no bridge for ${orphaned.join(', ')}`);
+  return `${offered.size} channels`;
+});
+
+// The desktop menu and the server catalogue quote the same three picture names at
+// the same prices in two files that never import each other, so a change to one
+// has to be a change to the other. This is the check that notices when it is not.
+check('the picture ladder matches the server catalogue in names, quota and Naira price', async () => {
+  const desktop = await import(pathToFileURL(path.join(root, 'src/main/providers/images.js')).href);
+  const catalogue = await import(pathToFileURL(path.join(root, 'server/src/models.js')).href);
+  const plans = await import(pathToFileURL(path.join(root, 'server/src/plans.js')).href);
+  const starter = plans.PLANS.find((plan) => plan.code === 'starter');
+  const server = catalogue.DEFAULT_MODELS.filter((model) => model.kind === 'image');
+  if (server.length !== 3) throw new Error(`the server has ${server.length} picture models, expected 3`);
+  if (desktop.IMAGE_MODELS.length !== server.length) throw new Error('the desktop offers a different number of picture models');
+  for (const model of server) {
+    const match = desktop.IMAGE_MODELS.find((entry) => entry.code === model.code);
+    if (!match) throw new Error(`${model.code} is missing from the desktop ladder`);
+    if (match.name !== model.name) throw new Error(`${model.code} is called ${match.name} on the desktop and ${model.name} on the server`);
+    if (match.quotaTokens !== model.quotaTokensPerImage) throw new Error(`${model.code} burns ${match.quotaTokens} on the desktop and ${model.quotaTokensPerImage} on the server`);
+    if (match.minPlan !== model.minPlan) throw new Error(`${model.code} starts at ${match.minPlan} on the desktop and ${model.minPlan} on the server`);
+    const kobo = catalogue.imagePriceKobo(model, starter);
+    if (kobo !== match.nairaPerImage * 100) throw new Error(`${model.code} sells at ${kobo / 100} Naira on the server and ${match.nairaPerImage} on the desktop`);
+  }
+  return server.map((model) => model.name).join(', ');
 });
 
 await Promise.all(pendingChecks);
