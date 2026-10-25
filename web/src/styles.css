@@ -64,7 +64,10 @@
   --control-border: #b8c7da;
   --field-background: #ffffff;
   --text: #142033;
-  --muted: #6f7e95;
+  /* Darkened from #6f7e95 so secondary text clears 4.5:1 on the canvas (#eef3f9)
+     as well as on white. The chat now draws on the canvas, and a 12px caption or a
+     16px opening line at 3.7:1 is below the minimum for normal-size text. */
+  --muted: #5f6d83;
   --faint: #8b99ad;
   --accent: #3478e5;
   --accent-hover: #2a66cb;
@@ -1057,6 +1060,15 @@ a {
 
 .app-main.is-chat .app-foot {
   display: none;
+}
+
+/* The chat fills the window and only the transcript inside it scrolls. The page
+   itself ends up a fraction of a pixel taller than the viewport because the app
+   is sized from a fractional bar height, and that is enough for the browser to
+   draw a scrollbar down the side of the chat at every width. */
+body:has(.app-main.is-chat) {
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .app-content {
