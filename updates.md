@@ -1,5 +1,16 @@
 ## 2026-10-25 - Windows
 
+- A message that carries an attachment now stays on the device that opened it. The file's own wording is folded into the message text before it is stored, and so is the path it came from, so uploading the message put a private document into a chat history the browser can read. Those turns are marked localOnly and the sync skips them.
+- The answer to such a turn is marked the same way, because a reply about a document quotes it straight back. Holding back only the question would have leaked the file through the answer.
+- The rest of the conversation still syncs. A chat with an attachment in the middle keeps its ordinary turns in the account; only the file-carrying turn and its answer are held back, which is the point of the browser chat: continue the conversation, never ship the files.
+- A chat made of nothing but attachments opens no conversation in the account at all, rather than spending one of the 200 slots on a title the browser could never fill in.
+- The composer now says "Stays on this device" beside an attached file, so the behaviour is visible instead of a surprise when that chat does not show up in the browser.
+- Key files: src/main/store.js (appendMessage marks the turn and the reply), src/main/chat-sync.js (isUploadable, and no conversation for an attachment-only thread), src/renderer-react/ChatPanel.jsx (runTurn localOnly), scripts/check-chat-sync.mjs (10 new checks).
+- Other OS action: run "npm run test" after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Signed-in customers can now chat in the browser, on the same plan and token allowance as the desktop app. The site could sell a plan but had nowhere to use it: a person paid, then had to install the app before they could send a message. The Chat tab, at /chat, reuses the existing streamed chat endpoint, so pricing, quota and model choice are the ones already in the catalogue and nothing new is billed.
 - Conversations are saved to the account, so a chat can be opened on another machine. Two tables, conversations and conversation_messages, hold them; both carry ON DELETE CASCADE so removing an account or a chat removes its messages instead of leaving them behind.
 - Ownership is enforced by user_id in every query rather than by checking afterwards. Reading, renaming or deleting someone else chat answers 404, not 403, so a stranger cannot even confirm an id exists.
