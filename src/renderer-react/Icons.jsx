@@ -39,4 +39,5 @@ export {
   FileText as FileIcon,
   Download as DownloadIcon,
   LogOut as LogOutIcon,
+  Image as ImageIcon,
 } from 'lucide-react';
