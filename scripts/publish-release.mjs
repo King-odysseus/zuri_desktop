@@ -20,7 +20,9 @@ const repo = process.env.ZURI_RELEASE_REPO ?? 'King-odysseus/zuri-releases';
 
 /** @param {string} command @param {string[]} args */
 function run(command, args) {
-  const result = spawnSync(command, args, { cwd: repoRoot, stdio: 'inherit', shell: process.platform === 'win32' });
+  // No shell: with one, a title like "Zuri Desktop 0.2.2" is split into separate
+  // words and gh rejects the command. Passing argv directly keeps each argument whole.
+  const result = spawnSync(command, args, { cwd: repoRoot, stdio: 'inherit' });
   if (result.error?.code === 'ENOENT') {
     console.error(`${command} is not installed. Install the GitHub CLI, then run: gh auth login`);
     process.exit(1);
@@ -57,7 +59,7 @@ for (const installer of installers) console.log(`  ${installer.name} (${Math.rou
 const exists = spawnSync('gh', ['release', 'view', tag, '--repo', repo], {
   cwd: repoRoot,
   stdio: 'ignore',
-  shell: process.platform === 'win32',
+  // argv goes straight to gh, so no shell can re-split the title's spaces
 }).status === 0;
 
 if (exists) {
