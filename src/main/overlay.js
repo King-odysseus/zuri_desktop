@@ -105,7 +105,8 @@ function createOverlayWindow() {
     // card paints its own soft shadow (see .zuri-overlay-panel), so this is off.
     hasShadow: false,
     resizable: true,
-    // Dragging happens through the card's header (-webkit-app-region: drag).
+    // Dragging is done by moveOverlayBy below: the card's header reports the pointer's
+    // travel and main moves the window.
     movable: true,
     maximizable: false,
     minimizable: false,
@@ -166,6 +167,55 @@ export function openOverlay() {
 
   overlayWindow = createOverlayWindow();
   return overlayWindow;
+}
+
+// Largest distance one drag report may move the card. The renderer sends the pointer's
+// travel a few pixels at a time; anything larger is a bad payload, not a drag, so it is
+// clamped rather than obeyed.
+const MAX_DRAG_STEP = 200;
+
+/**
+ * @param {unknown} value
+ * @returns {number} a whole number of pixels, clamped to one drag step
+ */
+function dragStep(value) {
+  const step = Number(value);
+  if (!Number.isFinite(step)) return 0;
+  return Math.max(-MAX_DRAG_STEP, Math.min(MAX_DRAG_STEP, Math.round(step)));
+}
+
+/**
+ * Move the card by a screen delta while its header is being dragged.
+ *
+ * The card is a frameless transparent window, so it has no OS title bar, and the
+ * app-region drag Chromium offers for frameless windows does not move a transparent
+ * window on Windows. The renderer reports how far the pointer travelled and main moves
+ * the window, which behaves the same on every platform. The card stays inside the work
+ * area of the display it is on, so a long drag cannot lose it under the taskbar or off
+ * the edge of the screen.
+ * @param {unknown} dx
+ * @param {unknown} dy
+ * @returns {{ ok: boolean, moved?: boolean }}
+ */
+export function moveOverlayBy(dx, dy) {
+  if (!isOverlayOpen() || overlayWindow.isDestroyed()) return { ok: false };
+  const stepX = dragStep(dx);
+  const stepY = dragStep(dy);
+  if (stepX === 0 && stepY === 0) return { ok: true, moved: false };
+
+  const [x, y] = overlayWindow.getPosition();
+  const [width, height] = overlayWindow.getSize();
+  const area = screen.getDisplayNearestPoint({ x: Math.round(x + width / 2), y: Math.round(y + height / 2) }).workArea;
+  // Both bounds are floored at the work area's own edge, for a display too small to
+  // hold the whole card.
+  const maxX = Math.max(area.x, area.x + area.width - width);
+  const maxY = Math.max(area.y, area.y + area.height - height);
+  const nextX = Math.min(Math.max(x + stepX, area.x), maxX);
+  const nextY = Math.min(Math.max(y + stepY, area.y), maxY);
+  if (nextX === x && nextY === y) return { ok: true, moved: false };
+
+  overlayWindow.setPosition(nextX, nextY);
+  return { ok: true, moved: true };
 }
 
 /**

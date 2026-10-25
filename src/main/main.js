@@ -12,6 +12,7 @@ import {
   closeOverlay,
   hideOverlay,
   isOverlayOpen,
+  moveOverlayBy,
   openOverlay,
   setOverlayEnabled,
   startOverlayFromSettings,
@@ -349,6 +350,7 @@ const HANDLERS = new Map([
   ['zuri:overlay:open', handleOverlayOpen],
   ['zuri:overlay:hide', handleOverlayHide],
   ['zuri:overlay:open-main', handleOverlayOpenMain],
+  ['zuri:overlay:move-by', handleOverlayMoveBy],
 ]);
 
 /** Show the quick-ask card from a button in the main window. */
@@ -356,6 +358,16 @@ function handleOverlayOpen() {
   openOverlay();
   refreshTray();
   return { ok: true };
+}
+
+/**
+ * Drag the quick-ask card. The renderer reports the pointer's travel while its header
+ * is held down, and overlay.js moves the window by that much.
+ * @param {import('electron').IpcMainInvokeEvent} _event
+ * @param {{ dx?: unknown, dy?: unknown } | undefined} payload
+ */
+function handleOverlayMoveBy(_event, payload) {
+  return moveOverlayBy(payload?.dx, payload?.dy);
 }
 
 /** The card's close button: hide it, keeping any unsent text for the next open. */

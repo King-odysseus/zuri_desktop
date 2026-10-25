@@ -1007,9 +1007,10 @@ html:has(.zuri-overlay-root) #root {
     0 2px 8px color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
-/* The card is a frameless window, so its top strip is the title bar: it carries the
-   app-region drag that moves the window around the screen. Only this strip drags, so
-   text in the transcript below stays selectable. */
+/* The card is a frameless window, so its top strip is its title bar and the only place
+   a drag starts (see beginOverlayDrag in ChatPanel.jsx). Chromium's app-region drag does
+   not move a transparent window on Windows, so the strip reports the pointer's travel
+   instead. Only this strip drags, which keeps the transcript below selectable. */
 .zuri-overlay-header {
   display: flex;
   flex: 0 0 auto;
@@ -1018,15 +1019,26 @@ html:has(.zuri-overlay-root) #root {
   gap: 0.5rem;
   min-width: 0;
   padding: 0.5rem 0.5rem 0 0.75rem;
-  -webkit-app-region: drag;
   cursor: grab;
   user-select: none;
+  /* Without this a touch or pen drag scrolls the card instead of moving it. */
+  touch-action: none;
 }
 
 .zuri-overlay-header:active {
   cursor: grabbing;
 }
 
+/* Three rows of two dots: the handhold that says this strip can be dragged. */
+.zuri-overlay-grip {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 14px;
+  background-image: radial-gradient(circle, currentColor 1px, transparent 1.2px);
+  background-size: 4px 4px;
+  background-position: 0 1px;
+  opacity: 0.55;
+}
 .zuri-overlay-title {
   display: flex;
   align-items: center;
@@ -1041,12 +1053,11 @@ html:has(.zuri-overlay-root) #root {
   color: var(--muted);
 }
 
-/* A button inside a drag region never receives the click unless it opts out. */
+/* Kept as one box so the drag handler recognises a press on a button by this class. */
 .zuri-overlay-window-actions {
   display: flex;
   flex: 0 0 auto;
   gap: 0.25rem;
-  -webkit-app-region: no-drag;
 }
 
 .zuri-overlay-content {

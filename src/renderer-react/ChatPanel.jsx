@@ -37,6 +37,48 @@ const OPENING_QUESTION = "What's on the agenda today?";
  * @param {Date} [now]
  * @returns {string}
  */
+/**
+ * Drag the quick-ask card by its header.
+ *
+ * The card is a frameless transparent window, so it has no OS title bar, and Chromium's
+ * app-region drag does not move one on Windows. The pointer's travel is sent to main,
+ * which moves the window by that much. Pointer capture keeps the moves arriving once the
+ * pointer leaves the small card, which is what makes a long drag possible.
+ * @param {import('react').PointerEvent<HTMLDivElement>} event
+ * @returns {void}
+ */
+function beginOverlayDrag(event) {
+  // The window buttons live in the same strip; a press on one is a click, not a drag.
+  if (event.button !== 0 || event.target.closest('.zuri-overlay-window-actions')) return;
+
+  const strip = event.currentTarget;
+  let lastX = event.screenX;
+  let lastY = event.screenY;
+
+  function move(moveEvent) {
+    const dx = moveEvent.screenX - lastX;
+    const dy = moveEvent.screenY - lastY;
+    if (dx === 0 && dy === 0) return;
+    lastX = moveEvent.screenX;
+    lastY = moveEvent.screenY;
+    void window.zuri?.overlay?.moveBy?.({ dx, dy });
+  }
+
+  function stop() {
+    strip.removeEventListener('pointermove', move);
+    strip.removeEventListener('pointerup', stop);
+    strip.removeEventListener('pointercancel', stop);
+    strip.removeEventListener('lostpointercapture', stop);
+    if (strip.hasPointerCapture?.(event.pointerId)) strip.releasePointerCapture(event.pointerId);
+  }
+
+  strip.setPointerCapture?.(event.pointerId);
+  strip.addEventListener('pointermove', move);
+  strip.addEventListener('pointerup', stop);
+  strip.addEventListener('pointercancel', stop);
+  strip.addEventListener('lostpointercapture', stop);
+}
+
 function greetingHeading(name, now = new Date()) {
   const hour = now.getHours();
   const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
@@ -759,8 +801,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           opt out of it so they keep their clicks. It sits outside the scrolling
           content, which leaves the transcript selectable. */}
       {compact && (
-        <div className="zuri-overlay-header">
-          <span className="zuri-overlay-title">Zuri</span>
+        <div className="zuri-overlay-header" onPointerDown={beginOverlayDrag}>
+          <span className="zuri-overlay-title">
+            <span className="zuri-overlay-grip" aria-hidden="true" />
+            Zuri
+          </span>
           <div className="zuri-overlay-window-actions">
             <Button isIconOnly size="sm" variant="ghost" aria-label="Open Zuri" title="Open Zuri" onPress={() => void window.zuri?.overlay?.openMain?.()}>
               <ExpandIcon size={16} />

@@ -93,6 +93,10 @@ const CHANNELS = Object.freeze([
   'zuri:overlay:open',
   'zuri:overlay:hide',
   'zuri:overlay:open-main',
+  // Dragging the card by its header: the renderer sends the pointer's travel and
+  // main moves the window, because a transparent frameless window has no title bar
+  // to drag and Chromium's app-region drag does not move one on Windows.
+  'zuri:overlay:move-by',
 ]);
 
 // `zuri:<area>:<action>`, per the project naming convention.
