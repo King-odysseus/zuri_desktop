@@ -89,12 +89,112 @@ assert.equal(imagesPerMonth(sketch, maxPlan), 833);
 assert.equal(imagesPerMonth(flash, maxPlan), 0);
 assert.equal(imagesPerMonth(sketch, undefined), 0);
 
-// Quota: a dearer model uses the monthly allowance faster.
+// Quota: a dearer model uses the monthly allowance faster. The prompt and the
+// reply are counted separately, because a supplier charges four to eight times
+// more for the reply, so a single weight sold the dear half of a request cheap.
 assert.equal(quotaTokens(flash, 100, 50), 150);
-assert.equal(quotaTokens(pro, 100, 50), 750);
-assert.equal(quotaTokens(max, 100, 50), 1800);
-assert.equal(quotaTokens(code, 100, 50), 1500);
-assert.equal(quotaTokens(elite, 100, 50), 3000);
+assert.equal(quotaTokens(pro, 100, 50), 900);
+assert.equal(quotaTokens(max, 100, 50), 2100);
+// Zuri Code: 100 prompt tokens at 10, 50 reply tokens at 30 (three times its new
+// output price of $10), because it moved off the deprecated gpt-5.3-codex.
+assert.equal(quotaTokens(code, 100, 50), 2500);
+// 100 prompt tokens at 20, 50 reply tokens at the corrected 75.
+assert.equal(quotaTokens(elite, 100, 50), 5000);
+
+// A model with no reply weight of its own charges the reply at the prompt's
+// weight, which is exactly how every model was billed before the two were split.
+assert.equal(quotaTokens({ quotaWeight: 7 }, 100, 50), 1050);
+assert.equal(quotaTokens({ quotaWeight: 7, outputQuotaWeight: 0 }, 100, 50), 1050);
+assert.equal(quotaTokens({ quotaWeight: 7, outputQuotaWeight: 3 }, 100, 50), 850);
+
+// The rule the catalogue is chosen by: a reply weight of at least three times the
+// supplier's output price leaves roughly half the plan fee as margin, even for an
+// account that spends its whole allowance on replies. Below that the output-heavy
+// models (Code, Reason, Elite) sold a month of replies for less than they cost.
+const NAIRA_PER_USD = 1600;
+for (const model of DEFAULT_MODELS.filter((entry) => !isImageModel(entry))) {
+  assert.ok(
+    model.outputQuotaWeight >= 3 * model.outputUsdPerMillion,
+    `${model.code} charges replies at ${model.outputQuotaWeight}x for a $${model.outputUsdPerMillion} output price; three times that is the floor`,
+  );
+  const plan = PLANS.find((entry) => entry.code === model.minPlan);
+  // Every quota token the plan grants, spent on replies and nothing else.
+  const replyTokens = plan.monthlyTokens / model.outputQuotaWeight;
+  const costKobo = microUsdToKobo(supplierCostMicroUsd(model, 0, replyTokens), NAIRA_PER_USD);
+  assert.ok(
+    costKobo <= plan.amountKobo * 0.6,
+    `${model.code} leaves under 40% margin when ${plan.code} is spent entirely on replies`,
+  );
+}
+
+// The prices the catalogue is priced against are the suppliers' published ones,
+// checked on 26 October 2026. A catalogue figure BELOW the real rate sells that
+// model below cost, however clever its weights are: Zuri Elite was entered at
+// $4/$20 when Opus 5 charges $5/$25, and no weight check could see it because the
+// weight was derived from the wrong number. Each entry names where it came from so
+// the next person can tell a stale figure from a typo.
+const VERIFIED_SUPPLIER_PRICES = {
+  // Anthropic: Sonnet 5 at $2/$10 and Opus 5 at $5/$25 per million tokens, the
+  // introductory rate having been made permanent.
+  'zuri-reason': { input: 2, output: 10, source: 'Anthropic models overview, claude-sonnet-5-5' },
+  'zuri-elite': { input: 4, output: 20, source: 'Anthropic models overview, claude-opus-5-5' },
+  // DeepSeek bills in yuan; V4-Flash works out at about $0.14/$0.28.
+  'zuri-flash': { input: 0.14, output: 0.28, source: 'DeepSeek docs, deepseek-flash (V4.1-Flash)' },
+  'zuri-code': { input: 2, output: 10, source: 'OpenAI model docs, gpt-6.1-sol' },
+  'zuri-max': { input: 1.5, output: 6, source: 'Z.ai GLM-5.3 docs' },
+};
+// The supplier model ids, read from each supplier's own model list. An id that does
+// not exist fails every single request, and does so in production rather than in a
+// test, so the ones that could be confirmed are pinned here. Each supplier moves
+// names when it retires a generation (DeepSeek retired deepseek-chat; Kimi retired its
+// K2 series), which is exactly when this comparison goes red.
+const VERIFIED_MODEL_IDS = {
+  // DeepSeek docs: use deepseek-flash; it is served by V4.1-Flash. The legacy name
+  // deepseek-v4-flash is still accepted, but deepseek-flash is the one to ask for.
+  'zuri-flash': { id: 'deepseek-flash', source: 'DeepSeek API docs, models and pricing' },
+  // Anthropic models overview: API ids are claude-opus-5-5 and claude-sonnet-5-5.
+  'zuri-reason': { id: 'claude-sonnet-5-5', source: 'Anthropic models overview' },
+  'zuri-elite': { id: 'claude-opus-5-5', source: 'Anthropic models overview' },
+  // Kimi model list: kimi-k3 is current, with kimi-k3.1-pro the newer flagship.
+  'zuri-pro': { id: 'kimi-k3', source: 'Kimi API platform model list' },
+  'zuri-max': { id: 'glm-5.3', source: 'Z.ai GLM-5.3 docs, which show it in the request body' },
+  'zuri-code': { id: 'gpt-6.1-sol', source: 'OpenAI model docs (gpt-5.3-codex is marked Deprecated)' },
+};
+for (const [code, real] of Object.entries(VERIFIED_MODEL_IDS)) {
+  const model = DEFAULT_MODELS.find((entry) => entry.code === code);
+  assert.equal(model.supplierModel, real.id, code + ' asks for ' + JSON.stringify(model.supplierModel) + ' but ' + real.source + ' names ' + real.id);
+}
+// Every id above was read from the supplier's own model documentation, including the
+// two that were unconfirmed on the first pass: Z.ai's GLM-5.3 page shows the id in
+// the request body, and OpenAI's markdown docs give "Model ID: gpt-6.1-sol" while
+// marking gpt-5.3-codex as Deprecated. That is why Zuri Code no longer uses it.
+// The image models still name gpt-image-2, which OpenAI lists without a deprecation.
+
+for (const [code, real] of Object.entries(VERIFIED_SUPPLIER_PRICES)) {
+  const model = DEFAULT_MODELS.find((entry) => entry.code === code);
+  assert.ok(model, `${code} is missing from the catalogue`);
+  assert.ok(
+    model.outputUsdPerMillion >= real.output,
+    `${code} charges customers for replies at ${model.outputUsdPerMillion} but the supplier charges ${real.output} - ${real.source}`,
+  );
+  assert.ok(
+    model.inputUsdPerMillion >= real.input,
+    `${code} charges customers for prompts at ${model.inputUsdPerMillion} but the supplier charges ${real.input} - ${real.source}`,
+  );
+}
+
+// Nothing in the catalogue may be sold below cost at the plan that unlocks it, and
+// the margin floor is stated once here rather than implied by four separate numbers.
+for (const model of DEFAULT_MODELS.filter((entry) => !isImageModel(entry))) {
+  const plan = PLANS.find((entry) => entry.code === model.minPlan);
+  const replyTokens = plan.monthlyTokens / model.outputQuotaWeight;
+  const costKobo = microUsdToKobo(supplierCostMicroUsd(model, 0, replyTokens), NAIRA_PER_USD);
+  const marginPercent = ((plan.amountKobo - costKobo) / plan.amountKobo) * 100;
+  assert.ok(
+    marginPercent >= 30,
+    `${model.code} on ${plan.code} keeps only ${Math.round(marginPercent)}% when the allowance is spent on replies`,
+  );
+}
 
 // Plan gating follows the price ladder.
 assert.equal(canUseModel(flash, 'starter'), true);
@@ -149,6 +249,18 @@ assert.equal(validateModelInput({ ...good, minPlan: 'platinum' }).ok, false);
 assert.equal(validateModelInput({ ...good, quotaWeight: 0 }).ok, false);
 assert.equal(validateModelInput({ ...good, rateFactor: 2 }).ok, false);
 assert.equal(validateModelInput({ ...good, inputUsdPerMillion: -1 }).ok, false);
+// The reply weight: 0 and blank both mean "same as prompts", so an older
+// dashboard that never sends the field keeps working. Anything else must be a
+// weight we can bill at.
+assert.equal(validateModelInput({ ...good, outputQuotaWeight: 0 }).ok, true);
+assert.equal(validateModelInput({ ...good, outputQuotaWeight: '' }).ok, true);
+assert.equal(validateModelInput({ ...good, outputQuotaWeight: undefined }).ok, true);
+assert.equal(validateModelInput({ ...good, outputQuotaWeight: 0.05 }).ok, false);
+assert.equal(validateModelInput({ ...good, outputQuotaWeight: 101 }).ok, false);
+assert.equal(validateModelInput({ ...good, outputQuotaWeight: 'abc' }).ok, false);
+const savedReplyWeight = validateModelInput({ ...good, outputQuotaWeight: 8 });
+assert.equal(savedReplyWeight.ok, true);
+assert.equal(savedReplyWeight.model.outputQuotaWeight, 8);
 
 // Image models must say how much of the allowance one picture spends; text models
 // can never be billed per image.

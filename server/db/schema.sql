@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS models (
   input_usd_per_million NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (input_usd_per_million >= 0),
   output_usd_per_million NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (output_usd_per_million >= 0),
   quota_weight NUMERIC(8, 2) NOT NULL DEFAULT 1 CHECK (quota_weight > 0),
+  output_quota_weight NUMERIC(8, 2) NOT NULL DEFAULT 0 CHECK (output_quota_weight >= 0),
   min_plan TEXT NOT NULL REFERENCES plans(code),
   rate_factor NUMERIC(4, 2) NOT NULL DEFAULT 1 CHECK (rate_factor > 0 AND rate_factor <= 1),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
@@ -158,6 +159,11 @@ ALTER TABLE models ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'text';
 ALTER TABLE models ADD COLUMN IF NOT EXISTS usd_per_image NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (usd_per_image >= 0);
 ALTER TABLE models ADD COLUMN IF NOT EXISTS quota_tokens_per_image INTEGER NOT NULL DEFAULT 0 CHECK (quota_tokens_per_image >= 0);
 ALTER TABLE models ADD COLUMN IF NOT EXISTS image_quality TEXT NOT NULL DEFAULT '';
+
+-- Replies are dearer than prompts at every supplier on this catalogue, so they
+-- carry their own weight. 0 means "charge replies at quota_weight", which is how
+-- every row behaved before the split, so this default changes nobody's bill.
+ALTER TABLE models ADD COLUMN IF NOT EXISTS output_quota_weight NUMERIC(8, 2) NOT NULL DEFAULT 0 CHECK (output_quota_weight >= 0);
 
 -- quota_tokens is what counts against the monthly allowance (raw tokens times the
 -- model's weight); cost_micro_usd is what the supplier charged us for the request.
@@ -186,21 +192,38 @@ UPDATE subscriptions SET plan_code = 'starter' WHERE plan_code = 'free';
 UPDATE models SET min_plan = 'starter' WHERE min_plan = 'free';
 DELETE FROM plans WHERE code = 'free';
 
-INSERT INTO models (code, name, supplier, supplier_model, input_usd_per_million, output_usd_per_million, quota_weight, min_plan, rate_factor, sort_order)
+INSERT INTO models (code, name, supplier, supplier_model, input_usd_per_million, output_usd_per_million, quota_weight, output_quota_weight, min_plan, rate_factor, sort_order)
 VALUES
-  ('zuri-flash', 'Zuri Flash', 'deepseek', 'deepseek-flash', 0.14, 0.28, 1, 'starter', 1, 1),
-  ('zuri-pro', 'Zuri Pro', 'moonshot', 'kimi-k3', 0.6, 2.5, 5, 'starter', 0.5, 2),
-  ('zuri-max', 'Zuri Max', 'zai', 'glm-5.3', 1.5, 6, 12, 'pro', 0.25, 3),
-  ('zuri-code', 'Zuri Code', 'openai', 'gpt-5.3-codex', 1.75, 14, 10, 'pro', 0.4, 4),
-  ('zuri-reason', 'Zuri Reason', 'anthropic', 'claude-sonnet-5-5', 2, 10, 10, 'pro', 0.4, 5),
-  ('zuri-elite', 'Zuri Elite', 'anthropic', 'claude-opus-5-5', 4, 20, 20, 'max', 0.2, 6)
+  ('zuri-flash', 'Zuri Flash', 'deepseek', 'deepseek-flash', 0.14, 0.28, 1, 1, 'starter', 1, 1),
+  ('zuri-pro', 'Zuri Pro', 'moonshot', 'kimi-k3', 0.6, 2.5, 5, 8, 'starter', 0.5, 2),
+  ('zuri-max', 'Zuri Max', 'zai', 'glm-5.3', 1.5, 6, 12, 18, 'pro', 0.25, 3),
+  ('zuri-code', 'Zuri Code', 'openai', 'gpt-6.1-sol', 2, 10, 10, 30, 'pro', 0.4, 4),
+  ('zuri-reason', 'Zuri Reason', 'anthropic', 'claude-sonnet-5-5', 2, 10, 10, 30, 'pro', 0.4, 5),
+  ('zuri-elite', 'Zuri Elite', 'anthropic', 'claude-opus-5-5', 4, 20, 20, 60, 'max', 0.2, 6)
 ON CONFLICT (code) DO NOTHING;
+
+-- A database seeded before the split holds output_quota_weight at 0, and the seed
+-- above never overwrites an existing row. Fill the new weights in, but only where
+-- the row still matches what was seeded: if an operator has already changed the
+-- supplier price, their figure stays and theirs is the one to revisit.
+UPDATE models SET output_quota_weight = 1  WHERE code = 'zuri-flash'  AND output_quota_weight = 0 AND output_usd_per_million = 0.28;
+UPDATE models SET output_quota_weight = 8  WHERE code = 'zuri-pro'    AND output_quota_weight = 0 AND output_usd_per_million = 2.5;
+UPDATE models SET output_quota_weight = 18 WHERE code = 'zuri-max'    AND output_quota_weight = 0 AND output_usd_per_million = 6;
+
+-- OpenAI marks gpt-5.3-codex Deprecated, so Zuri Code moves to the current GPT-6.1 Sol
+-- at $2/$10 per million tokens, with its reply weight at three times the output price
+-- like the rest of the catalogue. Keyed on the old id so an admin choice is never
+-- overwritten.
+UPDATE models SET supplier_model = 'gpt-6.1-sol', input_usd_per_million = 2, output_usd_per_million = 10, output_quota_weight = 30
+  WHERE code = 'zuri-code' AND supplier_model = 'gpt-5.3-codex';
+UPDATE models SET output_quota_weight = 30 WHERE code = 'zuri-reason' AND output_quota_weight = 0 AND output_usd_per_million = 10;
+UPDATE models SET output_quota_weight = 60 WHERE code = 'zuri-elite'  AND output_quota_weight = 0 AND output_usd_per_million = 20;
 
 -- Image models are billed per picture through quota_tokens_per_image instead of
 -- input/output prices, so the one monthly allowance still covers them.
-INSERT INTO models (code, name, supplier, supplier_model, kind, usd_per_image, quota_tokens_per_image, image_quality, input_usd_per_million, output_usd_per_million, quota_weight, min_plan, rate_factor, sort_order)
+INSERT INTO models (code, name, supplier, supplier_model, kind, usd_per_image, quota_tokens_per_image, image_quality, input_usd_per_million, output_usd_per_million, quota_weight, output_quota_weight, min_plan, rate_factor, sort_order)
 VALUES
-  ('zuri-sketch', 'Zuri Sketch', 'zai', 'cogview-4', 'image', 0.012, 48000, 'standard', 0, 0, 1, 'starter', 0.4, 7),
-  ('zuri-canvas', 'Zuri Canvas', 'openai', 'gpt-image-2', 'image', 0.07, 264000, 'medium', 0, 0, 1, 'pro', 0.3, 8),
-  ('zuri-studio', 'Zuri Studio', 'openai', 'gpt-image-2', 'image', 0.19, 720000, 'high', 0, 0, 1, 'max', 0.2, 9)
+  ('zuri-sketch', 'Zuri Sketch', 'zai', 'cogview-4', 'image', 0.012, 48000, 'standard', 0, 0, 1, 0, 'starter', 0.4, 7),
+  ('zuri-canvas', 'Zuri Canvas', 'openai', 'gpt-image-2', 'image', 0.07, 264000, 'medium', 0, 0, 1, 0, 'pro', 0.3, 8),
+  ('zuri-studio', 'Zuri Studio', 'openai', 'gpt-image-2', 'image', 0.19, 720000, 'high', 0, 0, 1, 0, 'max', 0.2, 9)
 ON CONFLICT (code) DO NOTHING;
