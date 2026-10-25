@@ -1,5 +1,39 @@
 ## 2026-10-25 - Windows
 
+- Replies now carry their own quota weight, which closes the last way the catalogue could lose money. A supplier bills the reply at four to eight times the prompt's rate, but the monthly allowance counted both at one weight, so Zuri Code, Zuri Reason and Zuri Elite sold the expensive half of a request at the cheap half's price.
+- The mechanics: at the old single weight those three began costing more than the plan fee once 62.5% of the allowance had gone on replies, and nothing in the code or the tests could see it. Zuri Flash, Pro and Max never crossed it on any plan; the three dear ones did, and all three at the same point.
+- `models.quota_weight` still prices the prompt and a new `output_quota_weight` prices the reply. 0 means "same as the prompt", so every row seeded before this behaves exactly as it did and no existing bill changes. The admin dashboard shows and edits both, and the site's plan bullets now name both numbers.
+- Every text model's reply weight is at least three times its supplier output price, which keeps about half the plan fee as margin even for an account that spends its entire allowance on replies. The worst case is now 47% margin on Pro and Max and 57% on Power, where it used to be a loss. The models test fails if a catalogue figure ever breaks the rule.
+- A live database picks the new weights up on the next server start, only where the weight is still 0, so an operator's own figure is never overwritten.
+- Key files: `server/src/models.js`, `server/db/schema.sql`, `server/src/db.js`, `server/test/models.test.js`, `web/src/lib/format.js`, `web/src/views/AdminView.jsx`, `scripts/preview-web.mjs`.
+- Other OS action: run `npm run test && npm run web:build` after syncing. The schema upgrades itself; there is no manual migration.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- All six supplier model ids are confirmed against each supplier's own documentation (October 2026), and one was wrong. The OpenAI id behind Zuri Code exists but is marked Deprecated: it answers today and will stop, and a withdrawn id fails every request the day it is switched off. Zuri Code now uses that supplier's current balanced model at $2/$10 per million tokens, with its reply weight at 30 (three times the output price, like the rest of the catalogue). Their coding flagship bills $10/$50, which the Pro allowance cannot carry without a weight that cuts the monthly allowance by more than half.
+- Confirmed correct and now pinned by the models test: `deepseek-flash`, `claude-sonnet-5-5`, `claude-opus-5-5`, `kimi-k3` and `glm-5.3`. The image models still name `gpt-image-2`, which its supplier lists without a deprecation, so they are unchanged.
+- Migration added for databases already seeded: it moves `zuri-code` to the new id and price only when the row still names the old one, so a choice an operator made by hand is never overwritten.
+- Prices stand as checked against each supplier's published rates: DeepSeek $0.14/$0.28, Sonnet 5.5 $2/$10, Opus 5.5 $4/$20. The models test pins them and names the page each figure came from.
+- Correction, recorded so it is not repeated: an earlier pass read Opus 5.5 as $5/$25 and changed Zuri Elite to that figure with a reply weight of 75. That was wrong. The supplier lists $4 input and $20 output per million tokens, so the catalogue was correct from the start. Those figures are restored with a reply weight of 60, and the migration from that pass was removed because against the real rows it would have written a wrong price over a correct one. The numbers above are the final ones.
+- Key files: `server/src/models.js`, `server/db/schema.sql`, `server/test/models.test.js`.
+- Other OS action: run `npm run test` after syncing, then deploy so the schema migration updates any live database.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Act mode now works over the Zuri account. The app offers tool definitions, the server forwards them to the supplier and returns the calls the model asks for, and the app runs those tools on the person's own computer before asking again. The tools never run on the server: it only carries the request, so a workspace file is still read where it actually lives.
+- Wire format: a tool result is a message with `role: "tool"` and the `toolCallId` it answers; an assistant turn repeats the `toolCalls` it made. Each supplier client arranges those into its own shape (OpenAI-style `tool_calls`, Anthropic `tool_use`/`tool_result` blocks), and the Anthropic client collects a round's results into one user turn as that API requires.
+- A request that offers tools is answered whole rather than streamed: the point of that round is the call, not the words. The round is still charged, because its tokens were spent, so a loop cannot be made free by calling tools. Plain chat keeps the streaming path.
+- The loop is bounded by the existing `MAX_TOOL_ROUNDS`, and an agent's allow-list still narrows what the model may call, so a model cannot name a tool that was never offered.
+- Validation added: tools must have a name and at most 20 may be offered; an assistant turn may call at most 8 tools; a tool result must carry the id of the call it answers. A crafted body is refused before anything reaches a supplier.
+- Not covered: the cloud route forwards no `tools` for image generation and does not carry the Write/`dsml` markup the direct route tolerates, so a supplier that cannot emit real tool calls will simply answer in text instead of acting. Automations and the Word add-in still use the direct-provider path.
+- Key files: `server/src/deepseek.js`, `server/src/app.js`, `server/test/server.test.js`, `src/main/providers/cloud-chat.js`, `src/main/providers/chat.js`, `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Added `docs/voice-options.md`, a research note on voice: what the microphone button does today (browser dictation only, no model, no spoken reply), which of the five suppliers can actually do voice (OpenAI yes; DeepSeek, Kimi and Anthropic no; Z.ai unverified; Google, ElevenLabs and Deepgram would be new suppliers), and the three lanes with list prices converted at the 1,600 naira default rate. Short version: better dictation costs about 8 to 12 naira a minute, spoken answers about 64 naira a minute, and a realtime conversation about 48 naira a minute on Gemini Live or 300 to 500 on OpenAI Realtime.
 - Decision recorded in the same file: voice stays as browser dictation for now, and nothing in the app changed. The note lists what must be verified before a voice model is priced into the catalogue, including that a minute of audio is not a fixed number of tokens and that Zuri bills by tokens today, not by seconds.
 - Key files: `docs/voice-options.md` only. No source or config change, so no build is needed.
@@ -10,7 +44,7 @@
 - The composer's "Search the web" toggle now works on the Zuri account route. The cloud route has no tool loop, so the search cannot be a call the model makes; instead the app runs its existing `webSearch` tool before sending, shows "Searching the web..." while it runs, and passes the numbered results as a second system message after the identity. The model is told to cite results as [n], to end with a `Sources` line of markdown links for the results it actually used, and never to invent a source. A search that finds nothing is reported to the model as such rather than filled in from memory, and a failed search does not fail the message.
 - The results are instruction for that one request only and are never stored with the chat, so a later reply cannot cite a page nobody searched for.
 - Correction to the previous entry: file and folder attachments already reached the account route, because the composer inlines the file text into the message before it is sent. Nothing needed changing, and a check now pins it so the assumption cannot drift back.
-- Act mode is NOT covered and the plan item is corrected to say so. Act tools run on the person's own computer, and the model cannot ask for one through the cloud route: the server forwards no tool definitions and returns plain text. Giving Act mode a real tool loop over the account means the server accepting tools, returning tool calls, and the app executing them and calling again. That is its own piece of work, and until then Act mode stays on the direct-provider path.
+- Superseded by a later entry above: Act mode is now covered, because that tool loop was built. The reasoning is kept because it explains why the loop had to be written rather than routed around. At the time of this entry Act tools ran only on the person's own computer, and the model could not ask for one through the cloud route.
 - Key files: `src/main/providers/cloud-chat.js` (webSearchContext, lastQuestion, cloudMessages), `src/main/providers/chat.js`, `src/main/main.js`, `scripts/selftest.js`.
 - Other OS action: run `npm run test` after syncing.
 - Done on: Windows
