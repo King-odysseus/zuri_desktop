@@ -557,3 +557,10 @@
 - Key files: `server/src/models.js`, `server/src/deepseek.js`, `server/src/server.js`, `server/src/config.js`, `server/db/schema.sql`, `web/src/views/Landing.jsx`, `web/src/views/UsageView.jsx`, `web/src/lib/format.js`.
 - Other OS action: run `npm run web:build && npm --prefix server test` after syncing.
 - Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Improved release downloads by highlighting the visitor's likely desktop platform, showing the published installer version, selecting the matching installer in footer links, and linking to the GitHub release notes.
+- Key files: `server/src/downloads.js`, `server/test/server.test.js`, `web/src/lib/downloads.js`, `web/src/components/DownloadList.jsx`, `web/src/components/DownloadLink.jsx`, `web/src/styles.css`.
+- Other OS action: run `npm run react:build && npm run server:test` after syncing.
+- Done on: Windows

@@ -1961,6 +1961,23 @@ a.download-card:hover {
   background: color-mix(in srgb, var(--surface) 72%, transparent);
 }
 
+.download-card.is-recommended {
+  border-color: color-mix(in srgb, var(--accent) 58%, var(--control-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.download-release-note {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.download-release-note a {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
 .download-card-copy {
   display: flex;
   min-width: 0;

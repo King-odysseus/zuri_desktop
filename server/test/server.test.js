@@ -287,6 +287,7 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
   const mapped = downloadsFromReleases([
     {
       tag_name: 'v0.3.0',
+      html_url: 'https://github.com/King-odysseus/zuri-releases/releases/tag/v0.3.0',
       draft: false,
       prerelease: false,
       assets: [
@@ -313,6 +314,7 @@ assert.equal((await app(new Request('https://cloud.example.com/img/missing.jpg')
   assert.equal(windowsRelease.version, '0.3.0', 'the newest published release wins over older, draft and prerelease builds');
   assert.equal(windowsRelease.url, 'https://github.com/o/r/releases/download/v0.3.0/Zuri-0.3.0-Setup.exe');
   assert.equal(windowsRelease.size, 300, 'the size the page prints comes from here');
+  assert.equal(windowsRelease.releaseUrl, 'https://github.com/King-odysseus/zuri-releases/releases/tag/v0.3.0');
   assert.equal(macRelease.version, '0.2.0', 'macOS falls back to the newest release that actually carries a dmg');
   assert.equal(macRelease.url, 'https://example.test/Zuri-0.2.0.dmg');
   assert.ok(!mapped.some((file) => /\.blockmap$|\.yml$/.test(file.name)), 'updater side files are never a download');

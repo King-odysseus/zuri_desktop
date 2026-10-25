@@ -81,8 +81,8 @@ export function resolveDownloadPath(name) {
  * Kept free of network and file access so the mapping from a release to a
  * download card can be tested against a fixture.
  *
- * @param {Array<{ tag_name?: string, draft?: boolean, prerelease?: boolean, assets?: Array<{ name?: string, size?: number, browser_download_url?: string }> }>} releases
- * @returns {Array<{ platform: string, label: string, detail: string, name: string, size: number, version: string, url: string }>}
+ * @param {Array<{ tag_name?: string, html_url?: string, draft?: boolean, prerelease?: boolean, assets?: Array<{ name?: string, size?: number, browser_download_url?: string }> }>} releases
+ * @returns {Array<{ platform: string, label: string, detail: string, name: string, size: number, version: string, url: string, releaseUrl: string }>}
  */
 export function downloadsFromReleases(releases) {
   const newest = new Map();
@@ -105,6 +105,7 @@ export function downloadsFromReleases(releases) {
         // the tag is the fallback when a name has none.
         version: versionOf(name) || tagVersion,
         url: asset.browser_download_url,
+        releaseUrl: typeof release.html_url === 'string' ? release.html_url : '',
       });
     }
   }

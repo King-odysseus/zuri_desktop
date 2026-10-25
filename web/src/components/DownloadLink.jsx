@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchDownloads } from '../lib/downloads.js';
+import { fetchDownloads, recommendedPlatform } from '../lib/downloads.js';
 
 /**
  * A direct link to the desktop installer, for the footer and the dashboard
@@ -14,7 +14,9 @@ export default function DownloadLink({ className = 'foot-download' }) {
   useEffect(() => {
     let active = true;
     fetchDownloads().then((list) => {
-      if (active) setFile(list[0] ?? null);
+      if (!active) return;
+      const preferred = recommendedPlatform();
+      setFile(list.find((entry) => entry.platform === preferred) ?? list[0] ?? null);
     });
     return () => {
       active = false;

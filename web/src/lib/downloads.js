@@ -16,7 +16,7 @@ let cached = null;
 
 /**
  * Installers this server can hand out.
- * @returns {Promise<Array<{ platform: string, label: string, detail: string, name: string, size: number, version: string, url: string }>>}
+ * @returns {Promise<Array<{ platform: string, label: string, detail: string, name: string, size: number, version: string, url: string, releaseUrl?: string }>>}
  */
 export function fetchDownloads() {
   cached ??= api('/api/downloads')
@@ -32,4 +32,17 @@ export function formatDownloadSize(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
   const megabytes = bytes / (1024 * 1024);
   return megabytes >= 100 ? `${Math.round(megabytes)} MB` : `${Math.round(megabytes * 10) / 10} MB`;
+}
+
+/**
+ * Return the platform most likely to match the visitor. This only changes
+ * emphasis and never hides another available installer.
+ * @returns {string}
+ */
+export function recommendedPlatform() {
+  if (typeof navigator === 'undefined') return '';
+  const platform = String(navigator.userAgentData?.platform ?? navigator.platform ?? navigator.userAgent).toLowerCase();
+  if (platform.includes('win')) return 'windows';
+  if (platform.includes('mac') || platform.includes('darwin')) return 'macos';
+  return '';
 }
