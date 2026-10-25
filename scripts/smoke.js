@@ -2,6 +2,7 @@
 
 import { app, BrowserWindow, screen } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import '../src/main/bootstrap.js';
@@ -16,7 +17,15 @@ const hardStop = setTimeout(() => {
   app.exit(1);
 }, 60000);
 
-app.whenReady().then(async () => {
+// `npm test` builds before this step, and vite empties dist-react as it starts, so a
+// build that has not run yet leaves nothing to load. Say that plainly instead of
+// booting a window straight into a bare ERR_FILE_NOT_FOUND.
+const buildEntry = path.join(root, 'dist-react', 'index.html');
+const boot = fs.existsSync(buildEntry)
+  ? app.whenReady()
+  : Promise.reject(new Error(`${buildEntry} is missing - run "npm run react:build" first`));
+
+boot.then(async () => {
   const window = await waitForFirstWindow();
   await waitForLoad(window);
   const ready = await window.webContents.executeJavaScript(`({
