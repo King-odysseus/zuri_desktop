@@ -74,6 +74,13 @@ const CHANNELS = Object.freeze([
   'zuri:files:saveAs',
   'zuri:files:choose',
   'zuri:files:summarize',
+  // The picture ladder the composer menu lists, and one picture drawn with a name
+  // from it. Both are ordinary channels, so a typo here would leave the menu
+  // empty rather than break the bridge.
+  'zuri:images:models',
+  // Asking for a picture: the renderer sends a prompt and a model code, never a
+  // key; main calls the provider with the saved key and writes the file itself.
+  'zuri:images:generate',
   // The tool registry, so the agents page ticks the tools that really exist rather
   // than trusting a copy kept in the renderer.
   'zuri:tools:list',

@@ -1,11 +1,12 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell, Tray } from 'electron';
 import { existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
-import { copyFile, mkdir, readdir, readFile, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { CHAT_STREAM_CHANNEL, askForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
+import { IMAGE_MODELS, defaultImageModel, generateImage } from './providers/images.js';
 import { runOnboardingSetup } from './onboarding.js';
 import {
   closeOverlay,
@@ -26,7 +27,7 @@ import {
   trayMenuTemplate,
 } from './tray-menu.js';
 import { bringToFront } from './second-launch.js';
-import { clearKey, keyStatus, setKey } from './secrets.js';
+import { PROVIDERS, clearKey, getKey, keyStatus, setKey } from './secrets.js';
 import { clearCloudSession, readCloudSession, writeCloudSession } from './cloud-session.js';
 import { addinStatus, installAddin, removeAddin, resumeAddin } from './addin.js';
 import {
@@ -51,7 +52,7 @@ import {
   updateAutomation,
   updateTask,
 } from './store.js';
-import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, runTool, toolCatalogue } from './tools/index.js';
+import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, resolveWorkspacePath, runTool, toolCatalogue } from './tools/index.js';
 
 // ESM main process (package.json sets "type": "module"), so __dirname is built here.
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -340,6 +341,8 @@ const HANDLERS = new Map([
   ['zuri:files:saveAs', handleFilesSaveAs],
   ['zuri:files:choose', handleFilesChoose],
   ['zuri:files:summarize', handleFilesSummarize],
+  ['zuri:images:generate', handleImagesGenerate],
+  ['zuri:images:models', handleImagesModels],
   ['zuri:tools:list', handleToolsList],
   ['zuri:tools:run', handleToolsRun],
   ['zuri:tools:cancel', handleToolsCancel],
@@ -1263,6 +1266,136 @@ async function handleFilesSummarize(payload, event) {
   } catch (error) {
     console.error('[zuri:files] summarize', error);
     return filesFailure(error, 'FILES_SUMMARIZE_FAILED');
+  }
+}
+
+/* ------------------------------------------------------------------ images */
+
+// Pictures get their own workspace folder so the Files list stays readable and a
+// person can find what was drawn without hunting through documents.
+const IMAGES_DIR_NAME = 'images';
+
+/**
+ * The picture ladder as the composer menu shows it: name, one-line hint, the
+ * price a person pays, and whether they hold a key for the supplier behind it.
+ * `available` is a boolean rather than a key check in the view, so the renderer
+ * never has to ask which providers exist or guess at the mapping.
+ * @returns {object}
+ */
+function handleImagesModels() {
+  const providers = PROVIDERS.filter((provider) => getKey(provider) !== null);
+  return {
+    ok: true,
+    data: IMAGE_MODELS.map((model) => ({
+      code: model.code,
+      name: model.name,
+      hint: model.hint,
+      minPlan: model.minPlan,
+      nairaPerImage: model.nairaPerImage,
+      available: providers.includes(model.provider),
+    })),
+  };
+}
+
+/**
+ * The name a generated picture is saved under: the model, then the moment it was
+ * made. The timestamp is what keeps two pictures asked for in the same second
+ * from overwriting each other, and it keeps the list sorted by newest.
+ * @param {string} modelCode
+ * @param {string} extension
+ * @returns {string}
+ */
+function imageFileName(modelCode, extension) {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const stamp = [
+    now.getFullYear(),
+    pad(now.getMonth() + 1),
+    pad(now.getDate()),
+    '-',
+    pad(now.getHours()),
+    pad(now.getMinutes()),
+    pad(now.getSeconds()),
+  ].join('');
+  // The code arrives from the renderer, so only the characters a model code can
+  // hold survive: nothing from that string reaches a path unchanged.
+  const safeCode = String(modelCode).toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'image';
+  return `zuri-${safeCode}-${stamp}.${extension}`;
+}
+
+/**
+ * Write one generated picture into the workspace. The path goes through the tool
+ * layer's own guard, so a name that tried to leave the folder is refused there
+ * rather than by a second copy of the check in this file.
+ * @param {Buffer} bytes
+ * @param {string} extension
+ * @param {string} modelCode
+ * @returns {Promise<object>}
+ */
+async function saveGeneratedImage(bytes, extension, modelCode) {
+  try {
+    const relative = `${IMAGES_DIR_NAME}/${imageFileName(modelCode, extension)}`;
+    const target = resolveWorkspacePath(relative);
+    // The images folder does not exist before the first picture, so creating it is
+    // part of saving rather than a separate onboarding step.
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, bytes);
+    return { ok: true, data: { name: path.basename(target), path: target, relative, bytes: bytes.length } };
+  } catch (error) {
+    // A workspace refusal carries a TOOL_ code and is an answer for the view; a real
+    // write error is worth a log line for whoever reads this next.
+    if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:images] save', error);
+    return { ok: false, error: { code: 'IMAGE_SAVE_FAILED', message: String(error?.message ?? error) } };
+  }
+}
+
+/**
+ * Ask a provider for a picture and save it in the workspace.
+ *
+ * Only providers with a key saved are offered, so the default picture model is the
+ * best one the person can actually pay for. The renderer can name a model, never a
+ * key or an endpoint. The API key itself is read inside providers/images.js and
+ * only ever reaches that request's Authorization header, so nothing here logs it.
+ * @param {{ prompt?: string, modelCode?: string }} [payload]
+ * @param {Electron.IpcMainInvokeEvent} [event]
+ * @returns {Promise<object>}
+ */
+async function handleImagesGenerate(payload, event) {
+  const prompt = typeof payload?.prompt === 'string' ? payload.prompt.trim() : '';
+  if (prompt === '') {
+    return { ok: false, error: { code: 'IMAGE_PROMPT_REQUIRED', message: 'Describe the picture you want first.' } };
+  }
+
+  const providers = PROVIDERS.filter((provider) => getKey(provider) !== null);
+  const requested = typeof payload?.modelCode === 'string' ? payload.modelCode.trim() : '';
+  // The file name carries the model code and generateImage owns the choice, so the
+  // code is resolved once here and passed down. A wrong code or a missing key fails
+  // before save is ever called, so the empty fallback cannot reach a file name.
+  const modelCode = requested !== '' ? requested : (defaultImageModel(providers)?.code ?? '');
+
+  try {
+    const result = await generateImage({
+      prompt,
+      modelCode,
+      providers,
+      save: (bytes, extension) => saveGeneratedImage(bytes, extension, modelCode),
+    });
+    if (result?.ok !== true) return result;
+
+    // The same push handleFilesSummarize sends: a view that did not start this flow
+    // still needs to know the workspace changed, and Files re-lists on it.
+    const sender = event?.sender;
+    const relative = result.data?.image?.relative;
+    if (sender && sender.isDestroyed?.() !== true && typeof relative === 'string') {
+      sender.send(STATE_CHANGED_CHANNEL, { area: 'files', path: relative });
+    }
+
+    return result;
+  } catch (error) {
+    // generateImage is built not to throw; this is the last line that keeps a fault
+    // from reaching the renderer as a rejected IPC call with no shape to show.
+    console.error('[zuri:images] generate', error);
+    return { ok: false, error: { code: 'IMAGE_PROVIDER_FAILED', message: 'Zuri could not make that picture. Try again.' } };
   }
 }
 

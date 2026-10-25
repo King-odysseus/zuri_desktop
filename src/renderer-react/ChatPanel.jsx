@@ -10,6 +10,7 @@ import {
   FileIcon,
   FolderIcon,
   GlobeIcon,
+  ImageIcon,
   MicIcon,
   NewChatIcon,
   PanelLeftCloseIcon,
@@ -170,7 +171,7 @@ function voiceErrorMessage(code) {
   return 'Voice typing stopped unexpectedly. Try again.';
 }
 
-const FILE_KIND_LABELS = { docx: 'Word document', xlsx: 'Excel spreadsheet', pptx: 'PowerPoint presentation' };
+const FILE_KIND_LABELS = { docx: 'Word document', xlsx: 'Excel spreadsheet', pptx: 'PowerPoint presentation', image: 'Image' };
 
 /** A file Zuri built in a reply: open it, find it in its folder, or save a copy elsewhere. */
 function FileCard({ file, api }) {
@@ -217,6 +218,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   // The rewrite a person has now used often enough to be worth offering as their default.
   const [styleOffer, setStyleOffer] = useState(null);
   const [menuView, setMenuView] = useState('');
+  // The picture ladder is fetched when the menu opens rather than on mount, and a
+  // preview is kept per saved file so a picture shows without reading it back from
+  // disk on every render.
+  const [imageModels, setImageModels] = useState([]);
+  const [imagePreviews, setImagePreviews] = useState({});
+  const [imageBusy, setImageBusy] = useState('');
   const [answerLength, setAnswerLength] = useState('balanced');
   // On by default for current answers, then remembered when the person changes it.
   const [webSearch, setWebSearch] = useState(readWebSearchPreference);
@@ -389,6 +396,97 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       skipped: picked.data.skipped,
     });
     setError('');
+  }
+
+  /**
+   * Load the picture names once per session, when the menu opens on them. Each
+   * entry says whether a key is saved behind it, so a name nobody can pay for is
+   * shown dimmed instead of failing after the person types a whole prompt.
+   * @returns {Promise<void>}
+   */
+  async function loadImageModels() {
+    if (imageModels.length > 0 || typeof api?.images?.models !== 'function') return;
+    const listed = await api.images.models();
+    if (listed?.ok === true && Array.isArray(listed.data)) setImageModels(listed.data);
+  }
+
+  /**
+   * Draw a picture with one of Zuri's image names and keep it in the chat.
+   *
+   * The picture is made before anything is written to the thread, so a failed call
+   * leaves the chat as it was with one readable error line, instead of a question
+   * in the history that never gets an answer under it.
+   * @param {{ code: string, name: string, nairaPerImage: number }} model
+   * @returns {Promise<void>}
+   */
+  async function createImage(model) {
+    const prompt = draft.trim();
+    setMenuView('');
+    if (prompt === '') {
+      setError('Describe the picture you want in the message box first.');
+      return;
+    }
+    if (imageBusy !== '' || replying) return;
+    if (typeof api?.images?.generate !== 'function' || typeof api?.chats?.create !== 'function') {
+      setError('Pictures are only available inside the Zuri app.');
+      return;
+    }
+
+    setError('');
+    setImageBusy(model.name);
+    try {
+      const made = await api.images.generate({ prompt, modelCode: model.code });
+      if (made?.ok !== true) {
+        setError(made?.error?.message ?? 'Zuri could not make that picture. Try again.');
+        return;
+      }
+
+      let activeThreadId = threadId;
+      if (activeThreadId === '') {
+        const created = await api.chats.create({ title: prompt.slice(0, 60) || 'New chat' });
+        if (!created?.ok || typeof created.data?.id !== 'string') {
+          setError(created?.error?.message ?? 'A new chat could not be created.');
+          return;
+        }
+        activeThreadId = created.data.id;
+        setThreadId(activeThreadId);
+      }
+
+      const asked = await api.chats.appendMessage({
+        threadId: activeThreadId,
+        message: { role: 'user', content: prompt },
+      });
+      if (!asked?.ok) {
+        setError(asked?.error?.message ?? 'Your message could not be saved.');
+        return;
+      }
+
+      const image = made.data?.image ?? {};
+      const naira = Number(made.data?.nairaPerImage ?? model.nairaPerImage ?? 0);
+      const saved = await api.chats.appendMessage({
+        threadId: activeThreadId,
+        message: {
+          role: 'assistant',
+          content: `${model.name} drew this for about NGN ${naira}. It is saved in your workspace under images.`,
+          files: [{ name: image.name, path: image.path, kind: 'image', bytes: image.bytes }],
+        },
+      });
+      if (!saved?.ok) {
+        setError(saved?.error?.message ?? 'The picture was made but the chat could not save it.');
+        return;
+      }
+
+      setMessages(Array.isArray(saved.data?.thread?.messages) ? saved.data.thread.messages : []);
+      if (typeof made.data?.previewUrl === 'string' && typeof image.path === 'string') {
+        setImagePreviews((current) => ({ ...current, [image.path]: made.data.previewUrl }));
+      }
+      setDraft('');
+      onChatUpdated?.();
+    } catch (drawError) {
+      setError(drawError?.message ?? 'Zuri could not make that picture.');
+    } finally {
+      setImageBusy('');
+    }
   }
 
   function pickMenuItem(action) {
@@ -656,9 +754,14 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           <NewChatIcon size={19} />
         </Button>
       )}
-      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
-        {compact && (
-          <div className="absolute right-3 top-3 z-10 flex gap-1">
+      {/* The card is a frameless window, so this strip is its title bar: the CSS
+          app-region drag moves the whole popup around the screen, and the buttons
+          opt out of it so they keep their clicks. It sits outside the scrolling
+          content, which leaves the transcript selectable. */}
+      {compact && (
+        <div className="zuri-overlay-header">
+          <span className="zuri-overlay-title">Zuri</span>
+          <div className="zuri-overlay-window-actions">
             <Button isIconOnly size="sm" variant="ghost" aria-label="Open Zuri" title="Open Zuri" onPress={() => void window.zuri?.overlay?.openMain?.()}>
               <ExpandIcon size={16} />
             </Button>
@@ -666,7 +769,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               <CloseIcon size={16} />
             </Button>
           </div>
-        )}
+        </div>
+      )}
+      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
         {!compact && !hasConversation && (
           <div className={`mb-6 flex w-full ${contentWidth} flex-col items-center`}>
             {/* The mark sits above the line rather than beside it: the heading is
@@ -714,7 +819,19 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   <div className="min-w-0 break-words rounded-2xl bg-surface-secondary px-4 py-3 text-sm text-foreground">
                     <FormattedMessage content={message.content} />
                   </div>
-                  {Array.isArray(message.files) && message.files.map((file) => <FileCard key={file.path} file={file} api={api} />)}
+                  {Array.isArray(message.files) && message.files.map((file) => (
+                    <div key={file.path} className="flex min-w-0 flex-col gap-2">
+                      {typeof imagePreviews[file.path] === 'string' && (
+                        <img
+                          src={imagePreviews[file.path]}
+                          alt={file.name}
+                          className="max-h-80 w-full rounded-2xl border border-border object-contain"
+                          decoding="async"
+                        />
+                      )}
+                      <FileCard file={file} api={api} />
+                    </div>
+                  ))}
                   {/* Copy and the rewrite choices share one row, so the newest reply
                       keeps one tidy action line instead of two stacked ones. */}
                   <div className="flex flex-wrap items-center gap-1">
@@ -752,6 +869,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             )}
             {replying && activity !== '' && <p className="self-start text-sm text-muted">{activity}...</p>}
             {replying && streamingText === '' && activity === '' && <p className="self-start text-sm text-muted">Zuri is thinking...</p>}
+            {imageBusy !== '' && <p role="status" className="self-start text-sm text-muted">{imageBusy} is drawing your picture...</p>}
           </div>
         )}
 
@@ -786,6 +904,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                         <span className="flex-1">Search the web</span>
                         {webSearch && <CheckIcon size={16} />}
                       </button>
+                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" title="Draw a picture with one of Zuri's image models" onClick={() => pickMenuItem(() => { void loadImageModels(); setMenuView('image'); })}>
+                        <ImageIcon size={16} />
+                        <span className="flex-1">Create an image</span>
+                      </button>
                       <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => setMenuView('length')}>
                         <SlashCommandIcon size={16} />
                         <span className="flex-1">Reply length</span>
@@ -796,6 +918,28 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                         <span>Slash commands</span>
                       </button>
                     </>
+                  ) : menuView === 'image' ? (
+                    <div className="flex flex-col gap-1">
+                      {imageModels.length === 0 && <p className="px-3 py-2 text-xs text-muted">Checking which picture models you can use...</p>}
+                      {imageModels.map((model) => (
+                        <button
+                          key={model.code}
+                          type="button"
+                          role="menuitem"
+                          disabled={!model.available || imageBusy !== ''}
+                          title={model.available ? `${model.hint}. About NGN ${model.nairaPerImage} an image.` : 'Add a key for this provider in Settings first.'}
+                          className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary disabled:opacity-40"
+                          onClick={() => void createImage(model)}
+                        >
+                          <span className="flex w-full items-center gap-2">
+                            <ImageIcon size={15} />
+                            {model.name}
+                            <span className="ml-auto text-xs text-muted">NGN {model.nairaPerImage}</span>
+                          </span>
+                          <span className="text-xs text-muted">{model.available ? model.hint : 'Needs a key in Settings'}</span>
+                        </button>
+                      ))}
+                    </div>
                   ) : menuView === 'length' ? (
                     [['concise', 'Concise'], ['balanced', 'Balanced'], ['detailed', 'Detailed']].map(([value, label]) => (
                       <button key={value} type="button" role="menuitemradio" aria-checked={answerLength === value} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseAnswerLength(value))}>
