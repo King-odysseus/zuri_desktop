@@ -651,6 +651,169 @@ export async function deleteTask(taskId, options = {}) {
 /** Title a thread carries until its first user message names it. */
 export const UNTITLED_THREAD = 'New chat';
 
+/* ---------------------------------------------------------------------------
+   Cloud links
+
+   A thread that has been uploaded carries `cloud: { id }`, the id of its
+   conversation on the server, and each uploaded message carries `cloudId`, the id
+   the server stored it under. Those two fields are what make a repeated sync a
+   no-op instead of a pile of duplicates, so nothing else writes them and every
+   write goes through the chat lock like any other chat mutation.
+   ------------------------------------------------------------------------- */
+
+/**
+ * Record which conversation on the server this thread is.
+ *
+ * A blank id forgets the link, and forgetting also clears every message's cloud id
+ * in the same write. That pairing is the point: a message still pointing at a
+ * conversation that has been deleted would never be uploaded again, so the thread
+ * would come back from the cloud empty. One write keeps the two halves agreeing.
+ *
+ * @param {string} threadId
+ * @param {string} cloudId The server's conversation id, or '' to forget it.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { id: string, cloudId: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function setThreadCloudId(threadId, cloudId, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'linking a chat to the cloud needs a thread id');
+  }
+  if (typeof cloudId !== 'string') {
+    return failure('CHAT_INVALID_CLOUD_ID', 'a cloud conversation id must be a string');
+  }
+  const linked = cloudId.trim();
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+
+    if (linked === '') {
+      delete thread.cloud;
+      const messages = Array.isArray(thread.messages) ? thread.messages : [];
+      for (const message of messages) {
+        if (message !== null && typeof message === 'object') delete message.cloudId;
+      }
+    } else {
+      thread.cloud = { id: linked };
+    }
+
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { id: threadId, cloudId: linked } };
+  });
+}
+
+/**
+ * Record the id the server stored one message under. Only the sync writes this, and
+ * only after the upload succeeded, so the field can be trusted to mean "the cloud
+ * already has this message".
+ * @param {string} threadId
+ * @param {string} messageId
+ * @param {string} cloudId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { threadId: string, messageId: string, cloudId: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function setMessageCloudId(threadId, messageId, cloudId, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'linking a message to the cloud needs a thread id');
+  }
+  if (typeof messageId !== 'string' || messageId.trim() === '') {
+    return failure('CHAT_INVALID_MESSAGE', 'linking a message to the cloud needs a message id');
+  }
+  // Clearing goes through setThreadCloudId, which owns both halves of the link.
+  if (typeof cloudId !== 'string' || cloudId.trim() === '') {
+    return failure('CHAT_INVALID_CLOUD_ID', 'a cloud message id must not be blank');
+  }
+  const linked = cloudId.trim();
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+
+    const messages = Array.isArray(thread.messages) ? thread.messages : [];
+    const message = messages.find((entry) => entry?.id === messageId);
+    if (!message) return failure('CHAT_MESSAGE_NOT_FOUND', `no message with id ${messageId} in thread ${threadId}`);
+
+    message.cloudId = linked;
+
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { threadId, messageId, cloudId: linked } };
+  });
+}
+
+/**
+ * Append a message that came down from the cloud.
+ *
+ * This is the same write appendMessage makes, with the two differences the sync
+ * needs. The server's id is kept as `cloudId`, so the next pull recognises the
+ * message and does not append it a second time. And the thread's title is left
+ * alone: a message pulled down does not rename a chat the person can already see.
+ *
+ * @param {string} threadId
+ * @param {{ role?: string, content?: string, createdAt?: string, cloudId?: string }} message
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { thread: any, message: any } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function appendSyncedMessage(threadId, message, options = {}) {
+  if (typeof threadId !== 'string' || threadId === '') {
+    return failure('CHAT_INVALID_THREAD', 'appending a message needs a thread id');
+  }
+  if (message === null || typeof message !== 'object') {
+    return failure('CHAT_INVALID_MESSAGE', 'a synced message needs a role and a content string');
+  }
+  if (message.role !== 'user' && message.role !== 'assistant') {
+    return failure('CHAT_INVALID_MESSAGE', `unknown message role: ${String(message.role)}`);
+  }
+  if (typeof message.content !== 'string' || message.content.trim() === '') {
+    return failure('CHAT_INVALID_MESSAGE', 'a message needs non-empty content');
+  }
+  if (typeof message.cloudId !== 'string' || message.cloudId.trim() === '') {
+    return failure('CHAT_INVALID_CLOUD_ID', 'a synced message needs the cloud id it was stored under');
+  }
+  const cloudId = message.cloudId.trim();
+
+  // The server's own timestamp is kept when it sent a usable one, so a turn pulled
+  // onto this machine shows when it was written, not when it was downloaded.
+  const sentAt = typeof message.createdAt === 'string' ? Date.parse(message.createdAt) : Number.NaN;
+  const createdAt = Number.isFinite(sentAt) ? new Date(sentAt).toISOString() : new Date().toISOString();
+  const now = new Date().toISOString();
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+    if (!Array.isArray(thread.messages)) thread.messages = [];
+
+    const stored = {
+      id: randomUUID(),
+      role: message.role,
+      content: message.content.trim(),
+      createdAt,
+      cloudId,
+    };
+    thread.messages.push(stored);
+    // The sidebar and the thread list both order on updatedAt, so a thread that just
+    // received a message has to move like one that was typed into.
+    thread.updatedAt = now;
+
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { thread, message: stored } };
+  });
+}
+
 /** Longer titles are cut here; sidebar rows truncate them anyway. */
 const THREAD_TITLE_MAX_LENGTH = 60;
 
@@ -869,6 +1032,10 @@ export async function appendMessage(threadId, message, options = {}) {
  * @returns {number}
  */
 function compareThreads(left, right) {
+
+
+  // ISO-8601 strings sort in the same order as the moments they encode, so the two
+  // are compared directly: nothing is parsed and no timezone is involved.
   const byUpdate = String(left.updatedAt ?? '').localeCompare(String(right.updatedAt ?? ''));
   if (byUpdate !== 0) return byUpdate;
   return String(left.createdAt ?? '').localeCompare(String(right.createdAt ?? ''));

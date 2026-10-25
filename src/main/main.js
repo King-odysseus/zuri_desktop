@@ -32,6 +32,7 @@ import {
 import { bringToFront } from './second-launch.js';
 import { PROVIDERS, clearKey, getKey, keyStatus, setKey } from './secrets.js';
 import { clearCloudSession, readCloudSession, writeCloudSession } from './cloud-session.js';
+import { createChatSync } from './chat-sync.js';
 import { addinStatus, installAddin, removeAddin, resumeAddin } from './addin.js';
 import {
   appendMessage,
@@ -74,6 +75,12 @@ export const ICO_ENTRY = path.join(moduleDir, 'assets', 'zuri-icon.ico');
 // Windows shell APIs cannot read an icon path inside app.asar. The packaged
 // executable embeds the same ICO, so it is the real on-disk source for taskbar metadata.
 const WINDOWS_SHELL_ICON = app.isPackaged ? process.execPath : ICO_ENTRY;
+/**
+ * How long after launch the first cloud sync runs. Long enough that the window, the
+ * tray and the automation catch-up are not competing with it for the network.
+ */
+const STARTUP_SYNC_DELAY_MS = 4000;
+
 const CANVAS_DARK = '#040130'; // matches --background in dark mode, so the window does not flash white before first paint
 
 /**
@@ -480,7 +487,15 @@ function handleChatCreate(payload) {
  * @returns {Promise<object>}
  */
 async function handleChatDelete(payload) {
+  // Read first: the link to the cloud copy lives on the thread itself, and the
+  // delete below is what removes it.
+  const cloudId = await cloudIdOfThread(payload?.threadId);
   const result = await deleteThread(payload?.threadId);
+  // Best effort and not awaited. The chat is already gone from this machine, so a
+  // cloud delete that fails must not become an error in front of the person who
+  // asked for it. A copy left behind in the account is the cheaper mistake of the
+  // two: an error dialog over a chat already deleted is worse than a stray record.
+  if (result?.ok === true && cloudId !== '') backgroundSync(chatSync.deleteConversation(cloudId));
   if (result?.ok === true) announceState({ area: 'chats' });
   return result;
 }
@@ -631,7 +646,7 @@ function handleChatSend(payload, event) {
     if (activeReplies.get(threadId) === controller) activeReplies.delete(threadId);
   };
 
-  return sendChatMessage(threadId, {
+  const answered = sendChatMessage(threadId, {
     // The composer sends the agent it has picked; without one the reply falls back to
     // settings.activeAgentId, which is the same id in the normal case.
     agentId: typeof payload?.agentId === 'string' ? payload.agentId : undefined,
@@ -649,7 +664,21 @@ function handleChatSend(payload, event) {
       // The window can close mid-stream; sending to a destroyed webContents throws.
       if (sender && !sender.isDestroyed()) sender.send(CHAT_STREAM_CHANNEL, streamEvent);
     },
-  }).finally(settle);
+  });
+
+  // The account's copy of this chat catches up once the reply is saved. Started and
+  // forgotten rather than awaited: the window already has its answer, and a sync that
+  // cannot run (signed out, offline, account full) must never surface as a chat error.
+  answered.then(
+    (result) => {
+      if (result?.ok === true && typeof threadId === 'string') backgroundSync(chatSync.syncThread(threadId));
+    },
+    // The renderer still sees this rejection through the return below; this branch is
+    // here only so the sync hook does not become a second report of it.
+    () => {},
+  );
+
+  return answered.finally(settle);
 }
 
 /**
@@ -781,6 +810,54 @@ async function cloudFetch(pathname, options = {}, requireSession = false) {
   return body;
 }
 
+/**
+ * The cloud sync, bound to the one function that knows how to reach the account.
+ * Every request it makes goes out through cloudFetch, so the bearer token never
+ * passes through chat-sync.js and a sync cannot be sent up as the wrong person.
+ */
+const chatSync = createChatSync({ request: cloudFetch });
+
+/**
+ * Start a cloud sync and let it finish on its own.
+ *
+ * Nothing a person does waits on one: the reply is already on screen and the window
+ * is already open, so a slow or failed sync has to cost nothing anyone can see. Every
+ * entry point in chat-sync.js reports a failure instead of throwing, and the catch
+ * here only makes sure an unexpected throw cannot become an unhandled rejection.
+ * @param {Promise<object>} started
+ * @returns {void}
+ */
+function backgroundSync(started) {
+  started.catch((error) => console.error('[zuri-cloud] sync', error?.message ?? error));
+}
+
+/**
+ * Catch every stored chat up with the account that has just signed in. Not awaited:
+ * the sign-in reply has to reach the window at once, and the person is looking at
+ * the account page rather than at this work.
+ * @returns {void}
+ */
+function afterCloudSignIn() {
+  backgroundSync(chatSync.syncAllThreads());
+}
+
+/**
+ * The cloud conversation a stored thread is linked to, or '' when it has none.
+ *
+ * Read before the thread is deleted, because deleteThread takes away the only copy
+ * of the link and the cloud copy is deleted afterwards.
+ * @param {string} threadId
+ * @returns {Promise<string>}
+ */
+async function cloudIdOfThread(threadId) {
+  if (typeof threadId !== 'string' || threadId === '') return '';
+  const listed = await listThreads();
+  if (listed.ok !== true) return '';
+  const thread = listed.data.find((entry) => entry?.id === threadId);
+  const cloudId = thread?.cloud?.id;
+  return typeof cloudId === 'string' ? cloudId.trim() : '';
+}
+
 async function handleCloudConfig() {
   const settings = await readSettings();
   if (!settings.ok) return settings;
@@ -797,6 +874,7 @@ async function handleCloudSignIn(payload) {
   if (!result.ok) return result;
   const stored = await writeCloudSession(result.data?.token, result.data?.expiresAt);
   if (!stored.ok) return stored;
+  afterCloudSignIn();
   return { ok: true, data: { user: result.data?.user, usage: result.data?.usage, expiresAt: result.data?.expiresAt } };
 }
 
@@ -920,6 +998,7 @@ async function cloudCreateSession(pathname, body) {
   if (!result.ok) return result;
   const stored = await writeCloudSession(result.data?.token, result.data?.expiresAt);
   if (!stored.ok) return stored;
+  afterCloudSignIn();
   return { ok: true, data: { user: result.data?.user, subscription: result.data?.subscription, expiresAt: result.data?.expiresAt } };
 }
 
@@ -1976,6 +2055,15 @@ app.whenReady().then(async () => {
       }
     },
   });
+
+  // Anything asked in a browser, or typed here before the last shutdown, is caught up
+  // once the window is up. Delayed a few seconds and capped inside chat-sync.js, so
+  // the first frame, the tray and the automation catch-up all get there first.
+  const startupSync = setTimeout(() => {
+    backgroundSync(chatSync.syncAllThreads());
+  }, STARTUP_SYNC_DELAY_MS);
+  // A quit inside that window must not keep the process alive just for a sync.
+  startupSync.unref();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
