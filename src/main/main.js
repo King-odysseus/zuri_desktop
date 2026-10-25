@@ -331,6 +331,8 @@ const HANDLERS = new Map([
   ['zuri:cloud:set-password', handleCloudSetPassword],
   ['zuri:cloud:account', handleCloudAccount],
   ['zuri:cloud:plans', handleCloudPlans],
+  ['zuri:cloud:topups', handleCloudTopups],
+  ['zuri:cloud:topup', handleCloudTopup],
   ['zuri:cloud:checkout', handleCloudCheckout],
   ['zuri:cloud:sign-out', handleCloudSignOut],
   ['zuri:tasks:list', handleTasksList],
@@ -1084,15 +1086,36 @@ async function handleCloudPlans() {
   return cloudFetch('/api/plans');
 }
 
+async function handleCloudTopups() {
+  return cloudFetch('/api/topups');
+}
+
+async function handleCloudTopup(payload) {
+  return openPaystackCheckout('/api/billing/topup', { packCode: payload?.packCode }, 'packCode');
+}
+
 async function handleCloudCheckout(payload) {
-  const result = await cloudFetch('/api/billing/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ planCode: payload?.planCode }) }, true);
+  return openPaystackCheckout('/api/billing/checkout', { planCode: payload?.planCode }, 'planCode');
+}
+
+/**
+ * Start a Paystack charge in the browser and hand the person there. Both a plan
+ * change and a top-up end in the same place, so the link is only opened after it
+ * is confirmed to be Paystack's own origin: a tampered reply cannot send someone
+ * to a look-alike checkout page.
+ * @param {string} path API route that returns { authorizationUrl }
+ * @param {Record<string, unknown>} body
+ * @param {string} echoKey field of the reply to echo back to the renderer
+ */
+async function openPaystackCheckout(path, body, echoKey) {
+  const result = await cloudFetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }, true);
   if (!result.ok) return result;
   let checkout;
   try { checkout = new URL(result.data?.authorizationUrl); } catch { return { ok: false, error: { code: 'CLOUD_CHECKOUT_INVALID', message: 'The checkout link was invalid.' } }; }
   if (checkout.origin !== 'https://checkout.paystack.com') return { ok: false, error: { code: 'CLOUD_CHECKOUT_INVALID', message: 'The checkout link was not trusted.' } };
   const problem = await shell.openExternal(checkout.toString());
   if (problem) return { ok: false, error: { code: 'CLOUD_CHECKOUT_OPEN_FAILED', message: problem } };
-  return { ok: true, data: { opened: true, planCode: result.data?.planCode ?? payload?.planCode } };
+  return { ok: true, data: { opened: true, [echoKey]: result.data?.[echoKey] ?? body[echoKey] } };
 }
 
 async function handleCloudSignOut() {

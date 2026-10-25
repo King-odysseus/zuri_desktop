@@ -52,6 +52,10 @@ const CHANNELS = Object.freeze([
   'zuri:cloud:set-password',
   'zuri:cloud:account',
   'zuri:cloud:plans',
+  // Extra-usage packs and one-off purchases. A top-up adds tokens to the current
+  // allowance without changing plan, so it is a separate channel from checkout.
+  'zuri:cloud:topups',
+  'zuri:cloud:topup',
   'zuri:cloud:checkout',
   'zuri:cloud:sign-out',
   'zuri:tasks:list',
