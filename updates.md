@@ -575,5 +575,5 @@
 
 - Added a Capacitor Android target for the Zuri Cloud dashboard. The Android build embeds the production API URL, permits only the Capacitor localhost origins at the cloud API, builds a debug APK in GitHub Actions, and publishes `.apk` assets alongside Windows and macOS releases. The website now lists Android downloads automatically.
 - Key files: `capacitor.config.json`, `android/**`, `scripts/build-android.mjs`, `.github/workflows/build-android.yml`, `server/src/downloads.js`, `server/src/app.js`, `web/src/lib/api.js`, `web/src/lib/downloads.js`, `package.json`.
-- Other OS action: run `npm install && npm run android:build` after syncing. A Java 17 JDK and Android SDK are required for the native build.
+- Other OS action: run `npm install && npm run android:build` after syncing. A Java 21 JDK and Android SDK are required for the native build.
 - Done on: Windows
