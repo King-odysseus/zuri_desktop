@@ -5,6 +5,8 @@ import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/pro
 import { fileURLToPath } from 'node:url';
 
 import { CHAT_STREAM_CHANNEL, askForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
+import { lastQuestion, replyThroughAccount, webSearchContext } from './providers/cloud-chat.js';
+import { readChatStream } from './providers/sse.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
 import { IMAGE_MODELS, defaultImageModel, generateImage } from './providers/images.js';
 import { runOnboardingSetup } from './onboarding.js';
@@ -634,6 +636,9 @@ function handleChatSend(payload, event) {
     // settings.activeAgentId, which is the same id in the normal case.
     agentId: typeof payload?.agentId === 'string' ? payload.agentId : undefined,
     webSearch: payload?.webSearch === true,
+    // Every reply in the window goes through the account, so no supplier key is
+    // read and a signed-out window is told to sign in instead.
+    cloudReply: (request) => cloudChatReply(request),
     signal: controller.signal,
     emit: (streamEvent) => {
       // The window can close mid-stream; sending to a destroyed webContents throws.
@@ -713,7 +718,20 @@ function cloudBaseUrl(settings) {
   return url.toString().replace(/\/$/, '');
 }
 
-async function cloudFetch(pathname, options = {}, requireSession = false) {
+/**
+ * Send one signed request to Zuri Cloud and hand back the open response.
+ *
+ * Split out from cloudFetch because a streamed reply has to be read as it
+ * arrives, while every other call wants the parsed JSON. Both need the same base
+ * URL, the same session header and the same timeout handling, so this is the one
+ * place those live.
+ *
+ * @param {string} pathname
+ * @param {{ method?: string, headers?: Record<string, string>, body?: string, timeoutMs?: number, signal?: AbortSignal | null }} [options]
+ * @param {boolean} [requireSession]
+ * @returns {Promise<{ ok: true, data: { response: Response } } | { ok: false, error: { code: string, message: string }, status?: number }>}
+ */
+async function cloudRequest(pathname, options = {}, requireSession = false) {
   const settings = await readSettings();
   if (!settings.ok) return settings;
   const base = cloudBaseUrl(settings.data);
@@ -725,12 +743,33 @@ async function cloudFetch(pathname, options = {}, requireSession = false) {
     if (!saved.data?.token) return { ok: false, error: { code: 'CLOUD_AUTH_REQUIRED', message: 'Sign in to Zuri Cloud first.' } };
     headers.authorization = `Bearer ${saved.data.token}`;
   }
-  let response;
+  // A chat reply can take far longer than any other call, so the caller says how
+  // long it will wait and may pass its own signal, which is how Stop ends a reply
+  // that is still being written.
+  const { timeoutMs = 20_000, signal = null, ...fetchOptions } = options;
   try {
-    response = await fetch(`${base}${pathname}`, { ...options, headers, signal: AbortSignal.timeout(20_000) });
+    const response = await fetch(`${base}${pathname}`, {
+      ...fetchOptions,
+      headers,
+      signal: signal ?? AbortSignal.timeout(timeoutMs),
+    });
+    return { ok: true, data: { response } };
   } catch {
     return { ok: false, error: { code: 'CLOUD_UNAVAILABLE', message: 'Zuri Cloud could not be reached.' } };
   }
+}
+
+/**
+ * Run one JSON call and return the body the cloud answered with.
+ * @param {string} pathname
+ * @param {object} [options]
+ * @param {boolean} [requireSession]
+ * @returns {Promise<object>}
+ */
+async function cloudFetch(pathname, options = {}, requireSession = false) {
+  const reached = await cloudRequest(pathname, options, requireSession);
+  if (!reached.ok) return reached;
+  const response = reached.data.response;
   let body;
   try { body = await response.json(); } catch { body = null; }
   if (!response.ok || body?.ok !== true) return { ok: false, error: body?.error ?? { code: 'CLOUD_REQUEST_FAILED', message: 'Zuri Cloud rejected the request.' }, status: response.status };
@@ -754,6 +793,114 @@ async function handleCloudSignIn(payload) {
   const stored = await writeCloudSession(result.data?.token, result.data?.expiresAt);
   if (!stored.ok) return stored;
   return { ok: true, data: { user: result.data?.user, usage: result.data?.usage, expiresAt: result.data?.expiresAt } };
+}
+
+/**
+ * Ask the Zuri account for one reply.
+ *
+ * This is the app's only chat route: the desktop no longer needs a supplier key to
+ * answer, because the account pays for the request out of the plan. The request
+ * shape lives in providers/cloud-chat.js so the checks can prove it without a
+ * network, and this function supplies the signed POST it needs.
+ * @param {{ conversation: object, settings: object, signal?: AbortSignal, emit?: (event: object) => void }} request
+ * @returns {Promise<object>}
+ */
+/**
+ * Run the web search the person switched on, before the reply is asked for.
+ *
+ * The cloud route has no tool loop, so the search cannot be offered to the model as
+ * a call it makes. The app already owns a working search, so it runs here and the
+ * results travel with the question. A failed search is reported to the model rather
+ * than failing the message: a person who asked a question still deserves the best
+ * answer available without the web.
+ *
+ * @param {object} conversation
+ * @param {(event: object) => void} [emit]
+ * @returns {Promise<string>} The instruction block, empty when there was nothing to search.
+ */
+async function searchForReply(conversation, emit) {
+  const query = lastQuestion(conversation);
+  if (query === '') return '';
+
+  // Said out loud, because a search adds a wait and silence reads as a freeze.
+  emit?.({ status: 'Searching the web...' });
+  try {
+    const found = await runTool('webSearch', { query });
+    if (!found?.ok) return webSearchContext(query, []);
+    const results = Array.isArray(found.data?.results) ? found.data.results : [];
+    return webSearchContext(query, results);
+  } catch (error) {
+    console.error('[zuri] web search', error?.message ?? error);
+    return webSearchContext(query, []);
+  } finally {
+    emit?.({ status: '' });
+  }
+}
+
+async function cloudChatReply({ conversation, settings, signal, emit, webSearch, tools }) {
+  // Only when the person switched it on for this message; the direct route makes
+  // the same choice, so the toggle means one thing.
+  const searchContext = webSearch === true ? await searchForReply(conversation, emit) : '';
+  return replyThroughAccount({
+    conversation,
+    settings,
+    // The search results are instruction for this request only, never stored with
+    // the chat, so a later reply cannot cite a page nobody searched for.
+    context: searchContext,
+    tools: Array.isArray(tools) ? tools : [],
+    signal,
+    emit: (event) => emit?.(event),
+    postChat: async (body, chatOptions) => {
+      const reached = await cloudRequest('/api/chat', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        // A long answer can outlast any short timeout, and Stop has to be able to
+        // end one that is still being written.
+        timeoutMs: 120_000,
+        signal: chatOptions?.signal,
+      }, true);
+
+      /** The sentence a signed-out or expired session deserves. */
+      const signIn = {
+        ok: false,
+        error: { code: 'CLOUD_AUTH_REQUIRED', message: 'Sign in to Zuri to get replies. Open Zuri Cloud in the sidebar.' },
+      };
+
+      if (!reached.ok) {
+        // The session check happens before any request goes out, so this is the
+        // everyday signed-out case rather than a server answer.
+        if (reached.error?.code === 'CLOUD_AUTH_REQUIRED') return signIn;
+        return reached;
+      }
+
+      const response = reached.data.response;
+      const contentType = response.headers.get('content-type') ?? '';
+
+      // A server that has not been updated answers one plain JSON body. Reading it
+      // here means an older deploy still works, just without the typing effect.
+      if (!contentType.includes('text/event-stream')) {
+        let payload = null;
+        try { payload = await response.json(); } catch { payload = null; }
+        if (response.status === 401 || payload?.error?.code === 'AUTH_REQUIRED') return signIn;
+        if (!response.ok || payload?.ok !== true) {
+          return { ok: false, error: payload?.error ?? { code: 'CLOUD_REQUEST_FAILED', message: 'Zuri Cloud rejected the request.' } };
+        }
+        return payload;
+      }
+
+      // An event stream always answers 200; a refusal arrives as an error frame or
+      // as a JSON body before the stream starts.
+      if (!response.ok) {
+        let payload = null;
+        try { payload = await response.json(); } catch { payload = null; }
+        if (response.status === 401) return signIn;
+        return { ok: false, error: payload?.error ?? { code: 'CLOUD_REQUEST_FAILED', message: 'Zuri Cloud rejected the request.' } };
+      }
+
+      return readChatStream(response, (text) => chatOptions?.onDelta?.(text));
+    },
+  });
 }
 
 /**

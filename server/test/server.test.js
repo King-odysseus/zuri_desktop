@@ -186,7 +186,7 @@ assert.equal(invalidChat.status, 400);
   assert.equal(canUseModel(max, 'starter'), false);
   assert.equal(canUseModel(pro, 'power'), true);
   assert.equal(canUseModel(max, 'unknown'), false);
-  assert.equal(quotaTokens(pro, 100, 50), 750, 'a dearer model burns quota faster');
+  assert.equal(quotaTokens(pro, 100, 50), 900, 'a dearer model burns quota faster');
   assert.equal(supplierCostMicroUsd(flash, 1_000_000, 1_000_000), 420_000);
   assert.equal(microUsdToKobo(1_000_000, 1600), 160_000);
   assert.equal(limitsForModel({ requestsPerMinute: 10, maxConcurrent: 2 }, max).requestsPerMinute, 2);
@@ -663,6 +663,203 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
   const aliasRoute = await postJson('/api/auth/password', { password: 'another passphrase' }, sessionToken);
   assert.equal(aliasRoute.status, 404);
   assert.equal((await aliasRoute.json()).error.code, 'NOT_FOUND');
+}
+
+// A streamed reply is what the desktop asks for, so the answer appears word by word.
+// The two things that must not change are the charge and the wording: the same usage
+// is committed as a non-streamed reply, and a refusal still arrives as JSON before any
+// text does, so a person is never shown half an answer to a request that was refused.
+{
+  // The checks above sign out, which revokes that session, so this block needs one
+  // of its own rather than reusing a token that has just been killed.
+  const streamingSession = await auth.signInWithGoogle('credential');
+  const streamed = [];
+  const leases = [];
+  const streamApp = createApp({
+    auth,
+    repository: {
+      ...repository,
+      async reserveUsage() { return { id: 'reservation-stream', reservedTokens: 9000 }; },
+      async commitUsage(entry) { streamed.push(entry); },
+      async releaseUsage() { throw new Error('a finished stream must not release its reservation'); },
+    },
+    now: fixedNow,
+    chatProvider: async (request) => {
+      // The route hands in the pieces, which is what it turns into event frames.
+      for (const piece of ['Zuri ', 'is ', 'here.']) request.onDelta?.(piece);
+      return { model: request.model, content: 'Zuri is here.', usage: { inputTokens: 12, outputTokens: 8 } };
+    },
+  });
+  const response = await streamApp(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${streamingSession.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', stream: true, messages: [{ role: 'user', content: 'Hi' }] }),
+  }));
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get('content-type') ?? '', /text\/event-stream/, 'a streamed reply must not be buffered as JSON');
+  assert.equal(response.headers.get('cache-control'), 'no-store');
+
+  const frames = (await response.text())
+    .split('\n\n')
+    .filter((frame) => frame.trim() !== '')
+    .map((frame) => JSON.parse(frame.replace(/^data: /, '')));
+  const deltas = frames.filter((frame) => frame.type === 'delta').map((frame) => frame.text);
+  assert.deepEqual(deltas, ['Zuri ', 'is ', 'here.'], 'the text arrives in the order the supplier sent it');
+  assert.equal(frames.at(-1).type, 'done', 'the last frame closes the reply');
+  assert.equal(frames.at(-1).data.content, 'Zuri is here.');
+  assert.equal(frames.at(-1).data.modelName, 'Zuri Flash', 'the customer sees the Zuri name');
+  assert.ok(!JSON.stringify(frames).includes('deepseek'), 'the supplier name never travels to the customer');
+
+  // The charge is the same one the non-streamed route would have made: 20 raw
+  // tokens on a weight-1 model.
+  assert.equal(streamed.length, 1);
+  assert.equal(streamed[0].inputTokens, 12);
+  assert.equal(streamed[0].outputTokens, 8);
+  assert.equal(streamed[0].quotaTokens, 20);
+  assert.equal(streamed[0].modelCode, 'zuri-flash');
+
+  // A supplier failure mid-reply is answered with one error frame and no charge.
+  const released = [];
+  const failing = createApp({
+    auth,
+    repository: {
+      ...repository,
+      async reserveUsage() { return { id: 'reservation-fail', reservedTokens: 9000 }; },
+      async commitUsage() { throw new Error('a failed stream must not be charged'); },
+      async releaseUsage(id) { released.push(id); },
+    },
+    now: fixedNow,
+    chatProvider: async () => {
+      const error = new Error('The AI provider rejected the request.');
+      error.code = 'PROVIDER_REQUEST_FAILED';
+      throw error;
+    },
+  });
+  const failed = await failing(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${streamingSession.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', stream: true, messages: [{ role: 'user', content: 'Hi' }] }),
+  }));
+  const failedFrames = (await failed.text())
+    .split('\n\n')
+    .filter((frame) => frame.trim() !== '')
+    .map((frame) => JSON.parse(frame.replace(/^data: /, '')));
+  assert.deepEqual(failedFrames.map((frame) => frame.type), ['error']);
+  assert.equal(failedFrames[0].error.code, 'PROVIDER_REQUEST_FAILED');
+  assert.deepEqual(released, ['reservation-fail'], 'nothing was delivered, so the plan is not charged');
+
+  // An over-quota account is refused in JSON before any streaming starts.
+  const overQuota = createApp({
+    auth,
+    repository: {
+      ...repository,
+      async reserveUsage() {
+        const error = new Error('This request would exceed the plan quota.');
+        error.code = 'QUOTA_EXCEEDED';
+        throw error;
+      },
+    },
+    now: fixedNow,
+    chatProvider: async () => ({ model: 'x', content: 'never reached', usage: { inputTokens: 1, outputTokens: 1 } }),
+  });
+  const refused = await overQuota(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${streamingSession.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', stream: true, messages: [{ role: 'user', content: 'Hi' }] }),
+  }));
+  assert.equal(refused.status, 429);
+  assert.match(refused.headers.get('content-type') ?? '', /application\/json/);
+  assert.equal((await refused.json()).error.code, 'QUOTA_EXCEEDED');
+  assert.equal(leases.length, 0);
+}
+
+// Act mode tools run on the persons own computer, so the account route cannot
+// run them: it forwards the definitions, returns the call, and charges for the round.
+// What it must never do is run anything itself, or let a caller name a tool it never
+// offered.
+{
+  const active = await auth.signInWithGoogle('credential');
+  const charged = [];
+  const seen = [];
+  const toolApp = createApp({
+    auth,
+    repository: {
+      ...repository,
+      async reserveUsage() { return { id: 'reservation-tool', reservedTokens: 9000 }; },
+      async commitUsage(entry) { charged.push(entry); },
+      async releaseUsage() {},
+    },
+    now: fixedNow,
+    chatProvider: async (request) => {
+      seen.push(request);
+      // A real model answers a tool round with a call and little or no text.
+      return {
+        model: request.model,
+        content: '',
+        toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{"path":"notes.txt"}' }],
+        usage: { inputTokens: 20, outputTokens: 5 },
+      };
+    },
+  });
+
+  const tools = [{ name: 'readFile', description: 'Read a workspace file.', parameters: { type: 'object', properties: { path: { type: 'string' } }, required: ['path'] } }];
+  const called = await toolApp(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${active.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', stream: true, tools, messages: [{ role: 'user', content: 'Read my notes' }] }),
+  }));
+  assert.equal(called.status, 200);
+  // A tool round is answered whole, so the app can act on the call without waiting
+  // on a stream that has nothing useful to stream.
+  assert.match(called.headers.get('content-type') ?? '', /application\/json/);
+  const round = (await called.json()).data;
+  assert.equal(round.toolCalls.length, 1);
+  assert.equal(round.toolCalls[0].name, 'readFile');
+  assert.equal(seen[0].tools.length, 1, 'the definition reached the supplier');
+
+  // The round is charged: its tokens were spent whether or not it produced text.
+  assert.equal(charged.length, 1);
+  assert.equal(charged[0].inputTokens, 20);
+  assert.equal(charged[0].quotaTokens, 25);
+
+  // The second request carries the call and its result back, which is the whole
+  // point of the loop, and the supplier must receive them as such.
+  const followUp = await toolApp(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${active.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({
+      model: 'zuri-flash',
+      stream: true,
+      messages: [
+        { role: 'user', content: 'Read my notes' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{"path":"notes.txt"}' }] },
+        { role: 'tool', toolCallId: 'call_1', content: '{"ok":true,"data":{"text":"hello"}}' },
+      ],
+    }),
+  }));
+  assert.equal(followUp.status, 200);
+  const relayed = seen.at(-1).messages;
+  assert.equal(relayed.at(-2).role, 'assistant');
+  assert.equal(relayed.at(-2).toolCalls[0].name, 'readFile', 'the call travelled back');
+  assert.equal(relayed.at(-1).role, 'tool');
+  assert.equal(relayed.at(-1).toolCallId, 'call_1', 'the result names the call it answers');
+
+  // A malformed tool or message is refused rather than forwarded.
+  const badTool = await toolApp(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${active.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', messages: [{ role: 'user', content: 'x' }], tools: [{ description: 'no name' }] }),
+  }));
+  assert.equal(badTool.status, 400);
+  assert.equal((await badTool.json()).error.code, 'INVALID_TOOLS');
+
+  const badResult = await toolApp(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${active.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', messages: [{ role: 'tool', content: 'orphan result' }] }),
+  }));
+  assert.equal(badResult.status, 400);
+  assert.equal((await badResult.json()).error.code, 'INVALID_MESSAGES');
 }
 
 console.log('PASS server contract');

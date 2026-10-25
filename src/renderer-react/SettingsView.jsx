@@ -297,7 +297,7 @@ export default function SettingsView() {
 
           <section className="rounded-xl border border-border bg-surface p-5">
             <h2 className="text-lg font-medium">Model and overlay</h2>
-            <p className="mt-1 text-sm text-muted">Choose the Zuri model that writes your local desktop replies. Each one runs on one provider key.</p>
+            <p className="mt-1 text-sm text-muted">Choose the Zuri model that answers your chats. It is billed to your Zuri plan, so it needs no key of your own.</p>
             <div className="mt-4">
               <SelectField
                 label="Model"
@@ -315,7 +315,7 @@ export default function SettingsView() {
             <p className="mt-2 text-xs text-muted">
               {zuriModel === null
                 ? 'This model was chosen outside the Zuri list, so it is shown by its provider id.'
-                : `${zuriModel.name}: ${zuriModel.note} It answers through your ${providerLabel(zuriModel.provider)} key.`}
+                : `${zuriModel.name}: ${zuriModel.note} Billed to your Zuri plan.`}
             </p>
             <p className="mt-2 text-xs text-muted">Your selected provider key is stored only on this computer. Cloud model usage and allowance are separate from local provider usage.</p>
             <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
@@ -357,8 +357,8 @@ export default function SettingsView() {
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <h2 className="text-lg font-medium">Providers and keys</h2>
-            <p className="mt-1 text-sm text-muted">Keys are stored on this computer. Zuri only knows whether one is saved.</p>
+            <h2 className="text-lg font-medium">Provider key (optional)</h2>
+            <p className="mt-1 text-sm text-muted">You do not need a key to chat: replies are billed to your Zuri plan through the account you signed in with. A key is only used by the Word add-in, which talks to a provider directly. Keys are stored on this computer and Zuri only knows whether one is saved.</p>
             <p className="mt-1 text-sm text-muted">Your messages, and the text of any file you attach, are sent to the provider you pick to write replies. Some providers are outside Nigeria. AI can be wrong, so check anything important. Read the privacy and terms notices at the Zuri Cloud site (/privacy and /terms).</p>
             <p role="note" className="mt-3 rounded-xl border border-border bg-surface-secondary px-4 py-3 text-sm text-muted">
               Your messages are sent to the AI company behind the model you use, so it can write a reply. Some of these

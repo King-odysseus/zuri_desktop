@@ -207,18 +207,77 @@ function validateMessages(messages) {
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
     return { ok: false, message: 'Send between 1 and 50 chat messages.' };
   }
-  const allowedRoles = new Set(['system', 'user', 'assistant']);
+  const allowedRoles = new Set(['system', 'user', 'assistant', 'tool']);
   const normalized = [];
   let characters = 0;
   for (const entry of messages) {
-    if (!entry || typeof entry !== 'object' || !allowedRoles.has(entry.role) || typeof entry.content !== 'string' || entry.content.trim() === '') {
+    if (!entry || typeof entry !== 'object' || !allowedRoles.has(entry.role) || typeof entry.content !== 'string') {
       return { ok: false, message: 'Each message needs a supported role and text content.' };
     }
+    // A tool result can legitimately be an empty string (a tool that only wrote a
+    // file), and an assistant turn that only asked for a tool has no text either.
+    const mayBeEmpty = entry.role === 'tool' || entry.role === 'assistant';
+    if (!mayBeEmpty && entry.content.trim() === '') {
+      return { ok: false, message: 'Each message needs a supported role and text content.' };
+    }
+
+    // The two additions a tool loop needs: the id a result answers, and the calls an
+    // assistant turn made. Both are bounded here so a crafted body cannot make the
+    // server repeat an unbounded conversation back to a supplier.
+    if (entry.role === 'tool') {
+      if (typeof entry.toolCallId !== 'string' || entry.toolCallId === '' || entry.toolCallId.length > 120) {
+        return { ok: false, message: 'A tool result needs the id of the call it answers.' };
+      }
+      normalized.push({ role: 'tool', content: entry.content, toolCallId: entry.toolCallId });
+    } else if (entry.role === 'assistant' && Array.isArray(entry.toolCalls) && entry.toolCalls.length > 0) {
+      if (entry.toolCalls.length > 8) return { ok: false, message: 'An assistant turn cannot call more than 8 tools.' };
+      const calls = [];
+      for (const call of entry.toolCalls) {
+        if (!call || typeof call.name !== 'string' || call.name === '') {
+          return { ok: false, message: 'Each tool call needs a name.' };
+        }
+        calls.push({
+          id: typeof call.id === 'string' ? call.id.slice(0, 120) : '',
+          name: call.name.slice(0, 60),
+          arguments: typeof call.arguments === 'string' ? call.arguments.slice(0, 20_000) : '{}',
+        });
+      }
+      normalized.push({ role: 'assistant', content: entry.content, toolCalls: calls });
+    } else {
+      // An empty assistant turn that made no calls carries nothing to send.
+      if (entry.content.trim() === '') continue;
+      normalized.push({ role: entry.role, content: entry.content });
+    }
+
     characters += entry.content.length;
     if (characters > 400_000) return { ok: false, message: 'The conversation is too large.' };
-    normalized.push({ role: entry.role, content: entry.content });
   }
   return { ok: true, data: normalized, inputTokens: Math.ceil(characters / 4) };
+}
+
+/**
+ * The tools a request may offer the model.
+ *
+ * The model can only call a name that is on this list, and only the app decides what
+ * is on it: the server forwards the definitions and never runs anything itself, so a
+ * tool call coming back is a request the app still has to honour.
+ * @param {unknown} tools
+ * @returns {{ ok: true, data: Array<object> } | { ok: false, message: string }}
+ */
+function validateTools(tools) {
+  if (tools === undefined || tools === null) return { ok: true, data: [] };
+  if (!Array.isArray(tools)) return { ok: false, message: 'Tools must be a list.' };
+  if (tools.length > 20) return { ok: false, message: 'Offer at most 20 tools.' };
+  const normalized = [];
+  for (const tool of tools) {
+    if (!tool || typeof tool.name !== 'string' || tool.name === '' || tool.name.length > 60) {
+      return { ok: false, message: 'Each tool needs a name of up to 60 characters.' };
+    }
+    const description = typeof tool.description === 'string' ? tool.description.slice(0, 2000) : '';
+    const parameters = tool.parameters && typeof tool.parameters === 'object' ? tool.parameters : { type: 'object', properties: {} };
+    normalized.push({ name: tool.name, description, parameters });
+  }
+  return { ok: true, data: normalized };
 }
 
 /** @param {string} siteUrl @returns {string} */
@@ -396,6 +455,8 @@ export function createApp(dependencies = {}) {
         const body = await readJson(request, MAX_CHAT_BODY_BYTES);
         const messages = validateMessages(body.messages);
         if (!messages.ok) return response(400, { ok: false, error: { code: 'INVALID_MESSAGES', message: messages.message } });
+        const offeredTools = validateTools(body.tools);
+        if (!offeredTools.ok) return response(400, { ok: false, error: { code: 'INVALID_TOOLS', message: offeredTools.message } });
         const catalogue = await loadModels(dependencies);
         const zuriModel = findModel(catalogue, body.model);
         if (!zuriModel) return response(400, { ok: false, error: { code: 'UNKNOWN_MODEL', message: 'That model is not available.' } });
@@ -419,18 +480,24 @@ export function createApp(dependencies = {}) {
         }
         let reservation;
         const requestId = randomUUID();
-        try {
-          // Reserve the full allowed request envelope, weighted for the model.
-          // This is conservative, but prevents tokenizer differences from
-          // overspending the quota.
-          reservation = await dependencies.repository.reserveUsage({
-            userId: session.user.id,
-            subscriptionId: session.subscription.id,
-            requestedTokens: quotaTokens(zuriModel, limits.maxInputTokens, limits.maxOutputTokens),
-            expiresAt: new Date(now().getTime() + RESERVATION_TTL_MS),
-          });
-          const result = await dependencies.chatProvider({ messages: messages.data, model: zuriModel.supplierModel, supplier: zuriModel.supplier, maxTokens: limits.maxOutputTokens, signal: AbortSignal.timeout(120_000) });
-          await dependencies.repository.commitUsage({
+
+        // The request lease is released exactly once. The streamed branch returns
+        // its Response before the direct branch's finally would run, so a shared
+        // guard is what keeps the limiter's slot from being held for ever.
+        let leaseReleased = false;
+        const releaseLease = () => {
+          if (leaseReleased) return;
+          leaseReleased = true;
+          lease.release();
+        };
+
+        /**
+         * Record what a finished reply actually spent. Both the streamed and the
+         * direct answer go through here, so the two can never bill differently.
+         * @param {{ model: string, usage: { inputTokens: number, outputTokens: number } }} result
+         */
+        const commitReply = (result) =>
+          dependencies.repository.commitUsage({
             reservationId: reservation.id,
             userId: session.user.id,
             model: result.model,
@@ -442,16 +509,153 @@ export function createApp(dependencies = {}) {
             outputTokens: result.usage.outputTokens,
             requestId,
           });
+
+        /**
+         * Map a failure onto the answer the client should see, so the streamed and
+         * the direct route report the same code for the same mistake.
+         * @param {any} error
+         * @returns {{ status: number, body: object }}
+         */
+        const failureFor = (error) => {
+          if (error?.code === 'QUOTA_EXCEEDED') return { status: 429, body: { ok: false, error: { code: error.code, message: error.message } } };
+          if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'PROVIDER_RESPONSE_INVALID') return { status: 502, body: { ok: false, error: { code: error.code, message: error.message } } };
+          return { status: 500, body: { ok: false, error: { code: 'CHAT_FAILED', message: 'The chat request could not be completed.' } } };
+        };
+
+        try {
+          // Reserve the full allowed request envelope, weighted for the model.
+          // This is conservative, but prevents tokenizer differences from
+          // overspending the quota. It happens before any streaming starts, so an
+          // over-quota account is told plainly instead of watching a partial reply
+          // that will never be billed.
+          reservation = await dependencies.repository.reserveUsage({
+            userId: session.user.id,
+            subscriptionId: session.subscription.id,
+            requestedTokens: quotaTokens(zuriModel, limits.maxInputTokens, limits.maxOutputTokens),
+            expiresAt: new Date(now().getTime() + RESERVATION_TTL_MS),
+          });
+        } catch (error) {
+          releaseLease();
+          const mapped = failureFor(error);
+          // A quota refusal is an answer, not a fault, so it is not logged as one.
+          if (mapped.status !== 429) console.error('[zuri-cloud] reserve usage', error?.message ?? error);
+          return response(mapped.status, mapped.body);
+        }
+
+        // A request that offers tools is answered whole, not streamed. The point of
+        // such a round is the calls, not the words, and the app has to run them and
+        // come back: streaming halfway through a tool loop only delays the decision.
+        if (offeredTools.data.length > 0) {
+          try {
+            const result = await dependencies.chatProvider({
+              messages: messages.data,
+              model: zuriModel.supplierModel,
+              supplier: zuriModel.supplier,
+              maxTokens: limits.maxOutputTokens,
+              signal: AbortSignal.timeout(120_000),
+              tools: offeredTools.data,
+            });
+            // The round is charged whether or not it also produced text: the tokens
+            // were spent either way, and a loop that only billed the last round would
+            // be free for anyone willing to call tools.
+            await commitReply(result);
+            releaseLease();
+            return response(200, {
+              ok: true,
+              data: {
+                requestId,
+                model: zuriModel.code,
+                modelName: zuriModel.name,
+                content: result.content,
+                toolCalls: Array.isArray(result.toolCalls) ? result.toolCalls : [],
+                usage: result.usage,
+              },
+            });
+          } catch (error) {
+            if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
+            const mapped = failureFor(error);
+            if (mapped.status === 500) console.error('[zuri-cloud] chat', error?.message ?? error);
+            return response(mapped.status, mapped.body);
+          } finally {
+            releaseLease();
+          }
+        }
+
+        // A streamed reply is what the desktop app asks for, so the answer appears
+        // word by word instead of after a long silence. The body is server-sent
+        // events: `delta` as the text arrives, then one `done` carrying the saved
+        // message and its usage, or one `error` and nothing more.
+        if (body.stream === true) {
+          const encoder = new TextEncoder();
+          const stream = new ReadableStream({
+            async start(controller) {
+              let closed = false;
+              const send = (event) => {
+                if (closed) return;
+                try {
+                  controller.enqueue(encoder.encode(`data: ${json(event)}\n\n`));
+                } catch {
+                  // The window closed or the connection dropped, which is the
+                  // person pressing Stop or losing the network. Stop writing.
+                  closed = true;
+                }
+              };
+              try {
+                const result = await dependencies.chatProvider({
+                  messages: messages.data,
+                  model: zuriModel.supplierModel,
+                  supplier: zuriModel.supplier,
+                  maxTokens: limits.maxOutputTokens,
+                  signal: AbortSignal.timeout(120_000),
+                  onDelta: (text) => send({ type: 'delta', text }),
+                });
+                await commitReply(result);
+                // The supplier's model name stays server-side; customers see the
+                // Zuri name.
+                send({ type: 'done', data: { requestId, model: zuriModel.code, modelName: zuriModel.name, content: result.content, usage: result.usage } });
+              } catch (error) {
+                // Nothing reached the person, so the plan is not charged for it.
+                if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
+                const mapped = failureFor(error);
+                if (mapped.status === 500) console.error('[zuri-cloud] chat', error?.message ?? error);
+                send({ type: 'error', error: mapped.body.error });
+              } finally {
+                releaseLease();
+                if (!closed) {
+                  closed = true;
+                  try {
+                    controller.close();
+                  } catch {
+                    // Already closed by the reader going away.
+                  }
+                }
+              }
+            },
+          });
+          return new Response(stream, {
+            status: 200,
+            headers: {
+              'content-type': 'text/event-stream; charset=utf-8',
+              'cache-control': 'no-store',
+              // A proxy that buffers would hold every delta until the reply was
+              // finished, which is the exact delay streaming exists to remove.
+              'x-accel-buffering': 'no',
+            },
+          });
+        }
+
+        try {
+          const result = await dependencies.chatProvider({ messages: messages.data, model: zuriModel.supplierModel, supplier: zuriModel.supplier, maxTokens: limits.maxOutputTokens, signal: AbortSignal.timeout(120_000) });
+          await commitReply(result);
           // The supplier's model name stays server-side; customers see the Zuri name.
           return response(200, { ok: true, data: { requestId, model: zuriModel.code, modelName: zuriModel.name, content: result.content, usage: result.usage } });
         } catch (error) {
           if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
-          if (error?.code === 'QUOTA_EXCEEDED') return response(429, { ok: false, error: { code: error.code, message: error.message } });
-          if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'PROVIDER_RESPONSE_INVALID') return response(502, { ok: false, error: { code: error.code, message: error.message } });
-          console.error('[zuri-cloud] chat', error?.message ?? error);
-          return response(500, { ok: false, error: { code: 'CHAT_FAILED', message: 'The chat request could not be completed.' } });
+          const mapped = failureFor(error);
+          if (mapped.status === 500) console.error('[zuri-cloud] chat', error?.message ?? error);
+          return response(mapped.status, mapped.body);
         } finally {
-          lease.release();
+          releaseLease();
         }
       } catch (error) {
         if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });

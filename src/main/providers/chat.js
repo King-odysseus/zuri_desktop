@@ -23,6 +23,7 @@ import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import { DEFAULT_PROVIDER, PROVIDERS, getKey } from '../secrets.js';
+import { replyThroughAccount } from './cloud-chat.js';
 import { appendMessage, findAgent, readStore } from '../store.js';
 import { agentAllowedTools, runTool } from '../tools/index.js';
 
@@ -1143,11 +1144,103 @@ export async function sendChatMessage(threadId, options = {}) {
     settings,
   });
 
+  // The account is the only way in. main.js hands in a cloudReply whenever the app
+  // asks for a reply, so a chat is answered from the person's Zuri plan and no
+  // supplier key is read, stored or needed. A caller with no account route (the
+  // automation runner, the checks) keeps the direct-provider path below.
+  if (typeof options.cloudReply === 'function') {
+    let reached;
+    try {
+      // The account route is a conversation of rounds now: the model may ask for a
+      // tool, the app runs it, and the result goes back. The tools themselves always
+      // run here, on this computer, because that is where the workspace is; the
+      // server only ever forwards the definitions and returns the request.
+      const allowedForAccount = agentAllowedTools(settings, options.agentId);
+      const offeredForAccount = (options.webSearch === true ? ALL_CHAT_TOOLS : BASE_TOOLS)
+        .filter((tool) => allowedForAccount === null || allowedForAccount.includes(tool.name));
+
+      // The wire conversation grows as rounds go by: an assistant turn that asked
+      // for a tool, then one result per call.
+      const wire = conversation.turns.map((turn) => ({ ...turn }));
+      let rounds = 0;
+      let textSoFar = '';
+      for (;;) {
+        const toolsForRound = rounds < MAX_TOOL_ROUNDS ? offeredForAccount : [];
+        reached = await options.cloudReply({
+          conversation: { system: conversation.system, turns: wire },
+          settings,
+          tools: toolsForRound,
+          signal: options.signal,
+          emit: (event) => {
+            if (typeof event.delta === 'string') textSoFar += event.delta;
+            emit({ threadId, ...event });
+          },
+        });
+        if (!reached.ok) break;
+
+        const calls = Array.isArray(reached.data?.toolCalls) ? reached.data.toolCalls : [];
+        if (calls.length === 0 || toolsForRound.length === 0) break;
+
+        // The call and its results have to travel with the next round, or the model
+        // cannot see what it asked for or what came back.
+        wire.push({ role: 'assistant', content: reached.data.content || '', toolCalls: calls });
+        for (const call of calls) {
+          const args = parseToolInput(call.arguments);
+          const offered = offeredForAccount.some((tool) => tool.name === call.name);
+          const outcome = offered
+            ? await runTool(call.name, args, { allowedTools: allowedForAccount })
+            : failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
+          const madeFile = FILE_TOOL_NAMES.has(call.name) && outcome.ok;
+          if (madeFile) {
+            const { path: filePath, name, kind, bytes } = outcome.data;
+            builtFiles.push({ path: filePath, name, kind, bytes });
+            emit({ threadId, files: [{ path: filePath, name, kind, bytes }] });
+          }
+          emit({ threadId, status: madeFile ? `Made ${outcome.data.name}` : '' });
+          wire.push({
+            role: 'tool',
+            toolCallId: call.id,
+            content: JSON.stringify(madeFile
+              ? { ok: true, data: { name: outcome.data.name, kind: outcome.data.kind, note: 'The file is ready and shown to the person as a download card.' } }
+              : outcome,
+            ).slice(0, TOOL_RESULT_LIMIT),
+          });
+        }
+        rounds += 1;
+      }
+
+      // The per-round tool files are already in builtFiles; the shared code below
+      // saves one message from reached.data.content, so it is told the whole text.
+      if (reached.ok) reached.data.content = textSoFar !== '' ? textSoFar : reached.data.content;
+    } catch (error) {
+      // Stop aborts the request under the stream, which surfaces as a failed read
+      // rather than an answer. That is the person's own doing and must not appear
+      // as a network fault, so it gets the same wording the direct route uses.
+      if (options.signal?.aborted) return failure('CHAT_STOPPED', 'That reply was stopped before it arrived.');
+      if (error?.name === 'TimeoutError') return failure('CHAT_TIMEOUT', 'Zuri Cloud did not answer in time. Try again.');
+      return failure('CHAT_NETWORK_ERROR', 'The reply from Zuri Cloud was cut off. Try again.');
+    }
+    // The stream stopped early or the server reported a failure; say so plainly.
+    if (options.signal?.aborted) return failure('CHAT_STOPPED', 'That reply was stopped before it arrived.');
+    if (!reached.ok) return reached;
+    const saved = await appendMessage(threadId, {
+      role: 'assistant',
+      content: reached.data.content,
+      files: [],
+    });
+    if (!saved.ok) return saved;
+    emit({ threadId, done: true });
+    return {
+      ok: true,
+      data: { ...saved.data, provider: 'zuri-cloud', model: reached.data.modelCode },
+    };
+  }
+
   const key = getKey(provider);
   if (key === null) {
     return failure(
       'CHAT_NO_KEY',
-      `No ${config.label} key is saved. Add one in Settings to get replies.`,
+      `No ${config.label} key is saved. Sign in to Zuri, or add a key in Settings.`,
     );
   }
 

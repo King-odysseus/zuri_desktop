@@ -262,6 +262,226 @@ check('setup completes without a provider key', async () => {
     fs.rmSync(scratch, { recursive: true, force: true });
   }
 });
+// Chat is answered from the Zuri plan now, so the app has to hand the send path an
+// account route, and a signed-out window must be told to sign in rather than
+// quietly falling back to a key nobody was asked for.
+check('chat answers through the Zuri account, not a saved key', () => {
+  const main = read('src/main/main.js');
+  if (!main.includes('cloudReply: (request) => cloudChatReply(request)')) {
+    throw new Error('the window chat send has no account route');
+  }
+  if (!main.includes("cloudRequest('/api/chat'")) throw new Error('nothing calls the cloud chat route');
+  if (!main.includes('readChatStream')) throw new Error('the app never reads the streamed reply');
+  const chat = read('src/main/providers/chat.js');
+  if (!chat.includes("if (typeof options.cloudReply === 'function')")) {
+    throw new Error('the send path ignores the account route');
+  }
+  return 'sent with the session, no key read';
+});
+
+check('the account request names a Zuri model and carries the identity', async () => {
+  const { replyThroughAccount } = await import(pathToFileURL(path.join(root, 'src/main/providers/cloud-chat.js')).href);
+  const sent = [];
+  const deltas = [];
+  const conversation = {
+    system: 'You are Zuri, an AI assistant made by Tijha.',
+    turns: [
+      { role: 'user', content: 'Hello' },
+      { role: 'assistant', content: 'Hi' },
+      { role: 'user', content: 'Who are you?' },
+    ],
+  };
+  const result = await replyThroughAccount({
+    conversation,
+    // A settings file written before the switch still holds the supplier id.
+    settings: { model: 'deepseek-flash' },
+    postChat: async (body) => {
+      sent.push(body);
+      return { ok: true, data: { content: 'I am Zuri.', model: 'zuri-flash', modelName: 'Zuri Flash' } };
+    },
+    emit: (event) => deltas.push(event),
+  });
+  if (!result.ok) throw new Error(result.error.message);
+  if (sent.length !== 1) throw new Error('expected one request, sent ' + sent.length);
+  if (sent[0].model !== 'zuri-flash') throw new Error('model was ' + sent[0].model);
+  if (sent[0].messages[0].role !== 'system') throw new Error('the identity is not first');
+  if (!sent[0].messages[0].content.includes('made by Tijha')) throw new Error('the identity was dropped');
+  if (sent[0].messages.at(-1).content !== 'Who are you?') throw new Error('the question was not last');
+  if (sent[0].stream !== true) throw new Error('the request does not ask to stream');
+  // Not streaming, so the whole answer is handed over once rather than in pieces.
+  if (deltas.length !== 1 || deltas[0].delta !== 'I am Zuri.') throw new Error('an unstreamed reply was not emitted once');
+  // A Zuri code already saved must pass straight through untouched.
+  const again = await replyThroughAccount({
+    conversation,
+    settings: { model: 'zuri-elite' },
+    postChat: async (body) => {
+      sent.push(body);
+      return { ok: true, data: { content: 'ok' } };
+    },
+  });
+  if (!again.ok || sent.at(-1).model !== 'zuri-elite') throw new Error('a Zuri code was not passed through');
+
+  // A streaming server hands each piece to postChat, and those pieces are what the
+  // transcript shows: they must arrive in order and must not be repeated by the
+  // final content in done.
+  const pieces = [];
+  const streamed = await replyThroughAccount({
+    conversation,
+    settings: { model: 'zuri-flash' },
+    postChat: async (body, options) => {
+      for (const piece of ['I am ', 'Zu', 'ri.']) options.onDelta(piece);
+      return { ok: true, data: { content: 'I am Zuri.', model: 'zuri-flash' } };
+    },
+    emit: (event) => pieces.push(event.delta),
+  });
+  if (!streamed.ok) throw new Error('a streamed reply was refused');
+  if (pieces.join('') !== 'I am Zuri.') throw new Error('deltas were ' + JSON.stringify(pieces));
+  if (streamed.data.content !== 'I am Zuri.') throw new Error('the saved content was lost');
+  return 'identity first, legacy id translated, deltas in order';
+});
+// The window turns event frames into the text it shows, so the parser is fed real
+// frames here: what it must never do is drop a delta because a frame happened to
+// arrive in two network chunks, or present a broken reply as a finished one.
+check('the streamed reply is read frame by frame, even across a split chunk', async () => {
+  const { readChatStream } = await import(pathToFileURL(path.join(root, 'src/main/providers/sse.js')).href);
+
+  /** Build the response a server would send, from the exact chunks given. */
+  const respond = (chunks) => {
+    const encoder = new TextEncoder();
+    const body = new ReadableStream({
+      start(controller) {
+        for (const chunk of chunks) controller.enqueue(encoder.encode(chunk));
+        controller.close();
+      },
+    });
+    return new Response(body, { headers: { 'content-type': 'text/event-stream' } });
+  };
+
+  // The first frame is deliberately cut in half at "te|xt", which is what happens
+  // whenever a network packet boundary lands mid-frame.
+  const split = [
+    'data: {"type":"delta","te',
+    'xt":"Hi "}\n\ndata: {"type":"delta","text":"there"}\n\n',
+    'data: {"type":"done","data":{"content":"Hi there","model":"zuri-flash"}}\n\n',
+  ];
+  const seen = [];
+  const finished = await readChatStream(respond(split), (text) => seen.push(text));
+  if (!finished.ok) throw new Error('a good stream was refused: ' + finished.error.message);
+  if (seen.join('') !== 'Hi there') throw new Error('deltas were ' + JSON.stringify(seen));
+  if (finished.data.content !== 'Hi there') throw new Error('the done frame was not read');
+
+  // A reply that stops without a done frame is not a finished reply, even though
+  // text arrived. Saying so is what stops half an answer looking complete.
+  const cut = await readChatStream(respond(['data: {"type":"delta","text":"Half"}\n\n']), () => {});
+  if (cut.ok !== false || cut.error.code !== 'CHAT_STREAM_ENDED') throw new Error('a truncated reply was treated as finished');
+
+  // A failure after text arrived is still a failure: the request was not charged.
+  const refused = await readChatStream(
+    respond([
+      'data: {"type":"delta","text":"Starting"}\n\n',
+      'data: {"type":"error","error":{"code":"PROVIDER_REQUEST_FAILED","message":"The AI provider rejected the request."}}\n\n',
+    ]),
+    () => {},
+  );
+  if (refused.ok !== false || refused.error.code !== 'PROVIDER_REQUEST_FAILED') throw new Error('an error frame was ignored');
+
+  return 'deltas in order, split frame survived, truncation and errors refused';
+});
+// The composer's web search toggle has to mean something on the account route. The
+// search runs in the app because the cloud route has no tool loop, so what it is
+// told, and what it will not invent, is checked here.
+check('web search puts live results in front of the model, and cites them', async () => {
+  const { cloudMessages, lastQuestion, webSearchContext } = await import(pathToFileURL(path.join(root, 'src/main/providers/cloud-chat.js')).href);
+
+  const results = [
+    { title: 'Naira rate today', url: 'https://example.com/rate', snippet: 'One dollar is 1,550 naira.' },
+    { title: 'Central bank notice', url: 'https://example.com/cbn' },
+    // A result with no URL cannot be cited, so it must not be numbered.
+    { title: 'No link', snippet: 'orphan' },
+  ];
+  const context = webSearchContext('what is the dollar rate?', results);
+  if (!context.includes('what is the dollar rate?')) throw new Error('the question was lost');
+  if (!context.includes('1. Naira rate today')) throw new Error('results are not numbered');
+  if (!context.includes('https://example.com/rate')) throw new Error('the URL is missing');
+  if (context.includes('orphan')) throw new Error('a result with no URL was offered as a citation');
+  // The rule that matters: no invented source.
+  if (!context.includes('never invent a source')) throw new Error('the no-invented-sources rule is missing');
+
+  // Nothing found is said plainly, not filled in from memory.
+  const empty = webSearchContext('anything', []);
+  if (!empty.includes('could not find')) throw new Error('an empty search is not reported honestly');
+
+  // The question is the newest user turn, and an inlined attachment is not part of it.
+  const conversation = {
+    system: 'You are Zuri, an AI assistant made by Tijha.',
+    turns: [
+      { role: 'user', content: 'older question' },
+      { role: 'assistant', content: 'an answer' },
+      { role: 'user', content: 'what is the dollar rate?\n\nAttached file: notes.txt (path: notes.txt)\n\nsecret file body' },
+    ],
+  };
+  const question = lastQuestion(conversation);
+  if (question !== 'what is the dollar rate?') throw new Error('the search query was ' + question);
+  if (question.includes('secret file body')) throw new Error('the attachment body was searched for');
+
+  // Identity first, then the search instruction, then the conversation.
+  const messages = cloudMessages(conversation, 'SEARCH RESULTS');
+  if (messages[0].role !== 'system' || !messages[0].content.includes('made by Tijha')) {
+    throw new Error('the identity is not first');
+  }
+  if (messages[1].role !== 'system' || messages[1].content !== 'SEARCH RESULTS') {
+    throw new Error('the search results are not the second thing read');
+  }
+  // The whole turn travels, attachment included; it is the newest question only for
+  // the purpose of choosing what to search for.
+  if (!messages.at(-1).content.startsWith('what is the dollar rate?')) throw new Error('the question was not last');
+
+  // An attached file is already inlined into the message by the composer, so it
+  // travels to the account route without any extra work. This pins that, because
+  // "attachments are not sent" was the wrong assumption once made about this route.
+  const withFile = cloudMessages({ turns: [{ role: 'user', content: 'summarise this\n\nAttached file: notes.txt\n\nthe body' }] });
+  if (!withFile[0].content.includes('the body')) throw new Error('an attached file was dropped');
+
+  return 'numbered results, no invented sources, attachment text travels';
+});
+// Act mode over the account: the model asks, the app runs the tool on this computer,
+// the result goes back, and the answer finishes. The loop is what makes the account
+// route as capable as the direct one.
+check('a tool round over the account runs the tool locally and finishes the answer', async () => {
+  const { cloudMessages } = await import(pathToFileURL(path.join(root, 'src/main/providers/cloud-chat.js')).href);
+
+  // The app builds the wire conversation from the loop it is driving.
+  const turns = [
+    { role: 'user', content: 'Read my notes and summarise them' },
+    { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{"path":"notes.txt"}' }] },
+    { role: 'tool', toolCallId: 'call_1', content: '{"ok":true,"data":{"text":"the notes"}}' },
+    { role: 'user', content: 'Answer now using what you read.' },
+  ];
+  const messages = cloudMessages({ system: 'You are Zuri, an AI assistant made by Tijha.', turns });
+
+  if (messages[0].role !== 'system' || !messages[0].content.includes('made by Tijha')) {
+    throw new Error('the identity is not first');
+  }
+  const call = messages.find((message) => Array.isArray(message.toolCalls));
+  if (!call) throw new Error('the assistant call was dropped, so the supplier cannot see it');
+  if (call.toolCalls[0].name !== 'readFile') throw new Error('the call lost its name');
+  const result = messages.find((message) => message.role === 'tool');
+  if (!result) throw new Error('the tool result was dropped');
+  if (result.toolCallId !== 'call_1') throw new Error('the result does not name the call it answers');
+  if (!result.content.includes('the notes')) throw new Error('the result body was lost');
+
+  // An empty assistant turn with no calls is not worth sending, and would be refused
+  // by the server if it were.
+  const trimmed = cloudMessages({ turns: [{ role: 'assistant', content: '' }, { role: 'user', content: 'hi' }] });
+  if (trimmed.length !== 1) throw new Error('an empty assistant turn was sent');
+
+  // The loop is bounded, so a model that keeps asking cannot run for ever.
+  const chat = read('src/main/providers/chat.js');
+  if (!chat.includes('rounds < MAX_TOOL_ROUNDS')) throw new Error('the account loop is unbounded');
+  if (!chat.includes('runTool(call.name, args')) throw new Error('the tools are not run on this computer');
+
+  return 'call and result travel, loop is bounded, tools run locally';
+});
 
 const { setWorkspaceRoot, runTool } = await import(pathToFileURL(path.join(root, 'src/main/tools/index.js')).href);
 const officeWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-office-'));
@@ -538,6 +758,54 @@ check('the overlay window leaves room for the card shadow', () => {
   if (reach > margin) throw new Error(`the shadow reaches ${reach}px but the window margin is only ${margin}px`);
   return `margin ${margin}px, shadow reaches ${reach}px`;
 });
+
+/* A frameless transparent window has no title bar, and Chromium's app-region drag does
+   not move one on Windows, so the popup could not be moved at all until the header
+   started reporting the pointer's travel and main moved the window. Five pieces have to
+   agree for that to work: the window stays movable, the OS rectangle shadow stays off
+   (it draws straight edges and square corners over the round CSS shadow), the header
+   handles the press, the bridge carries the delta, and main answers it. */
+check('the quick-ask popup can be dragged around the screen', () => {
+  const overlay = read('src/main/overlay.js');
+  if (!overlay.includes('hasShadow: false')) {
+    throw new Error('overlay.js leaves the OS window shadow on, which paints straight edges and square corners behind the round card');
+  }
+  if (!overlay.includes('movable: true')) throw new Error('the overlay window is no longer movable');
+  if (!overlay.includes('export function moveOverlayBy(')) throw new Error('overlay.js cannot move the card, so a drag does nothing');
+
+  const panel = read('src/renderer-react/ChatPanel.jsx');
+  for (const required of ['className="zuri-overlay-header"', 'onPointerDown={beginOverlayDrag}', 'function beginOverlayDrag(']) {
+    if (!panel.includes(required)) throw new Error(`ChatPanel.jsx is missing ${required}`);
+  }
+  // The window buttons live in the same strip, so a press on one must not start a drag.
+  if (!panel.includes("closest('.zuri-overlay-window-actions')")) {
+    throw new Error('a press on the window buttons would start a drag instead of clicking');
+  }
+  if (!panel.includes('overlay?.moveBy?.({ dx, dy })')) throw new Error('the drag never reaches main');
+  // Slice the actions container alone: a button that drifts outside it loses its clicks.
+  // The class is also named in the drag handler, so slice from the markup element.
+  const actionsAt = panel.indexOf('className="zuri-overlay-window-actions"');
+  const actions = panel.slice(actionsAt, panel.indexOf('</div>', actionsAt));
+  for (const required of ['aria-label="Open Zuri"', 'aria-label="Close"']) {
+    if (!actions.includes(required)) throw new Error(`${required} sits outside the window actions box`);
+  }
+
+  if (!read('src/main/preload.js').includes("'zuri:overlay:move-by'")) {
+    throw new Error('the bridge does not offer zuri:overlay:move-by, so the card cannot be dragged');
+  }
+  if (!read('src/main/main.js').includes("['zuri:overlay:move-by', handleOverlayMoveBy]")) {
+    throw new Error('main does not answer zuri:overlay:move-by, so the card cannot be dragged');
+  }
+  const css = read('src/renderer-react/app.css');
+  if (/-webkit-app-region:\s*drag/.test(css)) {
+    throw new Error('a drag region is back in the stylesheet; it swallows the pointer events the drag handler needs, and it does not move a transparent window on Windows');
+  }
+  if (!/\.zuri-overlay-header\s*\{[^}]*cursor:\s*grab/.test(css)) {
+    throw new Error('.zuri-overlay-header does not show a grab cursor, so nothing says the card can be dragged');
+  }
+  return 'header drag reaches main through zuri:overlay:move-by';
+});
+;
 
 // A channel the preload bridge offers and main does not answer is a button that
 // does nothing, and one main answers but nobody can reach is dead code. Both lists
