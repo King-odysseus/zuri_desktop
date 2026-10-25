@@ -1,5 +1,19 @@
 ## 2026-10-25 - Windows
 
+- Signed-in customers can now chat in the browser, on the same plan and token allowance as the desktop app. The site could sell a plan but had nowhere to use it: a person paid, then had to install the app before they could send a message. The Chat tab, at /chat, reuses the existing streamed chat endpoint, so pricing, quota and model choice are the ones already in the catalogue and nothing new is billed.
+- Conversations are saved to the account, so a chat can be opened on another machine. Two tables, conversations and conversation_messages, hold them; both carry ON DELETE CASCADE so removing an account or a chat removes its messages instead of leaving them behind.
+- Ownership is enforced by user_id in every query rather than by checking afterwards. Reading, renaming or deleting someone else chat answers 404, not 403, so a stranger cannot even confirm an id exists.
+- Caps stop the history becoming a free storage service: 200 conversations per account, 500 messages each, 100000 characters per message.
+- The desktop app mirrors its local chats to the account, so a thread started in the app can be continued in the browser. Push and pull are idempotent: a message carries the server id once uploaded, so a repeated sync skips it rather than duplicating. A cloud thread that was deleted is unlinked and recreated on the next sync instead of failing forever.
+- Sync runs off the critical path. A reply is never delayed by an upload, a failure only writes one log line, and nothing is attempted when nobody is signed in or the machine is offline.
+- The web chat is bounded on a phone. Without that the card grew with the conversation and the Send button ended up below the fold once a reply arrived.
+- Version is now 0.2.0 so the installers carry this change.
+- Key files: server/db/schema.sql, server/src/db.js, server/src/app.js, server/test/conversations.test.js, web/src/views/ChatView.jsx, web/src/lib/api.js, web/src/styles.css, web/src/views/Dashboard.jsx, src/main/chat-sync.js, src/main/store.js, src/main/main.js, scripts/preview-web.mjs, server/public/**.
+- Other OS action: run "npm run test && npm run web:build". The two new tables are created by the schema step on the next server start, so no manual migration.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - The admin dashboard can now be reached without touching SQL. Setting `ADMIN_EMAIL` and `ADMIN_PASSWORD` in Railway creates that account, or promotes an account that already exists, on every start; the Admin tab in the dashboard then appears for that account and nobody else.
 - The password is rewritten from the variable on each boot, so changing the variable is how it rotates. Leaving `ADMIN_PASSWORD` empty keeps the hash already stored, which is what an administrator who signs in with Google needs. The value is never logged and never sent to the browser: only the scrypt hash reaches the database.
 - A new account also gets the Starter subscription sign-up hands out, because an account with no subscription cannot resolve a session, and the administrator would have signed in to an empty page.
