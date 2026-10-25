@@ -1105,6 +1105,26 @@ export async function askForAddin(request = {}, options = {}) {
  *   stream against a fake without network access.
  * @returns {Promise<{ ok: true, data: { thread: any, message: any, provider: string, model: string } } | { ok: false, error: { code: string, message: string } }>}
  */
+/**
+ * The chat model a caller asked for, when it is one this app can actually send.
+ *
+ * The composer's model chip sends a catalogue pair, so the pair is checked here
+ * rather than trusted. resolveChatTarget swaps an id that does not belong to its
+ * provider for that provider's default, so a mismatched pair would make the window
+ * say one Zuri model answered while another did. An unknown pair is ignored instead
+ * of failing the reply, so a chip left over from an older catalogue never blocks a
+ * chat.
+ * @param {unknown} value
+ * @returns {{ provider: 'openai'|'anthropic'|'deepseek'|'moonshot'|'zai', model: string } | null}
+ */
+function normaliseChosenModel(value) {
+  if (value === null || typeof value !== 'object') return null;
+  const provider = PROVIDERS.includes(value.provider) ? value.provider : null;
+  const model = typeof value.model === 'string' ? value.model.trim() : '';
+  if (provider === null || model === '' || model.length > 64) return null;
+  return PROVIDER_CONFIG[provider].modelPattern.test(model) ? { provider, model } : null;
+}
+
 export async function sendChatMessage(threadId, options = {}) {
   if (typeof threadId !== 'string' || threadId === '') {
     return failure('CHAT_INVALID_THREAD', 'A reply needs a chat to go in.');
@@ -1126,11 +1146,18 @@ export async function sendChatMessage(threadId, options = {}) {
 
   const settings = (await readStore('settings')).data;
   const agent = findAgent(settings, options.agentId);
+  // A chat can pin its own model, and the composer's chip does exactly that. Every
+  // model decision below reads `modelSettings`, so the cloud route, the direct route
+  // and the reply saved at the end agree on which model answered.
+  const chosenModel = normaliseChosenModel(options.model);
+  const modelSettings = chosenModel === null
+    ? settings
+    : { ...settings, provider: chosenModel.provider, model: chosenModel.model };
   // An agent's own provider wins over Settings; its model then falls back to that
   // provider's default because the saved model belongs to the Settings provider.
   const agentProvider = agent !== null && PROVIDERS.includes(agent.provider) ? agent.provider : null;
   const { provider, model } = resolveChatTarget(
-    agentProvider === null ? settings : { ...settings, provider: agentProvider },
+    agentProvider === null ? modelSettings : { ...modelSettings, provider: agentProvider },
   );
   const config = PROVIDER_CONFIG[provider];
   conversation.turns = await withImageParts(provider, conversation.turns);
@@ -1141,7 +1168,7 @@ export async function sendChatMessage(threadId, options = {}) {
   conversation.system = chatSystemPrompt({
     agentPrompt: agent !== null ? agent.systemPrompt : '',
     threadPrompt: conversation.system,
-    settings,
+    settings: modelSettings,
   });
 
   // The account is the only way in. main.js hands in a cloudReply whenever the app
@@ -1168,7 +1195,7 @@ export async function sendChatMessage(threadId, options = {}) {
         const toolsForRound = rounds < MAX_TOOL_ROUNDS ? offeredForAccount : [];
         reached = await options.cloudReply({
           conversation: { system: conversation.system, turns: wire },
-          settings,
+          settings: modelSettings,
           tools: toolsForRound,
           signal: options.signal,
           emit: (event) => {
@@ -1227,6 +1254,9 @@ export async function sendChatMessage(threadId, options = {}) {
       role: 'assistant',
       content: reached.data.content,
       files: [],
+      // Saved with the reply so the chip can name the model that answered, and so
+      // reopening this chat sends the next message to the same one.
+      model: { provider: modelSettings.provider, model: modelSettings.model },
     });
     if (!saved.ok) return saved;
     emit({ threadId, done: true });
@@ -1311,7 +1341,12 @@ export async function sendChatMessage(threadId, options = {}) {
     return failure('CHAT_EMPTY_REPLY', `${config.label} sent an empty reply. Try again.`);
   }
 
-  const saved = await appendMessage(threadId, { role: 'assistant', content: fullText, files: builtFiles });
+  const saved = await appendMessage(threadId, {
+    role: 'assistant',
+    content: fullText,
+    files: builtFiles,
+    model: { provider, model },
+  });
   if (!saved.ok) return saved;
 
   emit({ threadId, done: true });

@@ -134,7 +134,12 @@ const { splitDsml, answerStylePolicy, chatSystemPrompt, ZURI_IDENTITY_PROMPT, re
 // chat.js silently swaps a foreign id for the provider's default, so a wrong row
 // would answer with a different model than its Zuri name promises.
 check('every Zuri model in the desktop picker answers with the id it names', () => {
-  const source = read('src/renderer-react/SettingsView.jsx');
+  // The catalogue lives in its own module now, because the composer's model chip
+  // offers the same six names and a second copy would drift away from this one.
+  const source = read('src/renderer-react/zuriModels.js');
+  if (!read('src/renderer-react/SettingsView.jsx').includes("from './zuriModels.js'")) {
+    throw new Error('the Settings picker stopped offering the shared catalogue');
+  }
   const rows = [...source.matchAll(/\{ provider: '([a-z]+)', model: '([^']+)', name: '(Zuri [^']+)'/g)].map((match) => ({
     provider: match[1],
     model: match[2],
@@ -841,10 +846,168 @@ check('the picture ladder matches the server catalogue in names, quota and Naira
     if (match.name !== model.name) throw new Error(`${model.code} is called ${match.name} on the desktop and ${model.name} on the server`);
     if (match.quotaTokens !== model.quotaTokensPerImage) throw new Error(`${model.code} burns ${match.quotaTokens} on the desktop and ${model.quotaTokensPerImage} on the server`);
     if (match.minPlan !== model.minPlan) throw new Error(`${model.code} starts at ${match.minPlan} on the desktop and ${model.minPlan} on the server`);
+    // The desktop quotes whole naira in the menu ("About NGN 60"), while the server
+    // derives the price from the plan rate, which now lands a fraction of a naira
+    // short: Starter is NGN 2,499 to stay under Paystack's fee threshold, so a
+    // picture costs 59.98 rather than 60. Comparing to the nearest naira still
+    // catches a real change (a picture moving from 60 to 264), which is the drift
+    // this check exists to find.
     const kobo = catalogue.imagePriceKobo(model, starter);
-    if (kobo !== match.nairaPerImage * 100) throw new Error(`${model.code} sells at ${kobo / 100} Naira on the server and ${match.nairaPerImage} on the desktop`);
+    if (Math.round(kobo / 100) !== Math.round(match.nairaPerImage)) throw new Error(`${model.code} sells at ${kobo / 100} Naira on the server and ${match.nairaPerImage} on the desktop`);
   }
   return server.map((model) => model.name).join(', ');
+});
+
+
+// A chat can be pinned to a model from the composer, so the send path has to honour
+// that pick in one place and record it on the reply. Without the record, a reopened
+// chat would fall back to Settings and quietly change model mid-conversation.
+check('a chat is answered by the model picked for it, and the reply records it', async () => {
+  const { getStoreRoot, setStoreRoot, createThread, appendMessage, readStore } = await import(
+    pathToFileURL(path.join(root, 'src/main/store.js')).href,
+  );
+  const { sendChatMessage } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+  // Its own folder, restored afterwards, so this check cannot leave the checks
+  // around it reading a different store.
+  const previousRoot = getStoreRoot();
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-model-chip-'));
+  try {
+    setStoreRoot(scratch);
+    const created = await createThread({ title: 'Model chip' });
+    if (!created.ok) throw new Error('a chat could not be created');
+    const threadId = created.data.id;
+    await appendMessage(threadId, { role: 'user', content: 'Hello' });
+
+    const asked = [];
+    const picked = await sendChatMessage(threadId, {
+      model: { provider: 'zai', model: 'glm-5.3' },
+      cloudReply: async (request) => {
+        asked.push(request.settings);
+        return { ok: true, data: { content: 'Hello from Max', modelCode: 'zuri-max', modelName: 'Zuri Max' } };
+      },
+    });
+    if (!picked.ok) throw new Error(picked.error?.message ?? 'the reply failed');
+    if (asked.length !== 1) throw new Error(`expected one account request, got ${asked.length}`);
+    if (asked[0].model !== 'glm-5.3') throw new Error(`the account was asked for ${asked[0].model}, not the picked model`);
+
+    const thread = (await readStore('chats')).data.find((entry) => entry.id === threadId);
+    const reply = thread.messages.at(-1);
+    if (reply.role !== 'assistant') throw new Error('the reply was not saved');
+    if (reply.model?.model !== 'glm-5.3') throw new Error('the reply did not record the model that wrote it');
+    if (reply.model?.provider !== 'zai') throw new Error('the reply lost the provider that paid for it');
+
+    // A pair whose id belongs to another provider would be swapped for a default by
+    // resolveChatTarget, which would make the chip name a model that never answered.
+    const fallback = [];
+    const mismatched = await sendChatMessage(threadId, {
+      model: { provider: 'openai', model: 'glm-5.3' },
+      cloudReply: async (request) => {
+        fallback.push(request.settings.model);
+        return { ok: true, data: { content: 'ok' } };
+      },
+    });
+    if (!mismatched.ok) throw new Error('a mismatched pair blocked the reply instead of being ignored');
+    if (fallback[0] === 'glm-5.3') throw new Error('a model id was trusted on the wrong provider');
+    return `picked model honoured, recorded, and a foreign id ignored`;
+  } finally {
+    setStoreRoot(previousRoot);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+// The chip has to sit in the message row and offer the one catalogue, or a person
+// has to leave the chat to change model, which is what this change removes.
+check('the composer offers the model chip and sends the choice with the message', async () => {
+  const panel = read('src/renderer-react/ChatPanel.jsx');
+  const chipAt = panel.indexOf('aria-label={`Chat model: ');
+  const boxAt = panel.indexOf('<ComposerTextarea');
+  const sendAt = panel.indexOf('aria-label="Send"');
+  if (chipAt === -1) throw new Error('the composer has no model chip');
+  if (boxAt === -1 || sendAt === -1) throw new Error('the composer row could not be read');
+  // The chip sits in the right-hand group, after the box and before Send, so the model
+  // is within reach of the thumb that is about to send.
+  if (chipAt < boxAt) throw new Error('the chip drifted back to the left of the message box');
+  if (chipAt > sendAt) throw new Error('the chip is not beside Send');
+  if (panel.includes('AgentIcon size={14}')) throw new Error('the robot icon is back in the chip');
+  // The chip is plain text plus a chevron, not a filled pill: a fourth rounded shape
+  // in a row of round buttons read as another action rather than as the model name.
+  const chipEnd = panel.indexOf('</button>', chipAt);
+  const chipTag = chipEnd === -1 ? panel.slice(chipAt) : panel.slice(chipAt, chipEnd);
+  for (const pill of ['rounded-full', 'bg-surface-secondary', 'border-border']) {
+    if (chipTag.includes(pill)) throw new Error(`the chip is a filled pill again (${pill})`);
+  }
+  if (!chipTag.includes('ChevronDownIcon')) throw new Error('the chip has no chevron');
+  for (const required of [
+    "from './zuriModels.js'",
+    '{ZURI_MODELS.map((entry) => (',
+    'aria-checked={entry.name === chatModelLabel}',
+    'setPickedModelId(entry.model)',
+    'model: { provider: chatModel.provider, model: chatModel.model }',
+    'setPickedModelId(modelOfMessages(thread.messages))',
+  ]) {
+    if (!panel.includes(required)) throw new Error(`ChatPanel.jsx is missing ${required}`);
+  }
+  if (panel.includes('gpt-4o-mini')) throw new Error('a supplier model id is offered by name');
+
+  // The chip must never show a supplier id. An older settings file holds gpt-4o, and
+  // the cloud answers an unknown id with Zuri Flash, so that is what the chip says.
+  const { zuriModelName } = await import(pathToFileURL(path.join(root, 'src/renderer-react/zuriModels.js')).href);
+  // The retired 'zuri-code' is still saved in some settings files and is spelled out
+  // from the code itself by the fallback, so it must read as Zuri Core or the old name
+  // returns through the chip.
+  const names = [
+    ['glm-5.3', 'Zuri Max'],
+    ['gpt-6.1-sol', 'Zuri Core'],
+    ['zuri-code', 'Zuri Core'],
+    ['gpt-4o', 'Zuri Flash'],
+    ['zuri-ultra', 'Zuri Ultra'],
+    ['', ''],
+  ];
+  for (const [id, expected] of names) {
+    const got = zuriModelName(id);
+    if (got !== expected) throw new Error(`${JSON.stringify(id)} shows as "${got}", expected "${expected}"`);
+  }
+  return 'six Zuri names, sent with the message, restored per chat, never a supplier id';
+});
+
+
+// A reply has to say which model wrote it, and the caption has to come from what the
+// reply stored. A caption that read the chip instead would relabel old answers the
+// moment someone changed model.
+check('a reply names the model that wrote it, read from the stored reply', () => {
+  const panel = read('src/renderer-react/ChatPanel.jsx');
+  for (const required of [
+    'function modelLabelPositions(messages) {',
+    'const modelLabels = useMemo(() => modelLabelPositions(messages), [messages]);',
+    '{modelLabels[index] && (',
+    '<span className="px-1 text-xs text-muted">{zuriModelName(message.model.model)}</span>',
+  ]) {
+    if (!panel.includes(required)) throw new Error(`ChatPanel.jsx is missing ${required}`);
+  }
+  if (panel.includes('zuriModelName(chatModelId)}</span>')) {
+    throw new Error('the reply caption reads the chip instead of the stored reply');
+  }
+
+  // The rule the renderer applies: first reply names its model, and so does the first
+  // reply after a switch, but a chat that never changes model is not captioned twice.
+  const positions = (messages) => {
+    let previous = '';
+    return messages.map((message) => {
+      if (message.role === 'user') return false;
+      const used = typeof message?.model?.model === 'string' ? message.model.model : '';
+      if (used === '') return false;
+      const show = used !== previous;
+      previous = used;
+      return show;
+    });
+  };
+  const same = positions([{ role: 'user' }, { role: 'assistant', model: { model: 'deepseek-flash' } }, { role: 'user' }, { role: 'assistant', model: { model: 'deepseek-flash' } }]);
+  if (same.filter(Boolean).length !== 1) throw new Error('a chat that never changed model was captioned more than once');
+  const switched = positions([{ role: 'assistant', model: { model: 'deepseek-flash' } }, { role: 'assistant', model: { model: 'glm-5.3' } }, { role: 'assistant', model: { model: 'glm-5.3' } }]);
+  if (switched.filter(Boolean).length !== 2) throw new Error('a switch between models was not captioned');
+  const legacy = positions([{ role: 'assistant' }]);
+  if (legacy[0] !== false) throw new Error('a reply saved before models were recorded was captioned');
+  return 'caption from the stored reply, once per model change, none on old replies';
 });
 
 await Promise.all(pendingChecks);

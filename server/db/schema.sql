@@ -176,7 +176,7 @@ CREATE INDEX IF NOT EXISTS usage_events_created_idx ON usage_events(created_at D
 
 INSERT INTO plans (code, name, amount_kobo, monthly_tokens)
 VALUES
-  ('starter', 'Starter', 250000, 2000000),
+  ('starter', 'Starter', 249900, 2000000),
   ('pro', 'Pro', 600000, 6000000),
   ('power', 'Power', 1500000, 12000000),
   ('max', 'Max', 4000000, 40000000)
@@ -197,7 +197,7 @@ VALUES
   ('zuri-flash', 'Zuri Flash', 'deepseek', 'deepseek-flash', 0.14, 0.28, 1, 1, 'starter', 1, 1),
   ('zuri-pro', 'Zuri Pro', 'moonshot', 'kimi-k3', 0.6, 2.5, 5, 8, 'starter', 0.5, 2),
   ('zuri-max', 'Zuri Max', 'zai', 'glm-5.3', 1.5, 6, 12, 18, 'pro', 0.25, 3),
-  ('zuri-code', 'Zuri Code', 'openai', 'gpt-6.1-sol', 2, 10, 10, 30, 'pro', 0.4, 4),
+  ('zuri-code', 'Zuri Core', 'openai', 'gpt-6.1-sol', 2, 10, 10, 30, 'pro', 0.4, 4),
   ('zuri-reason', 'Zuri Reason', 'anthropic', 'claude-sonnet-5-5', 2, 10, 10, 30, 'pro', 0.4, 5),
   ('zuri-elite', 'Zuri Elite', 'anthropic', 'claude-opus-5-5', 4, 20, 20, 60, 'max', 0.2, 6)
 ON CONFLICT (code) DO NOTHING;
@@ -210,7 +210,7 @@ UPDATE models SET output_quota_weight = 1  WHERE code = 'zuri-flash'  AND output
 UPDATE models SET output_quota_weight = 8  WHERE code = 'zuri-pro'    AND output_quota_weight = 0 AND output_usd_per_million = 2.5;
 UPDATE models SET output_quota_weight = 18 WHERE code = 'zuri-max'    AND output_quota_weight = 0 AND output_usd_per_million = 6;
 
--- OpenAI marks gpt-5.3-codex Deprecated, so Zuri Code moves to the current GPT-6.1 Sol
+-- OpenAI marks gpt-5.3-codex Deprecated, so this row moves to the current GPT-6.1 Sol
 -- at $2/$10 per million tokens, with its reply weight at three times the output price
 -- like the rest of the catalogue. Keyed on the old id so an admin choice is never
 -- overwritten.
@@ -218,6 +218,11 @@ UPDATE models SET supplier_model = 'gpt-6.1-sol', input_usd_per_million = 2, out
   WHERE code = 'zuri-code' AND supplier_model = 'gpt-5.3-codex';
 UPDATE models SET output_quota_weight = 30 WHERE code = 'zuri-reason' AND output_quota_weight = 0 AND output_usd_per_million = 10;
 UPDATE models SET output_quota_weight = 60 WHERE code = 'zuri-elite'  AND output_quota_weight = 0 AND output_usd_per_million = 20;
+
+-- The row no longer sells coding: it is an OpenAI general model priced the same as
+-- Zuri Reason, so it is sold as Zuri Core. Only the seeded name is moved, so a name
+-- an operator chose in the dashboard is never overwritten.
+UPDATE models SET name = 'Zuri Core' WHERE code = 'zuri-code' AND name = 'Zuri Code';
 
 -- Image models are billed per picture through quota_tokens_per_image instead of
 -- input/output prices, so the one monthly allowance still covers them.

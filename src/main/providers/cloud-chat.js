@@ -25,6 +25,7 @@ export const ZURI_MODEL_BY_SUPPLIER = Object.freeze({
   'kimi-k3': 'zuri-pro',
   'glm-5.3': 'zuri-max',
   'gpt-5.3-codex': 'zuri-code',
+  'gpt-6.1-sol': 'zuri-code',
   'claude-sonnet-5-5': 'zuri-reason',
   'claude-opus-5-5': 'zuri-elite',
 });

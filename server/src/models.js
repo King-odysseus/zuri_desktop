@@ -18,7 +18,7 @@ export const MODEL_KINDS = Object.freeze(['text', 'image']);
  *   glm-5.3            Z.ai GLM 5.3,                             $1.5  / $6
  *   gpt-6.1-sol        OpenAI GPT-6.1 Sol,                       $2    / $10
  *
- * Zuri Code used gpt-5.3-codex, which OpenAI now marks Deprecated: it answers today
+ * This row used gpt-5.3-codex, which OpenAI now marks Deprecated: it answers today
  * but will stop, and a deprecated id fails every request the day it is switched off.
  * GPT-6.1 Sol replaces it because it is current, priced within a few cents of the old
  * model, and is OpenAI's own "balance intelligence and cost" choice. GPT-6 Astra is
@@ -50,7 +50,11 @@ export const DEFAULT_MODELS = Object.freeze([
   Object.freeze({ code: 'zuri-flash', name: 'Zuri Flash', supplier: 'deepseek', supplierModel: 'deepseek-flash', kind: 'text', usdPerImage: 0, quotaTokensPerImage: 0, inputUsdPerMillion: 0.14, outputUsdPerMillion: 0.28, quotaWeight: 1, outputQuotaWeight: 1, minPlan: 'starter', rateFactor: 1, isActive: true, sortOrder: 1 }),
   Object.freeze({ code: 'zuri-pro', name: 'Zuri Pro', supplier: 'moonshot', supplierModel: 'kimi-k3', kind: 'text', usdPerImage: 0, quotaTokensPerImage: 0, inputUsdPerMillion: 0.6, outputUsdPerMillion: 2.5, quotaWeight: 5, outputQuotaWeight: 8, minPlan: 'starter', rateFactor: 0.5, isActive: true, sortOrder: 2 }),
   Object.freeze({ code: 'zuri-max', name: 'Zuri Max', supplier: 'zai', supplierModel: 'glm-5.3', kind: 'text', usdPerImage: 0, quotaTokensPerImage: 0, inputUsdPerMillion: 1.5, outputUsdPerMillion: 6, quotaWeight: 12, outputQuotaWeight: 18, minPlan: 'pro', rateFactor: 0.25, isActive: true, sortOrder: 3 }),
-  Object.freeze({ code: 'zuri-code', name: 'Zuri Code', supplier: 'openai', supplierModel: 'gpt-6.1-sol', kind: 'text', usdPerImage: 0, quotaTokensPerImage: 0, inputUsdPerMillion: 2, outputUsdPerMillion: 10, quotaWeight: 10, outputQuotaWeight: 30, minPlan: 'pro', rateFactor: 0.4, isActive: true, sortOrder: 4 }),
+  // Sold as Zuri Core: it is an OpenAI general model priced with Zuri Reason, not a
+  // coding model, so the name promises nothing the supplier ladder cannot keep. The
+  // code stays 'zuri-code' because usage history and saved settings already name it,
+  // and rewriting the key would orphan both without changing anything a person sees.
+  Object.freeze({ code: 'zuri-code', name: 'Zuri Core', supplier: 'openai', supplierModel: 'gpt-6.1-sol', kind: 'text', usdPerImage: 0, quotaTokensPerImage: 0, inputUsdPerMillion: 2, outputUsdPerMillion: 10, quotaWeight: 10, outputQuotaWeight: 30, minPlan: 'pro', rateFactor: 0.4, isActive: true, sortOrder: 4 }),
   Object.freeze({ code: 'zuri-reason', name: 'Zuri Reason', supplier: 'anthropic', supplierModel: 'claude-sonnet-5-5', kind: 'text', usdPerImage: 0, quotaTokensPerImage: 0, inputUsdPerMillion: 2, outputUsdPerMillion: 10, quotaWeight: 10, outputQuotaWeight: 30, minPlan: 'pro', rateFactor: 0.4, isActive: true, sortOrder: 5 }),
   Object.freeze({ code: 'zuri-elite', name: 'Zuri Elite', supplier: 'anthropic', supplierModel: 'claude-opus-5-5', kind: 'text', usdPerImage: 0, quotaTokensPerImage: 0, inputUsdPerMillion: 4, outputUsdPerMillion: 20, quotaWeight: 20, outputQuotaWeight: 60, minPlan: 'max', rateFactor: 0.2, isActive: true, sortOrder: 6 }),
   Object.freeze({ code: 'zuri-sketch', name: 'Zuri Sketch', supplier: 'zai', supplierModel: 'cogview-4', kind: 'image', usdPerImage: 0.012, quotaTokensPerImage: 48000, imageQuality: 'standard', minPlan: 'starter', rateFactor: 0.4, quotaWeight: 1, outputQuotaWeight: 0, inputUsdPerMillion: 0, outputUsdPerMillion: 0, isActive: true, sortOrder: 7 }),

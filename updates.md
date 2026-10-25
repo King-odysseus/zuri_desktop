@@ -1,5 +1,31 @@
 ## 2026-10-25 - Windows
 
+- Zuri Code is now Zuri Core. The row never did anything a coding feature would: it is an OpenAI general model priced exactly like Zuri Reason (2 dollars in, 10 out per million tokens, weight 10 and 30), so the name promised work the app cannot do while the model underneath answers general questions. Pricing, quota, plan gate and supplier are untouched, so no customer bill moves.
+- The internal code stays zuri-code. Past usage records and saved settings files already name it, and rewriting the key would orphan that history without changing anything a person sees. A comment on the row records why the code and the name no longer match, and the schema migration moves only the seeded name, so a name an operator chose in the dashboard is never overwritten.
+- The desktop picker also stopped naming gpt-5.3-codex, which OpenAI marks Deprecated. That row now asks for gpt-6.1-sol, the id the server catalogue has sold since the deprecation, and cloud-chat.js maps both ids to zuri-code so a settings file written before either change still answers.
+- One gap the rename exposed: zuriModelName spells out an unknown Zuri code, so a settings file holding zuri-code would have shown "Zuri Code" and brought the retired name back through the chip. A RENAMED_CODES map now names it Zuri Core, and the selftest asserts that for both zuri-code and gpt-6.1-sol.
+- The Pro plan card now reads "Zuri Core and Zuri Reason: prompts 10x, replies 30x", and server/public was rebuilt so the site matches the app.
+- Key files: server/src/models.js, server/db/schema.sql, src/renderer-react/zuriModels.js, src/main/providers/cloud-chat.js, web/src/lib/format.js, scripts/preview-web.mjs, server/test/models.test.js, scripts/selftest.js, server/public/**.
+- Other OS action: run "npm run test && npm run web:build" after syncing. The schema migrates itself on the next server start.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
+- The chat model can now be chosen from the message row. A chip beside Send shows the model that will answer this chat (Zuri Flash, Pro, Max, Code, Reason or Elite) and opens the same six names with a one-line note each. It sits after the microphone, directly beside Send, and carries no icon: the name and a chevron are the whole control.
+- The choice belongs to the chat, not the app. It rides with the next message, the reply stores the pair that wrote it, and reopening a chat restores its model from the newest reply. A chat with no choice of its own sends nothing, so the model in Settings stays in charge there instead of today's default being pinned into every future chat.
+- `zuri:chat:send` accepts an optional `model: { provider, model }`. `providers/chat.js` checks the pair against the provider table before using it, because an id that does not belong to its provider is swapped for that provider's default by `resolveChatTarget`, which would make the chip name a model that never answered. An unknown pair is ignored rather than failing the reply, so a chip left from an older catalogue never blocks a chat.
+- The six names moved into `src/renderer-react/zuriModels.js`, because Settings and the composer both offer them and two copies of a supplier id would drift apart. The chip never shows a supplier id: an older settings file holds `gpt-4o`, which the cloud answers as Zuri Flash, and a Zuri code the catalogue has not caught up with is shown as a name (`zuri-ultra` becomes Zuri Ultra).
+- The quick-ask popup is a 420px card and keeps the chip out of its row, so that window still follows the model in Settings.
+- Three checks added: every catalogue row answers with the id it names, a picked model is the one the account is asked for and the one recorded on the reply (with a mismatched pair ignored), and the chip stays in the right-hand group with no robot icon.
+- Replies now name the model that wrote them, read from the model stored on the reply rather than from the chip. A caption read from the chip would relabel old answers the moment someone changed model.
+- The caption appears once per model change, not on every bubble: the first reply carries it, and so does the first reply after a switch, which reads as the point where the conversation moved. A chat that never left one model would otherwise repeat the same name down the whole transcript while the chip already names it.
+- Replies saved before a model was recorded carry none and show no caption, so an older chats.json opens exactly as it did.
+- Key files: `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/zuriModels.js`, `src/renderer-react/SettingsView.jsx`, `src/main/providers/chat.js`, `src/main/store.js`, `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run test` after syncing. No schema or settings change; `chats.json` simply gains a `model` field on new replies and old ones read fine without it.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - Replies now carry their own quota weight, which closes the last way the catalogue could lose money. A supplier bills the reply at four to eight times the prompt's rate, but the monthly allowance counted both at one weight, so Zuri Code, Zuri Reason and Zuri Elite sold the expensive half of a request at the cheap half's price.
 - The mechanics: at the old single weight those three began costing more than the plan fee once 62.5% of the allowance had gone on replies, and nothing in the code or the tests could see it. Zuri Flash, Pro and Max never crossed it on any plan; the three dear ones did, and all three at the same point.
 - `models.quota_weight` still prices the prompt and a new `output_quota_weight` prices the reply. 0 means "same as the prompt", so every row seeded before this behaves exactly as it did and no existing bill changes. The admin dashboard shows and edits both, and the site's plan bullets now name both numbers.
@@ -709,4 +735,11 @@
 - Added a Capacitor Android target for the Zuri Cloud dashboard. The Android build embeds the production API URL, permits only the Capacitor localhost origins at the cloud API, builds a debug APK in GitHub Actions, and publishes `.apk` assets alongside Windows and macOS releases. The website now lists Android downloads automatically.
 - Key files: `capacitor.config.json`, `android/**`, `scripts/build-android.mjs`, `.github/workflows/build-android.yml`, `server/src/downloads.js`, `server/src/app.js`, `web/src/lib/api.js`, `web/src/lib/downloads.js`, `package.json`.
 - Other OS action: run `npm install && npm run android:build` after syncing. A Java 21 JDK and Android SDK are required for the native build.
+- Done on: Windows
+
+## 2026-10-26 - Windows
+
+- The composer's model control is now the model name and a chevron, with no pill: the row already holds round buttons, and a fourth filled shape read as another action rather than as the name of the model that will answer. It still opens the same six-name list, still sits beside Send, and keeps its keyboard focus ring.
+- Key files: `src/renderer-react/ChatPanel.jsx`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build` after syncing. No dependency, database or catalogue change.
 - Done on: Windows

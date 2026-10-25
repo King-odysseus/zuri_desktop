@@ -288,7 +288,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
           </article>
           <article className="card feature">
             <h3>What you pay in Naira</h3>
-            <p>Starter is NGN 2,500, Pro is NGN 6,000, Power is NGN 15,000, and Max is NGN 40,000 per month. Your dashboard shows the remaining allowance.</p>
+            <p>Starter is NGN 2,499, Pro is NGN 6,000, Power is NGN 15,000, and Max is NGN 40,000 per month. Your dashboard shows the remaining allowance.</p>
           </article>
         </div>
       </section>

@@ -49,7 +49,7 @@ export function initialsFor(displayName, email) {
  */
 const PLAN_FEATURES = {
   starter: ['Zuri Flash: prompts 1x, replies 1x', 'Zuri Pro: prompts 5x, replies 8x', '2 requests at a time, 30 a minute'],
-  pro: ['Zuri Max: prompts 12x, replies 18x', 'Zuri Code and Zuri Reason: prompts 10x, replies 30x', '3 requests at a time, 60 a minute'],
+  pro: ['Zuri Max: prompts 12x, replies 18x', 'Zuri Core and Zuri Reason: prompts 10x, replies 30x', '3 requests at a time, 60 a minute'],
   power: ['Every model except Zuri Elite', 'The same model weights as Pro', '4 requests at a time, 120 a minute', 'Up to 64,000 input and 8,000 output tokens per request'],
   max: ['Zuri Elite: prompts 20x, replies 60x', 'Every Zuri model is available', '8 requests at a time, 240 a minute'],
 };

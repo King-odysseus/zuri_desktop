@@ -57,8 +57,8 @@ assert.equal(supplierCostMicroUsd(flash, 0, 0), 0);
 assert.equal(microUsdToKobo(1_000_000, 1600), 160_000);
 
 // Image: the price a customer pays comes from the plan's own naira rate, so the
-// picture ladder stays in step with what a plan costs. Starter is NGN 2500 for
-// two million quota tokens, which is 125000 kobo per million tokens.
+// picture ladder stays in step with what a plan costs. Starter is NGN 2499 for
+// two million quota tokens, which is 124950 kobo per million tokens.
 assert.equal(MODEL_KINDS.includes('image'), true);
 assert.equal(isImageModel(sketch), true);
 assert.equal(isImageModel(flash), false);
@@ -71,13 +71,13 @@ const starterPlan = PLANS.find((plan) => plan.code === 'starter');
 const proPlanInfo = PLANS.find((plan) => plan.code === 'pro');
 const powerPlan = PLANS.find((plan) => plan.code === 'power');
 const maxPlan = PLANS.find((plan) => plan.code === 'max');
-assert.equal(koboPerMillionQuotaTokens(starterPlan), 125_000);
+assert.equal(koboPerMillionQuotaTokens(starterPlan), 124_950);
 assert.equal(koboPerMillionQuotaTokens(proPlanInfo), 100_000);
 assert.equal(koboPerMillionQuotaTokens(undefined), 0);
-assert.equal(koboPerMillionQuotaTokens({ amountKobo: 250_000, monthlyTokens: 0 }), 0);
-assert.equal(imagePriceKobo(sketch, starterPlan), 6_000);
-assert.equal(imagePriceKobo(canvas, starterPlan), 33_000);
-assert.equal(imagePriceKobo(studio, starterPlan), 90_000);
+assert.equal(koboPerMillionQuotaTokens({ amountKobo: 249_900, monthlyTokens: 0 }), 0);
+assert.equal(imagePriceKobo(sketch, starterPlan), 5_998);
+assert.equal(imagePriceKobo(canvas, starterPlan), 32_987);
+assert.equal(imagePriceKobo(studio, starterPlan), 89_964);
 assert.equal(imagePriceKobo(sketch, proPlanInfo), 4_800);
 assert.equal(imagePriceKobo(flash, starterPlan), 0);
 
@@ -95,7 +95,7 @@ assert.equal(imagesPerMonth(sketch, undefined), 0);
 assert.equal(quotaTokens(flash, 100, 50), 150);
 assert.equal(quotaTokens(pro, 100, 50), 900);
 assert.equal(quotaTokens(max, 100, 50), 2100);
-// Zuri Code: 100 prompt tokens at 10, 50 reply tokens at 30 (three times its new
+// Zuri Core: 100 prompt tokens at 10, 50 reply tokens at 30 (three times its new
 // output price of $10), because it moved off the deprecated gpt-5.3-codex.
 assert.equal(quotaTokens(code, 100, 50), 2500);
 // 100 prompt tokens at 20, 50 reply tokens at the corrected 75.
@@ -167,7 +167,7 @@ for (const [code, real] of Object.entries(VERIFIED_MODEL_IDS)) {
 // Every id above was read from the supplier's own model documentation, including the
 // two that were unconfirmed on the first pass: Z.ai's GLM-5.3 page shows the id in
 // the request body, and OpenAI's markdown docs give "Model ID: gpt-6.1-sol" while
-// marking gpt-5.3-codex as Deprecated. That is why Zuri Code no longer uses it.
+// marking gpt-5.3-codex as Deprecated. That is why Zuri Core no longer uses it.
 // The image models still name gpt-image-2, which OpenAI lists without a deprecation.
 
 for (const [code, real] of Object.entries(VERIFIED_SUPPLIER_PRICES)) {
@@ -232,9 +232,10 @@ assert.equal(imageLadder.code, 'zuri-canvas');
 assert.equal(imageLadder.kind, 'image');
 assert.equal(imageLadder.quotaTokensPerImage, 264_000);
 assert.deepEqual(imageLadder.plans.map((plan) => plan.code), ['starter', 'pro', 'power', 'max']);
-// Starter and Power share one rate (NGN 2500 per 2 million), as do Pro and Max
-// (NGN 6000 per 6 million), so the per-picture price follows the plan rate.
-assert.deepEqual(imageLadder.plans.map((plan) => plan.priceKobo), [33_000, 26_400, 33_000, 26_400]);
+// Pro and Max share one rate (NGN 6000 per 6 million), so their picture price
+// matches. Starter sits a hair under Power because it is priced at NGN 2499 to
+// stay below Paystack's NGN 2500 fee threshold, so its pictures cost 13 kobo less.
+assert.deepEqual(imageLadder.plans.map((plan) => plan.priceKobo), [32_987, 26_400, 33_000, 26_400]);
 assert.deepEqual(imageLadder.plans.map((plan) => plan.images), [7, 22, 45, 151]);
 const shownImage = JSON.stringify(publicImageModel(studio, PLANS));
 assert.ok(!shownImage.includes('supplier'));
@@ -291,7 +292,7 @@ function appFor(planCode, isAdmin) {
       async releaseUsage() {},
       async saveModel(model) { saved.push(model); return model; },
       async adminOverview() {
-        return { days: 30, users: 5, revenueKobo: 1_000_000, byModel: [{ modelCode: 'zuri-flash', requests: 3, inputTokens: 10, outputTokens: 10, quotaTokens: 20, costMicroUsd: 1_000_000 }], plans: [{ code: 'starter', name: 'Starter', amountKobo: 250000, monthlyTokens: 2000000, subscribers: 4 }] };
+        return { days: 30, users: 5, revenueKobo: 1_000_000, byModel: [{ modelCode: 'zuri-flash', requests: 3, inputTokens: 10, outputTokens: 10, quotaTokens: 20, costMicroUsd: 1_000_000 }], plans: [{ code: 'starter', name: 'Starter', amountKobo: 249900, monthlyTokens: 2000000, subscribers: 4 }] };
       },
     },
     chatProvider: async (request) => ({ model: request.model, content: 'hi', usage: { inputTokens: 100, outputTokens: 50 } }),
@@ -315,9 +316,9 @@ assert.ok(!JSON.stringify(listed).includes('deepseek'));
 // anyone signs in, and it never names a supplier.
 const prices = await (await call(customer, '/api/image-prices')).json();
 assert.deepEqual(prices.data.map((model) => model.code), ['zuri-sketch', 'zuri-canvas', 'zuri-studio']);
-assert.equal(prices.data[0].plans[0].priceKobo, 6_000);
+assert.equal(prices.data[0].plans[0].priceKobo, 5_998);
 assert.equal(prices.data[0].plans[0].images, 41);
-assert.equal(prices.data[2].plans[0].priceKobo, 90_000);
+assert.equal(prices.data[2].plans[0].priceKobo, 89_964);
 assert.ok(!JSON.stringify(prices).includes('supplier'));
 assert.equal((await call(customer, '/api/image-prices', { method: 'POST' })).status, 405);
 
@@ -334,7 +335,7 @@ const pictureRows = overview.models.filter((model) => model.kind === 'image');
 assert.deepEqual(pictureRows.map((model) => model.code), ['zuri-sketch', 'zuri-canvas', 'zuri-studio']);
 assert.deepEqual(pictureRows.map((model) => model.pricePlanCode), ['starter', 'pro', 'max']);
 assert.deepEqual(pictureRows.map((model) => model.supplierCostKoboPerImage), [1_800, 10_500, 28_500]);
-assert.deepEqual(pictureRows.map((model) => model.priceKoboPerImage), [6_000, 26_400, 72_000]);
+assert.deepEqual(pictureRows.map((model) => model.priceKoboPerImage), [5_998, 26_400, 72_000]);
 for (const row of pictureRows) {
   assert.ok(row.priceKoboPerImage > row.supplierCostKoboPerImage, `${row.code} must earn more than its supplier charge`);
 }
@@ -370,5 +371,48 @@ const committed = chats.find((entry) => entry.committed).committed;
 assert.equal(committed.modelCode, 'zuri-flash');
 assert.equal(committed.quotaTokens, 150);
 assert.equal(committed.costMicroUsd, 28);
+
+// In production the catalogue a customer sees is read from the database, and the
+// database is seeded by db/schema.sql. A name changed in one file and left in the
+// other shows a customer a model the code does not agree with - which is exactly how
+// the retired "Zuri Code" name survived a rename of the code default. Reading both
+// files here keeps them in step, without needing a live database.
+{
+  const { readFileSync } = await import('node:fs');
+  const schemaSql = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8');
+
+  // Every seeded row starts with its code and its display name.
+  const seeded = [...schemaSql.matchAll(/^\s*\('([a-z0-9-]+)',\s*'([^']*)'/gm)];
+  for (const [, code, name] of seeded) {
+    const model = DEFAULT_MODELS.find((entry) => entry.code === code);
+    // The plan and image rows share this shape; only catalogue rows are compared.
+    if (model === undefined) continue;
+    assert.equal(
+      name,
+      model.name,
+      `schema.sql seeds ${code} as ${JSON.stringify(name)} but the code calls it ${JSON.stringify(model.name)}`,
+    );
+  }
+  // Prove the comparison above actually saw the text models, so it cannot pass by
+  // matching nothing at all.
+  for (const model of DEFAULT_MODELS) {
+    assert.ok(
+      seeded.some(([, code]) => code === model.code),
+      `schema.sql never seeds ${model.code}, so a fresh deploy would not have it`,
+    );
+  }
+
+  // A database seeded before the rename keeps the old display name until this runs,
+  // and it moves only the seeded name, never one an operator chose in the dashboard.
+  assert.match(
+    schemaSql,
+    /UPDATE models SET name = 'Zuri Core' WHERE code = 'zuri-code' AND name = 'Zuri Code'/,
+    'schema.sql must rename an existing Zuri Code row, or a live database keeps the retired name',
+  );
+  assert.ok(
+    !/INSERT INTO models[^;]*'Zuri Code'/.test(schemaSql),
+    'schema.sql must not seed the retired Zuri Code name',
+  );
+}
 
 console.log('PASS server models');

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Button, Checkbox, Chip, Input, Textarea } from './ui.jsx';
 import SelectField from './SelectField.jsx';
+// The catalogue lives in its own module because the composer's model chip offers
+// the same six names, and two copies of a supplier id would drift apart.
+import { ZURI_MODELS } from './zuriModels.js';
 
 const PROVIDERS = [
   ['openai', 'OpenAI'],
@@ -8,24 +11,6 @@ const PROVIDERS = [
   ['deepseek', 'DeepSeek'],
   ['moonshot', 'Kimi (Moonshot)'],
   ['zai', 'Z.ai (GLM)'],
-];
-
-/**
- * The same catalogue the cloud sells, so a person meets one product name (Zuri
- * Flash) instead of a supplier model id (deepseek-flash).
- *
- * Each row still carries the real supplier id, because that is what the provider
- * API is asked for and what providers/chat.js checks the saved model against. The
- * provider travels with the model because a supplier id is only valid on its own
- * API, so choosing a model also chooses the key that pays for it.
- */
-const ZURI_MODELS = [
-  { provider: 'deepseek', model: 'deepseek-flash', name: 'Zuri Flash', note: 'Cheap and quick for everyday questions.' },
-  { provider: 'moonshot', model: 'kimi-k3', name: 'Zuri Pro', note: 'Balanced, and good with long documents.' },
-  { provider: 'zai', model: 'glm-5.3', name: 'Zuri Max', note: 'Strong general reasoning.' },
-  { provider: 'openai', model: 'gpt-5.3-codex', name: 'Zuri Code', note: 'Code, scripts and technical work.' },
-  { provider: 'anthropic', model: 'claude-sonnet-5-5', name: 'Zuri Reason', note: 'Careful step-by-step analysis.' },
-  { provider: 'anthropic', model: 'claude-opus-5-5', name: 'Zuri Elite', note: 'The deepest answers, and the dearest.' },
 ];
 
 /** The person-facing name of the provider whose key a model spends. */

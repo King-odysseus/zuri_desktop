@@ -778,7 +778,7 @@ const MESSAGE_MODES = Object.freeze(['ask', 'act', 'autopilot']);
 /**
  * Append one message to a thread, bump its `updatedAt`, and persist.
  * @param {string} threadId
- * @param {{ role?: 'user' | 'assistant', content?: string, mode?: string }} message
+ * @param {{ role?: 'user' | 'assistant', content?: string, mode?: string, model?: { provider?: string, model?: string } }} message
  * @param {{ root?: string }} [options]
  * @returns {Promise<{ ok: true, data: { thread: any, message: any } } | { ok: false, error: { code: string, message: string } }>}
  */
@@ -827,12 +827,24 @@ export async function appendMessage(threadId, message, options = {}) {
         kind: String(file.kind ?? ''),
         bytes: Number.isFinite(file.bytes) ? file.bytes : 0,
       }));
+    // Which Zuri model wrote an assistant reply is kept with it, so reopening a chat
+    // can name the model that answered and send the next message to the same one. A
+    // pair missing either half is dropped rather than half-saved: the composer reads
+    // this back to decide which model a chat is pinned to.
+    const claimed = message.model !== null && typeof message.model === 'object'
+      ? {
+        provider: typeof message.model.provider === 'string' ? message.model.provider.trim().slice(0, 32) : '',
+        model: typeof message.model.model === 'string' ? message.model.model.trim().slice(0, 64) : '',
+      }
+      : null;
+    const usedModel = claimed !== null && claimed.provider !== '' && claimed.model !== '' ? claimed : null;
     const stored = {
       id: randomUUID(),
       role,
       content,
       createdAt: now,
       ...(mode ? { mode } : {}),
+      ...(usedModel !== null ? { model: usedModel } : {}),
       ...(role === 'user' && images.length > 0 ? { images } : {}),
       ...(role === 'assistant' && files.length > 0 ? { files } : {}),
     };

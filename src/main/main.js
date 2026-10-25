@@ -612,7 +612,7 @@ async function handleAutomationsDelete(payload) {
  * Tokens go out on CHAT_STREAM_CHANNEL as they arrive, addressed to the sender only,
  * so a second window can never see another window's reply. The final answer holds
  * the thread with the reply already saved in chats.json.
- * @param {{ threadId?: string }} [payload]
+ * @param {{ threadId?: string, model?: { provider?: string, model?: string } }} [payload]
  * @param {Electron.IpcMainInvokeEvent} [event]
  * @returns {Promise<object>}
  */
@@ -636,6 +636,11 @@ function handleChatSend(payload, event) {
     // settings.activeAgentId, which is the same id in the normal case.
     agentId: typeof payload?.agentId === 'string' ? payload.agentId : undefined,
     webSearch: payload?.webSearch === true,
+    // The composer's model chip pins a model for this chat. Without one the reply
+    // uses the model chosen in Settings, so an older window keeps working.
+    model: payload?.model !== null && typeof payload?.model === 'object'
+      ? { provider: payload.model.provider, model: payload.model.model }
+      : undefined,
     // Every reply in the window goes through the account, so no supplier key is
     // read and a signed-out window is told to sign in instead.
     cloudReply: (request) => cloudChatReply(request),

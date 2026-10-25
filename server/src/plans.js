@@ -5,7 +5,10 @@
  * the price ladder that a model's minimum plan is checked against.
  */
 export const PLANS = Object.freeze([
-  Object.freeze({ code: 'starter', name: 'Starter', amountKobo: 250_000, monthlyTokens: 2_000_000 }),
+  // NGN 2,499, not 2,500, on purpose: Paystack waives its NGN 100 flat fee only
+  // for a transaction UNDER NGN 2,500, so one naira less costs the customer less
+  // and keeps NGN 99 more per month. See the fee note in test/models.test.js.
+  Object.freeze({ code: 'starter', name: 'Starter', amountKobo: 249_900, monthlyTokens: 2_000_000 }),
   Object.freeze({ code: 'pro', name: 'Pro', amountKobo: 600_000, monthlyTokens: 6_000_000 }),
   Object.freeze({ code: 'power', name: 'Power', amountKobo: 1_500_000, monthlyTokens: 12_000_000 }),
   Object.freeze({ code: 'max', name: 'Max', amountKobo: 4_000_000, monthlyTokens: 40_000_000 }),

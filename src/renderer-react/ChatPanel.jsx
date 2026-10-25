@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, ComposerTextarea } from './ui.jsx';
+// The same catalogue Settings offers, so the chip and the Settings picker can never
+// disagree about which supplier id sits behind a Zuri name.
+import { ZURI_MODELS, zuriModelFor, zuriModelName } from './zuriModels.js';
 import {
   ArrowUpIcon,
   CheckIcon,
+  ChevronDownIcon,
   CloseIcon,
   CopyIcon,
   DownloadIcon,
@@ -243,6 +247,49 @@ function FileCard({ file, api }) {
   );
 }
 
+/**
+ * The model a chat was last answered with, read from its stored replies.
+ *
+ * A reply keeps the pair that wrote it, so a reopened chat restores the chip without
+ * a second settings field to drift out of step with the transcript. The latest one
+ * wins, which makes the chip follow the most recent choice made in that chat.
+ * @param {any[]} messages
+ * @returns {string} A supplier model id, or '' when no reply carries one.
+ */
+function modelOfMessages(messages) {
+  // A hand-edited chats.json can carry a thread with no messages at all.
+  const list = Array.isArray(messages) ? messages : [];
+  for (let index = list.length - 1; index >= 0; index -= 1) {
+    const used = list[index]?.model?.model;
+    if (typeof used === 'string' && used !== '') return used;
+  }
+  return '';
+}
+
+/**
+ * Where a reply should name the model that wrote it.
+ *
+ * A caption on every bubble would repeat the same name down a long chat that never
+ * changed model, and the chip already names the model in use. The label earns its
+ * place where the model changed, so the first reply carries it and so does the first
+ * reply after a switch, which reads as the point where the conversation moved.
+ * Replies saved before a model was recorded carry none and show no caption.
+ * @param {any[]} messages
+ * @returns {boolean[]} One entry per message, true where the caption belongs.
+ */
+function modelLabelPositions(messages) {
+  const list = Array.isArray(messages) ? messages : [];
+  let previous = '';
+  return list.map((message) => {
+    if (message?.role === 'user') return false;
+    const used = typeof message?.model?.model === 'string' ? message.model.model : '';
+    if (used === '') return false;
+    const show = used !== previous;
+    previous = used;
+    return show;
+  });
+}
+
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar, openingKind = 'question' }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [draft, setDraft] = useState('');
@@ -269,6 +316,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [answerLength, setAnswerLength] = useState('balanced');
   // On by default for current answers, then remembered when the person changes it.
   const [webSearch, setWebSearch] = useState(readWebSearchPreference);
+  // The model chip. `pickedModelId` is what the person chose in this chat and wins
+  // over the last reply's model; '' means nothing was picked here, which leaves the
+  // model chosen in Settings in charge.
+  const [pickedModelId, setPickedModelId] = useState('');
+  const [settingsModelId, setSettingsModelId] = useState('');
+  const [modelMenu, setModelMenu] = useState(false);
+  const modelMenuRef = useRef(null);
   const menuRef = useRef(null);
   const composerRef = useRef(null);
   const scrollRef = useRef(null);
@@ -296,6 +350,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       if (!active || !result?.ok) return;
       if (typeof result.data?.name === 'string') setPersonName(result.data.name);
       if (typeof result.data?.answerLength === 'string') setAnswerLength(result.data.answerLength);
+      if (typeof result.data?.model === 'string') setSettingsModelId(result.data.model);
     };
     void loadName();
     return () => { active = false; };
@@ -314,10 +369,19 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       const thread = result?.ok ? result.data?.find((entry) => entry?.id === initialThreadId) : null;
       if (!active || !thread) return;
       setMessages(Array.isArray(thread.messages) ? thread.messages : []);
+      // A reopened chat starts on the model its last reply used.
+      setPickedModelId(modelOfMessages(thread.messages));
     };
     void loadThread();
     return () => { active = false; };
   }, [api, initialThreadId]);
+
+  // A brand new chat starts from Settings again rather than inheriting the model of
+  // whichever chat happened to be open before it.
+  useEffect(() => {
+    if (initialThreadId !== '') return;
+    setPickedModelId('');
+  }, [initialThreadId]);
 
   useEffect(() => {
     if (typeof api?.chat?.onStream !== 'function') return undefined;
@@ -332,6 +396,23 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       }
     });
   }, [api, threadId]);
+
+  // The chip's list closes on the same two gestures as the + menu, with its own ref
+  // so closing one popover cannot close the other.
+  useEffect(() => {
+    if (!modelMenu) return undefined;
+    const close = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'mousedown' && modelMenuRef.current?.contains(event.target)) return;
+      setModelMenu(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [modelMenu]);
 
   useEffect(() => {
     if (menuView === '') return undefined;
@@ -650,7 +731,14 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       setMessages(Array.isArray(appended.data?.thread?.messages) ? appended.data.thread.messages : []);
       onChatUpdated?.();
 
-      const result = await api.chat.send({ threadId: activeThreadId, webSearch });
+      // The chip's model travels with this one send. A chat with no choice of its own
+      // sends nothing, which leaves Settings in charge rather than pinning today's
+      // default into every chat opened later.
+      const result = await api.chat.send({
+        threadId: activeThreadId,
+        webSearch,
+        ...(chatModel !== null ? { model: { provider: chatModel.provider, model: chatModel.model } } : {}),
+      });
       if (!result?.ok) {
         if (result?.error?.code === 'CHAT_STOPPED') {
           // Stop intentionally discards the partial answer, so this is the
@@ -724,6 +812,19 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     await runTurn(adjustment.text, adjustment.text);
   }
 
+  /**
+   * Remember the model for the rest of this chat.
+   *
+   * Nothing is written here. The choice rides with the next message and is stored on
+   * the reply it produces, so changing the chip can never race a reply already in
+   * flight, and a chat keeps its model without a second settings write.
+   * @param {{ provider: string, model: string }} entry
+   */
+  function pickModel(entry) {
+    setPickedModelId(entry.model);
+    setModelMenu(false);
+  }
+
   async function chooseAnswerLength(value) {
     const saved = await api?.settings?.save?.({ answerLength: value });
     if (saved?.ok !== true) {
@@ -757,6 +858,18 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     }
     return -1;
   }, [messages]);
+
+  // Which model answers this chat: the one picked here, else the one the last reply
+  // used, else the one chosen in Settings, so the chip never shows a model other than
+  // the one about to be asked.
+  const chatModelId = useMemo(() => {
+    if (pickedModelId !== '') return pickedModelId;
+    const remembered = modelOfMessages(messages);
+    return remembered !== '' ? remembered : settingsModelId;
+  }, [pickedModelId, messages, settingsModelId]);
+  const chatModel = zuriModelFor(chatModelId);
+  const modelLabels = useMemo(() => modelLabelPositions(messages), [messages]);
+  const chatModelLabel = zuriModelName(chatModelId) || 'Zuri';
 
   const hasConversation = messages.length > 0 || streamingText !== '';
   // The window opens maximised, so a 56rem column left most of a wide screen
@@ -861,6 +974,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                 </div>
               ) : (
                 <div key={messageKey(message, index)} className="flex min-w-0 max-w-[85%] flex-col items-start gap-1 self-start">
+                  {/* The store keeps the model with each reply, so the caption is read back
+                      from what was saved rather than from the current chips state. */}
+                  {modelLabels[index] && (
+                    <span className="px-1 text-xs text-muted">{zuriModelName(message.model.model)}</span>
+                  )}
                   <div className="min-w-0 break-words rounded-2xl bg-surface-secondary px-4 py-3 text-sm text-foreground">
                     <FormattedMessage content={message.content} />
                   </div>
@@ -1026,6 +1144,50 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             >
               <MicIcon />
             </Button>
+            {/* The model chip sits at the right of the row, directly beside Send, so the
+            model that will answer is in reach of the thumb that is about to send. It is
+            plain text with a chevron, not a filled pill: the row already holds round
+            buttons, and a fourth filled shape competed with them. The quick-ask popup is
+            a 420px card that keeps its row to the basics, so the chip stays out of it and
+            that window follows the model in Settings. */}
+            {!compact && (
+            <div ref={modelMenuRef} className="relative shrink-0">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={modelMenu}
+                aria-label={`Chat model: ${chatModelLabel}`}
+                title={`${chatModelLabel}${chatModel !== null ? `. ${chatModel.note}` : ''} Change the model for this chat.`}
+                className="flex h-10 max-w-32 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted outline-none hover:text-foreground focus:ring-2 focus:ring-accent/30"
+                onClick={() => setModelMenu((open) => !open)}
+              >
+                <span className="truncate">{chatModelLabel}</span>
+                <ChevronDownIcon size={12} />
+              </button>
+              {modelMenu && (
+                <div role="menu" aria-label="Chat model" className="absolute bottom-full right-0 z-20 mb-2 w-64 rounded-2xl border border-border bg-surface p-1 shadow-lg">
+                  <p className="px-3 pb-1 pt-2 text-xs text-muted">Zuri answers this chat with:</p>
+                  {ZURI_MODELS.map((entry) => (
+                    <button
+                      key={entry.model}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={entry.name === chatModelLabel}
+                      className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary"
+                      onClick={() => pickModel(entry)}
+                    >
+                      <span className="flex w-full items-center gap-2">
+                        <span className="flex-1 truncate">{entry.name}</span>
+                        {entry.model === chatModelId && <CheckIcon size={15} />}
+                      </span>
+                      <span className="text-xs text-muted">{entry.note}</span>
+                    </button>
+                  ))}
+                  <p className="px-3 pb-1 pt-2 text-xs text-muted">Billed to your Zuri plan, like every other reply.</p>
+                </div>
+              )}
+            </div>
+            )}
             {replying ? (
               <Button
                 type="button"

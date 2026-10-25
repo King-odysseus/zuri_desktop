@@ -75,7 +75,7 @@ const paystack = {
     return { authorization_url: 'https://checkout.paystack.com/test', access_code: 'access-test' };
   },
   async verifyTransaction(reference) {
-    return { id: 123, status: 'success', reference, amount: 250_000, currency: 'NGN', customer: { email: user.email }, authorization: { authorization_code: 'AUTH_test' }, subscription_code: 'SUB_test' };
+    return { id: 123, status: 'success', reference, amount: 249_900, currency: 'NGN', customer: { email: user.email }, authorization: { authorization_code: 'AUTH_test' }, subscription_code: 'SUB_test' };
   },
 };
 assert.equal(verifyPaystackSignature('body', createHmac('sha512', webhookSecret).update('body').digest('hex'), webhookSecret), true);
@@ -201,7 +201,7 @@ const checkout = await app(new Request('https://cloud.example.com/api/billing/ch
 }));
 assert.equal(checkout.status, 200);
 assert.equal((await checkout.json()).data.authorizationUrl, 'https://checkout.paystack.com/test');
-assert.equal(paystackCalls[0].amountKobo, 250_000);
+assert.equal(paystackCalls[0].amountKobo, 249_900);
 const verified = await app(new Request('https://cloud.example.com/api/billing/verify?reference=zuri-test-ref'));
 assert.equal(verified.status, 200);
 const invalidWebhook = await app(new Request('https://cloud.example.com/api/paystack/webhook', {
