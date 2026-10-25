@@ -1,5 +1,15 @@
 ## 2026-10-25 - Windows
 
+- Claude models can now use tools. The tool list was emptied for the Anthropic path and no Anthropic tool format existed, so switching to a Claude model silently removed web search, page fetch and document creation. The request now carries `{ name, description, input_schema }`, the stream reader collects `content_block_start` plus `input_json_delta` into tool calls, and the tool loop sends `tool_use` blocks back with `tool_result` blocks in the next user turn.
+- `readFile` and `summarizeDocument` are offered in chat on every message, not only when web search is on, because they only read and so need no approval.
+- Automations ask the model instead of guessing a tool from the prompt text. A schedule with no declared steps sends its prompt through the chat pipeline with its own allowed tools, and the answer is written into the run result under a new "Answer" heading. A caller with no model available keeps the old single-call plan.
+- Four new self-test checks cover this with a fake Anthropic stream and a fake automation run, so none of it needs a network or a key.
+- Key files: `src/main/providers/chat.js`, `src/main/scheduler.js`, `src/main/main.js`, `scripts/selftest.js`, `docs/deep-dive-vs-agent-clis.md`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - The Android APK is now on the live site. `server/src/downloads.js` already accepted `.apk`, but the deployed bundle predated that change, so `/api/downloads` returned only Windows and macOS. Rebuilt `server/public` and redeployed: the site now lists all three installers (`Zuri-0.1.0-Setup.exe`, `Zuri-0.1.0.dmg`, `Zuri-0.1.0.apk`) straight from the v0.1.0 GitHub release.
 - Corrected the Power plan card: it claimed "the largest input and output limits", but Max holds the higher limits (128k input, 16k output, 240 requests a minute). Each card now states its real model weight and request guardrails from `server/src/models.js` and `server/src/limits.js`. Prices were already read from `/api/plans` and needed no change.
 - Key files: `web/src/lib/format.js`, `server/public/**`.
