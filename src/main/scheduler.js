@@ -269,6 +269,12 @@ export function formatRunMarkdown(input) {
     `- Needs attention: ${input.needsAttention ? 'yes' : 'no'}`,
   ];
   if (input.error) lines.push(`- Error: ${input.error}`);
+
+  // The answer comes before the steps because it is what the person opened the file
+  // to read: the steps are the working, and a model run has no useful steps to show.
+  const answer = typeof input.answer === 'string' ? input.answer.trim() : '';
+  if (answer !== '') lines.push('', '## Answer', '', answer);
+
   lines.push('', '## Steps', '');
 
   if (input.steps.length === 0) lines.push('No step was planned for this automation.', '');
@@ -389,7 +395,17 @@ export async function runSchedule(schedule, options = {}) {
 
   const startedMs = Number.isFinite(options.now) ? options.now : Date.now();
   const startedAt = new Date(startedMs).toISOString();
-  const planned = typeof options.plan === 'function' ? options.plan(schedule) : planSteps(schedule);
+
+  // A model run replaces the heuristic with the prompt itself. A schedule that was
+  // taught explicit steps still replays them exactly as written, and a caller with no
+  // model wired in (the offline demo) keeps the single-call plan.
+  const declaredSteps = Array.isArray(schedule.steps) && schedule.steps.length > 0;
+  const askModel = declaredSteps === false && typeof options.runPrompt === 'function';
+  const planned = askModel
+    ? []
+    : typeof options.plan === 'function'
+      ? options.plan(schedule)
+      : planSteps(schedule);
   const runStep =
     typeof options.runStep === 'function'
       ? options.runStep
@@ -401,7 +417,7 @@ export async function runSchedule(schedule, options = {}) {
       automationId: schedule.id,
       title: String(schedule.prompt ?? '').trim(),
       mode: schedule.mode,
-      stepsTotal: planned.length,
+      stepsTotal: askModel ? 1 : planned.length,
       startedAt,
     },
     { root: options.root },
@@ -424,6 +440,45 @@ export async function runSchedule(schedule, options = {}) {
   let stepsDone = 0;
   let needsAttention = false;
   let failureText = null;
+  /** The model's answer, when this run asked one; undefined keeps the file step-only. */
+  let answer;
+
+  if (askModel) {
+    let outcome;
+    try {
+      outcome = await options.runPrompt({
+        prompt: String(schedule.prompt ?? '').trim(),
+        agentId: schedule.agentId ?? null,
+        allowedTools,
+        signal: options.signal,
+        onStatus: (status) => options.onStatus?.(status),
+      });
+    } catch (error) {
+      // runPrompt reports failures as values; a throw here is a bug in what was
+      // injected, and it must still leave the run row closed.
+      outcome = { ok: false, error: { code: 'MODEL_FAILED', message: String(error?.message ?? error) } };
+    }
+
+    const text = outcome?.ok === true ? String(outcome.data?.text ?? '').trim() : '';
+    if (text !== '') {
+      answer = text;
+      stepsDone = 1;
+      steps.push({
+        name: 'answer',
+        ok: true,
+        data: { provider: outcome.data?.provider, model: outcome.data?.model, characters: text.length },
+      });
+    } else {
+      needsAttention = true;
+      const problem =
+        outcome?.ok === true
+          ? { code: 'CHAT_EMPTY_REPLY', message: 'The model returned an empty answer.' }
+          : outcome?.error ?? { code: 'MODEL_FAILED', message: 'The automation could not run.' };
+      failureText = String(problem.message ?? 'The automation could not run.');
+      steps.push({ name: 'answer', ok: false, error: problem });
+    }
+    options.onStatus?.('');
+  }
 
   for (const step of planned) {
     let outcome;
@@ -461,6 +516,7 @@ export async function runSchedule(schedule, options = {}) {
   const markdown = formatRunMarkdown({
     schedule,
     steps,
+    answer,
     startedAt,
     finishedAt,
     status: failureText === null ? 'completed' : 'failed',
@@ -543,8 +599,10 @@ export async function runSchedule(schedule, options = {}) {
  *   now?: number,
  *   plan?: Function,
  *   runStep?: Function,
+ *   runPrompt?: Function,
  *   notify?: Function,
  *   onProgress?: Function,
+ *   onStatus?: Function,
  *   settings?: object,
  *   dependencies?: Record<string, Function>,
  *   allowedTools?: string[],

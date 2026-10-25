@@ -4,7 +4,7 @@ import path from 'node:path';
 import { copyFile, mkdir, readdir, readFile, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { CHAT_STREAM_CHANNEL, askForAddin, sendChatMessage, summarizeText } from './providers/chat.js';
+import { CHAT_STREAM_CHANNEL, askForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
 import { runOnboardingSetup } from './onboarding.js';
 import {
@@ -1662,6 +1662,10 @@ app.whenReady().then(async () => {
   // same push the rest of the app uses, so the Context panel and the runs page follow
   // it without a timer of their own.
   startScheduler({
+    // Without this the scheduler would fall back to picking one tool from the prompt
+    // text, so an automation asking for a judgement would run a web search instead.
+    // With it, the prompt goes through the same pipeline a chat message does.
+    runPrompt: (request) => runPrompt(request),
     onProgress: (change) => announceState(change),
     onCatchUp: (report) => {
       announceCatchUp(report);

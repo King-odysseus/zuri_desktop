@@ -108,6 +108,24 @@ check('the sidebar refreshes after chat history changes', () => {
   return 'Recents follows clear and delete events';
 });
 
+// A prompt is worth copying as much as a reply, so the user branch keeps its own copy button.
+check('own prompts carry a copy action, not only replies', () => {
+  const source = read('src/renderer-react/ChatPanel.jsx');
+  const userAt = source.indexOf("message.role === 'user'");
+  const replyAt = source.indexOf('<FormattedMessage');
+  if (userAt === -1) throw new Error('the transcript has no user branch');
+  if (replyAt === -1 || replyAt < userAt) throw new Error('the assistant branch no longer follows the user branch');
+  // Slice the user branch alone, so a control that only lives in the reply branch fails this.
+  const promptBranch = source.slice(userAt, replyAt);
+  for (const required of ['aria-label="Copy message"', 'copyMessage(message, index)']) {
+    if (!promptBranch.includes(required)) throw new Error(`the user branch is missing ${required}`);
+  }
+  for (const required of ['aria-label="Copy reply"', 'That message could not be copied to the clipboard.']) {
+    if (!source.includes(required)) throw new Error(`missing ${required}`);
+  }
+  return 'prompts and replies both copy through one path';
+});
+
 const { splitDsml, answerStylePolicy, chatSystemPrompt, ZURI_IDENTITY_PROMPT } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
 
 check('DSML tool markup is hidden from the reply and read as tool calls', () => {
@@ -277,6 +295,167 @@ check('readFile reads Word text and Excel cells with addresses', async () => {
 check('legacy design checks are no longer part of the test graph', () => {
   const checks = fs.readdirSync(path.join(root, 'scripts')).filter((name) => name.endsWith('.check.js'));
   if (checks.length > 0) throw new Error(`${checks.length} design check scripts remain`);
+});
+
+/* ---------------------------------------------------------------------------
+   Provider tool support
+
+   Anthropic speaks a different tool dialect from the OpenAI-style providers:
+   input_schema going out, tool_use blocks coming back, and results returned as
+   tool_result content in the next user turn. A fake stream proves the
+   translation, with no network and no key.
+   ------------------------------------------------------------------------ */
+
+const { setKey } = await import(pathToFileURL(path.join(root, 'src/main/secrets.js')).href);
+const { runPrompt } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+
+await setKey('anthropic', 'sk-ant-selftest-placeholder');
+await saveSettings({ provider: 'anthropic', model: 'claude-3-5-haiku-latest' });
+
+/** Turn a list of Anthropic stream events into the response the reader expects. */
+const sseResponse = (events) =>
+  new Response(events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join(''), {
+    status: 200,
+    headers: { 'content-type': 'text/event-stream' },
+  });
+
+const anthropicBodies = [];
+const anthropicFetch = async (url, init) => {
+  anthropicBodies.push(JSON.parse(init.body));
+  if (anthropicBodies.length === 1) {
+    return sseResponse([
+      { type: 'message_start', message: { id: 'msg_1', role: 'assistant', content: [] } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Let me look.' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'content_block_start', index: 1, content_block: { type: 'tool_use', id: 'toolu_1', name: 'readFile', input: {} } },
+      // Split across two frames, the way a real stream delivers it.
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '{"path":' } },
+      { type: 'content_block_delta', index: 1, delta: { type: 'input_json_delta', partial_json: '"invoices-2026.docx"}' } },
+      { type: 'content_block_stop', index: 1 },
+      { type: 'message_stop' },
+    ]);
+  }
+  return sseResponse([
+    { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+    { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Here is your answer.' } },
+    { type: 'message_stop' },
+  ]);
+};
+
+const anthropicRun = await runPrompt({ prompt: 'Read my invoices file' }, { fetchImpl: anthropicFetch });
+
+check('an Anthropic model is offered tools in its own shape, not an empty list', () => {
+  if (!anthropicRun.ok) throw new Error(anthropicRun.error.message);
+  const body = anthropicBodies[0];
+  if (!Array.isArray(body.tools) || body.tools.length === 0) throw new Error('no tools were sent');
+  const read = body.tools.find((tool) => tool.name === 'readFile');
+  if (!read) throw new Error('readFile was not offered');
+  if (read.function !== undefined) throw new Error('the OpenAI wrapper was sent to Anthropic');
+  if (typeof read.input_schema?.properties?.path !== 'object') throw new Error('input_schema was not built');
+  // The free tools travel without web search being switched on.
+  for (const name of ['summarizeDocument', 'createDocument', 'editDocument']) {
+    if (!body.tools.some((tool) => tool.name === name)) throw new Error(`${name} was not offered`);
+  }
+  if (body.tools.some((tool) => tool.name === 'writeFile')) throw new Error('a confirmation-gated tool was offered');
+});
+
+check('an Anthropic tool_use is answered with a tool_result in the next user turn', () => {
+  const body = anthropicBodies[1];
+  if (!body) throw new Error('the model was never asked a second time');
+  const assistant = body.messages.at(-2);
+  const results = body.messages.at(-1);
+  const use = Array.isArray(assistant?.content) ? assistant.content.find((block) => block.type === 'tool_use') : null;
+  if (!use) throw new Error('the assistant turn carried no tool_use block');
+  if (use.id !== 'toolu_1' || use.name !== 'readFile') throw new Error(`tool_use was ${use.id}/${use.name}`);
+  if (use.input?.path !== 'invoices-2026.docx') throw new Error(`arguments were ${JSON.stringify(use.input)}`);
+  const result = Array.isArray(results?.content) ? results.content.find((block) => block.type === 'tool_result') : null;
+  if (!result) throw new Error('no tool_result was sent back');
+  if (result.tool_use_id !== 'toolu_1') throw new Error(`tool_result answered ${result.tool_use_id}`);
+  if (assistant.role !== 'assistant' || results.role !== 'user') throw new Error('the turns were in the wrong order');
+  if (!anthropicRun.data.text.includes('Here is your answer.')) throw new Error(`text was "${anthropicRun.data.text}"`);
+});
+
+/* ---------------------------------------------------------------------------
+   Automations ask the model
+
+   Before this change the prompt was turned into one web search or one page
+   fetch by looking at its text, so a question needing judgement ran a search.
+   ------------------------------------------------------------------------ */
+
+const { runSchedule } = await import(pathToFileURL(path.join(root, 'src/main/scheduler.js')).href);
+const { createAutomation } = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+
+const schedulerRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-scheduler-'));
+let savedMarkdown = '';
+// Saved through the store, so the run's own bookkeeping (the row, the advance of
+// nextRunAt) works against a real automation rather than a made-up object.
+const savedAutomation = await createAutomation(
+  {
+    prompt: 'Summarise my invoices and tell me which are overdue',
+    mode: 'autopilot',
+    cadence: { type: 'daily', timeOfDay: '09:00' },
+    allowedTools: ['webSearch', 'readFile'],
+  },
+  { root: schedulerRoot },
+);
+if (!savedAutomation.ok) throw new Error(savedAutomation.error.message);
+
+const ranAnAutomation = await runSchedule(
+  savedAutomation.data,
+  {
+    root: schedulerRoot,
+    notify: () => true,
+    runPrompt: async (request) => {
+      if (!Array.isArray(request.allowedTools)) throw new Error('the allow-list did not reach the model');
+      return { ok: true, data: { text: 'Two invoices are overdue.', provider: 'anthropic', model: 'claude-3-5-haiku-latest' } };
+    },
+    runStep: async (name, args) => {
+      // Only the result write may happen; a tool call here would mean the old
+      // heuristic still ran the prompt instead of the model.
+      if (name !== 'writeFile') throw new Error(`the automation ran ${name}`);
+      savedMarkdown = args.content;
+      return { ok: true, data: { relative: args.path } };
+    },
+  },
+);
+
+check('an automation asks the model instead of guessing a tool from the prompt', () => {
+  if (!ranAnAutomation.ok) throw new Error(ranAnAutomation.error.message);
+  if (ranAnAutomation.data.run.status !== 'completed') throw new Error(`status was ${ranAnAutomation.data.run.status}`);
+  if (ranAnAutomation.data.run.stepsTotal !== 1) throw new Error(`steps total was ${ranAnAutomation.data.run.stepsTotal}`);
+  if (!savedMarkdown.includes('## Answer')) throw new Error('the result file has no answer section');
+  if (!savedMarkdown.includes('Two invoices are overdue.')) throw new Error('the model answer was not saved');
+});
+
+let offlineMarkdown = '';
+const offlineAutomation = await createAutomation(
+  {
+    prompt: 'Check https://example.com/jobs for new roles',
+    mode: 'autopilot',
+    cadence: { type: 'daily', timeOfDay: '09:00' },
+  },
+  { root: schedulerRoot },
+);
+if (!offlineAutomation.ok) throw new Error(offlineAutomation.error.message);
+
+const ranWithoutModel = await runSchedule(
+  offlineAutomation.data,
+  {
+    root: schedulerRoot,
+    notify: () => true,
+    runStep: async (name, args) => {
+      if (name === 'writeFile') offlineMarkdown = args.content;
+      return { ok: true, data: { relative: `${name}.txt` } };
+    },
+  },
+);
+
+check('an automation with no model available still runs its single-call plan', () => {
+  if (!ranWithoutModel.ok) throw new Error(ranWithoutModel.error.message);
+  if (offlineMarkdown.includes('## Answer')) throw new Error('a model answer was invented');
+  if (ranWithoutModel.data.run.stepsTotal !== 1) throw new Error('the plan was not kept');
+  if (ranWithoutModel.data.run.status !== 'completed') throw new Error('the planned step did not run');
 });
 
 await Promise.all(pendingChecks);

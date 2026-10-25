@@ -96,12 +96,53 @@ const EDIT_TOOL = Object.freeze({
   },
 });
 
+/**
+ * Reading tools. Offered on every message, not only when web search is switched on,
+ * because they change nothing: an attachment is already inlined into the message, but
+ * the model may still want to open another workspace file, or have a long attachment
+ * summarised properly instead of guessing from the truncated inline copy.
+ */
+const READ_TOOL = Object.freeze({
+  name: 'readFile',
+  description:
+    'Read a file from the Zuri workspace, or the text inside a .docx, .xlsx or .pptx file, by its path. ' +
+    'Use it when the person names a file, or after an "Attached file" line whose inline copy was cut short.',
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'Path inside the workspace, or the attached file path.' },
+    },
+    required: ['path'],
+  },
+});
+
+const SUMMARY_TOOL = Object.freeze({
+  name: 'summarizeDocument',
+  description:
+    'Read a document and return a summary of it, written by the AI provider. Use it for a long document the person wants ' +
+    'condensed; for a short file, readFile is enough and costs less.',
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'Path of the document to summarise.' },
+      instruction: { type: 'string', description: 'What the summary should focus on, when they asked for something specific.' },
+    },
+    required: ['path'],
+  },
+});
+
 /** Tools that produce a downloadable file; each success becomes a card under the reply. */
 const FILE_TOOLS = Object.freeze([DOCUMENT_TOOL, EDIT_TOOL]);
 const FILE_TOOL_NAMES = new Set(FILE_TOOLS.map((tool) => tool.name));
 
+/**
+ * Everything offered with web search left off: building files and reading them.
+ * Confirmation-gated tools stay out, because a streaming reply has nowhere to ask.
+ */
+const BASE_TOOLS = Object.freeze([...FILE_TOOLS, READ_TOOL, SUMMARY_TOOL]);
+
 /** Every tool chat can run by name; which are offered on a given message is decided per send. */
-const ALL_CHAT_TOOLS = Object.freeze([...CHAT_TOOLS, ...FILE_TOOLS]);
+const ALL_CHAT_TOOLS = Object.freeze([...CHAT_TOOLS, ...BASE_TOOLS]);
 
 /** Each extra round is another paid model call, so the loop is capped hard. */
 const MAX_TOOL_ROUNDS = 4;
@@ -508,6 +549,17 @@ function requestBody(provider, model, conversation, tools = []) {
       // Anthropic takes the system prompt as its own field, not as a message.
       ...(conversation.system ? { system: conversation.system } : {}),
       messages: conversation.turns,
+      // Same tool list, different shape: Anthropic names the schema `input_schema`
+      // and keeps the three fields flat, where OpenAI nests them under `function`.
+      ...(tools.length > 0
+        ? {
+            tools: tools.map((tool) => ({
+              name: tool.name,
+              description: tool.description,
+              input_schema: tool.parameters,
+            })),
+          }
+        : {}),
     };
   }
 
@@ -745,8 +797,23 @@ async function streamReply(provider, model, key, conversation, options = {}) {
         return;
       }
 
-      // Tool calls arrive in pieces keyed by index; the name comes first, the JSON
-      // arguments are spread over later events.
+      // Anthropic announces a call with content_block_start and then streams its
+      // arguments as input_json_delta pieces, keyed by the same content block index.
+      if (provider === 'anthropic') {
+        if (event?.type === 'content_block_start' && event.content_block?.type === 'tool_use') {
+          toolCalls[event.index ?? 0] = {
+            id: event.content_block.id ?? '',
+            name: event.content_block.name ?? '',
+            arguments: '',
+          };
+        } else if (event?.type === 'content_block_delta' && event.delta?.type === 'input_json_delta') {
+          const slot = (toolCalls[event.index ?? 0] ??= { id: '', name: '', arguments: '' });
+          slot.arguments += event.delta.partial_json ?? '';
+        }
+      }
+
+      // OpenAI-style tool calls arrive in pieces keyed by index; the name comes
+      // first, the JSON arguments are spread over later events.
       const delta = Array.isArray(event?.choices) ? event.choices[0]?.delta : null;
       if (typeof delta?.reasoning_content === 'string') reasoning += delta.reasoning_content;
       for (const piece of Array.isArray(delta?.tool_calls) ? delta.tool_calls : []) {
@@ -815,27 +882,50 @@ async function streamReply(provider, model, key, conversation, options = {}) {
  * DeepSeek's thinking mode rejects the next request unless the assistant message that
  * made the calls carries its reasoning_content back, so it is kept here.
  */
-async function answerToolCalls(conversation, reply, allowedTools, onStatus = () => {}, offeredTools = ALL_CHAT_TOOLS) {
+async function answerToolCalls(
+  conversation,
+  reply,
+  allowedTools,
+  onStatus = () => {},
+  offeredTools = ALL_CHAT_TOOLS,
+  provider = 'openai',
+) {
   /** Files built by createDocument in this round, handed back so the reply can carry them. */
   const files = [];
-  conversation.turns.push({
-    role: 'assistant',
-    content: reply.text,
-    ...(reply.reasoning ? { reasoning_content: reply.reasoning } : {}),
-    tool_calls: reply.toolCalls.map((call, index) => ({
-      id: call.id || `call_${index}`,
-      type: 'function',
-      function: { name: call.name, arguments: call.arguments || '{}' },
-    })),
-  });
+  /** Anthropic collects every result into one user turn; OpenAI wants one turn each. */
+  const anthropicResults = [];
+  const callId = (call, index) => call.id || (provider === 'anthropic' ? `toolu_${index}` : `call_${index}`);
+
+  if (provider === 'anthropic') {
+    // Anthropic wants the call and its result as typed blocks: tool_use in the
+    // assistant turn, tool_result in the user turn that follows it.
+    conversation.turns.push({
+      role: 'assistant',
+      content: [
+        ...(reply.text ? [{ type: 'text', text: reply.text }] : []),
+        ...reply.toolCalls.map((call, index) => ({
+          type: 'tool_use',
+          id: callId(call, index),
+          name: call.name,
+          input: parseToolInput(call.arguments),
+        })),
+      ],
+    });
+  } else {
+    conversation.turns.push({
+      role: 'assistant',
+      content: reply.text,
+      ...(reply.reasoning ? { reasoning_content: reply.reasoning } : {}),
+      tool_calls: reply.toolCalls.map((call, index) => ({
+        id: callId(call, index),
+        type: 'function',
+        function: { name: call.name, arguments: call.arguments || '{}' },
+      })),
+    });
+  }
 
   for (const [index, call] of reply.toolCalls.entries()) {
-    let args = {};
-    try {
-      args = JSON.parse(call.arguments || '{}');
-    } catch {
-      args = {};
-    }
+    const args = parseToolInput(call.arguments);
     // Only the chat tool list is reachable; the model cannot name another tool.
     const offered = offeredTools.some((tool) => tool.name === call.name);
     if (offered) {
@@ -843,6 +933,10 @@ async function answerToolCalls(conversation, reply, allowedTools, onStatus = () 
         onStatus(`Creating your ${String(args.kind ?? 'document').toLowerCase()} file`);
       } else if (call.name === 'editDocument') {
         onStatus('Editing a copy of your file');
+      } else if (call.name === 'readFile') {
+        onStatus(`Reading ${path.basename(String(args.path ?? args.file ?? 'your file')).slice(0, 80)}`);
+      } else if (call.name === 'summarizeDocument') {
+        onStatus('Summarising your document');
       } else {
         const target = String(args.query ?? args.url ?? '').slice(0, 80);
         onStatus(call.name === 'webFetch' ? `Reading ${target}` : `Searching the web for ${target}`);
@@ -856,26 +950,48 @@ async function answerToolCalls(conversation, reply, allowedTools, onStatus = () 
       const { path: filePath, name, kind, bytes } = result.data;
       files.push({ path: filePath, name, kind, bytes });
     }
-    conversation.turns.push({
-      role: 'tool',
-      tool_call_id: call.id || `call_${index}`,
-      // The model only needs to know it worked; the full disk path is not useful to it.
-      content: JSON.stringify(
-        madeFile
-          ? {
-              ok: true,
-              data: {
-                name: result.data.name,
-                kind: result.data.kind,
-                ...(result.data.changes !== undefined ? { changes: result.data.changes, notFound: result.data.notFound } : {}),
-                note: 'The file is ready and shown to the person as a download card.',
-              },
-            }
-          : result,
-      ).slice(0, TOOL_RESULT_LIMIT),
-    });
+    // The model only needs to know it worked; the full disk path is not useful to it.
+    const outcome = JSON.stringify(
+      madeFile
+        ? {
+            ok: true,
+            data: {
+              name: result.data.name,
+              kind: result.data.kind,
+              ...(result.data.changes !== undefined ? { changes: result.data.changes, notFound: result.data.notFound } : {}),
+              note: 'The file is ready and shown to the person as a download card.',
+            },
+          }
+        : result,
+    ).slice(0, TOOL_RESULT_LIMIT);
+
+    if (provider === 'anthropic') {
+      anthropicResults.push({ type: 'tool_result', tool_use_id: callId(call, index), content: outcome });
+    } else {
+      conversation.turns.push({ role: 'tool', tool_call_id: callId(call, index), content: outcome });
+    }
+  }
+
+  if (anthropicResults.length > 0) {
+    conversation.turns.push({ role: 'user', content: anthropicResults });
   }
   return files;
+}
+
+/**
+ * A tool call's arguments as an object. Both protocols stream them as JSON text,
+ * and a malformed payload must not take the whole reply down: the tool then reports
+ * its own missing-argument error, which the model can read and correct.
+ * @param {string} [json]
+ * @returns {Record<string, any>}
+ */
+function parseToolInput(json) {
+  try {
+    const parsed = JSON.parse(json || '{}');
+    return parsed !== null && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 /**
@@ -1035,14 +1151,12 @@ export async function sendChatMessage(threadId, options = {}) {
     );
   }
 
-  // Anthropic uses a different tool format, so tools are offered on the OpenAI-style
-  // providers only. An agent's allow-list narrows what the model can call.
+  // Every provider gets tools now: requestBody and answerToolCalls translate the list
+  // into Anthropic's shape when that is the provider. An agent's allow-list still
+  // narrows what the model may call.
   const allowedTools = agentAllowedTools(settings, options.agentId);
-  const candidateTools = options.webSearch === true ? ALL_CHAT_TOOLS : FILE_TOOLS;
-  const tools =
-    provider === 'anthropic'
-      ? []
-      : candidateTools.filter((tool) => allowedTools === null || allowedTools.includes(tool.name));
+  const candidateTools = options.webSearch === true ? ALL_CHAT_TOOLS : BASE_TOOLS;
+  const tools = candidateTools.filter((tool) => allowedTools === null || allowedTools.includes(tool.name));
   const builtFiles = [];
 
   // Text from every round is kept because it was all streamed to the window, so the
@@ -1055,7 +1169,7 @@ export async function sendChatMessage(threadId, options = {}) {
     // Once tools are withdrawn (or a round came back empty) the model must be told to
     // answer; otherwise it keeps writing tool markup that is stripped to nothing.
     if (round > 0 && !nudged && (toolsOffered.length === 0 || conversation.needsAnswer === true)) {
-      conversation.turns.push({ role: 'user', content: 'Answer now in plain text using the search results above. Do not call any tools.' });
+      conversation.turns.push({ role: 'user', content: 'Answer now in plain text using the results above. Do not call any tools.' });
       nudged = true;
     }
 
@@ -1085,7 +1199,14 @@ export async function sendChatMessage(threadId, options = {}) {
     }
     fullText += reply.text;
     if (reply.toolCalls.length === 0) break;
-    const made = await answerToolCalls(conversation, reply, allowedTools, (status) => emit({ threadId, status }), tools);
+    const made = await answerToolCalls(
+      conversation,
+      reply,
+      allowedTools,
+      (status) => emit({ threadId, status }),
+      tools,
+      provider,
+    );
     emit({ threadId, status: '' });
     if (made.length > 0) {
       builtFiles.push(...made);
@@ -1102,4 +1223,90 @@ export async function sendChatMessage(threadId, options = {}) {
 
   emit({ threadId, done: true });
   return { ok: true, data: { ...saved.data, provider, model } };
+}
+
+/**
+ * Run one prompt through the same pipeline a chat message uses, with no thread and
+ * nothing streamed: this is what an automation runs while the person is away.
+ *
+ * The loop is sendChatMessage's, and deliberately so. An automation used to be
+ * reduced to a single web search or page fetch chosen by looking at its prompt, so
+ * "summarise my invoices and tell me which are overdue" ran a search. Routing the
+ * prompt here instead lets the model decide what it needs, in the order it needs it.
+ *
+ * @param {{ prompt?: string, agentId?: string|null, allowedTools?: string[]|null, signal?: AbortSignal, onStatus?: (status: string) => void }} [request]
+ * @param {{ fetchImpl?: typeof fetch }} [options]
+ * @returns {Promise<{ ok: true, data: { text: string, provider: string, model: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function runPrompt(request = {}, options = {}) {
+  const prompt = typeof request.prompt === 'string' ? request.prompt.trim() : '';
+  if (prompt === '') {
+    return failure('CHAT_EMPTY_THREAD', 'This automation has no prompt to run.');
+  }
+
+  const settings = (await readStore('settings')).data;
+  const agent = findAgent(settings, request.agentId ?? null);
+  const agentProvider = agent !== null && PROVIDERS.includes(agent.provider) ? agent.provider : null;
+  const { provider, model } = resolveChatTarget(
+    agentProvider === null ? settings : { ...settings, provider: agentProvider },
+  );
+  const config = PROVIDER_CONFIG[provider];
+
+  const key = getKey(provider);
+  if (key === null) {
+    return failure('CHAT_NO_KEY', `No ${config.label} key is saved. Add one in Settings so automations can run.`);
+  }
+
+  const conversation = {
+    system: chatSystemPrompt({
+      agentPrompt: agent !== null ? agent.systemPrompt : '',
+      settings,
+    }),
+    turns: [{ role: 'user', content: prompt }],
+  };
+
+  // Confirmation-gated tools (writeFile, openUrl, openApp) are left out on purpose:
+  // a run happens with nobody watching, and starting an app or opening a link then
+  // is not something the person can agree to at the time.
+  const allowed = Array.isArray(request.allowedTools) ? request.allowedTools : null;
+  const tools = ALL_CHAT_TOOLS.filter((tool) => allowed === null || allowed.includes(tool.name));
+  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+
+  let fullText = '';
+  let nudged = false;
+  for (let round = 0; ; round += 1) {
+    const toolsOffered = round < MAX_TOOL_ROUNDS ? tools : [];
+    if (round > 0 && !nudged && (toolsOffered.length === 0 || conversation.needsAnswer === true)) {
+      conversation.turns.push({ role: 'user', content: 'Answer now in plain text using the results above. Do not call any tools.' });
+      nudged = true;
+    }
+
+    const reply = await streamReply(provider, model, key, conversation, {
+      fetchImpl,
+      signal: request.signal,
+      tools: toolsOffered,
+    });
+    if (!reply.ok) {
+      // A round that came back empty after tools ran is not worth losing the text.
+      if (reply.error.code === 'CHAT_EMPTY_REPLY' && round > 0 && fullText.trim() !== '') break;
+      return reply;
+    }
+
+    if (fullText !== '' && reply.text !== '') fullText += '\n\n';
+    fullText += reply.text;
+    if (reply.toolCalls.length === 0) break;
+    await answerToolCalls(
+      conversation,
+      reply,
+      allowed,
+      (status) => request.onStatus?.(status),
+      tools,
+      provider,
+    );
+  }
+
+  if (fullText.trim() === '') {
+    return failure('CHAT_EMPTY_REPLY', `${config.label} sent an empty answer for this automation.`);
+  }
+  return { ok: true, data: { text: fullText.trim(), provider, model } };
 }
