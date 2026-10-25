@@ -564,3 +564,10 @@
 - Key files: `server/src/downloads.js`, `server/test/server.test.js`, `web/src/lib/downloads.js`, `web/src/components/DownloadList.jsx`, `web/src/components/DownloadLink.jsx`, `web/src/styles.css`.
 - Other OS action: run `npm run react:build && npm run server:test` after syncing.
 - Done on: Windows
+
+## 2026-10-25 - Windows
+
+- Added a manual GitHub Actions workflow that builds and publishes the Windows installer alongside the existing macOS workflow. Documented the release secret and the fact that Android needs a separate application target before an APK or AAB can be published.
+- Key files: `.github/workflows/build-windows.yml`, `README.md`.
+- Other OS action: no source build required; run the workflow after syncing when `RELEASES_TOKEN` is configured.
+- Done on: Windows
