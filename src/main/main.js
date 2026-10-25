@@ -830,7 +830,15 @@ const chatSync = createChatSync({ request: cloudFetch });
  * @returns {void}
  */
 function backgroundSync(started) {
-  started.catch((error) => console.error('[zuri-cloud] sync', error?.message ?? error));
+  started.then(
+    (result) => {
+      // Messages that arrived from the account were written into chats.json behind
+      // the window's back, so the window is told to re-read them. Without this, a
+      // chat continued in the browser appears in Recents only after a restart.
+      if (result?.ok === true && (Number(result.data?.appended) || 0) > 0) announceState({ area: 'chats' });
+    },
+    (error) => console.error('[zuri-cloud] sync', error?.message ?? error),
+  );
 }
 
 /**

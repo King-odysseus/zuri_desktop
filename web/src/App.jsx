@@ -68,6 +68,10 @@ export default function App() {
   const [topups, setTopups] = useState([]);
   const [busyTopup, setBusyTopup] = useState('');
   const [route, setRoute] = useState(readRoute);
+  // The navigation is a drawer below the sidebar breakpoint. It is held here because
+  // the button that opens it lives in the top bar and the panel it opens belongs to
+  // the signed-in shell.
+  const [navOpen, setNavOpen] = useState(false);
 
   useEffect(() => {
     applyTheme(theme);
@@ -266,6 +270,8 @@ export default function App() {
   const handleViewChange = useCallback((next) => {
     const section = VIEWS.includes(next) ? next : 'overview';
     setView(section);
+    // Choosing a destination closes the drawer, which is the only reason it was open.
+    setNavOpen(false);
     // Chat is the one section with an address, so a reload or a shared /chat link
     // lands back on it; the rest stay in view state. replaceState rather than
     // pushState, because the single popstate handler only knows the public routes
@@ -327,6 +333,8 @@ export default function App() {
           onTopUp={handleTopUp}
           onSignIn={handleSignIn}
           onSignOut={() => handleSignOut('/signin')}
+          navOpen={navOpen}
+          onCloseNav={() => setNavOpen(false)}
         />
       );
     }
@@ -362,6 +370,8 @@ export default function App() {
     handleSignOut,
     handleViewChange,
     navigate,
+    // The drawer lives in the shell, so the memo has to rebuild when it opens.
+    navOpen,
     plans,
     topups,
     route.path,
@@ -380,6 +390,7 @@ export default function App() {
         onSignIn={handleSignIn}
         onSignOut={() => handleSignOut('/')}
         onNavigate={navigate}
+        onOpenNav={status === 'signed-in' ? () => setNavOpen(true) : undefined}
       />
       <NoticeBar notice={notice} />
       {body}

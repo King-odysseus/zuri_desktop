@@ -14,6 +14,10 @@
 @import "flowbite-react/plugin/tailwindcss";
 @source "./**/*.{jsx,js}";
 @source "../../node_modules/flowbite-react/dist";
+/* The chat answer is rendered by the desktop app's own markdown component, so the
+   utilities it uses have to be generated for this build too or a reply would lose
+   its code blocks, lists and tables on the web. */
+@source "../../src/renderer-react/FormattedMessage.jsx";
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
@@ -35,6 +39,10 @@
   --color-muted: var(--muted);
   --color-faint: var(--faint);
   --color-hairline: var(--hairline);
+  /* The shared message renderer was written against the desktop's token names, so
+     these two aliases let one component style both surfaces. */
+  --color-border: var(--hairline);
+  --color-foreground: var(--text);
   --color-control-border: var(--control-border);
   --color-success: var(--success);
   --color-warning: var(--warning);
@@ -905,17 +913,118 @@ a {
   min-height: calc(100dvh - var(--bar-height));
 }
 
+/*
+ * The navigation is a sidebar on a wide screen and a slide-in drawer on a phone,
+ * which is the shape ChatGPT uses: one list of destinations behind a menu button,
+ * with no bottom bar competing for the thumb. The drawer is fixed so it can cover
+ * the page without moving it, and it is out of the tab order while it is closed.
+ */
 .sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: min(296px, 86vw);
+  padding: calc(16px + env(safe-area-inset-top)) 14px calc(16px + env(safe-area-inset-bottom));
+  border-right: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  background: var(--surface);
+  overflow-y: auto;
+  visibility: hidden;
+  transform: translateX(-100%);
+  transition: transform 0.2s ease, visibility 0.2s ease;
+}
+
+.sidebar.is-open {
+  visibility: visible;
+  transform: none;
+  box-shadow: var(--shadow-glass);
+}
+
+/* The drawer carries its own close row; the docked sidebar does not need one. */
+.sidebar.is-open .sidebar-drawer-head {
+  display: flex;
+}
+
+/* The page stays visible but dimmed, and a tap on it closes the drawer. */
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  padding: 0;
+  border: 0;
+  background: rgba(9, 18, 33, 0.44);
+  cursor: pointer;
+}
+
+/* Only the drawer shows this row; once the sidebar is docked the top bar already
+   names the app, so the row is hidden rather than repeated. */
+.sidebar-drawer-head {
   display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px 4px;
+}
+
+/* The menu button beside the brand, shown only while the navigation is a drawer. */
+.topbar-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  margin-right: 2px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.topbar-menu:hover {
+  border-color: var(--hairline);
+  background: var(--surface-secondary);
+  color: var(--text);
+}
+
+.topbar-menu:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
 }
 
 .app-main {
   flex: 1 1 auto;
   min-width: 0;
-  padding: 20px 16px calc(96px + env(safe-area-inset-bottom));
+  padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
   background:
     radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 34rem),
     var(--canvas);
+}
+
+/* The chat owns the whole content area: no page padding, and the thread fills the
+   window under the bar so the composer sits at the bottom edge as it does in the
+   desktop app and in ChatGPT. */
+.app-main.is-chat {
+  display: flex;
+  padding: 0;
+}
+
+.app-main.is-chat .app-content {
+  display: flex;
+  flex: 1 1 auto;
+  max-width: none;
+  min-height: 0;
+  height: calc(100dvh - var(--bar-height));
+}
+
+.app-main.is-chat .app-foot {
+  display: none;
 }
 
 .app-content {
@@ -1180,62 +1289,6 @@ a {
   stroke: var(--selected-foreground);
 }
 
-.tabbar {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 25;
-  display: flex;
-  width: 100%;
-  padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
-  background: var(--glass);
-  border-top: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-}
-
-.tab {
-  flex: 1 1 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  min-height: 52px;
-  /* Six destinations for an admin at 390px: the label gives way, not the bar. */
-  min-width: 0;
-  padding: 4px;
-  border: 0;
-  border-radius: var(--radius-lg);
-  background: transparent;
-  color: var(--muted);
-  font: 500 11px/1.2 "Segoe UI", system-ui, sans-serif;
-  cursor: pointer;
-}
-
-.tab svg {
-  width: 20px;
-  height: 20px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.tab span {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tab.is-active {
-  color: var(--selected-foreground);
-  background: var(--selected);
-}
-
 .skeleton {
   height: 96px;
   border-radius: var(--radius-xl);
@@ -1275,36 +1328,43 @@ a {
   }
 
   /* The signed-in sidebar is the desktop's list panel: a lighter surface than
-     the canvas, one accent-tinted row for where you are. */
+     the canvas, one accent-tinted row for where you are. It stops being a drawer
+     here and simply sits beside the page. */
   .sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+    position: sticky;
+    top: var(--bar-height);
+    z-index: 1;
     flex: 0 0 264px;
     width: 264px;
+    height: calc(100dvh - var(--bar-height));
     padding: 24px 16px;
     border-right: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
     background: var(--surface-secondary);
-    position: sticky;
-    top: var(--bar-height);
-    height: calc(100dvh - var(--bar-height));
-    overflow-y: auto;
+    visibility: visible;
+    transform: none;
+    transition: none;
+    box-shadow: none;
+  }
+
+  .nav-scrim {
+    display: none;
+  }
+
+  .topbar-menu,
+  .sidebar-drawer-head {
+    display: none;
   }
 
   .app-main {
     padding: 32px 32px 64px;
   }
 
-  .tabbar {
-    display: none;
+  .app-main.is-chat {
+    padding: 0;
   }
 }
 
 @media (max-width: 899px) {
-  .app-main {
-    padding-bottom: calc(96px + env(safe-area-inset-bottom));
-  }
-
   .view-head {
     flex-direction: column;
     align-items: flex-start;
@@ -2452,38 +2512,46 @@ a.download-card:hover {
   font-size: 14px;
 }
 
-/* Chat: the account's saved conversations beside the open one. The message list is
-   the only thing that scrolls, so the composer keeps its place under the thumb. */
-.chat-shell {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  gap: 12px;
+/*
+ * Chat: the account's saved conversations beside the open one, drawn to match the
+ * desktop app's chat. The values are the desktop's own (an accent bubble for the
+ * prompt, a surface-secondary bubble for the reply, a 24px composer with the model
+ * chip beside Send), so the two surfaces can be compared side by side.
+ *
+ * Only the transcript scrolls. The composer stays under the thumb, which is what
+ * keeps Send reachable once a reply fills the screen on a phone.
+ */
+.chat-workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  width: 100%;
 }
 
-.chat-list-pane,
-.chat-thread-pane {
+/* ---------------------------------------------------------------- saved chats */
+.chat-recents {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 4px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
-  border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
-  box-shadow: var(--shadow-soft);
+  padding: 16px 12px;
+  border-right: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  background: var(--surface-secondary);
 }
 
-.chat-pane-head,
-.chat-thread-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.chat-recents-head {
+  padding: 0 2px;
 }
 
-.chat-pane-title {
+.chat-recents .chat-new {
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.chat-recents-label {
+  margin: 14px 0 0;
+  padding: 0 8px;
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
@@ -2491,304 +2559,579 @@ a.download-card:hover {
   text-transform: uppercase;
 }
 
-.chat-thread-title {
-  flex: 1 1 12ch;
-  min-width: 0;
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 600;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
-}
-
-.chat-alert-action {
-  display: inline-flex;
-  margin-left: 8px;
-}
-
-.chat-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-/* A row is one 52px target: title on top, how long ago underneath. The title is
-   clipped rather than wrapped so a long name never widens the pane. */
-.chat-row {
+.chat-recents-list {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  width: 100%;
-  min-height: 52px;
-  padding: 8px 10px;
-  border: 1px solid transparent;
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.chat-recents-empty,
+.chat-recents-foot {
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.chat-recents-foot {
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* One row: the open button fills it, the two icon buttons sit at its end. */
+.chat-recent {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   border-radius: var(--radius-lg);
+  padding: 2px;
+}
+
+.chat-recent:hover {
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+.chat-recent.is-active {
+  background: var(--selected);
+}
+
+.chat-recent-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--text);
+  color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
 
-.chat-row:hover {
-  background: color-mix(in srgb, var(--selected) 46%, transparent);
+.chat-recent-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
-.chat-row.is-active {
-  background: var(--selected);
+.chat-recent-title {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-recent.is-active .chat-recent-title {
   color: var(--selected-foreground);
 }
 
-.chat-row-title {
+.chat-recent-meta {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.chat-recent-actions {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  /* Touch keeps both buttons visible; a pointer reveals them on the row it is over,
+     which is the quiet row ChatGPT draws. */
+  opacity: 1;
+}
+
+.chat-row-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chat-row-action:hover {
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--text);
+}
+
+.chat-row-action.is-danger,
+.chat-row-action.is-danger:hover {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  color: var(--danger);
+}
+
+.chat-row-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.chat-row-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chat-recent-form {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+  padding: 2px;
+}
+
+.chat-recent-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--field-background);
+  color: var(--text);
+  font: 13px/1.4 "Segoe UI", system-ui, sans-serif;
+}
+
+.chat-recent-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+/* -------------------------------------------------------------------- thread */
+.chat-thread {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: var(--surface);
+}
+
+.chat-thread-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 10px 12px;
+}
+
+.chat-thread-title {
+  min-width: 0;
+}
+
+.chat-thread-title h1 {
+  margin: 0;
   overflow: hidden;
-  font-size: 14px;
+  color: var(--text);
+  font-size: 15px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.chat-row-time {
-  color: var(--faint);
+.chat-thread-title p {
+  margin: 0;
+  color: var(--muted);
   font-size: 12px;
 }
 
-.chat-row.is-active .chat-row-time {
-  color: var(--selected-foreground);
-}
-
-.chat-row-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 0 2px 4px;
-}
-
-.chat-row-actions .btn {
-  min-height: 44px;
-  padding: 0 10px;
-  font-size: 13px;
-}
-
-.chat-confirm {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin: 2px 0 6px;
-  padding: 10px;
-  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
+.chat-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
   border-radius: var(--radius-lg);
-  background: var(--danger-soft);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.chat-icon-btn:hover {
+  border-color: var(--hairline);
+  background: var(--surface-secondary);
   color: var(--text);
-  font-size: 13px;
-  line-height: 1.45;
 }
 
-.chat-rename {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 4px 2px;
-}
-
-.chat-rename-input {
-  width: 100%;
-  min-width: 0;
-  min-height: var(--control-height);
-  padding: 0 12px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-lg);
-  background: var(--field-background);
-  color: var(--text);
-  font: 400 14px/1.2 "Segoe UI", system-ui, sans-serif;
-}
-
-.chat-rename-input:focus-visible {
-  border-color: var(--accent);
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+.chat-icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-.chat-messages {
+.chat-transcript {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
+  flex: 1 1 auto;
   min-height: 0;
-  max-height: 58dvh;
-  padding: 4px 2px;
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 8px 16px 16px;
+  overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
 
-.chat-messages:focus-visible {
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  outline-offset: 1px;
-}
-
+/* ---------------------------------------------------------------- transcript */
 .chat-bubble {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  align-self: flex-start;
-  max-width: min(100%, 44rem);
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
+  gap: 4px;
+  max-width: 85%;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: var(--radius-xl);
+  font-size: 14px;
+  line-height: 1.55;
 }
 
 .chat-bubble-user {
   align-self: flex-end;
-  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
-  background: color-mix(in srgb, var(--accent-soft) 70%, var(--surface));
+  align-items: flex-end;
+  background: var(--accent);
+  color: var(--accent-foreground);
+}
+
+.chat-bubble-assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+  background: var(--surface-secondary);
+  color: var(--text);
 }
 
 .chat-bubble-role {
   color: var(--muted);
   font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
-/* A reply is not markup: line breaks are kept and nothing else is interpreted, so
-   no answer the model writes can inject anything into the page. */
+.chat-bubble-user .chat-text {
+  color: var(--accent-foreground);
+}
+
+/* A prompt is not markup: its line breaks are kept and nothing else is
+   interpreted, so a pasted document stays text. */
 .chat-text {
   margin: 0;
-  color: var(--text);
   font-size: 14px;
   line-height: 1.55;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
 
-.chat-composer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 10px;
-  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
-}
-
-.chat-draft {
+/* A reply goes through the desktop's markdown renderer, which builds React
+   elements rather than HTML, so formatting is drawn and nothing is injected. */
+.chat-answer {
   width: 100%;
-  min-height: 88px;
-  max-height: 30dvh;
-  padding: 10px 12px;
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-lg);
-  background: var(--field-background);
+  min-width: 0;
   color: var(--text);
-  font: 400 14px/1.5 "Segoe UI", system-ui, sans-serif;
-  resize: vertical;
+  font-size: 14px;
+  overflow-wrap: anywhere;
 }
 
-.chat-draft::placeholder {
-  color: var(--faint);
+/* The site resets list markers globally, and that rule is unlayered, so it beats
+   the renderer's own list utilities. A reply's bullets are put back here, scoped
+   to the answer, rather than unsetting markers across the whole dashboard. */
+.chat-answer ul {
+  list-style: disc;
+  padding-inline-start: 0.15rem;
 }
 
-.chat-draft:focus-visible {
-  border-color: var(--accent);
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+.chat-answer ol {
+  list-style: decimal;
+  padding-inline-start: 0.15rem;
+}
+
+.chat-bubble-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+/* The same copy affordance the desktop transcript carries, sized as a quiet
+   caption so it never competes with the answer itself. */
+.chat-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-bubble-user .chat-copy {
+  color: color-mix(in srgb, var(--accent-foreground) 78%, transparent);
+}
+
+.chat-copy:hover {
+  border-color: var(--hairline);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  color: var(--text);
+}
+
+.chat-bubble-user .chat-copy:hover {
+  color: var(--accent-foreground);
+}
+
+.chat-copy:focus-visible {
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-.chat-composer-foot {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.chat-model {
-  min-width: 140px;
-  max-width: 220px;
-}
-
-.chat-empty {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-  line-height: 1.55;
-}
-
-.chat-empty-pane p {
-  margin: 0;
-}
-
-.chat-empty-pane {
+/* The opening screen, matching the desktop chat: the app mark, a greeting and one
+   line of what Zuri can be asked for. */
+.chat-opening {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 10px;
-  min-height: 220px;
-  padding: 20px;
+  margin: auto;
+  padding: 32px 16px;
+  text-align: center;
+}
+
+.chat-opening-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 0.9rem;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+.chat-opening h2 {
+  margin: 4px 0 0;
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.chat-opening p {
+  margin: 0;
+  max-width: 32rem;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.chat-empty {
+  margin: auto;
   color: var(--muted);
   font-size: 14px;
   text-align: center;
 }
 
-/* Below the sidebar breakpoint the two panes never share the width: the list, or
-   the open chat with a back button to it. */
+/* ------------------------------------------------------------------ composer */
+.chat-composer-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 10px 8px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-2xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Flowbite's Textarea supplies the element and its accessibility; the site supplies
+   the paint, so the field sits inside the composer without a second border. */
+.chat-composer .chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 12rem;
+  padding: 8px 4px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
+  resize: none;
+}
+
+.chat-composer .chat-input:focus {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-color: transparent;
+}
+
+.chat-composer .chat-input::placeholder {
+  color: var(--muted);
+}
+
+/* The chip is a Flowbite Dropdown: its trigger button is the chip, restyled here so
+   the two surfaces show the same plain name and chevron beside Send. */
+.chat-model-slot {
+  flex: 0 0 auto;
+}
+
+.chat-model-slot button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--muted);
+  font: 500 13px/1 "Segoe UI", system-ui, sans-serif;
+  box-shadow: none;
+}
+
+.chat-model-slot button:hover {
+  border-color: var(--hairline);
+  background: var(--surface-secondary);
+  color: var(--text);
+}
+
+.chat-model-slot button:focus {
+  outline: none;
+}
+
+.chat-model-slot button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.chat-model-name {
+  flex: 1 1 auto;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.chat-composer .chat-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.chat-composer .chat-send:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.chat-composer .chat-send:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.chat-composer .chat-send.is-stop {
+  background: var(--surface-tertiary);
+  color: var(--text);
+  box-shadow: none;
+}
+
+.chat-note {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chat-note.is-error {
+  color: var(--danger);
+}
+
+.chat-alert-action {
+  margin-left: 8px;
+}
+
+/* Below the sidebar breakpoint the list and the thread are separate screens, which
+   is how ChatGPT treats the same pair on a phone: the list of chats, then the chat
+   itself with a back control. */
 @media (max-width: 899px) {
-  .chat-shell[data-pane='thread'] .chat-list-pane {
+  .chat-workspace[data-pane='list'] .chat-thread {
     display: none;
   }
 
-  .chat-shell[data-pane='list'] .chat-thread-pane {
+  .chat-workspace[data-pane='thread'] .chat-recents {
     display: none;
   }
 
-  /* On a phone the shell is what stays inside the screen, so the message list is
-     the only thing that scrolls and Send never drops below the tab bar. Without
-     the bound the card grows with the conversation and the composer lands off
-     screen once a reply arrives. */
-  .chat-shell {
-    height: calc(100dvh - var(--bar-height) - 214px);
-    min-height: 320px;
-  }
-
-  .chat-list-pane,
-  .chat-thread-pane {
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-  }
-
-  .chat-messages {
+  .chat-recents {
     flex: 1 1 auto;
-    max-height: none;
+    border-right: 0;
   }
 }
 
 @media (min-width: 900px) {
-  .chat-shell {
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+  .chat-recents {
+    flex: 0 0 264px;
+    width: 264px;
   }
 
-  .chat-list-pane,
-  .chat-thread-pane {
-    height: calc(100dvh - var(--bar-height) - 190px);
-    min-height: 380px;
-    max-height: 820px;
+  .chat-recents-actions,
+  .chat-recent-actions {
+    opacity: 0;
+    transition: opacity 0.12s ease;
   }
 
-  .chat-list-pane {
-    overflow-y: auto;
-  }
-
-  .chat-messages {
-    flex: 1 1 auto;
-    max-height: none;
+  .chat-recent:hover .chat-recent-actions,
+  .chat-recent:focus-within .chat-recent-actions {
+    opacity: 1;
   }
 
   .chat-back {
     display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-recent-actions {
+    transition: none;
   }
 }
 

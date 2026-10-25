@@ -1,5 +1,19 @@
 ## 2026-10-25 - Windows
 
+- The browser chat now mirrors the desktop one instead of approximating it. A reply is drawn by the desktop app's own markdown component, imported rather than copied, so code blocks, lists, tables and links read the same on both surfaces and there is only one set of rules to keep right. A prompt still shows exactly what was typed.
+- Both a prompt and a reply carry the same copy action the transcript has in the app, as an icon that confirms with "Copied" and clears itself. Before this only the reply had one, because the web chat drew its own bubbles.
+- The opening screen is the desktop's: the app mark, "Good morning, Ada" and one line about what can be asked, instead of a bare line of text. A chat also reopens on the model it was started with, read from the conversation rather than from whatever this tab last had picked, so a thread begun on Zuri Pro is not answered by Flash because someone changed the chip elsewhere.
+- The chat page fills the window: the header sits under the top bar, only the transcript scrolls, and the composer stays at the bottom edge with the model chip and Send beside it, as in the app and in ChatGPT. Before, the page scrolled as a whole and the composer drifted down the page.
+- The bottom tab bar is gone, at every width. Navigation is the sidebar on a wide screen, and below 900px a drawer opened by a menu button in the top bar, closed by its own close row, by the dimmed area behind it, or by choosing a destination. That is the shape ChatGPT uses and it stops the bar from covering the last row of a page or the chat composer.
+- The chat is built from the same parts the rest of the site uses: Flowbite's Dropdown for the model menu, its Textarea for the composer, the site's Button and InlineAlert, and lucide icons. No new component library was added.
+- Two refresh gaps closed. The web chat re-reads the account's list and the open thread when the tab comes back into view and once a minute while it is on screen, so a chat continued on a phone appears without a reload. The desktop app now announces a change when a sync pulls messages written in the browser, so Recents and the open thread update without a restart.
+- Seven checks added to npm run selftest: replies go through the shared renderer, one copy path covers both roles, no bottom bar exists anywhere, the phone drawer has its menu button and scrim, the chat fills the window with only the transcript scrolling, the model beside Send is a menu that restores a chat's own model, and a pulled message announces the desktop refresh.
+- Key files: web/src/views/ChatView.jsx, web/src/views/Dashboard.jsx, web/src/components/TopBar.jsx, web/src/components/Icons.jsx, web/src/App.jsx, web/src/styles.css, web/src/lib/format.js, src/main/main.js, scripts/selftest.js, server/public/** (rebuilt).
+- Other OS action: run "npm run test && npm run web:build". No schema change, no migration and no new dependency.
+- Done on: Windows
+
+## 2026-10-25 - Windows
+
 - The allowance now has a second clock. Besides the monthly tokens, every plan has a five-hour rolling allowance (Starter 250,000, Pro 750,000, Power 1,500,000, Max 5,000,000 quota tokens), measured from usage_events. Before calling a model, the server adds up the last five hours of committed usage plus any reservation still open, so a burst of parallel requests cannot spend the month in one afternoon.
 - A refusal from that window answers 429 WINDOW_EXCEEDED with retry-after and the message names the reason, so a client can say when to try again instead of looking broken. The window is a pause, not a ban: it clears itself as older requests age out.
 - Customers can buy extra usage without changing plan. Three one-off packs (1,000,000 tokens for NGN 1,500, 3,000,000 for NGN 4,200, 8,000,000 for NGN 10,000) are sold through Paystack and add to the period allowance for 90 days. The price and the token count both come from the server catalogue, never from the request.

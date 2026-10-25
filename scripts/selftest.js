@@ -1010,6 +1010,101 @@ check('a reply names the model that wrote it, read from the stored reply', () =>
   return 'caption from the stored reply, once per model change, none on old replies';
 });
 
+/*
+ * The browser chat is held to the desktop app it mirrors. These checks read the
+ * source rather than the rendered page, because what they guard against is a
+ * surface drifting back to its own markup: a reply drawn as raw text again, a
+ * bottom tab bar reappearing on a phone, or the model chip losing its menu.
+ */
+
+check('the web chat draws replies with the desktop renderer, not its own markup', () => {
+  const source = read('web/src/views/ChatView.jsx');
+  if (!source.includes("from '../../../src/renderer-react/FormattedMessage.jsx'")) {
+    throw new Error('the web chat does not use the shared reply renderer');
+  }
+  if (!source.includes("from '../../../src/renderer-react/clipboard.js'")) {
+    throw new Error('the web chat uses its own clipboard call');
+  }
+  // A prompt stays text and a reply is rendered, but both come from this one file,
+  // and neither is ever written into the page as HTML.
+  if (!/<FormattedMessage content=\{message\.content\} \/>/.test(source)) {
+    throw new Error('a stored reply is not rendered by FormattedMessage');
+  }
+  if (/dangerouslySetInnerHTML/.test(source)) throw new Error('the reply is injected as HTML');
+  return 'shared renderer for replies, plain text for prompts';
+});
+
+check("both the person's prompts and Zuri's replies carry a copy action", () => {
+  const source = read('web/src/views/ChatView.jsx');
+  const copyAt = source.indexOf('className="chat-copy"');
+  if (copyAt < 0) throw new Error('no copy action is drawn');
+  // One button, placed after the role branch, is what makes it cover both roles.
+  const roleBranch = source.indexOf('message.role === \'assistant\'');
+  if (roleBranch < 0 || copyAt < roleBranch) throw new Error('the copy action sits inside one role only');
+  if (!source.includes('copyMessage(message, index)')) throw new Error('the copy action does not copy the message');
+  if (!source.includes('aria-label={copiedIndex === index ? \'Copied\'')) throw new Error('the copy action never confirms');
+  return 'one copy path for prompts and replies';
+});
+
+check('the signed-in shell has no bottom tab bar', () => {
+  for (const file of ['web/src/views/Dashboard.jsx', 'web/src/styles.css']) {
+    if (/\btabbar\b/.test(read(file))) throw new Error(file + ' still draws a bottom bar');
+  }
+  const views = fs.readdirSync(path.join(root, 'web/src/views'));
+  if (views.some((name) => /tabbar/i.test(name))) throw new Error('a tab bar component remains');
+  return 'navigation is a sidebar, not a bottom bar';
+});
+
+check('a phone reaches the navigation through a drawer with a menu button and a scrim', () => {
+  const dashboard = read('web/src/views/Dashboard.jsx');
+  const topBar = read('web/src/components/TopBar.jsx');
+  const styles = read('web/src/styles.css');
+  for (const required of ['sidebar${navOpen ? ', 'className="nav-scrim"', 'onClick={onCloseNav}']) {
+    if (!dashboard.includes(required)) throw new Error('the shell is missing ' + required);
+  }
+  if (!topBar.includes('onOpenNav') || !topBar.includes('aria-label="Open navigation"')) {
+    throw new Error('the top bar has no menu button');
+  }
+  // The closed drawer must be off-screen, and the open one must actually slide in.
+  if (!/\.sidebar \{[^}]*transform: translateX\(-100%\);/.test(styles)) {
+    throw new Error('the closed drawer still sits on the page');
+  }
+  if (!/\.sidebar\.is-open \{[^}]*transform: none;/.test(styles)) throw new Error('the drawer does not slide in');
+  if (!/\.nav-scrim \{[^}]*position: fixed;/.test(styles)) throw new Error('the scrim does not cover the page');
+  return 'menu button, slide-in sidebar and a scrim that closes it';
+});
+
+check('the chat takes the whole window and only the transcript scrolls', () => {
+  const dashboard = read('web/src/views/Dashboard.jsx');
+  const styles = read('web/src/styles.css');
+  if (!dashboard.includes("view === 'chat' ? ' is-chat' : ''")) throw new Error('the chat view does not mark the shell');
+  if (!/\.app-main\.is-chat \.app-content \{[^}]*height: calc\(100dvh - var\(--bar-height\)\)/.test(styles)) {
+    throw new Error('the chat does not fill the window under the bar');
+  }
+  if (!/\.chat-transcript \{[^}]*overflow-y: auto;/.test(styles)) throw new Error('the transcript does not scroll on its own');
+  if (!/\.chat-composer-wrap \{[^}]*flex: 0 0 auto;/.test(styles)) throw new Error('the composer is not pinned under the transcript');
+  return 'full-height chat, scrolling transcript, fixed composer';
+});
+
+check('the model beside Send is a menu in the web chat, as it is in the app', () => {
+  const source = read('web/src/views/ChatView.jsx');
+  if (!source.includes("import { Dropdown, DropdownItem, Textarea } from 'flowbite-react';")) {
+    throw new Error('the composer does not use the Flowbite components');
+  }
+  if (!/<Dropdown label=\{modelName\}/.test(source)) throw new Error('the model is not offered as a menu');
+  if (!source.includes('onClick={() => setModel(entry.code)}')) throw new Error('a model cannot be picked');
+  if (!source.includes('setModel(data.model)')) throw new Error('a chat does not reopen on its own model');
+  return 'Flowbite dropdown, per-chat model restored on open';
+});
+
+check('a chat continued in the browser refreshes the desktop without a restart', () => {
+  const main = read('src/main/main.js');
+  if (!main.includes("(Number(result.data?.appended) || 0) > 0) announceState({ area: 'chats' })")) {
+    throw new Error('pulled messages do not announce a change');
+  }
+  return 'background sync announces the pulled turns';
+});
+
 await Promise.all(pendingChecks);
 console.log(failures === 0 ? 'PASS selftest' : `FAIL selftest: ${failures} assertion(s) failed`);
 process.exitCode = failures === 0 ? 0 : 1;

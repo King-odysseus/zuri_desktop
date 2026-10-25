@@ -11,6 +11,7 @@ import {
   Globe,
   LayoutGrid,
   Lock,
+  Menu,
   MessageSquare,
   MonitorSmartphone,
   Moon,
@@ -70,3 +71,5 @@ export const UserIcon = (props) => <User {...base} {...props} />;
 export const CloseIcon = (props) => <X {...base} {...props} />;
 export const MessageIcon = (props) => <MessageSquare {...base} {...props} />;
 export const BackIcon = (props) => <ArrowLeft {...base} {...props} />;
+/** The menu button that opens the navigation drawer on a phone. */
+export const MenuIcon = (props) => <Menu {...base} {...props} />;

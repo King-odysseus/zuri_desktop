@@ -1,6 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Dropdown, DropdownItem, Textarea } from 'flowbite-react';
+import {
+  ArrowUp,
+  Check,
+  ChevronLeft,
+  Copy,
+  Pencil,
+  Plus,
+  Square,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { Button, InlineAlert } from '../components/ui.jsx';
-import { BackIcon, MessageIcon } from '../components/Icons.jsx';
+import { LogoMark } from '../components/Icons.jsx';
+// The reply renderer and the clipboard fallback are the desktop app's own modules,
+// imported rather than copied: an answer is then drawn by one set of markdown rules
+// on both surfaces, and the code block's own copy button behaves the same way.
+import FormattedMessage from '../../../src/renderer-react/FormattedMessage.jsx';
+import { copyText } from '../../../src/renderer-react/clipboard.js';
 import {
   DEFAULT_CHAT_MODEL,
   appendMessage,
@@ -11,7 +28,7 @@ import {
   renameConversation,
   streamChat,
 } from '../lib/api.js';
-import { formatRelativeTime } from '../lib/format.js';
+import { formatRelativeTime, greetingFor } from '../lib/format.js';
 
 /*
  * The chat models a customer can choose, in the order the plans climb. The codes
@@ -34,6 +51,20 @@ const CHAT_MODELS = [
  * allowance, so a whole afternoon of history would cost more than the answer.
  */
 const HISTORY_LIMIT = 20;
+
+/**
+ * The name a model code is shown under. The picker already holds the names, but the
+ * composer's chip reads this so a code saved by an older build still shows a name
+ * rather than a bare supplier id.
+ * @param {string} code
+ * @returns {string}
+ */
+function modelNameFor(code) {
+  const found = CHAT_MODELS.find((entry) => entry.code === code);
+  if (found) return found.name;
+  const words = String(code ?? '').replace(/^zuri-/, '').replace(/[-_]+/g, ' ').trim();
+  return words === '' ? 'Zuri' : `Zuri ${words.replace(/\b\w/g, (letter) => letter.toUpperCase())}`;
+}
 
 /** Epoch milliseconds for a conversation, or 0 when the server sent no usable date. */
 function stamp(conversation) {
@@ -79,7 +110,7 @@ function failureOf(error, fallback) {
  * Below 900px only one pane is on screen at a time, because a 390px window has no
  * room for both, and the open chat carries a back button to the list.
  */
-export default function ChatView({ onSignIn }) {
+export default function ChatView({ onSignIn, userName = '' }) {
   const [conversations, setConversations] = useState([]);
   const [listStatus, setListStatus] = useState('loading');
   const [listError, setListError] = useState(null);
@@ -101,6 +132,10 @@ export default function ChatView({ onSignIn }) {
   const [renamingId, setRenamingId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [confirmId, setConfirmId] = useState(null);
+  // Which bubble was just copied, so its button can say so for a moment. -1 means
+  // none, because index 0 is a real message.
+  const [copiedIndex, setCopiedIndex] = useState(-1);
+  const [copyNote, setCopyNote] = useState('');
 
   const messagesRef = useRef(null);
   const draftRef = useRef(null);
@@ -129,6 +164,53 @@ export default function ChatView({ onSignIn }) {
     loadConversations();
   }, [loadConversations]);
 
+  /*
+   * The same conversation can be moving on another device: the desktop app mirrors
+   * its threads to this account and a second tab may be open. Nothing can be pushed
+   * to a page, so it re-reads when it comes back into view and once a minute while it
+   * is on screen. A reply already arriving is never interrupted.
+   */
+  const refreshHistory = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    try {
+      setConversations(newestFirst(await fetchConversations()));
+      setListError(null);
+    } catch {
+      // A background refresh is a nicety: the list already on screen stays put, and
+      // an error banner would report a failure nobody asked for.
+    }
+    if (!openId || streaming) return;
+    const run = runRef.current;
+    try {
+      const data = await fetchConversation(openId);
+      if (run !== runRef.current) return;
+      const messages = chatMessages(data.messages);
+      // Only a longer thread is taken: a shorter one means this tab holds turns the
+      // account has not accepted yet, and dropping them would lose the person's text.
+      setThread((previous) => (
+        messages.length > previous.messages.length
+          ? { title: data.title ?? previous.title, messages }
+          : previous
+      ));
+    } catch {
+      // Same reasoning as the list: what is open stays open.
+    }
+  }, [openId, streaming]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      void refreshHistory();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    const timer = window.setInterval(onVisible, 60_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+      window.clearInterval(timer);
+    };
+  }, [refreshHistory]);
+
   const resetReply = useCallback(() => {
     setStreamReply('');
     setStreamError(null);
@@ -151,6 +233,10 @@ export default function ChatView({ onSignIn }) {
       try {
         const data = await fetchConversation(id);
         setThread({ title: data.title ?? 'Untitled chat', messages: chatMessages(data.messages) });
+        // A chat keeps the model it was started on, as the desktop transcript does, so
+        // a thread begun on Zuri Pro opens on Zuri Pro instead of whatever this tab
+        // last had selected. A code the picker does not offer is ignored.
+        if (CHAT_MODELS.some((entry) => entry.code === data.model)) setModel(data.model);
         setThreadStatus('ready');
       } catch (error) {
         setThreadError(failureOf(error, 'This chat could not be opened.'));
@@ -340,6 +426,24 @@ export default function ChatView({ onSignIn }) {
     atBottomRef.current = node.scrollHeight - node.scrollTop - node.clientHeight < 48;
   }, []);
 
+  /**
+   * Copy one message, the same affordance the desktop transcript has on both a
+   * prompt and a reply. The confirmation clears itself, so the button returns to
+   * "Copy" without a second click.
+   * @param {{ role: string, content: string }} message
+   * @param {number} index
+   */
+  const copyMessage = useCallback(async (message, index) => {
+    const copied = await copyText(String(message?.content ?? ''));
+    if (!copied) {
+      setCopyNote('That message could not be copied to the clipboard.');
+      return;
+    }
+    setCopyNote('');
+    setCopiedIndex(index);
+    window.setTimeout(() => setCopiedIndex((current) => (current === index ? -1 : current)), 1500);
+  }, []);
+
   const showThread = Boolean(openId || composing);
 
   useEffect(() => {
@@ -361,222 +465,247 @@ export default function ChatView({ onSignIn }) {
 
   const sessionExpired = listError?.status === 401 || threadError?.status === 401 || streamError?.status === 401;
   const title = thread.title || 'New chat';
+  const modelName = modelNameFor(model);
+  // The newest reply carries the caption, as the desktop transcript does: repeating
+  // the model above every bubble would say the same thing down the whole page.
+  const lastAnswerIndex = thread.messages.reduce((last, message, index) => (message.role === 'assistant' ? index : last), -1);
 
   return (
-    <section className="view chat-view">
-      <div className="view-head">
-        <div>
-          <h1>Chat</h1>
-          <p>Your conversations are saved to your account, so you can pick one up on any device.</p>
+    <section className="chat-workspace" data-pane={showThread ? 'thread' : 'list'}>
+      {/*
+        * The saved chats, drawn the way the desktop app's chat sidebar draws them:
+        * a New chat row, a Recents label, then one quiet row per thread. On a phone
+        * this pane slides over the thread, which is how ChatGPT treats the same list,
+        * and the thread keeps its own back control.
+        */}
+      <aside className="chat-recents" aria-label="Saved chats">
+        <div className="chat-recents-head">
+          <Button variant="secondary" block className="chat-new" onClick={startNewChat}>
+            <Plus size={16} aria-hidden="true" />
+            <span>New chat</span>
+          </Button>
         </div>
-      </div>
 
-      {sessionExpired && (
-        <InlineAlert tone="danger">
-          <span>Your session expired. Sign in again to reach your saved chats.</span>
-          {onSignIn && (
-            <span className="chat-alert-action">
-              <Button variant="secondary" onClick={onSignIn}>
-                Sign in
-              </Button>
-            </span>
-          )}
-        </InlineAlert>
-      )}
-      {listError && !sessionExpired && <InlineAlert tone="danger">{listError.message}</InlineAlert>}
+        <p className="chat-recents-label">Recents</p>
 
-      <div className="chat-shell" data-pane={showThread ? 'thread' : 'list'}>
-        <aside className="chat-list-pane" aria-label="Saved chats">
-          <div className="chat-pane-head">
-            <h2 className="chat-pane-title">Saved chats</h2>
-            <Button variant="secondary" onClick={startNewChat}>
-              New chat
-            </Button>
-          </div>
-
-          {listStatus === 'loading' && <p className="chat-empty">Loading your chats...</p>}
-          {listStatus === 'ready' && conversations.length === 0 && (
-            <p className="chat-empty">Start a chat and it will be saved to your account.</p>
+        <div className="chat-recents-list">
+          {listStatus === 'loading' && <p className="chat-recents-empty">Loading your chats...</p>}
+          {listStatus !== 'loading' && conversations.length === 0 && (
+            <p className="chat-recents-empty">No saved chats yet. Your first question appears here.</p>
           )}
 
-          <ul className="chat-list">
-            {conversations.map((conversation) => (
-              <li key={conversation.id}>
-                {renamingId === conversation.id ? (
-                  <form
-                    className="chat-rename"
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      saveRename(conversation.id);
-                    }}
+          {conversations.map((conversation) => (
+            <div key={conversation.id} className={`chat-recent${conversation.id === openId ? ' is-active' : ''}`}>
+              {renamingId === conversation.id ? (
+                <form
+                  className="chat-recent-form"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void saveRename(conversation.id);
+                  }}
+                >
+                  <input
+                    className="chat-recent-input"
+                    aria-label="Chat name"
+                    maxLength={120}
+                    value={renameDraft}
+                    onChange={(event) => setRenameDraft(event.target.value)}
+                    autoFocus
+                  />
+                  <button type="submit" className="chat-row-action" aria-label="Save name" disabled={renameDraft.trim() === ''}>
+                    <Check size={14} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    className="chat-row-action"
+                    aria-label="Cancel renaming"
+                    onClick={() => { setRenamingId(null); setRenameDraft(''); }}
                   >
-                    <label className="sr-only" htmlFor={`chat-rename-${conversation.id}`}>
-                      Chat name
-                    </label>
-                    <input
-                      id={`chat-rename-${conversation.id}`}
-                      className="chat-rename-input"
-                      value={renameDraft}
-                      maxLength={120}
-                      onChange={(event) => setRenameDraft(event.target.value)}
-                      autoFocus
-                    />
-                    <div className="chat-row-actions">
-                      <Button type="submit" variant="primary">
-                        Save name
-                      </Button>
-                      <Button type="button" variant="ghost" onClick={() => setRenamingId(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <>
+                    <X size={14} aria-hidden="true" />
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="chat-recent-open"
+                    onClick={() => void openConversation(conversation.id)}
+                    aria-current={conversation.id === openId ? 'page' : undefined}
+                    title={conversation.title || 'New chat'}
+                  >
+                    <span className="chat-recent-title">{conversation.title || 'New chat'}</span>
+                    <span className="chat-recent-meta">{formatRelativeTime(stamp(conversation) || undefined)}</span>
+                  </button>
+                  <span className="chat-recent-actions">
                     <button
                       type="button"
-                      className={`chat-row${openId === conversation.id ? ' is-active' : ''}`}
-                      onClick={() => openConversation(conversation.id)}
-                      aria-current={openId === conversation.id ? 'true' : undefined}
+                      className="chat-row-action"
+                      aria-label={`Rename ${conversation.title || 'chat'}`}
+                      onClick={() => { setRenamingId(conversation.id); setRenameDraft(conversation.title ?? ''); }}
                     >
-                      <span className="chat-row-title">{conversation.title || 'Untitled chat'}</span>
-                      <span className="chat-row-time">
-                        {formatRelativeTime(conversation.updatedAt ?? conversation.createdAt)}
-                      </span>
+                      <Pencil size={14} aria-hidden="true" />
                     </button>
-                    <div className="chat-row-actions">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        aria-label={`Rename ${conversation.title || 'chat'}`}
-                        onClick={() => {
-                          setRenamingId(conversation.id);
-                          setRenameDraft(conversation.title ?? '');
-                          setConfirmId(null);
-                        }}
-                      >
-                        Rename
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        aria-label={`Delete ${conversation.title || 'chat'}`}
-                        onClick={() => setConfirmId(conversation.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                    {confirmId === conversation.id && (
-                      <div className="chat-confirm" role="alert">
-                        <p>Delete this chat? It cannot be undone.</p>
-                        <div className="chat-row-actions">
-                          <Button type="button" variant="primary" onClick={() => removeConversation(conversation.id)}>
-                            Delete chat
-                          </Button>
-                          <Button type="button" variant="ghost" onClick={() => setConfirmId(null)}>
-                            Keep it
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </li>
-            ))}
-          </ul>
-        </aside>
+                    <button
+                      type="button"
+                      className={`chat-row-action${confirmId === conversation.id ? ' is-danger' : ''}`}
+                      aria-label={confirmId === conversation.id
+                        ? `Confirm deleting ${conversation.title || 'chat'}`
+                        : `Delete ${conversation.title || 'chat'}`}
+                      onClick={() => {
+                        // Deleting takes two clicks: the first arms the row, the second
+                        // removes it, so a stray tap cannot lose a conversation.
+                        if (confirmId === conversation.id) void removeConversation(conversation.id);
+                        else setConfirmId(conversation.id);
+                      }}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  </span>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
 
-        <div className="chat-thread-pane">
-          {showThread ? (
-            <>
-              <div className="chat-thread-head">
-                <Button type="button" variant="ghost" className="chat-back" onClick={backToList}>
-                  <BackIcon />
-                  <span>Chats</span>
-                </Button>
-                <h2 className="chat-thread-title">{title}</h2>
-              </div>
+        <p className="chat-recents-foot">Every chat here is saved to your account.</p>
+      </aside>
 
-              {threadError && !sessionExpired && <InlineAlert tone="danger">{threadError.message}</InlineAlert>}
+      <main className="chat-thread">
+        <header className="chat-thread-head">
+          <button type="button" className="chat-icon-btn chat-back" aria-label="Back to saved chats" onClick={backToList}>
+            <ChevronLeft size={18} aria-hidden="true" />
+          </button>
+          <div className="chat-thread-title">
+            <h1>{title}</h1>
+            <p>{streaming ? 'Zuri is answering...' : 'Saved to your account'}</p>
+          </div>
+        </header>
 
-              <div className="chat-messages" ref={messagesRef} onScroll={onMessagesScroll} tabIndex={0} aria-label="Messages">
-                {threadStatus === 'loading' && <p className="chat-empty">Loading messages...</p>}
-                {threadStatus !== 'loading' && thread.messages.length === 0 && !streaming && (
-                  <p className="chat-empty">
-                    {openId
-                      ? 'This chat has no messages yet. Ask something below and the exchange is saved here.'
-                      : 'Ask anything below. This chat is saved to your account once you send.'}
-                  </p>
-                )}
-
-                {thread.messages.map((message, index) => (
-                  <article key={`${index}-${message.role}`} className={`chat-bubble chat-bubble-${message.role}`}>
-                    <span className="chat-bubble-role">{message.role === 'user' ? 'You' : 'Zuri'}</span>
-                    <p className="chat-text">{message.content}</p>
-                  </article>
-                ))}
-
-                {streaming && (
-                  <article className="chat-bubble chat-bubble-assistant is-streaming">
-                    <span className="chat-bubble-role">Zuri</span>
-                    <p className="chat-text">{streamReply || 'Thinking...'}</p>
-                  </article>
-                )}
-              </div>
-
-              {streamError && !sessionExpired && <InlineAlert tone="danger">{streamError.message}</InlineAlert>}
-              {saveWarning && <InlineAlert tone="warning">{saveWarning}</InlineAlert>}
-
-              <form
-                className="chat-composer"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  send();
-                }}
-              >
-                <label className="sr-only" htmlFor="chat-draft">
-                  Message
-                </label>
-                <textarea
-                  id="chat-draft"
-                  ref={draftRef}
-                  className="chat-draft"
-                  value={draft}
-                  rows={3}
-                  placeholder="Ask Zuri anything"
-                  onChange={(event) => setDraft(event.target.value)}
-                  onKeyDown={onComposerKeyDown}
-                />
-                <div className="chat-composer-foot">
-                  <label className="field chat-model">
-                    <span>Model</span>
-                    <select value={model} onChange={(event) => setModel(event.target.value)}>
-                      {CHAT_MODELS.map((entry) => (
-                        <option key={entry.code} value={entry.code}>
-                          {entry.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {streaming ? (
-                    <Button type="button" variant="secondary" onClick={stop}>
-                      Stop
-                    </Button>
-                  ) : (
-                    <Button type="submit" disabled={!draft.trim()}>
-                      Send
-                    </Button>
-                  )}
-                </div>
-              </form>
-            </>
-          ) : (
-            <div className="chat-empty-pane">
-              <MessageIcon />
-              <p>Choose a saved chat, or start a new one.</p>
+        <div ref={messagesRef} onScroll={onMessagesScroll} className="chat-transcript">
+          {!showThread && (
+            <div className="chat-opening">
+              <span className="chat-opening-mark" aria-hidden="true">
+                <LogoMark size={30} />
+              </span>
+              <h2>{greetingFor(userName)}</h2>
+              <p>Pick a chat from the list, or ask something new. A reply can carry code, a table or a list of links.</p>
+              <Button variant="secondary" onClick={startNewChat}>
+                <Plus size={16} aria-hidden="true" />
+                <span>Start a new chat</span>
+              </Button>
             </div>
           )}
+
+          {showThread && threadStatus === 'loading' && <p className="chat-empty">Loading messages...</p>}
+
+          {showThread && threadStatus !== 'loading' && thread.messages.length === 0 && !streaming && (
+            <div className="chat-opening">
+              <span className="chat-opening-mark" aria-hidden="true">
+                <LogoMark size={30} />
+              </span>
+              <h2>{greetingFor(userName)}</h2>
+              <p>
+                {openId
+                  ? 'This chat has no messages yet. Ask something below and the exchange is saved here.'
+                  : 'Ask anything below. This chat is saved to your account once you send, so it opens on any device.'}
+              </p>
+            </div>
+          )}
+
+          {thread.messages.map((message, index) => (
+            <article key={`${index}-${message.role}`} className={`chat-bubble chat-bubble-${message.role}`}>
+              {message.role === 'assistant' && index === lastAnswerIndex && (
+                <span className="chat-bubble-role">{modelName}</span>
+              )}
+              {/* A prompt is shown exactly as typed. A reply goes through the desktop's
+                  own renderer, so code, lists, tables and links read the same on both. */}
+              {message.role === 'assistant'
+                ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
+                : <p className="chat-text">{message.content}</p>}
+              <div className="chat-bubble-actions">
+                <button
+                  type="button"
+                  className="chat-copy"
+                  aria-label={copiedIndex === index ? 'Copied' : message.role === 'user' ? 'Copy your message' : "Copy Zuri's reply"}
+                  title={copiedIndex === index ? 'Copied' : 'Copy'}
+                  onClick={() => void copyMessage(message, index)}
+                >
+                  {copiedIndex === index ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                </button>
+              </div>
+            </article>
+          ))}
+
+          {streaming && (
+            <article className="chat-bubble chat-bubble-assistant is-streaming">
+              <span className="chat-bubble-role">{modelName}</span>
+              {streamReply
+                ? <div className="chat-answer"><FormattedMessage content={streamReply} /></div>
+                : <p className="chat-text">Zuri is thinking...</p>}
+            </article>
+          )}
         </div>
-      </div>
+
+        <div className="chat-composer-wrap">
+          {sessionExpired && (
+            <InlineAlert tone="danger">
+              Your session expired. Sign in again to reach your saved chats.
+              {onSignIn && (
+                <Button variant="secondary" className="chat-alert-action" onClick={onSignIn}>
+                  Sign in
+                </Button>
+              )}
+            </InlineAlert>
+          )}
+          {listError && !sessionExpired && <InlineAlert tone="danger">{listError.message}</InlineAlert>}
+          {threadError && !sessionExpired && <InlineAlert tone="danger">{threadError.message}</InlineAlert>}
+          {streamError && <InlineAlert tone="danger">{streamError.message}</InlineAlert>}
+          {saveWarning !== '' && <p className="chat-note">{saveWarning}</p>}
+          {copyNote !== '' && <p className="chat-note is-error">{copyNote}</p>}
+
+          <form
+            className="chat-composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void send();
+            }}
+          >
+            <Textarea
+              ref={draftRef}
+              className="chat-input"
+              rows={1}
+              value={draft}
+              placeholder="Ask Zuri anything"
+              aria-label="Message"
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={onComposerKeyDown}
+            />
+
+            {/* The model chip sits beside Send, exactly as the desktop composer places
+                it, and names the model that will answer this chat. */}
+            <div className="chat-model-slot">
+              <Dropdown label={modelName} size="sm" placement="top-end" dismissOnClick>
+                {CHAT_MODELS.map((entry) => (
+                  <DropdownItem key={entry.code} onClick={() => setModel(entry.code)}>
+                    <span className="chat-model-name">{entry.name}</span>
+                    {model === entry.code && <Check size={14} aria-hidden="true" />}
+                  </DropdownItem>
+                ))}
+              </Dropdown>
+            </div>
+
+            {streaming ? (
+              <Button type="button" variant="secondary" className="chat-send is-stop" aria-label="Stop reply" onClick={stop}>
+                <Square size={14} aria-hidden="true" />
+              </Button>
+            ) : (
+              <Button type="submit" className="chat-send" aria-label="Send" disabled={draft.trim() === ''}>
+                <ArrowUp size={18} aria-hidden="true" />
+              </Button>
+            )}
+          </form>
+        </div>
+      </main>
     </section>
   );
 }

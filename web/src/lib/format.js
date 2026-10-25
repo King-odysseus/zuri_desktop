@@ -28,6 +28,22 @@ export function formatDate(value) {
 }
 
 /**
+ * "Good morning", plus the first name when the account has one. The desktop chat
+ * greets people the same way, so the two surfaces open on the same line.
+ * @param {string} name Display name, or '' when the account has none.
+ * @param {Date} [now]
+ * @returns {string}
+ */
+export function greetingFor(name, now = new Date()) {
+  const hour = now.getHours();
+  const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  if (trimmed === '') return part;
+  // First name only: "Good evening, Alex" reads as a greeting, the full name reads as a form.
+  return `${part}, ${trimmed.split(/\s+/)[0]}`;
+}
+
+/**
  * How long ago a conversation was touched, in words short enough for a list row:
  * "Just now", "12 min ago", "3 hr ago", "2 days ago", then a plain date once a
  * week is no longer a useful measure.

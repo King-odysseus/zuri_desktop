@@ -1,6 +1,6 @@
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
-import { ChartIcon, CardIcon, GridIcon, MessageIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
+import { ChartIcon, CardIcon, CloseIcon, GridIcon, MessageIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
@@ -10,43 +10,43 @@ import PlansView from './PlansView.jsx';
 import BillingView from './BillingView.jsx';
 
 export const NAV_ITEMS = [
-  { id: 'chat', label: 'Chat', short: 'Chat', icon: <MessageIcon /> },
-  { id: 'overview', label: 'Overview', short: 'Overview', icon: <GridIcon /> },
-  { id: 'usage', label: 'Usage and limits', short: 'Usage', icon: <ChartIcon /> },
-  { id: 'plans', label: 'Plans', short: 'Plans', icon: <CardIcon /> },
-  { id: 'billing', label: 'Billing', short: 'Billing', icon: <ReceiptIcon /> },
+  { id: 'chat', label: 'Chat', icon: <MessageIcon /> },
+  { id: 'overview', label: 'Overview', icon: <GridIcon /> },
+  { id: 'usage', label: 'Usage and limits', icon: <ChartIcon /> },
+  { id: 'plans', label: 'Plans', icon: <CardIcon /> },
+  { id: 'billing', label: 'Billing', icon: <ReceiptIcon /> },
 ];
 
 // Shown only to administrators; the server refuses the data to anyone else.
-const ADMIN_ITEM = { id: 'admin', label: 'Admin', short: 'Admin', icon: <ShieldIcon /> };
+const ADMIN_ITEM = { id: 'admin', label: 'Admin', icon: <ShieldIcon /> };
 
-function NavList({ view, onViewChange, compact, isAdmin }) {
+function NavList({ view, onViewChange, isAdmin }) {
   const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
   return items.map((item) => (
     <button
       key={item.id}
       type="button"
-      className={`${compact ? 'tab' : 'nav-item'}${view === item.id ? ' is-active' : ''}`}
+      className={`nav-item${view === item.id ? ' is-active' : ''}`}
       onClick={() => onViewChange(item.id)}
       aria-current={view === item.id ? 'page' : undefined}
     >
       {item.icon}
-      <span>{compact ? item.short : item.label}</span>
+      <span>{item.label}</span>
     </button>
   ));
 }
 
 /**
- * Signed-in shell. Sidebar on wide screens, a fixed bottom tab bar below 900px
- * so every destination stays reachable with a thumb.
+ * Signed-in shell. The navigation is a sidebar on a wide screen and a drawer behind
+ * the top bar's menu button below 900px, so no bottom bar covers the chat composer.
  */
-export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn }) {
+export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn, navOpen, onCloseNav }) {
   const user = account.me?.user ?? {};
   const name = user.displayName || user.email || 'Zuri user';
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <aside className={`sidebar${navOpen ? ' is-open' : ''}`} aria-label="Dashboard navigation">
         <div className="account-card">
           <span className="avatar">{initialsFor(user.displayName, user.email)}</span>
           <span style={{ minWidth: 0 }}>
@@ -58,6 +58,13 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
             </span>
           </span>
         </div>
+        {/* The bar already names the app once the panel is docked, so only the drawer shows this. */}
+        <div className="sidebar-drawer-head">
+          <span className="brand-name">Zuri Cloud</span>
+          <button type="button" className="icon-btn" onClick={onCloseNav} aria-label="Close navigation">
+            <CloseIcon />
+          </button>
+        </div>
         <nav className="nav" aria-label="Dashboard sections">
           <NavList view={view} onViewChange={onViewChange} isAdmin={user.isAdmin === true} />
         </nav>
@@ -67,9 +74,9 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
         <DownloadLink className="sidebar-download" />
       </aside>
 
-      <main className="app-main">
+      <main className={`app-main${view === 'chat' ? ' is-chat' : ''}`}>
         <div className="app-content">
-          {view === 'chat' && <ChatView onSignIn={onSignIn} />}
+          {view === 'chat' && <ChatView onSignIn={onSignIn} userName={user.displayName ?? ''} />}
           {view === 'overview' && <OverviewView me={account.me} usage={account.usage} />}
           {view === 'usage' && (
             <UsageView
@@ -100,9 +107,11 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
         </div>
       </main>
 
-      <nav className="tabbar" aria-label="Dashboard sections">
-        <NavList view={view} onViewChange={onViewChange} compact isAdmin={user.isAdmin === true} />
-      </nav>
+      {/* A tap outside the drawer closes it. The scrim is hidden once the sidebar
+          is docked at the wide breakpoint. */}
+      {navOpen && (
+        <button type="button" className="nav-scrim" aria-label="Close navigation" onClick={onCloseNav} />
+      )}
     </div>
   );
 }
