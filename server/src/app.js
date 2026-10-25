@@ -260,13 +260,14 @@ async function sessionPayload(dependencies, result) {
   return { ...result, usage: usageStatus(session.subscription, usage.usedTokens) };
 }
 
-/** @param {{ auth?: object, repository?: object, mailer?: object, now?: () => Date, googleClientId?: string, siteUrl?: string }} [dependencies] @returns {(request: Request) => Promise<Response>} */
+/** @param {{ auth?: object, repository?: object, mailer?: object, now?: () => Date, googleClientId?: string, siteUrl?: string, corsOrigins?: string[] }} [dependencies] @returns {(request: Request) => Promise<Response>} */
 export function createApp(dependencies = {}) {
   const now = dependencies.now ?? (() => new Date());
   const limiter = dependencies.limiter ?? createRequestLimiter({ now: () => now().getTime() });
   const siteUrl = siteBase(dependencies.siteUrl);
+  const corsOrigins = new Set(Array.isArray(dependencies.corsOrigins) ? dependencies.corsOrigins : []);
 
-  return async function app(request) {
+  const handle = async function app(request) {
     const url = new URL(request.url);
 
     if ((request.method === 'GET' || request.method === 'HEAD') && !url.pathname.startsWith('/api/')) {
@@ -634,6 +635,24 @@ export function createApp(dependencies = {}) {
     }
 
     return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } });
+  };
+
+  return async function corsApp(request) {
+    const origin = request.headers.get('origin') ?? '';
+    if (!corsOrigins.has(origin)) return handle(request);
+
+    const corsHeaders = {
+      'access-control-allow-origin': origin,
+      'access-control-allow-headers': 'authorization, content-type',
+      'access-control-allow-methods': 'GET, POST, PUT, OPTIONS',
+      vary: 'Origin',
+    };
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
+
+    const result = await handle(request);
+    const headers = new Headers(result.headers);
+    for (const [name, value] of Object.entries(corsHeaders)) headers.set(name, value);
+    return new Response(result.body, { status: result.status, statusText: result.statusText, headers });
   };
 }
 

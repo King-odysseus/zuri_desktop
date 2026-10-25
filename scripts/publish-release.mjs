@@ -39,7 +39,7 @@ const built = await readdir(releaseDir).catch(() => []);
 // latest.yml for its updater; those are not something a visitor downloads.
 const installers = [];
 for (const name of built) {
-  if (!/\.(exe|dmg)$/i.test(name)) continue;
+  if (!/\.(exe|dmg|apk)$/i.test(name)) continue;
   const info = await stat(path.join(releaseDir, name));
   installers.push({ name, path: path.join(releaseDir, name), size: info.size });
 }

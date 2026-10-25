@@ -1,0 +1,51 @@
+## Builds the Android dashboard APK from the same web app the cloud server serves.
+##
+## The APK is a cloud client, not the Windows-only local desktop runtime. Its
+## API origin is embedded at build time so it can sign in without a local server.
+name: Build Android app
+
+on:
+  workflow_dispatch:
+
+jobs:
+  android:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - run: npm ci
+      - name: Build the Android debug APK
+        run: npm run android:build
+      - name: Give the APK a release name
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "release/Zuri-$(node -p \"require('./package.json').version\").apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zuri-android-apk
+          path: release/*.apk
+          if-no-files-found: error
+
+      - name: Publish to the public releases repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "RELEASES_TOKEN is not set, so the apk stays in the workflow artifact."
+            exit 0
+          fi
+          npm run release:publish

@@ -140,14 +140,15 @@ the installer runs; that is expected for a local build, not a failure.
 
 ## Publish installers
 
-The release workflows build the Windows `.exe` on Windows and the universal macOS `.dmg` on a
-macOS runner. Run either workflow manually from GitHub Actions. Set the `RELEASES_TOKEN` repository
+The release workflows build the Windows `.exe` on Windows, the universal macOS `.dmg` on a
+macOS runner, and the Android cloud dashboard `.apk` on Ubuntu. Run a workflow manually from GitHub Actions. Set the `RELEASES_TOKEN` repository
 secret to a token that can write releases in `King-odysseus/zuri-releases`; without it, GitHub keeps
 the installer as a workflow artifact instead of publishing it.
 
-The cloud website reads the newest published release and creates direct download links automatically.
-There is no link to update by hand. Android is not included yet because this repository has no Android
-application target; it needs a mobile build before an `.apk` or `.aab` can be published.
+The cloud website reads the newest published release and creates direct download links for Windows,
+macOS and Android automatically. There is no link to update by hand. The Android target is the
+Zuri Cloud dashboard, so it needs internet access and does not include the Windows-only local
+provider, file system, reminder or automation runtime.
 
 The installed app uses the same data folder as the dev checkout, `%APPDATA%\Zuri`, described in
 "Where your data lives" below. Installing over a checkout therefore keeps your chats, tasks and

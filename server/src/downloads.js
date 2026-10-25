@@ -32,6 +32,7 @@ const RELEASE_TIMEOUT_MS = 5000;
 const INSTALLERS = new Map([
   ['.exe', { platform: 'windows', label: 'Windows', detail: 'Windows 10 or 11, 64-bit' }],
   ['.dmg', { platform: 'macos', label: 'macOS', detail: 'macOS 12 or later' }],
+  ['.apk', { platform: 'android', label: 'Android', detail: 'Android 6 or later' }],
 ]);
 
 /** @param {string} name @returns {string} */

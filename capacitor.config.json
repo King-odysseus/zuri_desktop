@@ -1,0 +1,9 @@
+{
+  "appId": "com.zuri.cloud",
+  "appName": "Zuri",
+  "webDir": "dist-android",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  }
+}
