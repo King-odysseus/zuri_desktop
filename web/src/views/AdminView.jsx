@@ -11,6 +11,10 @@ const BLANK_MODEL = Object.freeze({
   name: '',
   supplier: 'deepseek',
   supplierModel: '',
+  kind: 'text',
+  usdPerImage: 0,
+  quotaTokensPerImage: 0,
+  imageQuality: '',
   inputUsdPerMillion: 0,
   outputUsdPerMillion: 0,
   quotaWeight: 1,
@@ -20,11 +24,16 @@ const BLANK_MODEL = Object.freeze({
   sortOrder: 100,
 });
 
-const NUMBER_FIELDS = ['inputUsdPerMillion', 'outputUsdPerMillion', 'quotaWeight', 'rateFactor', 'sortOrder'];
+const NUMBER_FIELDS = ['inputUsdPerMillion', 'outputUsdPerMillion', 'usdPerImage', 'quotaTokensPerImage', 'quotaWeight', 'rateFactor', 'sortOrder'];
 
 /** Naira for a dollar price, so the operator sees what a model costs per million tokens at today's rate. */
 function nairaPerMillion(usd, rate) {
   return formatNaira(Math.round(Number(usd) * Number(rate) * 100));
+}
+
+/** What one picture earns after the supplier is paid: the number to watch per model. */
+function pictureMarginKobo(model) {
+  return (Number(model?.priceKoboPerImage) || 0) - (Number(model?.supplierCostKoboPerImage) || 0);
 }
 
 /**
@@ -150,7 +159,7 @@ export default function AdminView() {
                 <th>Plan</th>
                 <th>Weight</th>
                 <th>Rate</th>
-                <th>Cost per 1M tokens</th>
+                <th>Supplier cost</th>
                 <th>Requests</th>
                 <th>Spend</th>
                 <th><span className="sr-only">Edit</span></th>
@@ -167,8 +176,18 @@ export default function AdminView() {
                     <td>{model.quotaWeight}x</td>
                     <td>{Math.round(model.rateFactor * 100)}%</td>
                     <td>
-                      in {nairaPerMillion(model.inputUsdPerMillion, rate)}
-                      <small>out {nairaPerMillion(model.outputUsdPerMillion, rate)}</small>
+                      {model.kind === 'image' ? (
+                        <>
+                          {formatNaira(model.supplierCostKoboPerImage)}
+                          <small>sells at {formatNaira(model.priceKoboPerImage)} on {model.pricePlanName}</small>
+                          <small>margin {formatNaira(pictureMarginKobo(model))} a picture</small>
+                        </>
+                      ) : (
+                        <>
+                          in {nairaPerMillion(model.inputUsdPerMillion, rate)}
+                          <small>out {nairaPerMillion(model.outputUsdPerMillion, rate)}</small>
+                        </>
+                      )}
                     </td>
                     <td>{formatTokens(spend?.requests ?? 0)}</td>
                     <td>{formatNaira(spend?.costKobo ?? 0)}</td>
@@ -207,12 +226,35 @@ export default function AdminView() {
             <label className="field"><span>Supplier model name</span>
               <input value={draft.supplierModel} onChange={(event) => edit('supplierModel', event.target.value)} required />
             </label>
-            <label className="field"><span>Input price, USD per 1M tokens</span>
-              <input type="number" min="0" step="0.01" value={draft.inputUsdPerMillion} onChange={(event) => edit('inputUsdPerMillion', event.target.value)} />
+            <label className="field"><span>Billed as</span>
+              <select value={draft.kind ?? 'text'} onChange={(event) => edit('kind', event.target.value)}>
+                <option value="text">Chat, by the token</option>
+                <option value="image">Pictures, by the image</option>
+              </select>
             </label>
-            <label className="field"><span>Output price, USD per 1M tokens</span>
-              <input type="number" min="0" step="0.01" value={draft.outputUsdPerMillion} onChange={(event) => edit('outputUsdPerMillion', event.target.value)} />
-            </label>
+            {draft.kind !== 'image' && (
+              <>
+                <label className="field"><span>Input price, USD per 1M tokens</span>
+                  <input type="number" min="0" step="0.01" value={draft.inputUsdPerMillion} onChange={(event) => edit('inputUsdPerMillion', event.target.value)} />
+                </label>
+                <label className="field"><span>Output price, USD per 1M tokens</span>
+                  <input type="number" min="0" step="0.01" value={draft.outputUsdPerMillion} onChange={(event) => edit('outputUsdPerMillion', event.target.value)} />
+                </label>
+              </>
+            )}
+            {draft.kind === 'image' && (
+              <>
+                <label className="field"><span>Supplier price, USD per picture</span>
+                  <input type="number" min="0" step="0.001" value={draft.usdPerImage} onChange={(event) => edit('usdPerImage', event.target.value)} />
+                </label>
+                <label className="field"><span>Allowance tokens per picture</span>
+                  <input type="number" min="1000" max="4000000" step="1000" value={draft.quotaTokensPerImage} onChange={(event) => edit('quotaTokensPerImage', event.target.value)} />
+                </label>
+                <label className="field"><span>Picture size label</span>
+                  <input value={draft.imageQuality ?? ''} maxLength={20} onChange={(event) => edit('imageQuality', event.target.value)} placeholder="standard" />
+                </label>
+              </>
+            )}
             <label className="field"><span>Quota weight</span>
               <input type="number" min="0.1" max="100" step="0.1" value={draft.quotaWeight} onChange={(event) => edit('quotaWeight', event.target.value)} />
             </label>

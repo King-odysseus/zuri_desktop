@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { findPlan, PLANS, publicPlan } from './plans.js';
 import { usageStatus } from './usage.js';
 import { createRequestLimiter, limitsForPlan, PLAN_LIMITS } from './limits.js';
-import { DEFAULT_MODELS, canUseModel, findModel, limitsForModel, microUsdToKobo, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
+import { DEFAULT_MODELS, canUseModel, findModel, imagePriceKobo, imageSupplierCostMicroUsd, isImageModel, limitsForModel, microUsdToKobo, publicImageModel, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
 import { verifyPaystackSignature } from './paystack.js';
 import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
 
@@ -291,6 +291,16 @@ export function createApp(dependencies = {}) {
         },
       });
     }
+
+    // Public because the marketing page quotes picture prices before anyone signs
+    // in. It reads the live catalogue so an admin edit shows up straight away.
+    if (url.pathname === '/api/image-prices') {
+      if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for this endpoint.' } });
+      const images = (await loadModels(dependencies))
+        .filter((model) => model.isActive && isImageModel(model))
+        .sort((left, right) => left.sortOrder - right.sortOrder);
+      return response(200, { ok: true, data: images.map((model) => publicImageModel(model, PLANS)) });
+    }
     if (request.method === 'GET' && url.pathname === '/api/downloads') {
       return response(200, { ok: true, data: { files: await listDownloads() } });
     }
@@ -389,6 +399,11 @@ export function createApp(dependencies = {}) {
         const catalogue = await loadModels(dependencies);
         const zuriModel = findModel(catalogue, body.model);
         if (!zuriModel) return response(400, { ok: false, error: { code: 'UNKNOWN_MODEL', message: 'That model is not available.' } });
+        // Pictures are sold by the image, so a chat request must not hand a picture
+        // model's supplier name to the text endpoint and bill nothing for it.
+        if (isImageModel(zuriModel)) {
+          return response(400, { ok: false, error: { code: 'IMAGE_MODEL', message: `${zuriModel.name} makes pictures rather than chat replies. Choose a chat model.` } });
+        }
         if (!canUseModel(zuriModel, session.subscription.planCode)) {
           return response(403, { ok: false, error: { code: 'PLAN_UPGRADE_REQUIRED', message: `${zuriModel.name} needs a higher plan. Upgrade to use it.` } });
         }
@@ -572,6 +587,21 @@ export function createApp(dependencies = {}) {
       if (request.method !== 'GET' || typeof dependencies.repository?.adminOverview !== 'function') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for the overview.' } });
       const overview = await dependencies.repository.adminOverview(url.searchParams.get('days'));
       const catalogue = await loadModels(dependencies);
+
+      // Each picture is priced on the plan that sells it first. Quoting every
+      // image model at the Starter rate would misreport the margin of one that
+      // only Max subscribers can buy.
+      const models = catalogue.map((model) => {
+        if (!isImageModel(model)) return { ...model, supplierCostKoboPerImage: 0, priceKoboPerImage: 0, pricePlanCode: '', pricePlanName: '' };
+        const plan = findPlan(model.minPlan);
+        return {
+          ...model,
+          supplierCostKoboPerImage: microUsdToKobo(imageSupplierCostMicroUsd(model), nairaPerUsd),
+          priceKoboPerImage: plan ? imagePriceKobo(model, plan) : 0,
+          pricePlanCode: plan?.code ?? '',
+          pricePlanName: plan?.name ?? '',
+        };
+      });
       const spendByModel = overview.byModel.map((row) => ({ ...row, costKobo: microUsdToKobo(row.costMicroUsd, nairaPerUsd) }));
       const costKobo = spendByModel.reduce((sum, row) => sum + row.costKobo, 0);
       return response(200, {
@@ -583,7 +613,7 @@ export function createApp(dependencies = {}) {
           revenueKobo: overview.revenueKobo,
           costKobo,
           marginKobo: overview.revenueKobo - costKobo,
-          models: catalogue,
+          models,
           spendByModel,
           plans: overview.plans.map((plan) => ({ ...plan, limits: PLAN_LIMITS[plan.code] ?? null })),
         },

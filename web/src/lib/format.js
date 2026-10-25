@@ -11,6 +11,15 @@ export function formatNaira(amountKobo) {
   return `NGN ${NUMBER.format(Math.round((Number(amountKobo) || 0) / 100))}`;
 }
 
+/**
+ * The headline on an image card. One wording for every image price keeps the
+ * unit next to the number, so "NGN 60 per image" is never read as a plan price.
+ * @param {unknown} amountKobo
+ */
+export function imagePriceLine(amountKobo) {
+  return `${formatNaira(amountKobo)} per image`;
+}
+
 /** @param {unknown} value */
 export function formatDate(value) {
   const date = new Date(value);
@@ -43,4 +52,119 @@ const PLAN_FEATURES = {
 /** @param {string} code */
 export function planFeatures(code) {
   return PLAN_FEATURES[code] ?? ['Tokens on your plan'];
+}
+
+/*
+ * The plan ladder, cheapest first. Which image models a plan includes is read
+ * from each model's `minPlan` in the server catalogue, never from a table here,
+ * so a rate or a floor change on the server shows up on the page untouched.
+ */
+const PLAN_LADDER = ['starter', 'pro', 'power', 'max'];
+
+/** @param {string} code @returns {number} Position on the ladder, or -1 if unknown. */
+export function planRank(code) {
+  return PLAN_LADDER.indexOf(String(code ?? '').toLowerCase());
+}
+
+/**
+ * The server's own plan name when the caller has the plan list, else the code
+ * with its first letter raised, so a card never shows "pro" to a customer.
+ * @param {string} code
+ * @param {Array<{ code: string, name: string }>} [plans]
+ */
+export function planLabel(code, plans = []) {
+  const normalised = String(code ?? '').toLowerCase();
+  if (!normalised) return '';
+  const match = (Array.isArray(plans) ? plans : []).find(
+    (plan) => String(plan?.code ?? '').toLowerCase() === normalised,
+  );
+  if (match?.name) return match.name;
+  return `${normalised.charAt(0).toUpperCase()}${normalised.slice(1)}`;
+}
+
+/** @param {Array<{ code: string }>} [plans] The highest plan this catalogue knows. */
+export function highestPlanRank(plans = []) {
+  const ranks = (Array.isArray(plans) ? plans : [])
+    .map((plan) => planRank(plan?.code))
+    .filter((rank) => rank !== -1);
+  return ranks.length > 0 ? Math.max(...ranks) : PLAN_LADDER.length - 1;
+}
+
+/** "a, b or c". Never "and": these counts are alternatives, not a sum. */
+function listed(names) {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} or ${names[names.length - 1]}`;
+}
+
+/** "a, b and c", for clauses that all hold at once. */
+function joined(names) {
+  if (names.length <= 1) return names[0] ?? '';
+  return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/**
+ * Up to two short lines for a plan tile, or none when the image catalogue did
+ * not load.
+ *
+ * The counts are the plan's token allowance divided by the image model's quota
+ * cost, so they are alternatives: nobody can spend the whole allowance on
+ * messages and on images at those maximum counts. That is why the models are
+ * joined with "or", and why a model above the plan is named with the plan that
+ * unlocks it rather than being counted in.
+ * @param {string} planCode
+ * @param {Array<object>} imagePrices The /api/image-prices catalogue.
+ * @param {Array<{ code: string, name: string }>} [plans] For the plan names.
+ * @returns {string[]}
+ */
+export function planImageLines(planCode, imagePrices, plans = []) {
+  const code = String(planCode ?? '').toLowerCase();
+  const rank = planRank(code);
+  const models = (Array.isArray(imagePrices) ? imagePrices : []).filter(
+    (model) => model && typeof model.name === 'string' && Array.isArray(model.plans),
+  );
+  if (rank === -1 || models.length === 0) return [];
+
+  const imagesOn = (model) => {
+    const entry = model.plans.find((plan) => String(plan?.code ?? '').toLowerCase() === code);
+    const images = Math.floor(Number(entry?.images));
+    return Number.isFinite(images) && images > 0 ? images : 0;
+  };
+
+  const included = [];
+  const locked = [];
+  for (const model of models) {
+    const floor = planRank(model.minPlan);
+    // A model whose floor is not on the ladder cannot be placed, so it is left
+    // out rather than guessed at.
+    if (floor === -1) continue;
+    (floor <= rank ? included : locked).push({ model, floor });
+  }
+
+  const lines = [];
+
+  // Highest model first, which is also the order the plans themselves climb.
+  const counted = included
+    .sort((a, b) => b.floor - a.floor || imagesOn(a.model) - imagesOn(b.model))
+    .map(({ model }) => ({ name: model.name, images: imagesOn(model) }))
+    .filter((entry) => entry.images > 0);
+
+  if (counted.length > 0) {
+    const words = counted.map((entry) => `${formatTokens(entry.images)} ${entry.name}`);
+    const noun = counted.length === 1 && counted[0].images === 1 ? 'image' : 'images';
+    lines.push(`About ${listed(words)} ${noun} a month`);
+  }
+
+  if (locked.length > 0) {
+    const byPlan = new Map();
+    for (const { model, floor } of locked.sort((a, b) => a.floor - b.floor)) {
+      const plan = PLAN_LADDER[floor];
+      byPlan.set(plan, [...(byPlan.get(plan) ?? []), model.name]);
+    }
+    const clauses = [...byPlan].map(
+      ([plan, names]) => `${joined(names)} ${names.length === 1 ? 'unlocks' : 'unlock'} on ${planLabel(plan, plans)}`,
+    );
+    lines.push(joined(clauses));
+  }
+
+  return lines.slice(0, 2);
 }

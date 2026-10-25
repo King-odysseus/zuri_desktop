@@ -136,6 +136,10 @@ CREATE TABLE IF NOT EXISTS models (
   name TEXT NOT NULL,
   supplier TEXT NOT NULL,
   supplier_model TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'text',
+  usd_per_image NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (usd_per_image >= 0),
+  quota_tokens_per_image INTEGER NOT NULL DEFAULT 0 CHECK (quota_tokens_per_image >= 0),
+  image_quality TEXT NOT NULL DEFAULT '',
   input_usd_per_million NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (input_usd_per_million >= 0),
   output_usd_per_million NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (output_usd_per_million >= 0),
   quota_weight NUMERIC(8, 2) NOT NULL DEFAULT 1 CHECK (quota_weight > 0),
@@ -146,6 +150,14 @@ CREATE TABLE IF NOT EXISTS models (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Databases created before image models existed get the picture columns here. The
+-- defaults leave every existing row a text model, so nothing starts being billed
+-- per image after the upgrade.
+ALTER TABLE models ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'text';
+ALTER TABLE models ADD COLUMN IF NOT EXISTS usd_per_image NUMERIC(12, 4) NOT NULL DEFAULT 0 CHECK (usd_per_image >= 0);
+ALTER TABLE models ADD COLUMN IF NOT EXISTS quota_tokens_per_image INTEGER NOT NULL DEFAULT 0 CHECK (quota_tokens_per_image >= 0);
+ALTER TABLE models ADD COLUMN IF NOT EXISTS image_quality TEXT NOT NULL DEFAULT '';
 
 -- quota_tokens is what counts against the monthly allowance (raw tokens times the
 -- model's weight); cost_micro_usd is what the supplier charged us for the request.
@@ -182,4 +194,13 @@ VALUES
   ('zuri-code', 'Zuri Code', 'openai', 'gpt-5.3-codex', 1.75, 14, 10, 'pro', 0.4, 4),
   ('zuri-reason', 'Zuri Reason', 'anthropic', 'claude-sonnet-5-5', 2, 10, 10, 'pro', 0.4, 5),
   ('zuri-elite', 'Zuri Elite', 'anthropic', 'claude-opus-5-5', 4, 20, 20, 'max', 0.2, 6)
+ON CONFLICT (code) DO NOTHING;
+
+-- Image models are billed per picture through quota_tokens_per_image instead of
+-- input/output prices, so the one monthly allowance still covers them.
+INSERT INTO models (code, name, supplier, supplier_model, kind, usd_per_image, quota_tokens_per_image, image_quality, input_usd_per_million, output_usd_per_million, quota_weight, min_plan, rate_factor, sort_order)
+VALUES
+  ('zuri-sketch', 'Zuri Sketch', 'zai', 'cogview-4', 'image', 0.012, 48000, 'standard', 0, 0, 1, 'starter', 0.4, 7),
+  ('zuri-canvas', 'Zuri Canvas', 'openai', 'gpt-image-2', 'image', 0.07, 264000, 'medium', 0, 0, 1, 'pro', 0.3, 8),
+  ('zuri-studio', 'Zuri Studio', 'openai', 'gpt-image-2', 'image', 0.19, 720000, 'high', 0, 0, 1, 'max', 0.2, 9)
 ON CONFLICT (code) DO NOTHING;

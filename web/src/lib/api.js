@@ -55,6 +55,27 @@ export async function fetchPlans() {
 }
 
 /**
+ * The image catalogue: one entry per image model, with its price and the number
+ * of images a month on each plan. Prices are read from the server rather than
+ * written into the page, so a rate change needs no redeploy of the site.
+ *
+ * Unlike plans, this never throws: the image cards are an extra on a marketing
+ * page, so a server that has not shipped the endpoint yet (a 404) leaves the
+ * page exactly as it was instead of replacing it with an error.
+ * @returns {Promise<Array<{ code: string, name: string, kind: string, minPlan: string, quotaTokensPerImage: number, plans: Array<{ code: string, priceKobo: number, images: number }> }>>}
+ */
+export async function fetchImagePrices() {
+  try {
+    const data = await api('/api/image-prices');
+    return Array.isArray(data) ? data : [];
+  } catch {
+    // Deliberately silent: the caller renders no image section when this is
+    // empty, and an error about pictures would bury the plans it sells.
+    return [];
+  }
+}
+
+/**
  * Load everything the dashboard shows in one round trip.
  * Billing is optional: a server without Paystack answers 503 there, and the
  * dashboard should still render plans and usage.

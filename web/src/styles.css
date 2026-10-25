@@ -802,6 +802,100 @@ a {
   font-size: 13px;
 }
 
+/* The image sentences inside a plan tile. They sit under the token bullets in a
+   block of their own, because images come out of the same allowance but are not
+   part of the same list. */
+.plan-images {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+}
+
+.plan-images-title {
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.plan-images-list {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.plan-images-list li::before {
+  content: "-";
+  margin-right: 8px;
+  color: var(--faint);
+}
+
+/* One card per picture model: a single column on a phone, three across once the
+   window has room. The list is the grid, so the models are announced as one
+   group instead of three unrelated cards. */
+.image-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.image-card {
+  min-width: 0;
+}
+
+/* `.feature p` is muted body copy, but the price is the headline of this card,
+   so it lifts back to text colour at a larger size. */
+.image-card .image-price {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.image-card .image-plans-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.image-plan-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+}
+
+/* Plan name and count share a line while they fit and stack when they do not, so
+   a row never pushes the card wider than a 390px phone. */
+.image-plan-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.image-plan-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.image-plan-count {
+  min-width: 0;
+  color: var(--muted);
+}
+
+@media (min-width: 760px) {
+  .image-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 /* Signed-in application shell */
 .app {
   position: relative;
@@ -858,6 +952,31 @@ a {
 .view-head p {
   max-width: 48rem;
   margin-top: 4px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* The picture models below the plan grid in the signed-in picker: the same card
+   language as the marketing page, with its own heading so the two sections do
+   not read as one long list. */
+.plan-images-section {
+  display: grid;
+  gap: 12px;
+  padding-top: 20px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+}
+
+.plan-images-section h2 {
+  color: var(--text);
+  font-size: clamp(20px, 2.6vw, 24px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.plan-images-section > p {
+  max-width: 60ch;
   color: var(--muted);
   font-size: 14px;
   line-height: 1.55;

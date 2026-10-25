@@ -29,8 +29,12 @@ function publicModelRow(row) {
     name: row.name,
     supplier: row.supplier,
     supplierModel: row.supplier_model,
+    kind: row.kind === 'image' ? 'image' : 'text',
     inputUsdPerMillion: Number(row.input_usd_per_million),
     outputUsdPerMillion: Number(row.output_usd_per_million),
+    usdPerImage: Number(row.usd_per_image) || 0,
+    quotaTokensPerImage: Number(row.quota_tokens_per_image) || 0,
+    imageQuality: typeof row.image_quality === 'string' ? row.image_quality : '',
     quotaWeight: Number(row.quota_weight),
     minPlan: row.min_plan,
     rateFactor: Number(row.rate_factor),
@@ -315,12 +319,13 @@ export function createRepository(pool) {
     },
     async saveModel(model) {
       const result = await pool.query(
-        'INSERT INTO models (code, name, supplier, supplier_model, input_usd_per_million, output_usd_per_million, quota_weight, min_plan, rate_factor, is_active, sort_order) ' +
-        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ' +
-        'ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, supplier = EXCLUDED.supplier, supplier_model = EXCLUDED.supplier_model, ' +
+        'INSERT INTO models (code, name, supplier, supplier_model, kind, usd_per_image, quota_tokens_per_image, image_quality, input_usd_per_million, output_usd_per_million, quota_weight, min_plan, rate_factor, is_active, sort_order) ' +
+        'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15) ' +
+        'ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, supplier = EXCLUDED.supplier, supplier_model = EXCLUDED.supplier_model, kind = EXCLUDED.kind, ' +
+        'usd_per_image = EXCLUDED.usd_per_image, quota_tokens_per_image = EXCLUDED.quota_tokens_per_image, image_quality = EXCLUDED.image_quality, ' +
         'input_usd_per_million = EXCLUDED.input_usd_per_million, output_usd_per_million = EXCLUDED.output_usd_per_million, quota_weight = EXCLUDED.quota_weight, ' +
         'min_plan = EXCLUDED.min_plan, rate_factor = EXCLUDED.rate_factor, is_active = EXCLUDED.is_active, sort_order = EXCLUDED.sort_order, updated_at = NOW() RETURNING *',
-        [model.code, model.name, model.supplier, model.supplierModel, model.inputUsdPerMillion, model.outputUsdPerMillion, model.quotaWeight, model.minPlan, model.rateFactor, model.isActive, model.sortOrder],
+        [model.code, model.name, model.supplier, model.supplierModel, model.kind ?? 'text', model.usdPerImage ?? 0, model.quotaTokensPerImage ?? 0, model.imageQuality ?? '', model.inputUsdPerMillion, model.outputUsdPerMillion, model.quotaWeight, model.minPlan, model.rateFactor, model.isActive, model.sortOrder],
       );
       return publicModelRow(result.rows[0]);
     },

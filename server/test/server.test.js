@@ -171,6 +171,10 @@ assert.equal(invalidChat.status, 400);
     ['zuri-code', false],
     ['zuri-reason', false],
     ['zuri-elite', false],
+    // Image models are in the same catalogue and follow the same plan gate.
+    ['zuri-sketch', true],
+    ['zuri-canvas', false],
+    ['zuri-studio', false],
   ]);
   assert.ok(!JSON.stringify(listed).includes('supplier'));
   assert.equal((await app(new Request('https://cloud.example.com/api/admin/overview', { headers }))).status, 403, 'admin pages are admin-only');

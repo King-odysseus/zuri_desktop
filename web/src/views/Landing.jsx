@@ -1,5 +1,7 @@
+import { useEffect, useState } from 'react';
 import Footer from '../components/Footer.jsx';
 import DownloadList from '../components/DownloadList.jsx';
+import ImagePrices from '../components/ImagePrices.jsx';
 import PlanCard from '../components/PlanCard.jsx';
 import { Button, Chip, UsageBar } from '../components/ui.jsx';
 import {
@@ -14,6 +16,8 @@ import {
   LogoMark,
   SparkIcon,
 } from '../components/Icons.jsx';
+import { fetchImagePrices } from '../lib/api.js';
+import { planImageLines } from '../lib/format.js';
 
 const POINTS = [
   'One account for the desktop app and the web dashboard.',
@@ -66,6 +70,22 @@ const STATS = [
  * job per screen.
  */
 export default function Landing({ plans, busy, onChoose, onNavigate }) {
+  const [imagePrices, setImagePrices] = useState([]);
+
+  // The image catalogue is an extra, and fetchImagePrices never rejects: a
+  // server without the endpoint leaves this empty and the section below is not
+  // rendered at all, so the page a visitor sees is the one it always was. The
+  // rest of the page does not wait for it.
+  useEffect(() => {
+    let cancelled = false;
+    fetchImagePrices().then((prices) => {
+      if (!cancelled) setImagePrices(prices);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <main className="landing">
       <section className="hero">
@@ -227,6 +247,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
               <PlanCard
                 key={plan.code}
                 plan={plan}
+                imageLines={planImageLines(plan.code, imagePrices, plans)}
                 currentPlan={null}
                 signedIn={false}
                 busy={busy === plan.code}
@@ -237,6 +258,19 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
           </div>
         )}
       </section>
+
+      {imagePrices.length > 0 && (
+        <section className="section" id="images">
+          <div className="section-head">
+            <h2>Pictures, priced in Naira</h2>
+            <p>
+              Images are paid for out of the same monthly allowance as your messages, so a picture
+              never adds a second line to your bill.
+            </p>
+          </div>
+          <ImagePrices imagePrices={imagePrices} plans={plans} />
+        </section>
+      )}
 
       <section className="section pricing-notes" id="usage">
         <div className="section-head">

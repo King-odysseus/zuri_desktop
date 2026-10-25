@@ -15,6 +15,13 @@ const plans = [
 const usage = { planCode: 'pro', monthlyTokens: 6000000, usedTokens: 4050000, remainingTokens: 1950000, percentUsed: 68, overQuota: false, nearLimit: false };
 const subscription = { id: 'sub-1', planCode: 'pro', planName: 'Pro', monthlyTokens: 6000000, currentPeriodStart: '2026-10-01T00:00:00.000Z', currentPeriodEnd: '2026-11-01T00:00:00.000Z' };
 
+// Public picture prices, per plan, as /api/image-prices returns them.
+const imagePrices = [
+  { code: 'zuri-sketch', name: 'Zuri Sketch', minPlan: 'starter', plans: [{ code: 'starter', priceKobo: 6_000, images: 41 }, { code: 'pro', priceKobo: 4_800, images: 125 }, { code: 'power', priceKobo: 6_000, images: 250 }, { code: 'max', priceKobo: 4_800, images: 833 }] },
+  { code: 'zuri-canvas', name: 'Zuri Canvas', minPlan: 'pro', plans: [{ code: 'starter', priceKobo: 33_000, images: 7 }, { code: 'pro', priceKobo: 26_400, images: 22 }, { code: 'power', priceKobo: 33_000, images: 45 }, { code: 'max', priceKobo: 26_400, images: 151 }] },
+  { code: 'zuri-studio', name: 'Zuri Studio', minPlan: 'max', plans: [{ code: 'starter', priceKobo: 90_000, images: 2 }, { code: 'pro', priceKobo: 72_000, images: 8 }, { code: 'power', priceKobo: 90_000, images: 16 }, { code: 'max', priceKobo: 72_000, images: 55 }] },
+];
+
 // Sample admin report; PREVIEW_ADMIN=1 makes the sample account an administrator.
 const isAdmin = process.env.PREVIEW_ADMIN === '1';
 const adminOverview = {
@@ -26,6 +33,9 @@ const adminOverview = {
     { code: 'zuri-code', name: 'Zuri Code', supplier: 'openai', supplierModel: 'gpt-5.3-codex', inputUsdPerMillion: 1.75, outputUsdPerMillion: 14, quotaWeight: 10, minPlan: 'pro', rateFactor: 0.4, isActive: true, sortOrder: 4 },
     { code: 'zuri-reason', name: 'Zuri Reason', supplier: 'anthropic', supplierModel: 'claude-sonnet-5-5', inputUsdPerMillion: 2, outputUsdPerMillion: 10, quotaWeight: 10, minPlan: 'pro', rateFactor: 0.4, isActive: true, sortOrder: 5 },
     { code: 'zuri-elite', name: 'Zuri Elite', supplier: 'anthropic', supplierModel: 'claude-opus-5-5', inputUsdPerMillion: 4, outputUsdPerMillion: 20, quotaWeight: 20, minPlan: 'max', rateFactor: 0.2, isActive: true, sortOrder: 6 },
+    { code: 'zuri-sketch', name: 'Zuri Sketch', kind: 'image', supplier: 'zai', supplierModel: 'cogview-4', usdPerImage: 0.012, quotaTokensPerImage: 48_000, imageQuality: 'standard', inputUsdPerMillion: 0, outputUsdPerMillion: 0, quotaWeight: 1, minPlan: 'starter', rateFactor: 1, isActive: true, sortOrder: 7, supplierCostKoboPerImage: 1_920, priceKoboPerImage: 6_000, pricePlanCode: 'starter', pricePlanName: 'Starter' },
+    { code: 'zuri-canvas', name: 'Zuri Canvas', kind: 'image', supplier: 'openai', supplierModel: 'gpt-image-2', usdPerImage: 0.07, quotaTokensPerImage: 264_000, imageQuality: 'medium', inputUsdPerMillion: 0, outputUsdPerMillion: 0, quotaWeight: 5, minPlan: 'pro', rateFactor: 1, isActive: true, sortOrder: 8, supplierCostKoboPerImage: 11_200, priceKoboPerImage: 26_400, pricePlanCode: 'pro', pricePlanName: 'Pro' },
+    { code: 'zuri-studio', name: 'Zuri Studio', kind: 'image', supplier: 'openai', supplierModel: 'gpt-image-2', usdPerImage: 0.19, quotaTokensPerImage: 720_000, imageQuality: 'high', inputUsdPerMillion: 0, outputUsdPerMillion: 0, quotaWeight: 12, minPlan: 'max', rateFactor: 1, isActive: true, sortOrder: 9, supplierCostKoboPerImage: 30_400, priceKoboPerImage: 72_000, pricePlanCode: 'max', pricePlanName: 'Max' },
   ],
   spendByModel: [
     { modelCode: 'zuri-pro', requests: 5200, inputTokens: 9_000_000, outputTokens: 3_000_000, quotaTokens: 60_000_000, costMicroUsd: 1_900_000_000, costKobo: 3_040_000 },
@@ -53,6 +63,7 @@ function json(response, data) {
 createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
   if (url.pathname === '/api/plans') return json(response, plans);
+  if (url.pathname === '/api/image-prices') return json(response, imagePrices);
   if (url.pathname === '/api/admin/overview') return json(response, adminOverview);
   if (url.pathname === '/api/admin/models') return json(response, JSON.parse(await readBody(request)));
   if (url.pathname === '/api/public-config') return json(response, { googleClientId: '' });
