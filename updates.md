@@ -1,7 +1,46 @@
 ## 2026-10-25 - Windows
 
-- The quick-ask popup no longer ends in a grey box with square corners. Its shadow is drawn by CSS inside a transparent window, and the window kept only 8px around the card, so the blur was sliced off at the window edge. The window now keeps a 24px transparent border and the shadow is sized to finish fading inside it (6px offset plus 16px blur reaches 22px). A new self-test fails if the window margin, the card padding and the shadow ever drift apart.
-- Key files: `src/main/overlay.js`, `src/renderer-react/app.css`, `scripts/selftest.js`.
+- Added `docs/voice-options.md`, a research note on voice: what the microphone button does today (browser dictation only, no model, no spoken reply), which of the five suppliers can actually do voice (OpenAI yes; DeepSeek, Kimi and Anthropic no; Z.ai unverified; Google, ElevenLabs and Deepgram would be new suppliers), and the three lanes with list prices converted at the 1,600 naira default rate. Short version: better dictation costs about 8 to 12 naira a minute, spoken answers about 64 naira a minute, and a realtime conversation about 48 naira a minute on Gemini Live or 300 to 500 on OpenAI Realtime.
+- Decision recorded in the same file: voice stays as browser dictation for now, and nothing in the app changed. The note lists what must be verified before a voice model is priced into the catalogue, including that a minute of audio is not a fixed number of tokens and that Zuri bills by tokens today, not by seconds.
+- Key files: `docs/voice-options.md` only. No source or config change, so no build is needed.
+- Other OS action: none, read the note after syncing if voice comes up.
+- Done on: Windows
+## 2026-10-25 - Windows
+
+- The composer's "Search the web" toggle now works on the Zuri account route. The cloud route has no tool loop, so the search cannot be a call the model makes; instead the app runs its existing `webSearch` tool before sending, shows "Searching the web..." while it runs, and passes the numbered results as a second system message after the identity. The model is told to cite results as [n], to end with a `Sources` line of markdown links for the results it actually used, and never to invent a source. A search that finds nothing is reported to the model as such rather than filled in from memory, and a failed search does not fail the message.
+- The results are instruction for that one request only and are never stored with the chat, so a later reply cannot cite a page nobody searched for.
+- Correction to the previous entry: file and folder attachments already reached the account route, because the composer inlines the file text into the message before it is sent. Nothing needed changing, and a check now pins it so the assumption cannot drift back.
+- Act mode is NOT covered and the plan item is corrected to say so. Act tools run on the person's own computer, and the model cannot ask for one through the cloud route: the server forwards no tool definitions and returns plain text. Giving Act mode a real tool loop over the account means the server accepting tools, returning tool calls, and the app executing them and calling again. That is its own piece of work, and until then Act mode stays on the direct-provider path.
+- Key files: `src/main/providers/cloud-chat.js` (webSearchContext, lastQuestion, cloudMessages), `src/main/providers/chat.js`, `src/main/main.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+## 2026-10-25 - Windows
+
+- Signed-in replies now arrive word by word. `/api/chat` takes `stream: true` and answers server-sent events (`delta` frames, then one `done` or one `error`); the suppliers are asked to stream too, so the text the person sees is the supplier's, not a re-chunked whole. Both supplier clients share one SSE reader, and an Anthropic stream is normalised to the same result shape as the OpenAI-compatible ones.
+- The charge is unchanged by streaming. The plan is still reserved before anything is sent, committed after the reply finishes from the usage the supplier reported, and released if the reply never landed. A streamed reply commits exactly what a non-streamed one would: this is asserted in the server tests.
+- A refusal still arrives as JSON before any text does, so an over-quota account is told plainly instead of watching half a reply that will never be billed. A supplier failure mid-reply sends one error frame, releases the reservation and charges nothing.
+- The window reads frames in `providers/sse.js`, which is its own module so the parser can be tested without a network: a frame split across two network chunks, a truncated reply and an error after text all have checks. An older deploy that answers plain JSON still works, just without the typing effect.
+- Stop now ends a streamed reply cleanly. Aborting the request under the stream surfaces as a failed read, which is mapped to the same "stopped" wording the direct route uses rather than being reported as a network fault.
+- Known gaps, unchanged: web search, Act mode, file creation and image attachments are not sent on the account route yet, so the composer's web-search toggle does nothing for signed-in chat. Automations and the Word add-in still use the direct-provider path.
+- Key files: `server/src/app.js`, `server/src/deepseek.js`, `server/test/server.test.js`, `src/main/main.js`, `src/main/providers/sse.js`, `src/main/providers/cloud-chat.js`, `src/main/providers/chat.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+## 2026-10-25 - Windows
+
+- Chat now goes through the person's Zuri account, so no provider key is needed to use the app. `providers/cloud-chat.js` builds the request and names the Zuri model; `main.js` posts it to `/api/chat` with the saved session; `providers/chat.js` takes that route whenever the window asks for a reply. A settings file that still holds a supplier id (deepseek-flash and friends) is translated to the Zuri code rather than discarded. A signed-out window is told "Sign in to Zuri to get replies" instead of being asked for a key.
+- `cloudFetch` now takes a `timeoutMs` and an abort signal, because a chat reply can take far longer than the 20 seconds every other call allowed, and Stop has to be able to end one still being written.
+- Settings no longer presents the key as the way to chat: the model line says it is billed to the Zuri plan, and the key card is relabelled "(optional)" because the Word add-in still answers through a provider directly.
+- Known gaps on the account route, none of them silent: replies arrive in one piece rather than word by word, and web search, Act mode, file creation and image attachments are not sent. Automations and the Word add-in still use the direct-provider path, so they still want a key. Moving streaming and the tools onto the server is the next piece of work.
+- Key files: `src/main/providers/cloud-chat.js`, `src/main/providers/chat.js`, `src/main/main.js`, `src/renderer-react/SettingsView.jsx`, `src/renderer-react/OnboardingView.jsx`, `src/renderer-react/GoogleSignInButton.jsx`, `src/renderer-react/CloudView.jsx`, `src/main/onboarding.js`, `scripts/selftest.js`.
+- Other OS action: run `npm run test` after syncing.
+- Done on: Windows
+## 2026-10-25 - Windows
+
+- The quick-ask popup still showed sharp, straight edges even with its shadow drawn in CSS: Electron's own window shadow (`hasShadow: true`) paints a rectangle behind a transparent frameless window, so it drew square corners outside the round card. That shadow is now off, and the card's soft shadow is the only one left.
+- The transparent border the card sits in grew from 24px to 40px, and the card shadow is now an 8px offset with a 28px blur that reaches 36px, so it finishes fading inside that border instead of being sliced off at the window edge.
+- The popup could not be moved at all. A frameless transparent window has no title bar, and Chromium's app-region drag does not move one on Windows, so the card's top strip now reports how far the pointer travelled and the main process moves the window by that much, over a new `zuri:overlay:move-by` channel. In a live run, dragging the header moved the window from 300,200 to 555,277. The card is clamped to the work area of the display it is on, so a long drag cannot lose it under the taskbar or off the edge of the screen, and the "Open Zuri" and "Close" buttons still click because a press on them never starts a drag.
+- The self-test now fails if the popup loses its header drag, its `movable` window option, its native-shadow-off flag, or the `zuri:overlay:move-by` channel through the bridge and main, on top of the existing check that keeps the window margin, the card padding and the shadow size in agreement.
+- Key files: `src/main/overlay.js`, `src/renderer-react/app.css`, `src/renderer-react/ChatPanel.jsx`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build && npm run selftest` after syncing.
 - Done on: Windows
 
