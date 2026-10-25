@@ -22,8 +22,9 @@
     "cloud:deploy": "node scripts/deploy-cloud.mjs",
     "dist": "electron-builder --win nsis --publish never",
     "dist:mac": "electron-builder --mac dmg --universal --publish never",
-    "test": "npm run react:build && npm run server:test && npm run smoke && npm run selftest && npm run firstrun && npm run demo:act && npm run demo:autopilot",
-    "release:publish": "node scripts/publish-release.mjs"
+    "test": "npm run react:build && npm run server:test && npm run smoke && npm run selftest && npm run firstrun && npm run demo:act && npm run demo:autopilot && npm run sync:check",
+    "release:publish": "node scripts/publish-release.mjs",
+    "sync:check": "electron scripts/check-chat-sync.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^7.4.4",

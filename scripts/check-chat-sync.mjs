@@ -1,0 +1,233 @@
+/**
+ * check-chat-sync.mjs - runs the real desktop sync against a stand-in account.
+ *
+ * chat-sync.js takes its signed request as an argument, so the sync can be driven
+ * without a server, a session or a network. That matters because the parts most
+ * likely to break in the field are the ones a live run would only reach by luck:
+ * a second sync on an unchanged thread, a reply that arrives from the browser, and
+ * a cloud thread that was deleted while the app was closed.
+ *
+ * Run via: npm run sync:check
+ */
+
+import { app } from 'electron';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+import { createChatSync } from '../src/main/chat-sync.js';
+import { readCloudSession, writeCloudSession } from '../src/main/cloud-session.js';
+import { appendMessage, listThreads, setStoreRoot } from '../src/main/store.js';
+
+let failures = 0;
+
+/**
+ * @param {boolean} condition
+ * @param {string} label
+ * @param {string} [detail]
+ */
+function check(condition, label, detail = '') {
+  if (condition) {
+    console.log(`PASS ${label}`);
+    return;
+  }
+  failures += 1;
+  console.log(`FAIL ${label}${detail === '' ? '' : ` - ${detail}`}`);
+}
+
+/**
+ * A stand-in for the account: it keeps conversations in memory and answers exactly
+ * the shapes the server does, including the 404 a deleted conversation gives.
+ */
+function fakeAccount() {
+  let serial = 0;
+  const conversations = new Map();
+
+  return {
+    conversations,
+    /** @param {string} pathname @param {object} [options] */
+    async request(pathname, options = {}) {
+      const method = options.method ?? 'GET';
+      const body = options.body ? JSON.parse(options.body) : {};
+      const id = (pathname.match(/^\/api\/me\/conversations\/([^/]+)/) ?? [])[1];
+      const isMessagePost = pathname.endsWith('/messages') && method === 'POST';
+
+      if (method === 'POST' && !id) {
+        if (conversations.size >= 200) {
+          return { ok: false, error: { code: 'CONVERSATION_LIMIT', message: 'Too many chats.' } };
+        }
+        serial += 1;
+        const created = { id: `cloud-${serial}`, title: body.title ?? 'New chat', model: body.model, origin: body.origin, messages: [] };
+        conversations.set(created.id, created);
+        return { ok: true, data: { conversation: created } };
+      }
+
+      const found = id ? conversations.get(id) : null;
+      if (!found) {
+        return { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That chat does not exist.' } };
+      }
+
+      if (method === 'GET') {
+        return { ok: true, data: { conversation: found, messages: found.messages } };
+      }
+
+      if (isMessagePost) {
+        serial += 1;
+        const message = { id: `msg-${serial}`, role: body.role, content: body.content, createdAt: new Date().toISOString() };
+        found.messages.push(message);
+        return { ok: true, data: { message, conversation: found } };
+      }
+
+      if (method === 'DELETE') {
+        conversations.delete(id);
+        return { ok: true, data: { deleted: true } };
+      }
+
+      return { ok: true, data: { conversation: found } };
+    },
+
+    /** A reply written in the browser, which the desktop has never seen. */
+    addFromBrowser(cloudId, content) {
+      const found = conversations.get(cloudId);
+      serial += 1;
+      const message = { id: `msg-${serial}`, role: 'assistant', content, createdAt: new Date().toISOString() };
+      found.messages.push(message);
+      return message;
+    },
+  };
+}
+
+/** @returns {Promise<any[]>} The stored threads, whatever shape the store answered in. */
+async function storedThreads() {
+  const listed = await listThreads();
+  const rows = Array.isArray(listed) ? listed : listed?.data;
+  return Array.isArray(rows) ? rows : [];
+}
+
+/** @param {string} root */
+async function seedThread(root) {
+  const thread = {
+    id: 'thread-1',
+    title: 'Plan the launch',
+    createdAt: '2026-10-25T08:00:00.000Z',
+    updatedAt: '2026-10-25T08:01:00.000Z',
+    messages: [
+      { id: 'local-1', role: 'user', content: 'Plan the launch', createdAt: '2026-10-25T08:00:00.000Z' },
+      { id: 'local-2', role: 'assistant', content: 'Start with a date.', createdAt: '2026-10-25T08:01:00.000Z', model: { provider: 'openai', model: 'gpt-4o' } },
+    ],
+  };
+  await fs.writeFile(path.join(root, 'chats.json'), JSON.stringify([thread], null, 2));
+}
+
+async function main() {
+  // The sync refuses to run when nobody is signed in, and a real session is only
+  // readable with the app's own encryption, so this runs inside Electron for the
+  // same reason firstrun.js does.
+  await app.whenReady();
+
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'zuri-sync-check-'));
+  setStoreRoot(root);
+  await seedThread(root);
+
+  const session = await writeCloudSession('sync-check-token', '', root);
+  const stored = await readCloudSession(root);
+  if (session?.ok !== true || stored?.data?.token !== 'sync-check-token') {
+    // No keyring on this machine: the signed-in paths cannot be reached, and saying
+    // so is better than reporting a pass for work that never ran.
+    console.log(`SKIP chat sync - a session cannot be stored here (${session?.error?.code ?? 'unknown'})`);
+    await fs.rm(root, { recursive: true, force: true });
+    app.quit();
+    return;
+  }
+
+  const account = fakeAccount();
+  const chatSync = createChatSync({ request: account.request, log: () => {} });
+
+  // First run: the thread is uploaded and every local message gains a server id.
+  const first = await chatSync.syncThread('thread-1');
+  check(first?.ok === true, 'the first sync reports success');
+  check(account.conversations.size === 1, 'the thread created one cloud conversation', `saw ${account.conversations.size}`);
+  const [cloud] = [...account.conversations.values()];
+  check(cloud?.messages.length === 2, 'both local messages were uploaded', `saw ${cloud?.messages.length}`);
+  check(cloud?.origin === 'desktop', 'the conversation is filed as coming from the desktop', String(cloud?.origin));
+  check(cloud?.model === 'zuri-flash', 'a supplier id in the thread is filed under its Zuri code', String(cloud?.model));
+
+  let [local] = await storedThreads();
+  check(local?.cloud?.id === cloud?.id, 'the thread remembers the cloud conversation', String(local?.cloud?.id));
+  check(local?.messages.every((message) => typeof message.cloudId === 'string' && message.cloudId !== ''), 'every uploaded message kept its server id');
+
+  // Second run on an unchanged thread must add nothing.
+  await chatSync.syncThread('thread-1');
+  check(cloud.messages.length === 2, 'a repeat sync uploads no duplicates', `saw ${cloud.messages.length}`);
+
+  // A reply written in the browser arrives on the desktop.
+  account.addFromBrowser(cloud.id, 'Pick the third of November.');
+  await chatSync.syncThread('thread-1');
+  [local] = await storedThreads();
+  const pulled = local.messages.find((message) => message.content === 'Pick the third of November.');
+  check(Boolean(pulled), 'a reply written in the browser is pulled into the desktop thread');
+  check(pulled?.cloudId === cloud.messages.at(-1).id, 'the pulled message carries the server id, so it is never sent back');
+
+  await chatSync.syncThread('thread-1');
+  check(cloud.messages.length === 3, 'pulling a message does not push it back as a new one', `saw ${cloud.messages.length}`);
+
+  // The chat is deleted in the browser while the app was closed. Re-creating it at
+  // launch would resurrect a chat the person deliberately removed, so the run only
+  // forgets the link; the chat comes back when it is actually used again.
+  account.conversations.delete(cloud.id);
+  const afterDelete = await chatSync.syncThread('thread-1');
+  check(afterDelete?.ok === true, 'a deleted cloud conversation is not reported as a failure', JSON.stringify(afterDelete?.error ?? null));
+  check(account.conversations.size === 0, 'a chat deleted in the browser is not resurrected at launch', `saw ${account.conversations.size}`);
+  [local] = await storedThreads();
+  check(!local?.cloud?.id, 'the dead link is forgotten so the next sync starts a fresh copy', String(local?.cloud?.id));
+
+  // The next thing said in that thread starts a new cloud copy of it.
+  await appendMessage('thread-1', { id: 'local-3', role: 'user', content: 'Still planning the launch' });
+  await chatSync.syncThread('thread-1');
+  check(account.conversations.size === 1, 'the next reply re-creates the chat under a new cloud conversation', `saw ${account.conversations.size}`);
+  const [recreated] = [...account.conversations.values()];
+  [local] = await storedThreads();
+  check(
+    recreated?.messages.length === local.messages.length,
+    'the re-created chat carries the whole thread, not just the new reply',
+    `cloud ${recreated?.messages.length} vs local ${local.messages.length}`,
+  );
+  // Signed out is quiet: no failure surfaced and nothing written.
+  const signedOut = createChatSync({
+    request: async () => ({ ok: false, error: { code: 'CLOUD_AUTH_REQUIRED', message: 'Sign in to use the cloud.' } }),
+    log: () => {},
+  });
+  const quiet = await signedOut.syncThread('thread-1');
+  check(quiet?.ok === false, 'a signed-out sync reports a result rather than throwing');
+  check(quiet?.error?.code === 'CLOUD_AUTH_REQUIRED', 'the signed-out result keeps the reason', String(quiet?.error?.code));
+
+  // A request that throws must not escape into the chat path.
+  const broken = createChatSync({
+    request: async () => {
+      throw new Error('network down');
+    },
+    log: () => {},
+  });
+  let threw = null;
+  let brokenResult = null;
+  try {
+    brokenResult = await broken.syncThread('thread-1');
+  } catch (error) {
+    threw = error;
+  }
+  check(threw === null, 'a throwing request does not escape as an exception', String(threw?.message ?? ''));
+  check(brokenResult?.ok === false, 'a throwing request is turned into a failure result');
+
+  // The link written above is gone, so the thread is uploaded fresh under a new id;
+  // what matters is that the run succeeded and did not keep retrying a dead id.
+  await fs.rm(root, { recursive: true, force: true });
+  console.log(failures === 0 ? '\nPASS chat sync' : `\n${failures} check(s) failed`);
+  process.exitCode = failures === 0 ? 0 : 1;
+  app.quit();
+}
+
+main().catch((error) => {
+  console.error(`FAIL chat sync - ${error?.message ?? error}`);
+  process.exitCode = 1;
+  app.quit();
+});
