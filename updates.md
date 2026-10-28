@@ -880,3 +880,10 @@
 - Other OS action: run `npm test` and `npm run web:build`.
 - Done on: Windows
 
+## 2026-10-28 - Windows
+
+- The web chat now supports editing a saved prompt back into the composer, regenerating the latest reply, and searching saved conversations by title or message text. Search is owner-scoped, capped and parameterized, and the browser control is clearable and accessible.
+- Key files: web/src/views/ChatView.jsx, web/src/components/ConversationSearch.jsx, web/src/lib/api.js, web/src/styles.css, server/src/app.js, server/src/db.js, server/test/conversations.test.js, scripts/selftest.js.
+- Other OS action: run `npm test` and `npm run web:build`.
+- Done on: Windows
+

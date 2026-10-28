@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { createApp } from '../src/app.js';
 import { createAuthService } from '../src/auth.js';
-import { CONVERSATION_LIMIT, CONVERSATION_LIST_LIMIT, MESSAGE_LIMIT, createRepository } from '../src/db.js';
+import { CONVERSATION_LIMIT, CONVERSATION_LIST_LIMIT, CONVERSATION_SEARCH_MAX_LENGTH, MESSAGE_LIMIT, createRepository } from '../src/db.js';
 
 // Saved chat history is the one part of the cloud that holds what a customer actually
 // typed. The checks below are in two halves for that reason: the first half reads the
@@ -63,7 +63,7 @@ const listed = await createRepository(listing.pool).listConversations(USER_A);
 assert.equal(listing.queries.length, 1, 'the list is one query, not one per conversation');
 assert.match(listing.queries[0].text, /WHERE c\.user_id = \$1/);
 assert.match(listing.queries[0].text, /ORDER BY c\.updated_at DESC/);
-assert.deepEqual(listing.queries[0].values, [USER_A, CONVERSATION_LIST_LIMIT]);
+assert.deepEqual(listing.queries[0].values, [USER_A, '', CONVERSATION_LIST_LIMIT]);
 // COUNT is a bigint, which pg hands back as a string: the response must carry a number.
 assert.deepEqual(listed, [{
   id: CONVERSATION_ID,
@@ -75,6 +75,15 @@ assert.deepEqual(listed, [{
   updatedAt: UPDATED_AT,
 }]);
 console.log('PASS conversations are listed for their owner only');
+
+const searched = recordingPool([{ match: 'FROM conversations c', reply: { rows: [conversationRow], rowCount: 1 } }]);
+await createRepository(searched.pool).listConversations(USER_A, ' passport ');
+assert.match(searched.queries[0].text, /c\.title ILIKE/);
+assert.match(searched.queries[0].text, /conversation_messages sm/);
+assert.deepEqual(searched.queries[0].values, [USER_A, 'passport', CONVERSATION_LIST_LIMIT]);
+await createRepository(searched.pool).listConversations(USER_A, 'x'.repeat(CONVERSATION_SEARCH_MAX_LENGTH + 20));
+assert.equal(searched.queries[1].values[1].length, CONVERSATION_SEARCH_MAX_LENGTH);
+console.log('PASS conversation search is owner-scoped, parameterized and capped');
 
 const created = recordingPool([{
   match: 'INSERT INTO conversations',
@@ -226,9 +235,10 @@ function createMemoryRepository() {
   };
   return {
     rows,
-    async listConversations(userId) {
+    async listConversations(userId, search = '') {
+      const query = String(search).trim().slice(0, CONVERSATION_SEARCH_MAX_LENGTH).toLowerCase();
       return [...rows.values()]
-        .filter((row) => row.userId === userId)
+        .filter((row) => row.userId === userId && (query === '' || row.title.toLowerCase().includes(query) || row.messages.some((message) => message.content.toLowerCase().includes(query))))
         .sort((left, right) => right.updatedAt - left.updatedAt)
         .slice(0, CONVERSATION_LIST_LIMIT)
         .map(view);
@@ -434,6 +444,12 @@ assert.ok(listForA.length > 1);
 // two appends above made it the most recently updated thread of this account.
 assert.equal(listForA[0].id, threadId);
 console.log('PASS the list shows only the caller\'s threads, most recent first');
+const searchForA = (await (await call('GET', '/api/me/conversations?q=fee', { token: tokenA })).json()).data.conversations;
+assert.ok(searchForA.some((row) => row.id === threadId));
+assert.ok(searchForA.every((row) => row.id !== foreignThread.id));
+const searchCapped = await call('GET', `/api/me/conversations?q=${'x'.repeat(CONVERSATION_SEARCH_MAX_LENGTH + 20)}`, { token: tokenA });
+assert.equal(searchCapped.status, 200);
+console.log('PASS conversation search filters only the signed-in account');
 
 // Reading, writing, renaming and deleting somebody else\'s thread all answer exactly
 // like an id that does not exist, so an id cannot be tested for existence.

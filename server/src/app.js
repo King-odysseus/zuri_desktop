@@ -9,6 +9,7 @@ import { createRequestLimiter, limitsForPlan, PLAN_LIMITS } from './limits.js';
 import { DEFAULT_MODELS, canUseModel, findModel, imagePriceKobo, imageSupplierCostMicroUsd, isImageModel, limitsForModel, microUsdToKobo, publicImageModel, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
 import { verifyPaystackSignature } from './paystack.js';
 import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
+import { CONVERSATION_SEARCH_MAX_LENGTH } from './db.js';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const ASSETS_DIR = `${PUBLIC_DIR}${path.sep}assets`;
@@ -57,6 +58,11 @@ const MESSAGE_MAX_LENGTH = 100000;
 // oversized message would come back as BODY_TOO_LARGE instead of MESSAGE_TOO_LARGE.
 const MAX_MESSAGE_BODY_BYTES = 1024 * 1024;
 const CONVERSATIONS_PATH = '/api/me/conversations';
+
+/** @param {unknown} value @returns {string} */
+function conversationSearch(value) {
+  return typeof value === 'string' ? value.trim().slice(0, CONVERSATION_SEARCH_MAX_LENGTH) : '';
+}
 
 /** The model catalogue: the database when it has one, the built-in defaults otherwise. */
 async function loadModels(dependencies) {
@@ -1065,7 +1071,10 @@ export function createApp(dependencies = {}) {
       try {
         if (!conversationId) {
           if (request.method === 'GET') {
-            return response(200, { ok: true, data: { conversations: await dependencies.repository.listConversations(userId) } });
+            return response(200, {
+              ok: true,
+              data: { conversations: await dependencies.repository.listConversations(userId, conversationSearch(url.searchParams.get('q'))) },
+            });
           }
           if (request.method === 'POST') {
             const body = await readJson(request);

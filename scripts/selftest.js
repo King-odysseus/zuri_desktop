@@ -1184,6 +1184,25 @@ check('the model beside Send is a menu in the web chat, as it is in the app', ()
   return 'Flowbite dropdown, per-chat model restored on open';
 });
 
+check('conversation search is capped and encoded before it reaches the server', () => {
+  const api = read('web/src/lib/api.js');
+  const control = read('web/src/components/ConversationSearch.jsx');
+  if (!api.includes('fetchConversations(query = \'\')')) throw new Error('conversation fetch does not accept a search query');
+  if (!api.includes('slice(0, 120)')) throw new Error('conversation search has no length cap');
+  if (!api.includes('encodeURIComponent(trimmed)')) throw new Error('conversation search is not URL encoded');
+  if (!control.includes('aria-label="Search conversations"')) throw new Error('search control is not labelled');
+  if (!control.includes('Clear conversation search')) throw new Error('search control has no clear action');
+  return 'bounded, encoded server search with an accessible clearable control';
+});
+
+check('web chat prompts can be edited and the latest reply regenerated', () => {
+  const view = read('web/src/views/ChatView.jsx');
+  if (!view.includes('Edit and send again')) throw new Error('web prompts have no edit action');
+  if (!view.includes('Regenerate reply')) throw new Error('latest replies have no regenerate action');
+  if (!view.includes('send(message.content)')) throw new Error('regenerate does not replay the latest prompt');
+  return 'prompt edit and latest-reply regeneration controls are wired';
+});
+
 check('a chat continued in the browser refreshes the desktop without a restart', () => {
   const main = read('src/main/main.js');
   if (!main.includes("(Number(result.data?.appended) || 0) > 0) announceState({ area: 'chats' })")) {

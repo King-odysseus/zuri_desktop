@@ -7,11 +7,13 @@ import {
   Copy,
   Pencil,
   Plus,
+  RefreshCw,
   Square,
   Trash2,
   X,
 } from 'lucide-react';
 import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
+import ConversationSearch from '../components/ConversationSearch.jsx';
 import { LogoMark } from '../components/Icons.jsx';
 // The reply renderer and the clipboard fallback are the desktop app's own modules,
 // imported rather than copied: an answer is then drawn by one set of markdown rules
@@ -114,6 +116,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   const [conversations, setConversations] = useState([]);
   const [listStatus, setListStatus] = useState('loading');
   const [listError, setListError] = useState(null);
+  const [conversationQuery, setConversationQuery] = useState('');
 
   const [openId, setOpenId] = useState(null);
   // A new chat has no conversation row yet: it is created on the first send.
@@ -148,10 +151,10 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   const runRef = useRef(0);
   const atBottomRef = useRef(true);
 
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (query = '') => {
     setListStatus('loading');
     try {
-      setConversations(newestFirst(await fetchConversations()));
+      setConversations(newestFirst(await fetchConversations(query)));
       setListError(null);
     } catch (error) {
       setListError(failureOf(error, 'Your saved chats could not be loaded.'));
@@ -161,8 +164,11 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   }, []);
 
   useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+    const timer = window.setTimeout(() => {
+      void loadConversations(conversationQuery);
+    }, conversationQuery.trim() === '' ? 0 : 220);
+    return () => window.clearTimeout(timer);
+  }, [conversationQuery, loadConversations]);
 
   /*
    * The same conversation can be moving on another device: the desktop app mirrors
@@ -173,7 +179,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   const refreshHistory = useCallback(async () => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
     try {
-      setConversations(newestFirst(await fetchConversations()));
+      setConversations(newestFirst(await fetchConversations(conversationQuery)));
       setListError(null);
     } catch {
       // A background refresh is a nicety: the list already on screen stays put, and
@@ -195,7 +201,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
     } catch {
       // Same reasoning as the list: what is open stays open.
     }
-  }, [openId, streaming]);
+  }, [conversationQuery, openId, streaming]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -311,8 +317,8 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
     [loadConversations, model],
   );
 
-  const send = useCallback(async () => {
-    const question = draft.trim();
+  const send = useCallback(async (questionOverride = null) => {
+    const question = (typeof questionOverride === 'string' ? questionOverride : draft).trim();
     if (!question || streaming) return;
 
     const run = (runRef.current += 1);
@@ -376,6 +382,24 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
       setStreaming(false);
     }
   }, [draft, streaming, openId, thread.messages, model, resetReply, saveExchange]);
+
+  const editMessage = useCallback((message) => {
+    const content = typeof message?.content === 'string' ? message.content : '';
+    if (content.trim() === '' || streaming) return;
+    setDraft(content);
+    window.requestAnimationFrame(() => draftRef.current?.focus());
+  }, [streaming]);
+
+  const regenerateReply = useCallback(() => {
+    if (streaming) return;
+    for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
+      const message = thread.messages[index];
+      if (message?.role === 'user' && typeof message.content === 'string' && message.content.trim() !== '') {
+        void send(message.content);
+        return;
+      }
+    }
+  }, [send, streaming, thread.messages]);
 
   const stop = useCallback(() => {
     abortRef.current?.abort();
@@ -488,12 +512,22 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
           </Button>
         </div>
 
+        <ConversationSearch
+          value={conversationQuery}
+          onChange={setConversationQuery}
+          onClear={() => setConversationQuery('')}
+        />
+
         <p className="chat-recents-label">Recents</p>
 
         <div className="chat-recents-list">
           {listStatus === 'loading' && <p className="chat-recents-empty">Loading your chats...</p>}
           {listStatus !== 'loading' && conversations.length === 0 && (
-            <p className="chat-recents-empty">No saved chats yet. Your first question appears here.</p>
+            <p className="chat-recents-empty">
+              {conversationQuery.trim() === ''
+                ? 'No saved chats yet. Your first question appears here.'
+                : 'No chats match that search.'}
+            </p>
           )}
 
           {conversations.map((conversation) => (
@@ -635,6 +669,26 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                   ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
                   : <p className="chat-text">{message.content}</p>}
                 <div className="chat-bubble-actions">
+                  {message.role === 'user' && (
+                    <IconButton
+                      size="sm"
+                      className="chat-edit"
+                      label="Edit and send again"
+                      onClick={() => editMessage(message)}
+                    >
+                      <Pencil size={14} aria-hidden="true" />
+                    </IconButton>
+                  )}
+                  {message.role === 'assistant' && index === lastAnswerIndex && (
+                    <IconButton
+                      size="sm"
+                      className="chat-regenerate"
+                      label="Regenerate reply"
+                      onClick={regenerateReply}
+                    >
+                      <RefreshCw size={14} aria-hidden="true" />
+                    </IconButton>
+                  )}
                   <IconButton
                     size="sm"
                     className="chat-copy"

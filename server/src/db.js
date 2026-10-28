@@ -51,6 +51,7 @@ function publicModelRow(row) {
 export const CONVERSATION_LIMIT = 200;
 export const MESSAGE_LIMIT = 500;
 export const CONVERSATION_LIST_LIMIT = 100;
+export const CONVERSATION_SEARCH_MAX_LENGTH = 120;
 
 // Postgres raises 22P02 for an id that is not a uuid, which a handler would report as
 // a server fault. A caller that invents an id should learn nothing, so a malformed id
@@ -651,10 +652,14 @@ export function createRepository(pool) {
      * @param {string} userId
      * @returns {Promise<Array<object>>}
      */
-    async listConversations(userId) {
+    async listConversations(userId, search = '') {
+      const query = text(search).slice(0, CONVERSATION_SEARCH_MAX_LENGTH);
       const result = await pool.query(
-        CONVERSATION_COLUMNS + 'WHERE c.user_id = $1 GROUP BY c.id ORDER BY c.updated_at DESC LIMIT $2',
-        [userId, CONVERSATION_LIST_LIMIT],
+        CONVERSATION_COLUMNS +
+          'WHERE c.user_id = $1 AND ($2 = \'\' OR c.title ILIKE \'%\' || $2 || \'%\' OR EXISTS (' +
+          'SELECT 1 FROM conversation_messages sm WHERE sm.conversation_id = c.id AND sm.content ILIKE \'%\' || $2 || \'%\')) ' +
+          'GROUP BY c.id ORDER BY c.updated_at DESC LIMIT $3',
+        [userId, query, CONVERSATION_LIST_LIMIT],
       );
       return result.rows.map(publicConversation);
     },

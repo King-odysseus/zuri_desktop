@@ -2646,6 +2646,57 @@ a.download-card:hover {
   text-transform: uppercase;
 }
 
+.conversation-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  margin: 10px 0 0;
+  padding: 0 10px;
+  border: 1px solid var(--control-border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.conversation-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.conversation-search input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.conversation-search input::placeholder {
+  color: var(--muted);
+  opacity: 0.85;
+}
+
+.conversation-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.conversation-search-clear:hover {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+}
+
 .chat-recents-list {
   display: flex;
   flex-direction: column;

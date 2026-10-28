@@ -185,10 +185,15 @@ export const DEFAULT_CHAT_MODEL = 'zuri-flash';
 
 /**
  * This account's saved conversations, newest first as the server sends them.
+ * A query asks the server to match titles and message text without downloading
+ * every thread into the browser.
+ * @param {string} [query]
  * @returns {Promise<Array<{ id: string, title: string, createdAt?: string, updatedAt?: string }>>}
  */
-export async function fetchConversations() {
-  const data = await api('/api/me/conversations');
+export async function fetchConversations(query = '') {
+  const trimmed = typeof query === 'string' ? query.trim().slice(0, 120) : '';
+  const suffix = trimmed === '' ? '' : `?q=${encodeURIComponent(trimmed)}`;
+  const data = await api(`/api/me/conversations${suffix}`);
   return Array.isArray(data?.conversations) ? data.conversations : [];
 }
 
