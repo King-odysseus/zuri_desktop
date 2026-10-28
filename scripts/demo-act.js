@@ -37,7 +37,9 @@ import { ensureWorkspace, listWorkspaceFiles, runTool, setWorkspaceRoot } from '
 
 const QUERY = 'zuri desktop assistant release notes';
 
-const SCRATCH_ROOT = path.join(os.tmpdir(), 'zuri-demo-act');
+// A unique folder keeps parallel checks from deleting or pre-creating another
+// run's file, which would make the first confirmed write look like an overwrite.
+const SCRATCH_ROOT = path.join(os.tmpdir(), `zuri-demo-act-${process.pid}-${Date.now()}`);
 const STORE_DIR = path.join(SCRATCH_ROOT, 'store');
 const WORKSPACE_DIR = path.join(SCRATCH_ROOT, 'workspace');
 
