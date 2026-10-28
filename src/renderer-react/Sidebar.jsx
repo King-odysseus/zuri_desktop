@@ -18,6 +18,7 @@ import {
   PanelLeftOpenIcon,
   SearchIcon,
   SettingsIcon,
+  SkillsIcon,
   MoonIcon,
   OverlayIcon,
   SunIcon,
@@ -28,6 +29,7 @@ import { projectIconFor } from './projectIcons.js';
 export const NAV_ITEMS = [
   { key: 'chats', label: 'Chats', Icon: ChatIcon },
   { key: 'agents', label: 'Agents', Icon: AgentIcon },
+  { key: 'skills', label: 'Skills', Icon: SkillsIcon },
   { key: 'tasks', label: 'Tasks', Icon: TaskIcon },
   { key: 'reminders', label: 'Reminders', Icon: BellIcon },
   { key: 'automations', label: 'Automations', Icon: AutomationIcon },
@@ -40,7 +42,7 @@ export const NAV_ITEMS = [
 // The reference app pairs a narrow icon rail (where you are) with a list panel
 // (what you have). The rail carries the eight destinations; the panel is the
 // conversation list, which routing in App.jsx keeps in step with the rail.
-export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
+export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
   const [projects, setProjects] = useState([]);
   // Which projects are open in the list, and which chat is choosing a project.
@@ -289,6 +291,17 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
                     <ChevronRightIcon size={14} className={`shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
                     <ProjectIcon size={16} className="shrink-0" />
                     <span className="truncate">{project.name}</span>
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-11 min-w-11 shrink-0 rounded-lg text-muted"
+                    aria-label={`Edit project ${project.name}`}
+                    title="Name, icon and instructions"
+                    onPress={() => onEditProject(project)}
+                  >
+                    <EditIcon size={15} />
                   </Button>
                   <Button
                     isIconOnly

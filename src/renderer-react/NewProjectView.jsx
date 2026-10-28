@@ -1,29 +1,34 @@
 import { useState } from 'react';
-import { Button, Input } from './ui.jsx';
+import { Button, Input, Textarea } from './ui.jsx';
 import { PROJECT_ICON_CHOICES } from './projectIcons.js';
 
 // "Keep one topic in one place": a project is a named folder for chats. Naming it
-// and picking an icon is the whole job; chats are moved in from the sidebar.
-export default function NewProjectView({ onCreated }) {
-  const [name, setName] = useState('');
-  const [icon, setIcon] = useState(PROJECT_ICON_CHOICES[0].key);
+// and picking an icon is the first job; the instructions are what make it useful,
+// because Zuri follows them in every chat filed under the project.
+// With a `project` this edits that project instead of creating a new one.
+export default function NewProjectView({ project = null, onCreated }) {
+  const editing = project !== null;
+  const [name, setName] = useState(project?.name ?? '');
+  const [icon, setIcon] = useState(project?.icon ?? PROJECT_ICON_CHOICES[0].key);
+  const [instructions, setInstructions] = useState(project?.instructions ?? '');
   const [problem, setProblem] = useState('');
   const [saving, setSaving] = useState(false);
 
-  async function createProject(event) {
+  async function saveProject(event) {
     event.preventDefault();
     const trimmed = name.trim();
     if (trimmed === '' || saving) return;
-    if (!window.zuri?.projects?.create) {
+    const call = editing ? window.zuri?.projects?.update : window.zuri?.projects?.create;
+    if (!call) {
       setProblem('Projects need the Zuri desktop app.');
       return;
     }
     setSaving(true);
     setProblem('');
-    const result = await window.zuri.projects.create({ name: trimmed, icon });
+    const result = await call({ ...(editing ? { projectId: project.id } : {}), name: trimmed, icon, instructions });
     setSaving(false);
     if (!result?.ok) {
-      setProblem(result?.error?.message ?? 'The project could not be created.');
+      setProblem(result?.error?.message ?? 'The project could not be saved.');
       return;
     }
     onCreated(result.data);
@@ -32,9 +37,9 @@ export default function NewProjectView({ onCreated }) {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <form onSubmit={createProject} className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-6 text-center">
+        <form onSubmit={saveProject} className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-6 text-center">
           <header>
-            <h1 className="text-3xl font-medium tracking-tight">New project</h1>
+            <h1 className="text-3xl font-medium tracking-tight">{editing ? 'Edit project' : 'New project'}</h1>
             <p className="mt-2 text-sm text-muted">Keep one topic in one place</p>
           </header>
 
@@ -66,10 +71,20 @@ export default function NewProjectView({ onCreated }) {
             fullWidth
           />
 
+          <Textarea
+            value={instructions}
+            onChange={(event) => setInstructions(event.target.value)}
+            placeholder="Instructions for this project (optional). For example: answer as a patient maths tutor."
+            aria-label="Project instructions"
+            maxLength={1000}
+            rows={4}
+            className="w-full text-left"
+          />
+
           {problem !== '' && <p role="alert" className="text-sm text-danger">{problem}</p>}
 
           <Button type="submit" variant="primary" className="min-h-11 w-full" isDisabled={name.trim() === '' || saving}>
-            Create project
+            {editing ? 'Save project' : 'Create project'}
           </Button>
         </form>
       </div>

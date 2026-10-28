@@ -1,3 +1,16 @@
+## 2026-10-28 - Windows (act mode, skills, side panel)
+
+- Ask, Act and Autopilot are real. A mode picker sits beside the model chip. Ask answers and reads, and no longer offers the edit tool, which could never run there. Act also offers editDocument, writeFile, openUrl and openApp, and asks the person first through an approval card above the composer; no answer, Stop or five minutes counts as no. Autopilot skips the question only for copy-only edits and allow-listed links and apps; writeFile always asks. The new channel is zuri:chat:approve.
+- Bug fixed on the way: on the account route, a tool that built a file used a list that did not exist yet, so the reply failed with "cut off" and the file was never saved with the reply. The reply now carries its files.
+- Side panel: code blocks have Open in panel, and files Zuri makes have Preview. The panel sits beside the chat on a wide window and over it on a narrow one.
+- Skills: new Skills page (rail icon). Up to 20 saved, 5 on at once because each is added to every message. New channels zuri:skills:list, create, update, delete; skills.json is a new store file.
+- Projects now carry instructions (edit icon on a project row), added to every chat filed under it.
+- Regenerate button on the newest reply. The cloud copy of the chat keeps the old reply until it is deleted in the browser.
+- The overlay hotkey is Ctrl+Alt+Space, registered for real (Win+Space is reserved by Windows). The tray hint says the same.
+- Key files: src/main/providers/chat.js, store.js, main.js, preload.js, tray-menu.js, src/renderer-react/ChatPanel.jsx, ActControls.jsx, ResultPanel.jsx, SkillsView.jsx, NewProjectView.jsx, Sidebar.jsx, App.jsx, FormattedMessage.jsx, scripts/selftest.js.
+- Other OS action: run "npm run react:build".
+- Done on: Windows
+
 ## 2026-10-28 - Windows (projects)
 
 - The desktop sidebar has a Projects section: create a project (name and icon) from the New project screen, open it to see its chats, move a chat in or out with the folder button on the chat row, and delete a project (its chats are kept and return to Recents). New chat now shows its Ctrl K shortcut, which works from any screen.

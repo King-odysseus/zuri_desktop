@@ -33,6 +33,7 @@ const WRITE_RETRY_DELAY_MS = 250;
 export const DEFAULT_DATA = Object.freeze({
   chats: Object.freeze([]),
   projects: Object.freeze([]),
+  skills: Object.freeze([]),
   tasks: Object.freeze([]),
   reminders: Object.freeze([]),
   schedules: Object.freeze([]),
@@ -946,12 +947,27 @@ export const PROJECT_ICONS = Object.freeze(['folder', 'document', 'code', 'chart
 const PROJECT_NAME_MAX_LENGTH = 40;
 
 /**
+ * Standing instructions a project carries into every chat filed under it. They ride
+ * in each request, so they are capped like the account-wide instructions are.
+ */
+export const PROJECT_INSTRUCTIONS_MAX_LENGTH = 1000;
+
+/**
  * @param {unknown} name
  * @returns {string} The name flattened to one line and cut to length, or '' when blank.
  */
 function normaliseProjectName(name) {
   if (typeof name !== 'string') return '';
   return name.replace(/\s+/g, ' ').trim().slice(0, PROJECT_NAME_MAX_LENGTH).trimEnd();
+}
+
+/**
+ * @param {unknown} text
+ * @returns {string} Instructions trimmed and cut to length; '' means none.
+ */
+function normaliseProjectInstructions(text) {
+  if (typeof text !== 'string') return '';
+  return text.trim().slice(0, PROJECT_INSTRUCTIONS_MAX_LENGTH);
 }
 
 /**
@@ -982,6 +998,7 @@ export async function createProject(input = {}, options = {}) {
     id: randomUUID(),
     name,
     icon: PROJECT_ICONS.includes(input?.icon) ? input.icon : PROJECT_ICONS[0],
+    instructions: normaliseProjectInstructions(input?.instructions),
     createdAt: now,
     updatedAt: now,
   };
@@ -1021,6 +1038,7 @@ export async function updateProject(projectId, changes = {}, options = {}) {
 
     if (name !== null) project.name = name;
     if (PROJECT_ICONS.includes(changes?.icon)) project.icon = changes.icon;
+    if (typeof changes?.instructions === 'string') project.instructions = normaliseProjectInstructions(changes.instructions);
     project.updatedAt = new Date().toISOString();
 
     const written = await writeStore('projects', read.data, options);
@@ -1071,6 +1089,179 @@ export async function deleteProject(projectId, options = {}) {
     if (!written.ok) return written;
 
     return { ok: true, data: { id: projectId } };
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   Skills
+
+   skills.json holds saved instructions the person can switch on, such as "write in
+   my company style". Each enabled skill is added to the system prompt of every
+   reply, so the number switched on is capped: every one is paid for in tokens on
+   every message.
+   ------------------------------------------------------------------------- */
+
+export const SKILL_NAME_MAX_LENGTH = 40;
+export const SKILL_INSTRUCTIONS_MAX_LENGTH = 1500;
+export const SKILL_MAX_COUNT = 20;
+export const SKILL_MAX_ENABLED = 5;
+
+/**
+ * Every skill, oldest first so the list does not reshuffle when one is switched on.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: any[] } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function listSkills(options = {}) {
+  const read = await readStore('skills', options);
+  if (!read.ok) return read;
+
+  // By creation, not update: switching a skill on rewrites updatedAt, and the list
+  // must not jump around under the person's cursor when they do.
+  const skills = read.data
+    .filter(isThread)
+    .sort((left, right) => String(left.createdAt ?? '').localeCompare(String(right.createdAt ?? '')));
+  return { ok: true, data: skills };
+}
+
+/**
+ * @param {unknown} input
+ * @returns {{ ok: true, name: string, instructions: string } | { ok: false, error: { code: string, message: string } }}
+ */
+function checkSkillText(input) {
+  const name = typeof input?.name === 'string' ? input.name.replace(/\s+/g, ' ').trim().slice(0, SKILL_NAME_MAX_LENGTH) : '';
+  if (name === '') return failure('SKILL_INVALID_NAME', 'a skill needs a name');
+  const instructions = typeof input?.instructions === 'string' ? input.instructions.trim().slice(0, SKILL_INSTRUCTIONS_MAX_LENGTH) : '';
+  if (instructions === '') return failure('SKILL_INVALID_INSTRUCTIONS', 'a skill needs instructions');
+  return { ok: true, name, instructions };
+}
+
+/**
+ * Save a new skill. It starts switched off, so adding one never changes replies
+ * until the person turns it on.
+ * @param {{ name?: string, instructions?: string }} input
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: any } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function createSkill(input = {}, options = {}) {
+  const text = checkSkillText(input);
+  if (!text.ok) return text;
+
+  const now = new Date().toISOString();
+  const skill = { id: randomUUID(), name: text.name, instructions: text.instructions, enabled: false, createdAt: now, updatedAt: now };
+
+  return withChatLock(async () => {
+    const read = await readStore('skills', options);
+    if (!read.ok) return read;
+    if (read.data.length >= SKILL_MAX_COUNT) {
+      return failure('SKILL_LIMIT', `you can keep up to ${SKILL_MAX_COUNT} skills; delete one first`);
+    }
+
+    read.data.push(skill);
+    const written = await writeStore('skills', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: skill };
+  });
+}
+
+/**
+ * Change a skill's text or switch it on or off.
+ * @param {string} skillId
+ * @param {{ name?: string, instructions?: string, enabled?: boolean }} changes
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: any } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function updateSkill(skillId, changes = {}, options = {}) {
+  if (typeof skillId !== 'string' || skillId.trim() === '') {
+    return failure('SKILL_INVALID_ID', 'changing a skill needs its id');
+  }
+  if (changes?.enabled !== undefined && typeof changes.enabled !== 'boolean') {
+    return failure('SKILL_INVALID_ENABLED', 'enabled must be true or false');
+  }
+
+  return withChatLock(async () => {
+    const read = await readStore('skills', options);
+    if (!read.ok) return read;
+
+    const skill = read.data.find((entry) => entry?.id === skillId);
+    if (!skill) return failure('SKILL_NOT_FOUND', `no skill with id ${skillId}`);
+
+    if (changes.name !== undefined || changes.instructions !== undefined) {
+      const text = checkSkillText({ name: changes.name ?? skill.name, instructions: changes.instructions ?? skill.instructions });
+      if (!text.ok) return text;
+      skill.name = text.name;
+      skill.instructions = text.instructions;
+    }
+    if (changes.enabled === true && skill.enabled !== true) {
+      const enabledCount = read.data.filter((entry) => entry?.enabled === true).length;
+      if (enabledCount >= SKILL_MAX_ENABLED) {
+        return failure('SKILL_ENABLED_LIMIT', `only ${SKILL_MAX_ENABLED} skills can be on at once, because each one is added to every reply`);
+      }
+    }
+    if (typeof changes.enabled === 'boolean') skill.enabled = changes.enabled;
+    skill.updatedAt = new Date().toISOString();
+
+    const written = await writeStore('skills', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: skill };
+  });
+}
+
+/**
+ * @param {string} skillId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { id: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function deleteSkill(skillId, options = {}) {
+  if (typeof skillId !== 'string' || skillId.trim() === '') {
+    return failure('SKILL_INVALID_ID', 'deleting a skill needs its id');
+  }
+
+  return withChatLock(async () => {
+    const read = await readStore('skills', options);
+    if (!read.ok) return read;
+
+    const index = read.data.findIndex((entry) => entry?.id === skillId);
+    if (index === -1) return failure('SKILL_NOT_FOUND', `no skill with id ${skillId}`);
+
+    read.data.splice(index, 1);
+    const written = await writeStore('skills', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { id: skillId } };
+  });
+}
+
+/**
+ * Drop the newest message of a thread when it is an assistant reply, so that reply
+ * can be written again. A thread that ends on the person's own message is left as
+ * it is: there is nothing to regenerate, and removing their words would lose them.
+ * @param {string} threadId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { removed: boolean } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function removeTrailingReply(threadId, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'regenerating a reply needs a thread id');
+  }
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+
+    const messages = Array.isArray(thread.messages) ? thread.messages : [];
+    if (messages.at(-1)?.role !== 'assistant') return { ok: true, data: { removed: false } };
+
+    messages.pop();
+    thread.updatedAt = new Date().toISOString();
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { removed: true } };
   });
 }
 

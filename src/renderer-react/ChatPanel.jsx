@@ -22,10 +22,14 @@ import {
   PanelLeftOpenIcon,
   PaperclipIcon,
   PlusIcon,
+  PreviewIcon,
+  RegenerateIcon,
   SlashCommandIcon,
   StopIcon,
 } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
+import { ApprovalCard, ModeMenu, readChatMode, saveChatMode } from './ActControls.jsx';
+import ResultPanel from './ResultPanel.jsx';
 import { copyText } from './clipboard.js';
 // The app mark that sits above the opening line. Importing it lets the bundler
 // fingerprint the file and rewrite the URL relative to the built index.html,
@@ -220,8 +224,8 @@ function voiceErrorMessage(code) {
 
 const FILE_KIND_LABELS = { docx: 'Word document', xlsx: 'Excel spreadsheet', pptx: 'PowerPoint presentation', image: 'Image' };
 
-/** A file Zuri built in a reply: open it, find it in its folder, or save a copy elsewhere. */
-function FileCard({ file, api }) {
+/** A file Zuri built in a reply: preview it beside the chat, open it, find it, or save a copy. */
+function FileCard({ file, api, onPreview }) {
   const [note, setNote] = useState('');
   const run = async (action) => {
     if (typeof api?.files?.[action] !== 'function') return;
@@ -239,6 +243,9 @@ function FileCard({ file, api }) {
         </div>
       </div>
       <div className="flex flex-wrap gap-2">
+        {onPreview && file.kind !== 'image' && (
+          <Button size="sm" variant="secondary" onPress={() => onPreview(file)}><PreviewIcon size={14} />Preview</Button>
+        )}
         <Button size="sm" variant="secondary" onPress={() => void run('open')}>Open</Button>
         <Button size="sm" variant="ghost" onPress={() => void run('saveAs')}><DownloadIcon size={14} />Save as</Button>
         <Button size="sm" variant="ghost" onPress={() => void run('reveal')}><FolderIcon size={14} />Show in folder</Button>
@@ -305,6 +312,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [listening, setListening] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(-1);
   const [stopping, setStopping] = useState(false);
+  // Ask, Act or Autopilot, remembered on this computer. Only the full window shows the
+  // picker, so the quick-ask card always sends Ask and can never change anything.
+  const [mode, setMode] = useState(readChatMode);
+  // A step waiting for the person's yes or no, and the item open in the side panel.
+  const [approval, setApproval] = useState(null);
+  const [panelItem, setPanelItem] = useState(null);
+  const sendMode = compact ? 'ask' : mode;
   // The rewrite a person has now used often enough to be worth offering as their default.
   const [styleOffer, setStyleOffer] = useState(null);
   const [menuView, setMenuView] = useState('');
@@ -415,9 +429,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       if (typeof event.delta === 'string') setStreamingText((current) => current + event.delta);
       if (typeof event.status === 'string') setActivity(event.status);
       if (Array.isArray(event.files)) setStreamingFiles((current) => [...current, ...event.files]);
+      if (event.approval && typeof event.approval.id === 'string') setApproval(event.approval);
+      // Main closes a card itself when the step timed out or Stop was pressed.
+      if (typeof event.approvalClosed === 'string') {
+        setApproval((current) => (current?.id === event.approvalClosed ? null : current));
+      }
       if (event.done === true) {
         setReplying(false);
         setActivity('');
+        setApproval(null);
       }
     });
   }, [api, threadId]);
@@ -778,6 +798,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       const result = await api.chat.send({
         threadId: activeThreadId,
         webSearch,
+        mode: sendMode,
         ...(chatModel !== null ? { model: { provider: chatModel.provider, model: chatModel.model } } : {}),
       });
       if (!result?.ok) {
@@ -800,7 +821,88 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     } finally {
       setReplying(false);
       setStopping(false);
+      setApproval(null);
     }
+  }
+
+  /**
+   * Write the newest reply again.
+   *
+   * Main drops the old reply first so the model answers the person's last message,
+   * not its own earlier answer. If the new reply fails or is stopped, the stored chat
+   * no longer has the old one, so the transcript is re-read from the store rather
+   * than left showing a reply that is gone.
+   */
+  async function regenerateReply() {
+    if (replying || threadId === '' || typeof api?.chat?.send !== 'function') return;
+
+    setError('');
+    setStreamingText('');
+    setStreamingFiles([]);
+    setReplying(true);
+    setMessages((current) => (current.at(-1)?.role === 'assistant' ? current.slice(0, -1) : current));
+
+    try {
+      const result = await api.chat.send({
+        threadId,
+        webSearch,
+        mode: sendMode,
+        regenerate: true,
+        ...(chatModel !== null ? { model: { provider: chatModel.provider, model: chatModel.model } } : {}),
+      });
+      if (result?.ok) {
+        setMessages(Array.isArray(result.data?.thread?.messages) ? result.data.thread.messages : []);
+        onChatUpdated?.();
+        return;
+      }
+      if (result?.error?.code !== 'CHAT_STOPPED') setError(result?.error?.message ?? 'Zuri could not respond. Try again.');
+      const listed = await api.chats.list();
+      const stored = listed?.ok ? listed.data?.find((entry) => entry?.id === threadId) : null;
+      if (stored && Array.isArray(stored.messages)) setMessages(stored.messages);
+    } catch (sendError) {
+      setError(sendError?.message ?? 'Zuri could not respond.');
+    } finally {
+      setStreamingText('');
+      setStreamingFiles([]);
+      setReplying(false);
+      setStopping(false);
+      setApproval(null);
+    }
+  }
+
+  /** The person's answer to the step Zuri is waiting on. */
+  function answerApproval(approved) {
+    if (approval === null) return;
+    void api?.chat?.approve?.({ id: approval.id, approved });
+    setApproval(null);
+  }
+
+  function chooseMode(next) {
+    setMode(next);
+    saveChatMode(next);
+  }
+
+  /** Show a block of code from an answer in the side panel. */
+  function openCodeInPanel(block) {
+    setPanelItem({ title: block.language || 'Code', subtitle: 'From the answer', text: block.text });
+  }
+
+  /** Read a file Zuri made and show its text in the side panel. */
+  async function previewFile(file) {
+    setPanelItem({ title: file.name, subtitle: FILE_KIND_LABELS[file.kind] ?? 'File', text: '', loading: true, file });
+    if (typeof api?.tools?.run !== 'function') {
+      setPanelItem({ title: file.name, text: '', error: 'Previews need the Zuri desktop app.', file });
+      return;
+    }
+    const read = await api.tools.run({ name: 'readFile', args: { path: file.path } });
+    const text = read?.ok && typeof read.data?.text === 'string' ? read.data.text : '';
+    setPanelItem({
+      title: file.name,
+      subtitle: FILE_KIND_LABELS[file.kind] ?? 'File',
+      text,
+      error: text === '' ? (read?.error?.message ?? 'There is nothing to show for this file. Use Open to see it in its own app.') : '',
+      file,
+    });
   }
 
   async function sendMessage(event) {
@@ -972,7 +1074,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           </div>
         </div>
       )}
-      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
+      <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${panelItem !== null ? 'lg:pr-[28.5rem]' : ''} ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
         {!compact && !hasConversation && (
           <div className={`mb-6 flex w-full ${contentWidth} flex-col items-center`}>
             {/* The mark sits above the line rather than beside it: the heading is
@@ -1057,7 +1159,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                     <span className="px-1 text-xs text-muted">{zuriModelName(message.model.model)}</span>
                   )}
                   <div className="min-w-0 break-words rounded-2xl bg-surface-secondary px-4 py-3 text-sm text-foreground">
-                    <FormattedMessage content={message.content} />
+                    <FormattedMessage content={message.content} onOpenCode={compact ? undefined : openCodeInPanel} />
                   </div>
                   {Array.isArray(message.files) && message.files.map((file) => (
                     <div key={file.path} className="flex min-w-0 flex-col gap-2">
@@ -1069,7 +1171,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                           decoding="async"
                         />
                       )}
-                      <FileCard file={file} api={api} />
+                      <FileCard file={file} api={api} onPreview={compact ? undefined : previewFile} />
                     </div>
                   ))}
                   {/* Copy and the rewrite choices share one row, so the newest reply
@@ -1086,6 +1188,19 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                     >
                       {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
                     </Button>
+                    {index === lastAnswerIndex && !replying && (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 rounded-lg text-muted"
+                        aria-label="Regenerate reply"
+                        title="Write this reply again"
+                        onPress={() => void regenerateReply()}
+                      >
+                        <RegenerateIcon size={14} />
+                      </Button>
+                    )}
                     {index === lastAnswerIndex && !replying && QUICK_ADJUSTMENTS.map((adjustment) => (
                       <Button
                         key={adjustment.label}
@@ -1104,7 +1219,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             {streamingText !== '' && <div className="max-w-[85%] self-start rounded-2xl bg-surface-secondary px-4 py-3 text-sm"><FormattedMessage content={streamingText} /></div>}
             {streamingFiles.length > 0 && (
               <div className="flex max-w-[85%] flex-col gap-2 self-start">
-                {streamingFiles.map((file) => <FileCard key={file.path} file={file} api={api} />)}
+                {streamingFiles.map((file) => <FileCard key={file.path} file={file} api={api} onPreview={compact ? undefined : previewFile} />)}
               </div>
             )}
             {replying && activity !== '' && <p className="self-start text-sm text-muted">{activity}...</p>}
@@ -1115,6 +1230,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
         <div className={`w-full ${contentWidth} ${compact ? 'zuri-overlay-composer-wrap' : ''}`}>
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
+          {approval !== null && <ApprovalCard approval={approval} onAnswer={answerApproval} />}
           {styleOffer !== null && (
             <div role="status" className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm">
               <span className="flex-1">Make that your default for every answer?</span>
@@ -1227,6 +1343,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             buttons, and a fourth filled shape competed with them. The quick-ask popup is
             a 420px card that keeps its row to the basics, so the chip stays out of it and
             that window follows the model in Settings. */}
+            {!compact && <ModeMenu mode={mode} onChange={chooseMode} />}
             {!compact && (
             <div ref={modelMenuRef} className="relative shrink-0">
               <button
@@ -1301,6 +1418,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
         </div>
       </div>
+      {/* Beside the conversation on a wide window and over it on a narrow one, so a
+          result never squeezes the chat below a readable width. */}
+      {!compact && panelItem !== null && <ResultPanel item={panelItem} api={api} onClose={() => setPanelItem(null)} />}
     </main>
   );
 }

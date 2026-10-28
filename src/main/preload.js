@@ -39,6 +39,12 @@ const CHANNELS = Object.freeze([
   'zuri:chats:append-message',
   'zuri:chat:send',
   'zuri:chat:stop',
+  // The person's yes or no to a step the model wants to take in Act mode.
+  'zuri:chat:approve',
+  'zuri:skills:list',
+  'zuri:skills:create',
+  'zuri:skills:update',
+  'zuri:skills:delete',
   'zuri:settings:get',
   'zuri:settings:save',
   'zuri:onboarding:complete',

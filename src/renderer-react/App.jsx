@@ -14,6 +14,7 @@ import SignUpView from './SignUpView.jsx';
 import CloudView from './CloudView.jsx';
 import SignInView from './SignInView.jsx';
 import NewProjectView from './NewProjectView.jsx';
+import SkillsView from './SkillsView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const isOverlay = new URLSearchParams(window.location.search).has('overlay');
@@ -21,6 +22,8 @@ export default function App() {
   const [chatSessionKey, setChatSessionKey] = useState(0);
   const [activeThreadId, setActiveThreadId] = useState('');
   const [chatRefreshKey, setChatRefreshKey] = useState(0);
+  // The project the New project screen is editing; null means it creates a new one.
+  const [editingProject, setEditingProject] = useState(null);
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
   // The chat window toggles the sidebar from its own floating control, so the
   // state lives here rather than inside Sidebar where the chat view could not
@@ -91,6 +94,18 @@ export default function App() {
     void window.zuri?.settings?.save?.({ theme: next });
   }
 
+  // Opening the New project screen from the sidebar always starts a blank one, even
+  // if a project was being edited a moment ago.
+  function navigate(next) {
+    if (next === 'new-project') setEditingProject(null);
+    setRoute(next);
+  }
+
+  function editProject(project) {
+    setEditingProject(project);
+    setRoute('new-project');
+  }
+
   function startNewChat() {
     setRoute('chats');
     setActiveThreadId('');
@@ -142,9 +157,10 @@ export default function App() {
 
   return (
     <div className="flex h-dvh w-full bg-background text-foreground">
-      <Sidebar current={route} onNavigate={setRoute} onNewChat={startNewChat} onSelectThread={openThread} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
+      <Sidebar current={route} onNavigate={navigate} onNewChat={startNewChat} onSelectThread={openThread} onEditProject={editProject} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
       {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} onNewChat={startNewChat} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} openingKind={chatSessionKey % 2 === 0 ? 'greeting' : 'question'} />}
-      {route === 'new-project' && <NewProjectView onCreated={() => { refreshChats(); setRoute('chats'); }} />}
+      {route === 'new-project' && <NewProjectView key={editingProject?.id ?? 'new'} project={editingProject} onCreated={() => { setEditingProject(null); refreshChats(); setRoute('chats'); }} />}
+      {route === 'skills' && <SkillsView />}
       {route === 'agents' && <AgentsView />}
       {route === 'automations' && <AutomationsView />}
       {route === 'files' && <FilesView />}

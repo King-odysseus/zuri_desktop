@@ -64,7 +64,7 @@ function inlineContent(text, keyPrefix) {
   return pieces;
 }
 
-function CodeBlock({ language, lines }) {
+function CodeBlock({ language, lines, onOpen }) {
   const [state, setState] = useState('idle');
 
   async function copy() {
@@ -77,9 +77,18 @@ function CodeBlock({ language, lines }) {
     <div className="overflow-hidden rounded-xl bg-surface-tertiary">
       <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-1.5 text-xs text-muted">
         <span className="font-mono">{language || 'code'}</span>
-        <button type="button" onClick={() => void copy()} className="rounded px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground">
-          {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy'}
-        </button>
+        <span className="flex items-center gap-1">
+          {/* Only the desktop chat has a side panel to open it in; the web chat passes
+              nothing, so its code blocks keep the one Copy button they always had. */}
+          {onOpen && (
+            <button type="button" onClick={onOpen} className="rounded px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground">
+              Open in panel
+            </button>
+          )}
+          <button type="button" onClick={() => void copy()} className="rounded px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground">
+            {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy'}
+          </button>
+        </span>
       </div>
       <pre className="overflow-x-auto p-3 text-xs leading-relaxed">
         <code>{lines.join('\n')}</code>
@@ -105,12 +114,20 @@ function startsTable(lines, index) {
     && isSeparator(lines[index + 1]);
 }
 
-export default function FormattedMessage({ content }) {
+export default function FormattedMessage({ content, onOpenCode }) {
   const lines = String(content ?? '').replace(/\r\n?/g, '\n').split('\n');
   const blocks = [];
   let paragraph = [];
   let list = null;
   let code = null;
+
+  // Snapshot of the block at the moment it closes: the same `code` object is reused
+  // for the next fence, so the handler must read its own copy of the lines.
+  const openerFor = (block) => {
+    if (typeof onOpenCode !== 'function') return undefined;
+    const snapshot = { language: block.language, text: block.lines.join('\n') };
+    return () => onOpenCode(snapshot);
+  };
 
   const flushParagraph = () => {
     if (paragraph.length === 0) return;
@@ -146,7 +163,7 @@ export default function FormattedMessage({ content }) {
 
     if (code) {
       if (/^```/.test(line.trim())) {
-        blocks.push(<CodeBlock key={`code-${blocks.length}`} language={code.language} lines={code.lines} />);
+        blocks.push(<CodeBlock key={`code-${blocks.length}`} language={code.language} lines={code.lines} onOpen={openerFor(code)} />);
         code = null;
       } else {
         code.lines.push(line);
@@ -224,7 +241,7 @@ export default function FormattedMessage({ content }) {
   }
 
   if (code) {
-    blocks.push(<CodeBlock key={`code-${blocks.length}`} language={code.language} lines={code.lines} />);
+    blocks.push(<CodeBlock key={`code-${blocks.length}`} language={code.language} lines={code.lines} onOpen={openerFor(code)} />);
   }
   flushText();
 

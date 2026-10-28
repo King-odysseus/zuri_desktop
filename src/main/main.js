@@ -1,10 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeTheme, Notification, session, shell, Tray } from 'electron';
+import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeTheme, Notification, session, shell, Tray } from 'electron';
 import { existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { CHAT_STREAM_CHANNEL, askForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
+import { APPROVAL_TIMEOUT_MS, CHAT_STREAM_CHANNEL, askForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
 import { lastQuestion, replyThroughAccount, webSearchContext } from './providers/cloud-chat.js';
 import { readChatStream } from './providers/sse.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
@@ -22,6 +23,7 @@ import {
 import { startReminderTicker, stopReminderTicker } from './reminders.js';
 import { startScheduler, stopScheduler } from './scheduler.js';
 import {
+  OVERLAY_ACCELERATOR,
   TRAY_ITEM_IDS,
   TRAY_TOOLTIP,
   backgroundBalloon,
@@ -41,9 +43,11 @@ import {
   createAutomation,
   createProject,
   createReminder,
+  createSkill,
   createTask,
   createThread,
   deleteProject,
+  deleteSkill,
   deleteThread,
   deleteAutomation,
   deleteTask,
@@ -51,6 +55,7 @@ import {
   listNotifications,
   listProjects,
   listReminders,
+  listSkills,
   listTasks,
   listThreads,
   readSettings,
@@ -60,6 +65,7 @@ import {
   setThreadProject,
   updateAutomation,
   updateProject,
+  updateSkill,
   updateTask,
 } from './store.js';
 import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, resolveWorkspacePath, runTool, toolCatalogue } from './tools/index.js';
@@ -324,6 +330,11 @@ const HANDLERS = new Map([
   ['zuri:chats:append-message', handleChatAppendMessage],
   ['zuri:chat:send', handleChatSend],
   ['zuri:chat:stop', handleChatStop],
+  ['zuri:chat:approve', handleChatApprove],
+  ['zuri:skills:list', handleSkillList],
+  ['zuri:skills:create', handleSkillCreate],
+  ['zuri:skills:update', handleSkillUpdate],
+  ['zuri:skills:delete', handleSkillDelete],
   ['zuri:settings:get', handleSettingsGet],
   ['zuri:settings:save', handleSettingsSave],
   ['zuri:onboarding:complete', handleOnboardingComplete],
@@ -531,13 +542,13 @@ function handleProjectList() {
 }
 
 async function handleProjectCreate(payload) {
-  const result = await createProject({ name: payload?.name, icon: payload?.icon });
+  const result = await createProject({ name: payload?.name, icon: payload?.icon, instructions: payload?.instructions });
   if (result?.ok === true) announceState({ area: 'projects' });
   return result;
 }
 
 async function handleProjectUpdate(payload) {
-  const result = await updateProject(payload?.projectId, { name: payload?.name, icon: payload?.icon });
+  const result = await updateProject(payload?.projectId, { name: payload?.name, icon: payload?.icon, instructions: payload?.instructions });
   if (result?.ok === true) announceState({ area: 'projects' });
   return result;
 }
@@ -703,6 +714,13 @@ function handleChatSend(payload, event) {
     // settings.activeAgentId, which is the same id in the normal case.
     agentId: typeof payload?.agentId === 'string' ? payload.agentId : undefined,
     webSearch: payload?.webSearch === true,
+    // Ask, Act or Autopilot decides which tools are offered and which steps need a
+    // yes; an unknown value is treated as Ask inside the chat code.
+    mode: payload?.mode,
+    regenerate: payload?.regenerate === true,
+    // A step that needs the person's yes is put to them in the window that sent the
+    // message, and nowhere else.
+    requestApproval: (step) => askForApproval({ sender, threadId, signal: controller.signal }, step),
     // The composer's model chip pins a model for this chat. Without one the reply
     // uses the model chosen in Settings, so an older window keeps working.
     model: payload?.model !== null && typeof payload?.model === 'object'
@@ -750,6 +768,89 @@ function handleChatStop(payload) {
   controller.abort();
   activeReplies.delete(threadId);
   return { ok: true, data: { stopped: true } };
+}
+
+/**
+ * Steps waiting for the person's yes or no, by approval id. The id is random and is
+ * only ever sent to the window that owns the reply, so another window cannot answer
+ * a step it was never shown.
+ * @type {Map<string, { finish: (approved: boolean) => void }>}
+ */
+const pendingApprovals = new Map();
+
+/**
+ * Put one risky step to the person and wait for the answer.
+ *
+ * Every way out counts as a no: a closed window, Stop, or five minutes of silence.
+ * A step that was never answered must never run later.
+ * @param {{ sender: Electron.WebContents | undefined, threadId: string, signal: AbortSignal }} context
+ * @param {{ name: string, summary: string }} step
+ * @returns {Promise<boolean>}
+ */
+function askForApproval({ sender, threadId, signal }, step) {
+  return new Promise((resolve) => {
+    if (!sender || sender.isDestroyed() || signal?.aborted) {
+      resolve(false);
+      return;
+    }
+
+    const id = randomUUID();
+    let timer = null;
+    const onAbort = () => finish(false);
+    function finish(approved) {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      pendingApprovals.delete(id);
+      // Closes the card in the window when the answer did not come from it.
+      if (!sender.isDestroyed()) sender.send(CHAT_STREAM_CHANNEL, { threadId, approvalClosed: id });
+      resolve(approved);
+    }
+
+    timer = setTimeout(() => finish(false), APPROVAL_TIMEOUT_MS);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    pendingApprovals.set(id, { finish });
+    sender.send(CHAT_STREAM_CHANNEL, { threadId, approval: { id, name: step.name, summary: step.summary } });
+  });
+}
+
+/**
+ * The person's answer to an approval card.
+ * @param {{ id?: string, approved?: boolean }} [payload]
+ * @returns {{ ok: true, data: { settled: boolean } }}
+ */
+function handleChatApprove(payload) {
+  const waiting = typeof payload?.id === 'string' ? pendingApprovals.get(payload.id) : undefined;
+  // An answer to a step that already timed out or was stopped is not an error.
+  if (!waiting) return { ok: true, data: { settled: false } };
+  waiting.finish(payload.approved === true);
+  return { ok: true, data: { settled: true } };
+}
+
+/** Every saved skill, oldest first. */
+function handleSkillList() {
+  return listSkills();
+}
+
+async function handleSkillCreate(payload) {
+  const result = await createSkill({ name: payload?.name, instructions: payload?.instructions });
+  if (result?.ok === true) announceState({ area: 'skills' });
+  return result;
+}
+
+async function handleSkillUpdate(payload) {
+  const result = await updateSkill(payload?.skillId, {
+    name: payload?.name,
+    instructions: payload?.instructions,
+    enabled: payload?.enabled,
+  });
+  if (result?.ok === true) announceState({ area: 'skills' });
+  return result;
+}
+
+async function handleSkillDelete(payload) {
+  const result = await deleteSkill(payload?.skillId);
+  if (result?.ok === true) announceState({ area: 'skills' });
+  return result;
 }
 
 /**
@@ -1798,6 +1899,17 @@ function toggleOverlayFromTray() {
 }
 
 /**
+ * Make the shortcut the tray advertises a real one, so the quick-ask card opens from
+ * over any other program. Another program may already own the combination; the tray
+ * row still works then, so a refusal is logged and nothing else changes.
+ * @returns {void}
+ */
+function registerOverlayHotkey() {
+  const registered = globalShortcut.register(OVERLAY_ACCELERATOR, toggleOverlayFromTray);
+  if (!registered) console.warn(`[zuri:overlay] could not register ${OVERLAY_ACCELERATOR}; another program may be using it`);
+}
+
+/**
  * The tray's Quit row (0:13598): end the session rather than hide the window.
  * @returns {void}
  */
@@ -2041,6 +2153,8 @@ app.whenReady().then(async () => {
     console.error('[zuri:overlay]', error);
   }
 
+  registerOverlayHotkey();
+
   try {
     await resumeAddin(getStoreRoot(), (request) => askForAddin(request, { cloudReply: cloudChatReply }));
   } catch (error) {
@@ -2116,6 +2230,8 @@ app.on('will-quit', () => {
   stopReminderTicker();
   stopScheduler();
   closeOverlay();
+  // A shortcut left registered would keep swallowing the keys after Zuri has gone.
+  globalShortcut.unregisterAll();
   // An icon left behind in the notification area would outlive the process.
   if (tray !== null) {
     tray.destroy();

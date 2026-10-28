@@ -24,8 +24,8 @@ import path from 'node:path';
 
 import { DEFAULT_PROVIDER, PROVIDERS, getKey } from '../secrets.js';
 import { replyThroughAccount } from './cloud-chat.js';
-import { appendMessage, findAgent, readStore } from '../store.js';
-import { agentAllowedTools, runTool } from '../tools/index.js';
+import { appendMessage, findAgent, readStore, removeTrailingReply } from '../store.js';
+import { agentAllowedTools, runTool, TOOLS } from '../tools/index.js';
 
 /**
  * Tools the model may call on its own in chat, only when the person has switched web
@@ -132,23 +132,155 @@ const SUMMARY_TOOL = Object.freeze({
   },
 });
 
+const WRITE_TOOL = Object.freeze({
+  name: 'writeFile',
+  description:
+    'Save text or Markdown as a file inside the Zuri workspace folder. It replaces a file of the same name, so the person is asked first. ' +
+    'Use it only when they asked you to save or write something to a file.',
+  parameters: {
+    type: 'object',
+    properties: {
+      path: { type: 'string', description: 'File path inside the workspace, such as notes/plan.md.' },
+      content: { type: 'string', description: 'The full text to save.' },
+    },
+    required: ['path', 'content'],
+  },
+});
+
+const OPEN_URL_TOOL = Object.freeze({
+  name: 'openUrl',
+  description: 'Open a link in the default browser. Only links on the allow-list in Settings are accepted. Use it only when the person asks you to open something.',
+  parameters: {
+    type: 'object',
+    properties: { url: { type: 'string', description: 'Full http or https URL.' } },
+    required: ['url'],
+  },
+});
+
+const OPEN_APP_TOOL = Object.freeze({
+  name: 'openApp',
+  description: 'Start an application. Only app names on the allow-list in Settings are accepted. Use it only when the person asks you to open an app.',
+  parameters: {
+    type: 'object',
+    properties: { app: { type: 'string', description: 'The app name as it appears on the allow-list.' } },
+    required: ['app'],
+  },
+});
+
 /** Tools that produce a downloadable file; each success becomes a card under the reply. */
 const FILE_TOOLS = Object.freeze([DOCUMENT_TOOL, EDIT_TOOL]);
 const FILE_TOOL_NAMES = new Set(FILE_TOOLS.map((tool) => tool.name));
 
 /**
- * Everything offered with web search left off: building files and reading them.
- * Confirmation-gated tools stay out, because a streaming reply has nowhere to ask.
+ * Offered in every mode: building new files and reading them change nothing that
+ * already exists, so they need no approval.
  */
-const BASE_TOOLS = Object.freeze([...FILE_TOOLS, READ_TOOL, SUMMARY_TOOL]);
+const BASE_TOOLS = Object.freeze([DOCUMENT_TOOL, READ_TOOL, SUMMARY_TOOL]);
 
-// Ask and unattended Autopilot may inspect information but must not create or
-// edit files. Act is the explicit mode that allows the model to request changes;
-// the main-process confirmation gate still protects each destructive tool.
-const READ_ONLY_AUTOMATION_TOOLS = new Set(['webSearch', 'webFetch', 'readFile', 'summarizeDocument']);
+/**
+ * Tools that change or open something outside Zuri. They are only offered in Act and
+ * Autopilot, and the tool registry refuses each one until it is confirmed.
+ */
+const GATED_TOOLS = Object.freeze([EDIT_TOOL, WRITE_TOOL, OPEN_URL_TOOL, OPEN_APP_TOOL]);
 
 /** Every tool chat can run by name; which are offered on a given message is decided per send. */
 const ALL_CHAT_TOOLS = Object.freeze([...CHAT_TOOLS, ...BASE_TOOLS]);
+
+// Unattended automations in Ask or Autopilot may inspect information but must not
+// create files: nobody is watching, so nothing can be approved at the time.
+const READ_ONLY_AUTOMATION_TOOLS = new Set(['webSearch', 'webFetch', 'readFile', 'summarizeDocument']);
+
+/**
+ * The three ways a message can be sent. Ask answers and reads, Act may also change
+ * things once the person approves each step, and Autopilot skips the question for
+ * the steps whose damage is already limited.
+ */
+export const CHAT_MODES = Object.freeze(['ask', 'act', 'autopilot']);
+
+/**
+ * Autopilot only skips approval for steps that cannot destroy anything: an edit is
+ * written to a new copy, and a link or app has to be on the person's own allow-list
+ * in Settings. writeFile replaces a file, so it always asks, whatever the mode.
+ */
+const AUTOPILOT_AUTO_APPROVED = new Set(['editDocument', 'openUrl', 'openApp']);
+
+/** How long a step waits for an answer before it counts as a no. */
+export const APPROVAL_TIMEOUT_MS = 5 * 60_000;
+
+/**
+ * @param {unknown} value
+ * @returns {'ask'|'act'|'autopilot'} Anything unknown is Ask, the mode that changes nothing.
+ */
+export function normaliseChatMode(value) {
+  return CHAT_MODES.includes(value) ? value : 'ask';
+}
+
+/**
+ * The tools one message may offer. Ask is the old behaviour minus the edit tool,
+ * which could never run there because nothing asked for its approval.
+ * @param {string} mode
+ * @param {boolean} webSearch Whether the person switched web search on for this message.
+ * @returns {object[]}
+ */
+export function toolsForMode(mode, webSearch) {
+  const base = webSearch === true ? ALL_CHAT_TOOLS : BASE_TOOLS;
+  return normaliseChatMode(mode) === 'ask' ? [...base] : [...base, ...GATED_TOOLS];
+}
+
+/**
+ * One plain sentence for the approval card, so the person knows what they are
+ * allowing without reading the raw arguments.
+ * @param {string} name
+ * @param {Record<string, any>} args
+ * @returns {string}
+ */
+export function describeToolCall(name, args) {
+  const target = (value, fallback) => (typeof value === 'string' && value.trim() !== '' ? value.trim().slice(0, 120) : fallback);
+  switch (name) {
+    case 'editDocument':
+      return `Edit a copy of ${path.basename(target(args?.path, 'your file'))} (the original stays as it is)`;
+    case 'writeFile':
+      return `Save ${target(args?.path, 'a file')} in your workspace, replacing it if it already exists`;
+    case 'openUrl':
+      return `Open ${target(args?.url, 'a link')} in your browser`;
+    case 'openApp':
+      return `Start ${target(args?.app, 'an app')}`;
+    default:
+      return `Run ${name}`;
+  }
+}
+
+/**
+ * Decide whether a tool call may run now.
+ *
+ * Tools that change nothing run straight away. A gated tool needs a yes: Autopilot
+ * gives that yes for the limited-damage steps, and every other case asks the person
+ * through `requestApproval`. No way to ask means no, so a missing approver can never
+ * turn into a silent yes.
+ * @param {{ name: string, args: Record<string, any>, mode: string, requestApproval?: Function }} call
+ * @returns {Promise<{ run: boolean, confirmed: boolean, reason?: string }>}
+ */
+export async function approveToolCall({ name, args, mode, requestApproval }) {
+  const tool = TOOLS.find((entry) => entry.name === name);
+  if (!tool?.requiresConfirmation) return { run: true, confirmed: false };
+
+  const chosenMode = normaliseChatMode(mode);
+  if (chosenMode === 'ask') return { run: false, confirmed: false, reason: `${name} is not available in Ask mode. Switch to Act to allow it.` };
+  if (chosenMode === 'autopilot' && AUTOPILOT_AUTO_APPROVED.has(name)) return { run: true, confirmed: true };
+  if (typeof requestApproval !== 'function') return { run: false, confirmed: false, reason: `${name} needs your approval, and this window cannot ask for it.` };
+
+  const approved = await requestApproval({ name, summary: describeToolCall(name, args) });
+  return approved === true
+    ? { run: true, confirmed: true }
+    : { run: false, confirmed: false, reason: 'The person did not approve this step. Do not retry it; say what you did instead.' };
+}
+
+/** What the model is told about its mode, so it does not promise what the mode forbids. */
+const MODE_PROMPTS = Object.freeze({
+  ask: '',
+  act: 'You are in Act mode. You may use tools to change things for the person: edit a copy of a document, save a file, open a link or an app. The person is asked to approve each of those steps, so propose them plainly and do not retry a step that was declined.',
+  autopilot: 'You are in Autopilot mode. You may use tools to edit a copy of a document and to open allowed links and apps without asking. Saving a file over an existing one still needs the person to approve it. Work through the task, then say what you did.',
+});
 
 /** Each extra round is another paid model call, so the loop is capped hard. */
 const MAX_TOOL_ROUNDS = 4;
@@ -303,13 +435,18 @@ export const ZURI_IDENTITY_PROMPT = [
  * Order is deliberate: identity first, then the picked agent, then any prompt the
  * thread itself carries, then the facts and style the app supplies, and the
  * language rule last so nothing above it can switch languages by accident.
- * @param {{ agentPrompt?: string, threadPrompt?: string, settings?: object, now?: Date }} [parts]
+ * Project instructions and switched-on skills sit right after the agent: they are the
+ * person's own standing wishes for this work, so they come before the thread's prompt
+ * and the app's own style block.
+ * @param {{ agentPrompt?: string, projectPrompt?: string, skillsPrompt?: string, threadPrompt?: string, settings?: object, now?: Date }} [parts]
  * @returns {string}
  */
 export function chatSystemPrompt(parts = {}) {
   return [
     ZURI_IDENTITY_PROMPT,
     parts.agentPrompt,
+    parts.projectPrompt,
+    parts.skillsPrompt,
     parts.threadPrompt,
     currentTimeContext(parts.now instanceof Date ? parts.now : new Date()),
     answerStylePolicy(parts.settings ?? {}),
@@ -318,6 +455,31 @@ export function chatSystemPrompt(parts = {}) {
     .map((part) => (typeof part === 'string' ? part.trim() : ''))
     .filter((part) => part !== '')
     .join('\n\n');
+}
+
+/**
+ * The block that carries the person's switched-on skills into a reply.
+ * @param {Array<{ name?: string, instructions?: string, enabled?: boolean }>} skills
+ * @returns {string} Empty when no skill is on, so a reply without skills is unchanged.
+ */
+export function skillsPolicy(skills) {
+  const active = (Array.isArray(skills) ? skills : []).filter(
+    (skill) => skill?.enabled === true && typeof skill.instructions === 'string' && skill.instructions.trim() !== '',
+  );
+  if (active.length === 0) return '';
+  const lines = active.map((skill) => `- ${String(skill.name ?? 'Skill').trim()}: ${skill.instructions.trim()}`);
+  return `The person has switched on these skills. Follow them whenever they apply:\n${lines.join('\n')}`;
+}
+
+/**
+ * The block that carries a project's own instructions into every chat filed under it.
+ * @param {{ name?: string, instructions?: string } | null | undefined} project
+ * @returns {string}
+ */
+export function projectPolicy(project) {
+  const instructions = typeof project?.instructions === 'string' ? project.instructions.trim() : '';
+  if (instructions === '') return '';
+  return `This chat belongs to the project "${String(project.name ?? '').trim()}". Follow its instructions: ${instructions}`;
 }
 
 /** Provider error bodies are trimmed to this before they reach a bubble. */
@@ -1182,6 +1344,16 @@ export async function sendChatMessage(threadId, options = {}) {
 
   const emit = typeof options.emit === 'function' ? options.emit : () => {};
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
+  const mode = normaliseChatMode(options.mode);
+  /** Files the tools build this turn; filled by the account loop and saved with the reply. */
+  const builtFiles = [];
+
+  // Regenerate writes the newest reply again: the old one goes first, so the model
+  // answers the person's last message and not its own previous answer.
+  if (options.regenerate === true) {
+    const dropped = await removeTrailingReply(threadId);
+    if (!dropped.ok) return dropped;
+  }
 
   const listed = await readStore('chats');
   if (!listed.ok) return listed;
@@ -1215,11 +1387,23 @@ export async function sendChatMessage(threadId, options = {}) {
   // An agent's system prompt rides in front of any the thread already carries, so
   // the picked agent decides how the reply is written without losing the thread's
   // own. Zuri's identity is added inside chatSystemPrompt, ahead of both.
+  // A project's instructions and the person's switched-on skills are read fresh for
+  // every reply, so changing either takes effect on the very next message. A store
+  // that cannot be read leaves the reply without them rather than failing it.
+  const skillsStore = await readStore('skills');
+  const projectsStore = await readStore('projects');
+  const project = projectsStore.ok && typeof thread.projectId === 'string'
+    ? projectsStore.data.find((entry) => entry?.id === thread.projectId) ?? null
+    : null;
+
   conversation.system = chatSystemPrompt({
     agentPrompt: agent !== null ? agent.systemPrompt : '',
+    projectPrompt: projectPolicy(project),
+    skillsPrompt: skillsPolicy(skillsStore.ok ? skillsStore.data : []),
     threadPrompt: conversation.system,
     settings: modelSettings,
   });
+  if (MODE_PROMPTS[mode] !== '') conversation.system = `${conversation.system}\n\n${MODE_PROMPTS[mode]}`;
 
   // Desktop chat must always use the signed-in account route. Keeping a direct
   // provider fallback here would let an older caller bypass Railway and revive the
@@ -1239,7 +1423,7 @@ export async function sendChatMessage(threadId, options = {}) {
       // run here, on this computer, because that is where the workspace is; the
       // server only ever forwards the definitions and returns the request.
       const allowedForAccount = agentAllowedTools(settings, options.agentId);
-      const offeredForAccount = (options.webSearch === true ? ALL_CHAT_TOOLS : BASE_TOOLS)
+      const offeredForAccount = toolsForMode(mode, options.webSearch)
         .filter((tool) => allowedForAccount === null || allowedForAccount.includes(tool.name));
 
       // The wire conversation grows as rounds go by: an assistant turn that asked
@@ -1270,9 +1454,15 @@ export async function sendChatMessage(threadId, options = {}) {
         for (const call of calls) {
           const args = parseToolInput(call.arguments);
           const offered = offeredForAccount.some((tool) => tool.name === call.name);
-          const outcome = offered
-            ? await runTool(call.name, args, { allowedTools: allowedForAccount })
-            : failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
+          // The mode and the person decide whether a risky step runs; the registry
+          // still refuses it unless `confirmed` is set, so this is the only way in.
+          const decision = offered
+            ? await approveToolCall({ name: call.name, args, mode, requestApproval: options.requestApproval })
+            : null;
+          let outcome;
+          if (decision === null) outcome = failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
+          else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed });
+          else outcome = failure('TOOL_DECLINED', decision.reason);
           const madeFile = FILE_TOOL_NAMES.has(call.name) && outcome.ok;
           if (madeFile) {
             const { path: filePath, name, kind, bytes } = outcome.data;
@@ -1309,7 +1499,7 @@ export async function sendChatMessage(threadId, options = {}) {
     const saved = await appendMessage(threadId, {
       role: 'assistant',
       content: reached.data.content,
-      files: [],
+      files: builtFiles,
       // Saved with the reply so the chip can name the model that answered, and so
       // reopening this chat sends the next message to the same one.
       model: { provider: modelSettings.provider, model: modelSettings.model },
@@ -1336,7 +1526,6 @@ export async function sendChatMessage(threadId, options = {}) {
   const allowedTools = agentAllowedTools(settings, options.agentId);
   const candidateTools = options.webSearch === true ? ALL_CHAT_TOOLS : BASE_TOOLS;
   const tools = candidateTools.filter((tool) => allowedTools === null || allowedTools.includes(tool.name));
-  const builtFiles = [];
 
   // Text from every round is kept because it was all streamed to the window, so the
   // saved message matches what the person watched arrive.

@@ -45,4 +45,8 @@ export {
   Code as CodeIcon,
   ChartColumn as ChartIcon,
   Lightbulb as IdeaIcon,
+  RotateCw as RegenerateIcon,
+  Sparkles as SkillsIcon,
+  Eye as PreviewIcon,
+  ShieldCheck as ApprovalIcon,
 } from 'lucide-react';

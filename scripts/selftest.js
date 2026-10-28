@@ -658,10 +658,13 @@ check('an Anthropic model is offered tools in its own shape, not an empty list',
   if (read.function !== undefined) throw new Error('the OpenAI wrapper was sent to Anthropic');
   if (typeof read.input_schema?.properties?.path !== 'object') throw new Error('input_schema was not built');
   // The free tools travel without web search being switched on.
-  for (const name of ['summarizeDocument', 'createDocument', 'editDocument']) {
+  for (const name of ['summarizeDocument', 'createDocument']) {
     if (!body.tools.some((tool) => tool.name === name)) throw new Error(`${name} was not offered`);
   }
-  if (body.tools.some((tool) => tool.name === 'writeFile')) throw new Error('a confirmation-gated tool was offered');
+  // Nobody is there to approve a step in an unattended run, so none that needs it is offered.
+  for (const name of ['writeFile', 'editDocument', 'openUrl', 'openApp']) {
+    if (body.tools.some((tool) => tool.name === name)) throw new Error(`a confirmation-gated tool was offered: ${name}`);
+  }
 });
 
 check('an Anthropic tool_use is answered with a tool_result in the next user turn', () => {
@@ -1005,42 +1008,242 @@ check('a chat is answered by the model picked for it, and the reply records it',
 // A project is only a folder for chats: moving a chat in and out has to keep its
 // messages, and deleting the project must hand its chats back rather than lose them.
 check('chats move into a project and survive the project being deleted', async () => {
-  const { getStoreRoot, setStoreRoot, createThread, appendMessage, readStore, listProjects, createProject, deleteProject, setThreadProject } =
+  const { createThread, appendMessage, readStore, listProjects, createProject, deleteProject, setThreadProject } =
     await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
-  const previousRoot = getStoreRoot();
+  // Its own folder passed to every call, never the shared store root: checks run
+  // side by side, and moving the shared root would make them read each other's data.
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-projects-'));
+  const here = { root: scratch };
   try {
-    setStoreRoot(scratch);
-    const blank = await createProject({ name: '   ' });
+    const blank = await createProject({ name: '   ' }, here);
     if (blank.ok) throw new Error('a project with a blank name was accepted');
 
-    const project = await createProject({ name: '  Launch   plan ', icon: 'nonsense' });
+    const project = await createProject({ name: '  Launch   plan ', icon: 'nonsense' }, here);
     if (!project.ok) throw new Error('a project could not be created');
     if (project.data.name !== 'Launch plan') throw new Error(`the name was not tidied: ${project.data.name}`);
     if (project.data.icon !== 'folder') throw new Error('an unknown icon was stored instead of the default');
 
-    const thread = (await createThread({ title: 'Plan' })).data;
-    await appendMessage(thread.id, { role: 'user', content: 'Hello' });
+    const thread = (await createThread({ title: 'Plan' }, here)).data;
+    await appendMessage(thread.id, { role: 'user', content: 'Hello' }, here);
 
-    const missing = await setThreadProject(thread.id, 'no-such-project');
+    const missing = await setThreadProject(thread.id, 'no-such-project', here);
     if (missing.ok) throw new Error('a chat was moved into a project that does not exist');
 
-    const moved = await setThreadProject(thread.id, project.data.id);
+    const moved = await setThreadProject(thread.id, project.data.id, here);
     if (!moved.ok || moved.data.projectId !== project.data.id) throw new Error('the chat was not filed in the project');
 
-    const removed = await deleteProject(project.data.id);
+    const removed = await deleteProject(project.data.id, here);
     if (!removed.ok) throw new Error('the project could not be deleted');
-    if ((await listProjects()).data.length !== 0) throw new Error('the deleted project is still listed');
+    if ((await listProjects(here)).data.length !== 0) throw new Error('the deleted project is still listed');
 
-    const kept = (await readStore('chats')).data.find((entry) => entry.id === thread.id);
+    const kept = (await readStore('chats', here)).data.find((entry) => entry.id === thread.id);
     if (!kept || kept.messages.length !== 1) throw new Error('deleting the project lost the chat or its messages');
     if (kept.projectId !== undefined) throw new Error('the chat still points at the deleted project');
     return 'chats can be filed, and outlive their project';
   } finally {
-    setStoreRoot(previousRoot);
     fs.rmSync(scratch, { recursive: true, force: true });
   }
 });
+
+// Ask, Act and Autopilot decide which tools a message may use and which steps need a
+// yes. These are pure decisions, so they are checked without any model or store.
+check('modes decide which tools are offered and which steps need approval', async () => {
+  const { toolsForMode, approveToolCall, normaliseChatMode } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+  const gated = ['editDocument', 'writeFile', 'openUrl', 'openApp'];
+  const names = (mode, web = false) => toolsForMode(mode, web).map((tool) => tool.name);
+
+  if (normaliseChatMode('shout') !== 'ask' || normaliseChatMode(undefined) !== 'ask') throw new Error('an unknown mode did not fall back to Ask');
+  for (const name of gated) {
+    if (names('ask').includes(name)) throw new Error(`Ask offered ${name}`);
+    if (!names('act').includes(name) || !names('autopilot').includes(name)) throw new Error(`${name} was not offered to Act and Autopilot`);
+  }
+  if (!names('ask').includes('createDocument') || !names('ask').includes('readFile')) throw new Error('Ask lost the tools that change nothing');
+  if (names('ask').includes('webSearch') || !names('ask', true).includes('webSearch')) throw new Error('web search did not follow its switch');
+
+  let asked = 0;
+  const yes = async () => { asked += 1; return true; };
+  const no = async () => { asked += 1; return false; };
+
+  const read = await approveToolCall({ name: 'readFile', args: {}, mode: 'ask', requestApproval: yes });
+  if (!read.run || asked !== 0) throw new Error('a reading tool was held up for approval');
+
+  const inAsk = await approveToolCall({ name: 'writeFile', args: {}, mode: 'ask', requestApproval: yes });
+  if (inAsk.run || asked !== 0) throw new Error('Ask let a risky step through, or asked about one');
+
+  const allowed = await approveToolCall({ name: 'writeFile', args: { path: 'a.md' }, mode: 'act', requestApproval: yes });
+  if (!allowed.run || !allowed.confirmed || asked !== 1) throw new Error('Act did not run a step the person approved');
+
+  const refused = await approveToolCall({ name: 'writeFile', args: { path: 'a.md' }, mode: 'act', requestApproval: no });
+  if (refused.run || !refused.reason) throw new Error('Act ran a step the person refused');
+
+  const nobody = await approveToolCall({ name: 'openUrl', args: {}, mode: 'act' });
+  if (nobody.run) throw new Error('a step ran with nobody to ask');
+
+  const before = asked;
+  const auto = await approveToolCall({ name: 'editDocument', args: {}, mode: 'autopilot', requestApproval: no });
+  if (!auto.run || asked !== before) throw new Error('Autopilot asked about a copy-only edit');
+  const overwrite = await approveToolCall({ name: 'writeFile', args: {}, mode: 'autopilot', requestApproval: no });
+  if (overwrite.run || asked !== before + 1) throw new Error('Autopilot replaced a file without asking');
+  return 'Ask never changes things, Act asks every time, Autopilot never overwrites unasked';
+});
+
+// Skills and project instructions only matter if they reach the model, and a skill must
+// not be able to cost more than the limits promise.
+check('skills and project instructions are saved with limits and reach the prompt', async () => {
+  const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const { skillsPolicy, projectPolicy, chatSystemPrompt: build } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-skills-'));
+  const here = { root: scratch };
+  try {
+    if ((await store.createSkill({ name: ' ', instructions: 'x' }, here)).ok) throw new Error('a nameless skill was saved');
+    if ((await store.createSkill({ name: 'x', instructions: '  ' }, here)).ok) throw new Error('an empty skill was saved');
+
+    const made = [];
+    for (let index = 0; index < 6; index += 1) {
+      const created = await store.createSkill({ name: `Skill ${index}`, instructions: `Do thing ${index}` }, here);
+      if (!created.ok) throw new Error(created.error.message);
+      if (created.data.enabled !== false) throw new Error('a new skill started switched on');
+      made.push(created.data);
+    }
+    for (const skill of made.slice(0, store.SKILL_MAX_ENABLED)) {
+      const on = await store.updateSkill(skill.id, { enabled: true }, here);
+      if (!on.ok) throw new Error(on.error.message);
+    }
+    const sixth = await store.updateSkill(made[5].id, { enabled: true }, here);
+    if (sixth.ok || sixth.error.code !== 'SKILL_ENABLED_LIMIT') throw new Error('a sixth skill was switched on');
+
+    const listed = (await store.listSkills(here)).data;
+    if (listed.map((skill) => skill.name).join() !== made.map((skill) => skill.name).join()) throw new Error('the list order changed when skills were switched on');
+
+    const policy = skillsPolicy(listed);
+    if (!policy.includes('Do thing 0') || policy.includes('Do thing 5')) throw new Error('only switched-on skills belong in the prompt');
+    if (skillsPolicy([{ name: 'a', instructions: 'b', enabled: false }]) !== '') throw new Error('an off skill reached the prompt');
+
+    const project = (await store.createProject({ name: 'Maths', instructions: '  Answer as a patient tutor.  ' }, here)).data;
+    if (project.instructions !== 'Answer as a patient tutor.') throw new Error('project instructions were not trimmed');
+    const changed = await store.updateProject(project.id, { instructions: 'Use metric units.' }, here);
+    if (changed.data.instructions !== 'Use metric units.' || changed.data.name !== 'Maths') throw new Error('editing instructions lost the name');
+    if (!projectPolicy(changed.data).includes('Use metric units.')) throw new Error('project instructions did not reach the policy');
+
+    const prompt = build({ projectPrompt: projectPolicy(changed.data), skillsPrompt: policy });
+    if (!prompt.startsWith(ZURI_IDENTITY_PROMPT) || !prompt.includes('Use metric units.') || !prompt.includes('Do thing 0')) {
+      throw new Error('the prompt is missing the identity, the project or the skills');
+    }
+
+    const removed = await store.deleteSkill(made[0].id, here);
+    if (!removed.ok || (await store.listSkills(here)).data.length !== 5) throw new Error('a skill was not deleted');
+    return 'five on at most, names and text required, instructions reach the prompt';
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+check('regenerate drops only a trailing reply and never the person\'s own message', async () => {
+  const { createThread, appendMessage, removeTrailingReply, readStore } = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-regen-'));
+  const here = { root: scratch };
+  try {
+    const thread = (await createThread({ title: 'Regen' }, here)).data;
+    await appendMessage(thread.id, { role: 'user', content: 'Question' }, here);
+    const onlyUser = await removeTrailingReply(thread.id, here);
+    if (!onlyUser.ok || onlyUser.data.removed !== false) throw new Error('the person\'s own message was treated as a reply');
+    await appendMessage(thread.id, { role: 'assistant', content: 'Answer' }, here);
+    const dropped = await removeTrailingReply(thread.id, here);
+    if (!dropped.ok || dropped.data.removed !== true) throw new Error('the reply was not removed');
+    const kept = (await readStore('chats', here)).data.find((entry) => entry.id === thread.id);
+    if (kept.messages.length !== 1 || kept.messages[0].role !== 'user') throw new Error('the wrong message was removed');
+    return 'only a trailing reply goes';
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+// The whole path in one go, on the real send code with a stand-in account. It uses the
+// shared store location, so the checks around it must be finished first and this one
+// must finish before the next starts.
+await Promise.all(pendingChecks);
+check('a reply in Act mode builds files, asks before editing, and carries skills and project rules', async () => {
+  const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const { sendChatMessage } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+  const previousRoot = store.getStoreRoot();
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-act-'));
+  try {
+    store.setStoreRoot(scratch);
+    const project = (await store.createProject({ name: 'Reports', instructions: 'Keep every report to one page.' })).data;
+    const skill = (await store.createSkill({ name: 'Plain', instructions: 'Use plain English.' })).data;
+    await store.updateSkill(skill.id, { enabled: true });
+    const thread = (await store.createThread({ title: 'Act' })).data;
+    await store.setThreadProject(thread.id, project.id);
+    await store.appendMessage(thread.id, { role: 'user', content: 'Make a report, then fix a typo in my file.' });
+
+    /** A stand-in account: each scripted round is what the model "says", and every request is kept. */
+    const converse = (script) => {
+      const requests = [];
+      const cloudReply = async (request) => {
+        requests.push({ system: request.conversation.system, tools: request.tools.map((tool) => tool.name), turns: JSON.parse(JSON.stringify(request.conversation.turns)) });
+        return { ok: true, data: script[Math.min(requests.length - 1, script.length - 1)] };
+      };
+      return { requests, cloudReply };
+    };
+    const askedFor = [];
+
+    // Act, approved: a file is built, then a copy of an existing file is edited after a yes.
+    const approved = converse([
+      { content: '', toolCalls: [{ id: 'c1', name: 'createDocument', arguments: JSON.stringify({ kind: 'docx', fileName: 'report', content: OFFICE_SAMPLES.docx }) }] },
+      { content: '', toolCalls: [{ id: 'c2', name: 'editDocument', arguments: JSON.stringify({ path: madeDocx.data.path, edits: [{ find: 'Intro', replace: 'Summary' }] }) }] },
+      { content: 'All done.', modelCode: 'zuri-flash' },
+    ]);
+    const first = await sendChatMessage(thread.id, {
+      mode: 'act',
+      cloudReply: approved.cloudReply,
+      requestApproval: async (step) => { askedFor.push(step); return true; },
+    });
+    if (!first.ok) throw new Error(first.error?.message ?? 'the reply failed');
+    const reply = first.data.thread.messages.at(-1);
+    if (!Array.isArray(reply.files) || reply.files.length !== 2) throw new Error(`the reply carried ${reply.files?.length} files, expected the built one and the edited copy`);
+    if (askedFor.length !== 1 || askedFor[0].name !== 'editDocument') throw new Error('only the edit should have needed a yes');
+    const system = approved.requests[0].system;
+    for (const expected of ['Keep every report to one page.', 'Use plain English.', 'Act mode']) {
+      if (!system.includes(expected)) throw new Error(`the prompt is missing "${expected}"`);
+    }
+    if (!approved.requests[0].tools.includes('editDocument')) throw new Error('Act was not offered the edit tool');
+
+    // Act, refused: the step does not run and the model is told so.
+    await store.appendMessage(thread.id, { role: 'user', content: 'Edit it again.' });
+    const refusedRun = converse([
+      { content: '', toolCalls: [{ id: 'c3', name: 'editDocument', arguments: JSON.stringify({ path: madeDocx.data.path, edits: [{ find: 'Intro', replace: 'Nope' }] }) }] },
+      { content: 'Understood, I left it alone.' },
+    ]);
+    const second = await sendChatMessage(thread.id, { mode: 'act', cloudReply: refusedRun.cloudReply, requestApproval: async () => false });
+    if (!second.ok) throw new Error(second.error?.message ?? 'the second reply failed');
+    // A reply with no files carries no `files` field at all, so absence is the pass.
+    if ((second.data.thread.messages.at(-1).files ?? []).length !== 0) throw new Error('a refused edit still made a file');
+    const told = refusedRun.requests[1].turns.at(-1)?.content ?? '';
+    if (!told.includes('TOOL_DECLINED')) throw new Error('the model was not told the step was declined');
+
+    // Ask: the risky tools are not even offered, so there is nothing to approve.
+    await store.appendMessage(thread.id, { role: 'user', content: 'And in Ask mode?' });
+    const asking = converse([{ content: 'Just an answer.' }]);
+    const third = await sendChatMessage(thread.id, { mode: 'ask', cloudReply: asking.cloudReply });
+    if (!third.ok) throw new Error(third.error?.message ?? 'the Ask reply failed');
+    if (asking.requests[0].tools.some((name) => ['editDocument', 'writeFile', 'openUrl', 'openApp'].includes(name))) throw new Error('Ask was offered a risky tool');
+    if (asking.requests[0].system.includes('Act mode')) throw new Error('Ask was told it is in Act mode');
+
+    // Regenerate: the old reply is replaced, and the model never sees it as history.
+    const countBefore = third.data.thread.messages.length;
+    const again = converse([{ content: 'A fresh answer.' }]);
+    const redone = await sendChatMessage(thread.id, { mode: 'ask', regenerate: true, cloudReply: again.cloudReply });
+    if (!redone.ok) throw new Error(redone.error?.message ?? 'regenerate failed');
+    if (redone.data.thread.messages.length !== countBefore) throw new Error('regenerating added a message instead of replacing one');
+    if (JSON.stringify(again.requests[0].turns).includes('Just an answer.')) throw new Error('the model saw the reply it was replacing');
+    if (redone.data.thread.messages.at(-1).content !== 'A fresh answer.') throw new Error('the new reply was not saved');
+    return 'files saved with the reply, edit asked first, refusal reported, skills and project rules sent';
+  } finally {
+    store.setStoreRoot(previousRoot);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+await Promise.all(pendingChecks);
 
 // The chip has to sit in the message row and offer the one catalogue, or a person
 // has to leave the chat to change model, which is what this change removes.

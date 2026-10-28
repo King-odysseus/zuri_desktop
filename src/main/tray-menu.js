@@ -38,13 +38,13 @@ export const HIDE_OVERLAY_LABEL = 'Hide overlay';
 export const QUIT_LABEL = 'Quit';
 
 /**
- * The shortcut hints the design prints at the right of its rows. They are shown,
- * not registered: a tray menu item is not a global shortcut, and the overlay's
- * shortcut belongs to whoever sets it, so `registerAccelerator` stays off in the
- * template built from these.
+ * The shortcut hints the design prints at the right of its rows. The menu only shows
+ * them (`registerAccelerator` stays off in the template built from these); main.js
+ * registers the overlay one as a real global shortcut. It is not Win+Space, which
+ * Windows keeps for switching the keyboard language and never hands to an app.
  */
 export const NEW_CHAT_ACCELERATOR = 'Control+N';
-export const OVERLAY_ACCELERATOR = 'Super+Space';
+export const OVERLAY_ACCELERATOR = 'Control+Alt+Space';
 
 /** The balloon's first two lines (0:13689, 0:13690). */
 export const BALLOON_TITLE = 'Zuri is running in the background';
