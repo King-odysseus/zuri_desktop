@@ -3,7 +3,7 @@ import Footer from '../components/Footer.jsx';
 import DownloadList from '../components/DownloadList.jsx';
 import ImagePrices from '../components/ImagePrices.jsx';
 import PlanCard from '../components/PlanCard.jsx';
-import { Button, Chip, UsageBar } from '../components/ui.jsx';
+import { Button, UsageBar } from '../components/ui.jsx';
 import {
   ArrowRightIcon,
   BoltIcon,
@@ -13,8 +13,14 @@ import {
   CheckIcon,
   DeviceIcon,
   GlobeIcon,
+  FolderIcon,
   LogoMark,
+  MessageIcon,
+  SendIcon,
+  SettingsIcon,
   SparkIcon,
+  TaskIcon,
+  BellIcon,
 } from '../components/Icons.jsx';
 import { fetchImagePrices } from '../lib/api.js';
 import { planImageLines } from '../lib/format.js';
@@ -63,6 +69,94 @@ const STATS = [
   { value: '4', label: 'plans, priced in Naira' },
   { value: '6', label: 'Zuri models, one account' },
 ];
+
+// The frame colour of the preview. The theme attribute, not a class, switches the
+// site's dark mode, so the dark variant is written against [data-theme=dark].
+const NAVY = 'bg-[#0b1f3a] [[data-theme=dark]_&]:bg-[#0a1226]';
+const RAIL_ICONS = [MessageIcon, TaskIcon, BellIcon, FolderIcon, SettingsIcon];
+const BAR_HEIGHTS = ['h-[40%]', 'h-[62%]', 'h-[48%]', 'h-[80%]', 'h-[58%]', 'h-[92%]'];
+const PREVIEW_CARDS = [
+  { title: 'Writing sprint', note: 'Brief in progress' },
+  { title: 'Design review', note: '3 updates' },
+  { title: 'Launch plan', note: 'On track' },
+];
+const CALENDAR_ROWS = [
+  ['14', 'Creating app design'],
+  ['19', 'Meeting with a client'],
+];
+const CARD = 'min-w-0 rounded-xl border border-hairline bg-surface shadow-sm';
+
+/**
+ * A still of the desktop app drawn with Tailwind utilities and the site's colour
+ * tokens: the same rail, greeting and message box a customer sees after installing.
+ * The copy beside it carries the meaning, so the panel is hidden from assistive tech.
+ */
+function AppPreview() {
+  return (
+    <div className="flex items-center justify-center py-2" aria-hidden="true">
+      <div className="w-full overflow-hidden rounded-2xl border border-hairline bg-surface shadow-xl">
+        <div className={`flex gap-1.5 px-4 py-3 ${NAVY}`}>
+          <i className="size-2.5 rounded-full bg-white/30" />
+          <i className="size-2.5 rounded-full bg-white/30" />
+          <i className="size-2.5 rounded-full bg-white/30" />
+        </div>
+        <div className="grid grid-cols-[48px_minmax(0,1fr)]">
+          <div className={`flex flex-col items-center gap-1.5 py-3 ${NAVY}`}>
+            {RAIL_ICONS.map((Icon, index) => (
+              <span
+                key={index}
+                className={`grid size-8 place-items-center rounded-full [&_svg]:size-4 ${index === 0 ? 'bg-accent-soft text-accent-hover' : 'text-white/70'}`}
+              >
+                <Icon />
+              </span>
+            ))}
+          </div>
+          <div className="flex min-w-0 flex-col items-center gap-2 bg-canvas px-4 pb-4 pt-6">
+            <LogoMark size={40} className="rounded-xl" />
+            <strong className="text-xl font-medium tracking-tight text-body">Good morning, Tolu</strong>
+            <span className="mb-1 text-xs text-muted">I can draft a reply for you to edit.</span>
+            <div className="grid w-full gap-2 text-left sm:grid-cols-3">
+              {PREVIEW_CARDS.map((card) => (
+                <div key={card.title} className={`${CARD} grid gap-0.5 p-2.5`}>
+                  <strong className="text-[11px] font-bold text-body">{card.title}</strong>
+                  <span className="text-[10px] text-muted">{card.note}</span>
+                </div>
+              ))}
+            </div>
+            <div className="grid w-full gap-3 text-left sm:grid-cols-[0.9fr_1.1fr]">
+              <div className={`${CARD} grid content-start gap-2.5 p-3.5`}>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Project statistics</span>
+                <div className="flex h-24 items-end gap-1.5 rounded-lg bg-surface-secondary px-2 pt-2.5">
+                  {BAR_HEIGHTS.map((height, index) => (
+                    <i key={index} className={`flex-1 rounded-t ${height} ${index % 2 === 0 ? 'bg-accent' : 'bg-accent/60'}`} />
+                  ))}
+                </div>
+                <small className="text-[10px] text-muted">
+                  <b className="text-success">On target</b> 12 tasks this week
+                </small>
+              </div>
+              <div className={`${CARD} grid content-start gap-2.5 p-3.5`}>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-muted">Project calendar</span>
+                {CALENDAR_ROWS.map(([day, label]) => (
+                  <div key={day} className="grid grid-cols-[28px_minmax(0,1fr)] items-center gap-2 border-t border-hairline pt-2.5">
+                    <b className="text-[13px] text-accent-text">{day}</b>
+                    <span className="text-[10px] text-muted">{label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mt-1 flex w-full items-center justify-between rounded-full border border-control-border bg-surface py-1.5 pl-4 pr-1.5 text-[13px] text-muted">
+              <span>Ask Zuri</span>
+              <span className="grid size-[30px] place-items-center rounded-full bg-accent text-white [&_svg]:size-[15px]">
+                <SendIcon />
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Signed-out marketing page: promise, then how to start, then plans.
@@ -123,48 +217,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
           </ul>
         </div>
 
-        <div className="hero-visual">
-          {/* A still of the dashboard rather than decoration: the same two
-              figures a customer sees after signing in. The copy beside it
-              carries the meaning, so the panel is hidden from assistive tech. */}
-          <div className="preview" aria-hidden="true">
-            <div className="preview-bar">
-              <span className="preview-brand">
-                <span className="preview-mark">
-                  <LogoMark size={15} />
-                </span>
-                Zuri Cloud
-              </span>
-              <Chip>Overview</Chip>
-            </div>
-            <div className="preview-body">
-              <div className="preview-usage">
-                <span className="preview-label">This month</span>
-                <span className="preview-value">68%</span>
-                <span className="preview-sub">of the Pro plan used</span>
-                <UsageBar percent={68} label="Pro plan used" />
-              </div>
-              <div className="preview-tiles">
-                <div className="preview-tile">
-                  <span>Tokens left</span>
-                  <strong>32,000</strong>
-                </div>
-                <div className="preview-tile">
-                  <span>Renews</span>
-                  <strong>12 Nov</strong>
-                </div>
-              </div>
-              <div className="preview-row">
-                <span>Answer style</span>
-                <strong>Balanced, neutral</strong>
-              </div>
-              <div className="preview-row">
-                <span>Requests today</span>
-                <strong>14 of 200</strong>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AppPreview />
       </section>
 
       <section className="stat-strip" aria-label="Zuri Cloud at a glance">

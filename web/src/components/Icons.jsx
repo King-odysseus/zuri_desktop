@@ -3,6 +3,11 @@
 // its own look.
 import {
   ArrowLeft,
+  ArrowUp,
+  Bell,
+  Folder,
+  ListChecks,
+  Settings,
   ArrowRight,
   Brain,
   Check,
@@ -73,3 +78,9 @@ export const MessageIcon = (props) => <MessageSquare {...base} {...props} />;
 export const BackIcon = (props) => <ArrowLeft {...base} {...props} />;
 /** The menu button that opens the navigation drawer on a phone. */
 export const MenuIcon = (props) => <Menu {...base} {...props} />;
+// The rail of the app preview on the landing page uses the same five glyphs as the desktop sidebar.
+export const SendIcon = (props) => <ArrowUp {...base} {...props} />;
+export const TaskIcon = (props) => <ListChecks {...base} {...props} />;
+export const BellIcon = (props) => <Bell {...base} {...props} />;
+export const FolderIcon = (props) => <Folder {...base} {...props} />;
+export const SettingsIcon = (props) => <Settings {...base} {...props} />;
