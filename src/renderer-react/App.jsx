@@ -52,7 +52,9 @@ export default function App() {
         document.documentElement.dataset.theme = savedTheme;
         setTheme(savedTheme);
       }
-      setNeedsSignIn(account?.ok !== true && (account?.error?.code === 'CLOUD_AUTH_REQUIRED' || account?.status === 401));
+      // Anything but a loaded account asks for sign-in; being offline is the one
+      // failure that is not a missing session, so a signed-in person still gets in.
+      setNeedsSignIn(account?.ok !== true && account?.error?.code !== 'CLOUD_UNAVAILABLE');
       setStartup('ready');
     };
     void loadSettings();
