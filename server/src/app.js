@@ -313,6 +313,20 @@ function siteBase(siteUrl) {
  * @param {unknown} error
  * @returns {Response | null}
  */
+/**
+ * Which plan and how long, as an administrator may set them. The plan must be one
+ * the platform sells; the length is whole days between one and a year.
+ * @param {{ planCode?: unknown, days?: unknown }} body
+ * @returns {{ ok: true, planCode: string, days: number } | { ok: false, message: string }}
+ */
+function checkPlanChoice(body) {
+  const planCode = typeof body?.planCode === 'string' && body.planCode.trim() !== '' ? body.planCode.trim() : 'starter';
+  if (!findPlan(planCode)) return { ok: false, message: 'Choose one of the plans Zuri sells.' };
+  const days = body?.days === undefined || body.days === '' ? 30 : Number(body.days);
+  if (!Number.isInteger(days) || days < 1 || days > 366) return { ok: false, message: 'Enter a number of days between 1 and 366.' };
+  return { ok: true, planCode, days };
+}
+
 function authErrorResponse(error) {
   const code = error?.code;
   const message = error?.message ?? 'The request could not be completed.';
@@ -941,7 +955,7 @@ export function createApp(dependencies = {}) {
       }
     }
 
-    if (url.pathname === '/api/models' || url.pathname === '/api/admin/overview' || url.pathname === '/api/admin/models') {
+    if (url.pathname === '/api/models' || url.pathname.startsWith('/api/admin/')) {
       if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
       const token = bearerToken(request);
       const session = await dependencies.auth.authenticate(token);
@@ -968,6 +982,73 @@ export function createApp(dependencies = {}) {
           throw error;
         }
       }
+
+      if (url.pathname === '/api/admin/stats') {
+        if (request.method !== 'GET' || typeof dependencies.repository?.adminStats !== 'function') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for the health report.' } });
+        // Time one trivial query so the panel can show whether the database answers
+        // quickly, the first thing to check when the app feels slow.
+        const started = Date.now();
+        const stats = await dependencies.repository.adminStats(url.searchParams.get('days'));
+        const databaseMs = Date.now() - started;
+        return response(200, { ok: true, data: { ...stats, server: { uptimeSeconds: Math.round(process.uptime()), databaseMs, nodeVersion: process.version, environment: process.env.NODE_ENV ?? 'development' } } });
+      }
+
+      if (url.pathname === '/api/admin/users') {
+        if (typeof dependencies.repository?.adminListUsers !== 'function' || typeof dependencies.auth?.createManagedUser !== 'function') {
+          return response(503, { ok: false, error: { code: 'ADMIN_USERS_UNAVAILABLE', message: 'Managing users is not available on this server.' } });
+        }
+        if (request.method === 'GET') {
+          return response(200, { ok: true, data: { users: await dependencies.repository.adminListUsers({ search: url.searchParams.get('search') ?? '' }) } });
+        }
+        if (request.method !== 'POST') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET to list users or POST to add one.' } });
+        try {
+          const body = await readJson(request);
+          const checked = checkPlanChoice(body);
+          if (!checked.ok) return response(400, { ok: false, error: { code: 'INVALID_PLAN', message: checked.message } });
+          const created = await dependencies.auth.createManagedUser({ email: body.email, displayName: body.displayName, planCode: checked.planCode, days: checked.days });
+          return response(201, { ok: true, data: { user: created.user, temporaryPassword: created.temporaryPassword, planCode: checked.planCode, days: checked.days } });
+        } catch (error) {
+          const handled = authErrorResponse(error);
+          if (handled) return handled;
+          console.error('[zuri-cloud] admin create user', error?.message ?? error);
+          return response(500, { ok: false, error: { code: 'CREATE_USER_FAILED', message: 'The account could not be created.' } });
+        }
+      }
+
+      const managed = /^\/api\/admin\/users\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i.exec(url.pathname);
+      if (managed) {
+        if (request.method !== 'PATCH') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use PATCH to change an account.' } });
+        const userId = managed[1];
+        try {
+          const body = await readJson(request);
+          if (body.action === 'suspend' || body.action === 'restore') {
+            if (userId === session.user.id) return response(409, { ok: false, error: { code: 'SELF_ACTION', message: 'You cannot suspend your own account.' } });
+            const updated = await dependencies.repository.adminSetUserStatus(userId, body.action === 'suspend' ? 'suspended' : 'active');
+            if (!updated) return response(404, { ok: false, error: { code: 'USER_NOT_FOUND', message: 'That account was not found, or it is an administrator.' } });
+            return response(200, { ok: true, data: { user: updated } });
+          }
+          if (body.action === 'set-plan') {
+            const checked = checkPlanChoice(body);
+            if (!checked.ok) return response(400, { ok: false, error: { code: 'INVALID_PLAN', message: checked.message } });
+            await dependencies.repository.adminSetUserPlan(userId, checked.planCode, checked.days);
+            return response(200, { ok: true, data: { planCode: checked.planCode, days: checked.days } });
+          }
+          if (body.action === 'reset-password') {
+            const reset = await dependencies.auth.resetManagedPassword({ userId });
+            return response(200, { ok: true, data: { temporaryPassword: reset.temporaryPassword } });
+          }
+          return response(400, { ok: false, error: { code: 'INVALID_ACTION', message: 'Choose suspend, restore, set-plan or reset-password.' } });
+        } catch (error) {
+          if (error?.code === 'USER_NOT_FOUND') return response(404, { ok: false, error: { code: 'USER_NOT_FOUND', message: error.message } });
+          if (error?.code === 'INVALID_PLAN') return response(400, { ok: false, error: { code: 'INVALID_PLAN', message: error.message } });
+          const handled = authErrorResponse(error);
+          if (handled) return handled;
+          console.error('[zuri-cloud] admin change user', error?.message ?? error);
+          return response(500, { ok: false, error: { code: 'CHANGE_USER_FAILED', message: 'The account could not be changed.' } });
+        }
+      }
+
+      if (url.pathname !== '/api/admin/overview') return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'That admin page does not exist.' } });
 
       if (request.method !== 'GET' || typeof dependencies.repository?.adminOverview !== 'function') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for the overview.' } });
       const overview = await dependencies.repository.adminOverview(url.searchParams.get('days'));

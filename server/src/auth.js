@@ -102,6 +102,25 @@ export function validatePassword(password) {
   return { ok: true };
 }
 
+// No 0/O, 1/l/I: a password read out or typed from a message must not be ambiguous.
+const TEMPORARY_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+const TEMPORARY_PASSWORD_LENGTH = 14;
+
+/**
+ * A one-off password an administrator hands to a person. Shown once, stored only as
+ * a hash, and meant to be changed after the first sign-in.
+ * @param {() => Buffer} [random]
+ * @returns {string}
+ */
+export function generateTemporaryPassword(random = () => randomBytes(TEMPORARY_PASSWORD_LENGTH)) {
+  const bytes = random();
+  let password = '';
+  for (let index = 0; index < TEMPORARY_PASSWORD_LENGTH; index += 1) {
+    password += TEMPORARY_PASSWORD_ALPHABET[bytes[index % bytes.length] % TEMPORARY_PASSWORD_ALPHABET.length];
+  }
+  return password;
+}
+
 /** @param {unknown} password */
 function assertPassword(password) {
   const result = validatePassword(password);
@@ -233,6 +252,39 @@ export function createAuthService({ repository, verifyGoogleCredential = null, n
       }
       if (!(await verifyPassword(secret, record.passwordHash))) throw invalidCredentials();
       return startSession(record.user);
+    },
+    /**
+     * Administrator action: make an account with a generated password and a plan
+     * that is already paid for, so the person can sign in without signing up.
+     * @param {{ email?: string, displayName?: string, planCode?: string, days?: number }} [input]
+     * @returns {Promise<{ user: object, temporaryPassword: string }>}
+     */
+    async createManagedUser({ email, displayName, planCode, days } = {}) {
+      const address = normalizeEmail(email);
+      if (address === '') throw failure('INVALID_EMAIL', 'Enter a valid email address.');
+      if (typeof repository.adminCreateUser !== 'function') throw failure('AUTH_NOT_CONFIGURED', 'Creating accounts is not available.');
+      const temporaryPassword = generateTemporaryPassword(random);
+      const user = await repository.adminCreateUser({
+        email: address,
+        passwordHash: await hashPassword(temporaryPassword),
+        displayName: text(displayName).slice(0, 200),
+        planCode,
+        days,
+      });
+      return { user, temporaryPassword };
+    },
+    /**
+     * Administrator action: replace a password with a generated one and sign the
+     * person out everywhere, so the old password and any stolen session both die.
+     * @param {{ userId?: string }} [input]
+     * @returns {Promise<{ temporaryPassword: string }>}
+     */
+    async resetManagedPassword({ userId } = {}) {
+      if (typeof userId !== 'string' || userId.trim() === '') throw failure('INVALID_USER', 'A user is required.');
+      const temporaryPassword = generateTemporaryPassword(random);
+      await repository.updatePasswordHash(userId, await hashPassword(temporaryPassword));
+      await repository.revokeUserSessions(userId);
+      return { temporaryPassword };
     },
     async setPassword({ userId, password } = {}) {
       if (typeof userId !== 'string' || userId.trim() === '') throw failure('INVALID_USER', 'A user is required.');

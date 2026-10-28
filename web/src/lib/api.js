@@ -173,6 +173,24 @@ export async function saveAdminModel(model) {
   return api('/api/admin/models', { method: 'PUT', body: JSON.stringify(model) });
 }
 
+export async function fetchAdminStats(days = 30) {
+  return api(`/api/admin/stats?days=${encodeURIComponent(days)}`);
+}
+
+export async function fetchAdminUsers(search = '') {
+  return api(`/api/admin/users?search=${encodeURIComponent(search)}`);
+}
+
+/** @param {{ email: string, displayName?: string, planCode: string, days: number }} person */
+export async function createAdminUser(person) {
+  return api('/api/admin/users', { method: 'POST', body: JSON.stringify(person) });
+}
+
+/** @param {string} userId @param {{ action: string, planCode?: string, days?: number }} change */
+export async function changeAdminUser(userId, change) {
+  return api(`/api/admin/users/${encodeURIComponent(userId)}`, { method: 'PATCH', body: JSON.stringify(change) });
+}
+
 export async function signOutRequest() {
   // Signing out is best effort: the token is cleared by the caller either way.
   await api('/api/auth/sign-out', { method: 'POST' }).catch(() => undefined);

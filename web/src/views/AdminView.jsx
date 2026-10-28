@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '../components/DataRow.jsx';
 import { fetchAdminOverview, saveAdminModel } from '../lib/api.js';
 import { formatNaira, formatTokens } from '../lib/format.js';
+import AdminPeople from './AdminPeople.jsx';
 
 const SUPPLIERS = ['deepseek', 'moonshot', 'zai', 'openai', 'anthropic'];
 const WINDOWS = [7, 30, 90];
@@ -125,6 +126,8 @@ export default function AdminView() {
       {error && <Alert tone="danger">{error}</Alert>}
       {saved && <Alert>{saved}</Alert>}
       {marginTone && <Alert tone="danger">Supplier spend is higher than revenue for this period. Review the quota weights and plan prices.</Alert>}
+
+      <AdminPeople days={days} plans={overview.plans} />
 
       <div className="stat-grid">
         <article className="card">

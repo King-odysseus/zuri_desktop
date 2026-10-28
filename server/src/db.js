@@ -514,6 +514,207 @@ export function createRepository(pool) {
         plans: plans.rows.map((row) => ({ code: row.code, name: row.name, amountKobo: Number(row.amount_kobo), monthlyTokens: Number(row.monthly_tokens), subscribers: row.subscribers })),
       };
     },
+    /**
+     * Every account with its current plan and how much of the period it has used.
+     * Substring match with position() rather than LIKE, so a search for "50%" or
+     * "a_b" is plain text and not a pattern.
+     * @param {{ search?: string, limit?: number }} [options]
+     */
+    async adminListUsers({ search = '', limit = 200 } = {}) {
+      const cap = Math.min(500, Math.max(1, Math.floor(Number(limit) || 200)));
+      const result = await pool.query(
+        'SELECT u.id, u.email, u.display_name, u.status, u.is_admin, u.created_at, u.last_seen_at, (u.password_hash IS NOT NULL) AS has_password, ' +
+        'u.google_subject IS NOT NULL AS has_google, s.plan_code, s.plan_name, s.subscription_status, s.current_period_end, s.monthly_tokens, ' +
+        "COALESCE((SELECT SUM(COALESCE(e.quota_tokens, e.total_tokens)) FROM usage_events e WHERE e.user_id = u.id AND e.created_at >= COALESCE(s.current_period_start, NOW() - INTERVAL '30 days')), 0)::BIGINT AS used_tokens " +
+        'FROM users u LEFT JOIN LATERAL (' +
+        'SELECT x.plan_code, p.name AS plan_name, p.monthly_tokens, x.status AS subscription_status, x.current_period_start, x.current_period_end ' +
+        'FROM subscriptions x JOIN plans p ON p.code = x.plan_code ' +
+        "WHERE x.user_id = u.id AND x.status IN ('active', 'past_due', 'pending') ORDER BY (x.status = 'pending'), x.created_at DESC LIMIT 1) s ON TRUE " +
+        "WHERE u.status <> 'deleted' AND ($1 = '' OR position($1 in lower(u.email)) > 0 OR position($1 in lower(u.display_name)) > 0) " +
+        'ORDER BY u.created_at DESC LIMIT $2',
+        [String(search ?? '').trim().toLowerCase(), cap],
+      );
+      const iso = (value) => (value instanceof Date ? value.toISOString() : (value ?? null));
+      return result.rows.map((row) => ({
+        id: row.id,
+        email: row.email,
+        displayName: row.display_name,
+        status: row.status,
+        isAdmin: row.is_admin === true,
+        hasPassword: row.has_password === true,
+        hasGoogle: row.has_google === true,
+        createdAt: iso(row.created_at),
+        lastSeenAt: iso(row.last_seen_at),
+        planCode: row.plan_code ?? '',
+        planName: row.plan_name ?? '',
+        subscriptionStatus: row.subscription_status ?? '',
+        periodEnd: iso(row.current_period_end),
+        monthlyTokens: Number(row.monthly_tokens ?? 0),
+        usedTokens: Number(row.used_tokens ?? 0),
+      }));
+    },
+    /**
+     * Create an account on a paid-for plan. Unlike a sign-up, the subscription is
+     * active from the start: the administrator is the one vouching for it.
+     * @param {{ email: string, passwordHash: string, displayName?: string, planCode?: string, days?: number }} request
+     */
+    async adminCreateUser({ email, passwordHash, displayName = '', planCode = 'starter', days = 30 }) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        let created;
+        try {
+          created = await client.query(
+            'INSERT INTO users (email, display_name, password_hash) VALUES ($1, $2, $3) RETURNING *',
+            [email, displayName, passwordHash],
+          );
+        } catch (error) {
+          if (error?.code === '23505') {
+            const taken = new Error('An account with that email address already exists.');
+            taken.code = 'EMAIL_TAKEN';
+            throw taken;
+          }
+          throw error;
+        }
+        const user = created.rows[0];
+        try {
+          await client.query(
+            "INSERT INTO subscriptions (user_id, plan_code, status, current_period_start, current_period_end) VALUES ($1, $2, 'active', NOW(), NOW() + ($3 || ' days')::INTERVAL)",
+            [user.id, planCode, String(days)],
+          );
+        } catch (error) {
+          if (error?.code === '23503') {
+            const unknown = new Error('That plan does not exist.');
+            unknown.code = 'INVALID_PLAN';
+            throw unknown;
+          }
+          throw error;
+        }
+        await client.query('COMMIT');
+        return publicUser(user);
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    /**
+     * Suspend or restore an account. Administrators are excluded in the statement
+     * itself, so no caller can lock the last admin out; suspending also signs the
+     * person out everywhere.
+     * @param {string} userId
+     * @param {'active' | 'suspended'} status
+     * @returns {Promise<object | null>} The updated user, or null when none matched.
+     */
+    async adminSetUserStatus(userId, status) {
+      const result = await pool.query("UPDATE users SET status = $2 WHERE id = $1 AND is_admin = FALSE AND status <> 'deleted' RETURNING *", [userId, status]);
+      if (result.rowCount === 0) return null;
+      if (status === 'suspended') await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL', [userId]);
+      return publicUser(result.rows[0]);
+    },
+    /**
+     * Put an account on a plan for a number of days, replacing whatever it had.
+     * The old live rows are cancelled first because only one active or past-due
+     * subscription may exist per user.
+     * @param {string} userId
+     * @param {string} planCode
+     * @param {number} days
+     */
+    async adminSetUserPlan(userId, planCode, days = 30) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const found = await client.query("SELECT id FROM users WHERE id = $1 AND status <> 'deleted' FOR UPDATE", [userId]);
+        if (found.rowCount === 0) {
+          const missing = new Error('That account no longer exists.');
+          missing.code = 'USER_NOT_FOUND';
+          throw missing;
+        }
+        await client.query("UPDATE subscriptions SET status = 'cancelled', updated_at = NOW() WHERE user_id = $1 AND status IN ('active', 'past_due', 'pending')", [userId]);
+        try {
+          await client.query(
+            "INSERT INTO subscriptions (user_id, plan_code, status, current_period_start, current_period_end) VALUES ($1, $2, 'active', NOW(), NOW() + ($3 || ' days')::INTERVAL)",
+            [userId, planCode, String(days)],
+          );
+        } catch (error) {
+          if (error?.code === '23503') {
+            const unknown = new Error('That plan does not exist.');
+            unknown.code = 'INVALID_PLAN';
+            throw unknown;
+          }
+          throw error;
+        }
+        await client.query('COMMIT');
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+    /**
+     * Numbers for the health panel: who is using the app, how much, and what it
+     * earns. Counts are exact; the daily series always has one row per day, so the
+     * chart has no gaps to bridge.
+     * @param {number} [days]
+     */
+    async adminStats(days = 30) {
+      const window = Math.min(90, Math.max(1, Math.floor(Number(days) || 30)));
+      const [accounts, usage, daily, subscriptions, topUsers, payments] = await Promise.all([
+        pool.query(
+          "SELECT COUNT(*) FILTER (WHERE status = 'active')::INT AS active, COUNT(*) FILTER (WHERE status = 'suspended')::INT AS suspended, " +
+          "COUNT(*) FILTER (WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL)::INT AS joined, " +
+          "COUNT(*) FILTER (WHERE last_seen_at >= NOW() - INTERVAL '24 hours')::INT AS seen_today " +
+          "FROM users WHERE status <> 'deleted'",
+          [String(window)],
+        ),
+        pool.query(
+          "SELECT COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours')::INT AS requests_today, " +
+          "COALESCE(SUM(COALESCE(quota_tokens, total_tokens)) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours'), 0)::BIGINT AS tokens_today, " +
+          "COUNT(*)::INT AS requests, COALESCE(SUM(COALESCE(quota_tokens, total_tokens)), 0)::BIGINT AS tokens, COUNT(DISTINCT user_id)::INT AS people " +
+          "FROM usage_events WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL",
+          [String(window)],
+        ),
+        pool.query(
+          "SELECT to_char(d::date, 'YYYY-MM-DD') AS day, COALESCE(r.requests, 0)::INT AS requests, COALESCE(r.tokens, 0)::BIGINT AS tokens, COALESCE(r.people, 0)::INT AS people " +
+          "FROM generate_series(CURRENT_DATE - ($1::int - 1), CURRENT_DATE, INTERVAL '1 day') d LEFT JOIN (" +
+          "SELECT created_at::date AS day, COUNT(*) AS requests, SUM(COALESCE(quota_tokens, total_tokens)) AS tokens, COUNT(DISTINCT user_id) AS people " +
+          "FROM usage_events WHERE created_at >= CURRENT_DATE - ($1::int - 1) GROUP BY 1) r ON r.day = d::date ORDER BY d",
+          [window],
+        ),
+        pool.query(
+          "SELECT COUNT(*)::INT AS paying, COALESCE(SUM(p.amount_kobo), 0)::BIGINT AS monthly_kobo FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.status IN ('active', 'past_due')",
+        ),
+        pool.query(
+          "SELECT u.email, u.display_name, COUNT(*)::INT AS requests, COALESCE(SUM(COALESCE(e.quota_tokens, e.total_tokens)), 0)::BIGINT AS tokens " +
+          "FROM usage_events e JOIN users u ON u.id = e.user_id WHERE e.created_at >= NOW() - ($1 || ' days')::INTERVAL GROUP BY u.id ORDER BY 4 DESC LIMIT 5",
+          [String(window)],
+        ),
+        pool.query(
+          "SELECT COUNT(*) FILTER (WHERE status = 'success')::INT AS paid, COUNT(*) FILTER (WHERE status = 'failed')::INT AS failed " +
+          "FROM payments WHERE created_at >= NOW() - ($1 || ' days')::INTERVAL",
+          [String(window)],
+        ),
+      ]);
+      const account = accounts.rows[0] ?? {};
+      const used = usage.rows[0] ?? {};
+      return {
+        days: window,
+        accounts: { active: account.active ?? 0, suspended: account.suspended ?? 0, joined: account.joined ?? 0, seenToday: account.seen_today ?? 0 },
+        usage: {
+          requestsToday: used.requests_today ?? 0,
+          tokensToday: Number(used.tokens_today ?? 0),
+          requests: used.requests ?? 0,
+          tokens: Number(used.tokens ?? 0),
+          people: used.people ?? 0,
+        },
+        daily: daily.rows.map((row) => ({ day: row.day, requests: row.requests, tokens: Number(row.tokens), people: row.people })),
+        subscriptions: { paying: subscriptions.rows[0]?.paying ?? 0, monthlyKobo: Number(subscriptions.rows[0]?.monthly_kobo ?? 0) },
+        topUsers: topUsers.rows.map((row) => ({ email: row.email, displayName: row.display_name, requests: row.requests, tokens: Number(row.tokens) })),
+        payments: { paid: payments.rows[0]?.paid ?? 0, failed: payments.rows[0]?.failed ?? 0 },
+      };
+    },
     async releaseUsage(reservationId, userId) {
       await pool.query("UPDATE usage_reservations SET status = 'released' WHERE id = $1 AND user_id = $2 AND status = 'reserved'", [reservationId, userId]);
     },

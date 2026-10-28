@@ -1,3 +1,12 @@
+## 2026-10-28 - Windows (admin dashboard)
+
+- The web Admin screen now manages people and shows how the app is doing. Add a person (name, email, plan, days) and Zuri generates a temporary password, shown once, with an active plan and no payment step. Per account: change plan, reset password (signs them out everywhere), suspend and restore. Administrators cannot be suspended and you cannot suspend yourself.
+- Health panel: people, seen today, requests and tokens today, paying plans and monthly revenue, payments paid and failed, requests per day, busiest people, database answer time and server uptime.
+- New server routes: GET /api/admin/stats, GET and POST /api/admin/users, PATCH /api/admin/users/<id>. Covered by server/test/admin-users.test.js.
+- Key files: server/src/app.js, auth.js, db.js, web/src/views/AdminPeople.jsx, AdminView.jsx, web/src/lib/api.js.
+- Other OS action: Railway must redeploy to serve the new web bundle (server/public). The installers need no rebuild.
+- Done on: Windows
+
 ## 2026-10-28 - Windows (sign-in first)
 
 - The desktop app now opens on a Zuri sign-in screen when there is no session, and the Android app opens on sign-in instead of the marketing page. The cloud address is built in (the Railway API, or ZURI_CLOUD_URL for developers); the stored cloudUrl setting is gone.
