@@ -1002,6 +1002,46 @@ check('a chat is answered by the model picked for it, and the reply records it',
   }
 });
 
+// A project is only a folder for chats: moving a chat in and out has to keep its
+// messages, and deleting the project must hand its chats back rather than lose them.
+check('chats move into a project and survive the project being deleted', async () => {
+  const { getStoreRoot, setStoreRoot, createThread, appendMessage, readStore, listProjects, createProject, deleteProject, setThreadProject } =
+    await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const previousRoot = getStoreRoot();
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-projects-'));
+  try {
+    setStoreRoot(scratch);
+    const blank = await createProject({ name: '   ' });
+    if (blank.ok) throw new Error('a project with a blank name was accepted');
+
+    const project = await createProject({ name: '  Launch   plan ', icon: 'nonsense' });
+    if (!project.ok) throw new Error('a project could not be created');
+    if (project.data.name !== 'Launch plan') throw new Error(`the name was not tidied: ${project.data.name}`);
+    if (project.data.icon !== 'folder') throw new Error('an unknown icon was stored instead of the default');
+
+    const thread = (await createThread({ title: 'Plan' })).data;
+    await appendMessage(thread.id, { role: 'user', content: 'Hello' });
+
+    const missing = await setThreadProject(thread.id, 'no-such-project');
+    if (missing.ok) throw new Error('a chat was moved into a project that does not exist');
+
+    const moved = await setThreadProject(thread.id, project.data.id);
+    if (!moved.ok || moved.data.projectId !== project.data.id) throw new Error('the chat was not filed in the project');
+
+    const removed = await deleteProject(project.data.id);
+    if (!removed.ok) throw new Error('the project could not be deleted');
+    if ((await listProjects()).data.length !== 0) throw new Error('the deleted project is still listed');
+
+    const kept = (await readStore('chats')).data.find((entry) => entry.id === thread.id);
+    if (!kept || kept.messages.length !== 1) throw new Error('deleting the project lost the chat or its messages');
+    if (kept.projectId !== undefined) throw new Error('the chat still points at the deleted project');
+    return 'chats can be filed, and outlive their project';
+  } finally {
+    setStoreRoot(previousRoot);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 // The chip has to sit in the message row and offer the one catalogue, or a person
 // has to leave the chat to change model, which is what this change removes.
 check('the composer offers the model chip and sends the choice with the message', async () => {

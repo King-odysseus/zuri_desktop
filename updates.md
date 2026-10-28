@@ -1,3 +1,11 @@
+## 2026-10-28 - Windows (projects)
+
+- The desktop sidebar has a Projects section: create a project (name and icon) from the New project screen, open it to see its chats, move a chat in or out with the folder button on the chat row, and delete a project (its chats are kept and return to Recents). New chat now shows its Ctrl K shortcut, which works from any screen.
+- Chats and projects stay separate files: a chat carries projectId, projects.json holds the folders.
+- Key files: src/main/store.js, main.js, preload.js, src/renderer-react/Sidebar.jsx, NewProjectView.jsx, projectIcons.js, App.jsx, Icons.jsx, scripts/selftest.js.
+- Other OS action: run "npm run react:build".
+- Done on: Windows
+
 ## 2026-10-28 - Windows (admin dashboard)
 
 - The web Admin screen now manages people and shows how the app is doing. Add a person (name, email, plan, days) and Zuri generates a temporary password, shown once, with an active plan and no payment step. Per account: change plan, reset password (signs them out everywhere), suspend and restore. Administrators cannot be suspended and you cannot suspend yourself.

@@ -11,6 +11,9 @@ import {
   FeaturesIcon,
   HistoryIcon,
   FolderIcon,
+  FolderPlusIcon,
+  DeleteIcon,
+  ChevronRightIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   SearchIcon,
@@ -20,6 +23,7 @@ import {
   SunIcon,
   TaskIcon,
 } from './Icons.jsx';
+import { projectIconFor } from './projectIcons.js';
 
 export const NAV_ITEMS = [
   { key: 'chats', label: 'Chats', Icon: ChatIcon },
@@ -38,6 +42,10 @@ export const NAV_ITEMS = [
 // conversation list, which routing in App.jsx keeps in step with the rail.
 export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
+  const [projects, setProjects] = useState([]);
+  // Which projects are open in the list, and which chat is choosing a project.
+  const [openProjectIds, setOpenProjectIds] = useState([]);
+  const [movingThreadId, setMovingThreadId] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -45,17 +53,103 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
       const result = await window.zuri?.chats?.list?.();
       if (active && result?.ok) setThreads(Array.isArray(result.data) ? result.data : []);
     };
+    const loadProjects = async () => {
+      const result = await window.zuri?.projects?.list?.();
+      if (active && result?.ok) setProjects(Array.isArray(result.data) ? result.data : []);
+    };
     // History writes happen outside this component, so follow main's shared
     // change event instead of leaving Recents stale until the next chat reply.
     const stopListening = window.zuri?.state?.onChanged?.((change) => {
       if (change?.area === 'chats') void loadThreads();
+      if (change?.area === 'projects') void loadProjects();
     });
     void loadThreads();
+    void loadProjects();
     return () => {
       active = false;
       stopListening?.();
     };
   }, [refreshKey]);
+
+  function toggleProject(projectId) {
+    setOpenProjectIds((ids) => (ids.includes(projectId) ? ids.filter((id) => id !== projectId) : [...ids, projectId]));
+  }
+
+  async function moveThread(threadId, projectId) {
+    setMovingThreadId('');
+    await window.zuri?.chats?.move?.({ threadId, projectId });
+    if (projectId !== '') setOpenProjectIds((ids) => (ids.includes(projectId) ? ids : [...ids, projectId]));
+  }
+
+  async function removeProject(project) {
+    // The chats inside go back to Recents; only the folder is deleted.
+    if (!window.confirm(`Delete the project "${project.name}"? Its chats are kept and move back to Recents.`)) return;
+    await window.zuri?.projects?.delete?.({ projectId: project.id });
+  }
+
+  const projectIds = new Set(projects.map((project) => project.id));
+  // A chat whose project is gone still shows in Recents instead of vanishing.
+  const looseThreads = threads.filter((thread) => !projectIds.has(thread.projectId));
+
+  function renderThread(thread) {
+    return (
+      <div key={thread.id} className="mb-1">
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant={thread.id === activeThreadId ? 'secondary' : 'ghost'}
+            fullWidth
+            className="min-w-0 flex-1 justify-start truncate rounded-lg px-2 py-2 text-left"
+            onPress={() => onSelectThread(thread.id)}
+          >
+            {thread.title || 'New chat'}
+          </Button>
+          {projects.length > 0 && (
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className="min-h-11 min-w-11 shrink-0 rounded-lg text-muted"
+              aria-label={`Move "${thread.title || 'New chat'}" to a project`}
+              title="Move to a project"
+              aria-expanded={movingThreadId === thread.id}
+              onPress={() => setMovingThreadId((id) => (id === thread.id ? '' : thread.id))}
+            >
+              <FolderIcon size={15} />
+            </Button>
+          )}
+        </div>
+        {movingThreadId === thread.id && (
+          <div className="ml-2 mt-1 flex flex-col gap-1" role="menu" aria-label="Move chat to">
+            {projects.map((project) => (
+              <Button
+                key={project.id}
+                type="button"
+                variant="ghost"
+                role="menuitem"
+                className="min-h-11 justify-start rounded-lg px-2 text-left"
+                isDisabled={thread.projectId === project.id}
+                onPress={() => void moveThread(thread.id, project.id)}
+              >
+                {project.name}
+              </Button>
+            ))}
+            {projectIds.has(thread.projectId) && (
+              <Button
+                type="button"
+                variant="ghost"
+                role="menuitem"
+                className="min-h-11 justify-start rounded-lg px-2 text-left text-muted"
+                onPress={() => void moveThread(thread.id, '')}
+              >
+                Remove from project
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
   return (
     <div className="flex h-full shrink-0">
       <nav
@@ -157,7 +251,66 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           >
             <EditIcon size={16} />
             New chat
+            <kbd className="ml-auto text-xs text-muted" aria-hidden="true">Ctrl K</kbd>
           </Button>
+        </div>
+
+        <div className="flex items-center justify-between px-5 pb-2 pt-6">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted">Projects</p>
+          <Button
+            isIconOnly
+            size="sm"
+            variant="ghost"
+            className="h-8 w-8 rounded-lg text-muted"
+            aria-label="New project"
+            title="New project"
+            onPress={() => onNavigate('new-project')}
+          >
+            <FolderPlusIcon size={16} />
+          </Button>
+        </div>
+        <div className="zuri-scrollbar-hidden max-h-64 overflow-y-auto px-3 text-sm text-muted">
+          {projects.length === 0 && <p className="px-2">Keep one topic in one place. Create a project to group its chats.</p>}
+          {projects.map((project) => {
+            const ProjectIcon = projectIconFor(project.icon);
+            const isOpen = openProjectIds.includes(project.id);
+            const projectThreads = threads.filter((thread) => thread.projectId === project.id);
+            return (
+              <div key={project.id} className="mb-1">
+                <div className="flex items-center gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    fullWidth
+                    className="min-h-11 min-w-0 flex-1 justify-start gap-2 truncate rounded-lg px-2 text-left"
+                    aria-expanded={isOpen}
+                    onPress={() => toggleProject(project.id)}
+                  >
+                    <ChevronRightIcon size={14} className={`shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                    <ProjectIcon size={16} className="shrink-0" />
+                    <span className="truncate">{project.name}</span>
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    className="min-h-11 min-w-11 shrink-0 rounded-lg text-muted"
+                    aria-label={`Delete project ${project.name}`}
+                    title="Delete project"
+                    onPress={() => void removeProject(project)}
+                  >
+                    <DeleteIcon size={15} />
+                  </Button>
+                </div>
+                {isOpen && (
+                  <div className="ml-4">
+                    {projectThreads.length === 0 && <p className="px-2 pb-1">No chats yet. Use the folder button on a chat to add it.</p>}
+                    {projectThreads.map(renderThread)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <div className="flex items-center justify-between px-5 pb-2 pt-6">
@@ -176,18 +329,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         </div>
         <div className="zuri-scrollbar-hidden flex-1 overflow-y-auto px-3 text-sm text-muted">
           {threads.length === 0 && <p className="px-2">No conversations yet. Your threads will appear here, newest first.</p>}
-          {threads.map((thread) => (
-            <Button
-              key={thread.id}
-              type="button"
-              variant={thread.id === activeThreadId ? 'secondary' : 'ghost'}
-              fullWidth
-              className="mb-1 justify-start truncate rounded-lg px-2 py-2 text-left"
-              onPress={() => onSelectThread(thread.id)}
-            >
-              {thread.title || 'New chat'}
-            </Button>
-          ))}
+          {looseThreads.map(renderThread)}
         </div>
       </aside>
     </div>

@@ -39,14 +39,17 @@ import {
   clearThreads,
   completeReminder,
   createAutomation,
+  createProject,
   createReminder,
   createTask,
   createThread,
+  deleteProject,
   deleteThread,
   deleteAutomation,
   deleteTask,
   getStoreRoot,
   listNotifications,
+  listProjects,
   listReminders,
   listTasks,
   listThreads,
@@ -54,7 +57,9 @@ import {
   readStore,
   renameThread,
   saveSettings,
+  setThreadProject,
   updateAutomation,
+  updateProject,
   updateTask,
 } from './store.js';
 import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, resolveWorkspacePath, runTool, toolCatalogue } from './tools/index.js';
@@ -310,6 +315,11 @@ const HANDLERS = new Map([
   ['zuri:chats:create', handleChatCreate],
   ['zuri:chats:delete', handleChatDelete],
   ['zuri:chats:rename', handleChatRename],
+  ['zuri:chats:move', handleChatMove],
+  ['zuri:projects:list', handleProjectList],
+  ['zuri:projects:create', handleProjectCreate],
+  ['zuri:projects:update', handleProjectUpdate],
+  ['zuri:projects:delete', handleProjectDelete],
   ['zuri:chats:clear', handleChatClear],
   ['zuri:chats:append-message', handleChatAppendMessage],
   ['zuri:chat:send', handleChatSend],
@@ -505,6 +515,40 @@ async function handleChatDelete(payload) {
 async function handleChatRename(payload) {
   const result = await renameThread(payload?.threadId, payload?.title);
   if (result?.ok === true) announceState({ area: 'chats' });
+  return result;
+}
+
+/** Move a conversation into a project, or out of one when `projectId` is blank. */
+async function handleChatMove(payload) {
+  const result = await setThreadProject(payload?.threadId, payload?.projectId ?? '');
+  if (result?.ok === true) announceState({ area: 'chats' });
+  return result;
+}
+
+/** Every project, newest first. */
+function handleProjectList() {
+  return listProjects();
+}
+
+async function handleProjectCreate(payload) {
+  const result = await createProject({ name: payload?.name, icon: payload?.icon });
+  if (result?.ok === true) announceState({ area: 'projects' });
+  return result;
+}
+
+async function handleProjectUpdate(payload) {
+  const result = await updateProject(payload?.projectId, { name: payload?.name, icon: payload?.icon });
+  if (result?.ok === true) announceState({ area: 'projects' });
+  return result;
+}
+
+/** Deleting a project also frees its chats, so the chat list refreshes with it. */
+async function handleProjectDelete(payload) {
+  const result = await deleteProject(payload?.projectId);
+  if (result?.ok === true) {
+    announceState({ area: 'projects' });
+    announceState({ area: 'chats' });
+  }
   return result;
 }
 

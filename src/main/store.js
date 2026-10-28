@@ -32,6 +32,7 @@ const WRITE_RETRY_DELAY_MS = 250;
  */
 export const DEFAULT_DATA = Object.freeze({
   chats: Object.freeze([]),
+  projects: Object.freeze([]),
   tasks: Object.freeze([]),
   reminders: Object.freeze([]),
   schedules: Object.freeze([]),
@@ -928,6 +929,190 @@ export async function deleteThread(threadId, options = {}) {
     if (!written.ok) return written;
 
     return { ok: true, data: { id: threadId } };
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   Projects
+
+   projects.json holds `{ id, name, icon, createdAt, updatedAt }`. A chat belongs
+   to a project through `projectId` on the thread, so chats.json stays the only
+   place messages live and deleting a project can never delete a conversation.
+   ------------------------------------------------------------------------- */
+
+/** Icons the New project screen offers; anything else is stored as the default. */
+export const PROJECT_ICONS = Object.freeze(['folder', 'document', 'code', 'chart', 'idea']);
+
+const PROJECT_NAME_MAX_LENGTH = 40;
+
+/**
+ * @param {unknown} name
+ * @returns {string} The name flattened to one line and cut to length, or '' when blank.
+ */
+function normaliseProjectName(name) {
+  if (typeof name !== 'string') return '';
+  return name.replace(/\s+/g, ' ').trim().slice(0, PROJECT_NAME_MAX_LENGTH).trimEnd();
+}
+
+/**
+ * Every project, newest first.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: any[] } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function listProjects(options = {}) {
+  const read = await readStore('projects', options);
+  if (!read.ok) return read;
+
+  const projects = read.data.filter(isThread).sort((left, right) => compareThreads(right, left));
+  return { ok: true, data: projects };
+}
+
+/**
+ * Create one project.
+ * @param {{ name?: string, icon?: string }} [input]
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: any } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function createProject(input = {}, options = {}) {
+  const name = normaliseProjectName(input?.name);
+  if (name === '') return failure('PROJECT_INVALID_NAME', 'a project needs a name');
+
+  const now = new Date().toISOString();
+  const project = {
+    id: randomUUID(),
+    name,
+    icon: PROJECT_ICONS.includes(input?.icon) ? input.icon : PROJECT_ICONS[0],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  return withChatLock(async () => {
+    const read = await readStore('projects', options);
+    if (!read.ok) return read;
+
+    read.data.push(project);
+    const written = await writeStore('projects', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: project };
+  });
+}
+
+/**
+ * Rename one project and, optionally, change its icon.
+ * @param {string} projectId
+ * @param {{ name?: string, icon?: string }} changes
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: any } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function updateProject(projectId, changes = {}, options = {}) {
+  if (typeof projectId !== 'string' || projectId.trim() === '') {
+    return failure('PROJECT_INVALID_ID', 'changing a project needs its id');
+  }
+  const name = changes?.name === undefined ? null : normaliseProjectName(changes.name);
+  if (name === '') return failure('PROJECT_INVALID_NAME', 'a project name cannot be blank');
+
+  return withChatLock(async () => {
+    const read = await readStore('projects', options);
+    if (!read.ok) return read;
+
+    const project = read.data.find((entry) => entry?.id === projectId);
+    if (!project) return failure('PROJECT_NOT_FOUND', `no project with id ${projectId}`);
+
+    if (name !== null) project.name = name;
+    if (PROJECT_ICONS.includes(changes?.icon)) project.icon = changes.icon;
+    project.updatedAt = new Date().toISOString();
+
+    const written = await writeStore('projects', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: project };
+  });
+}
+
+/**
+ * Remove a project and send its chats back to the plain Chats list. The chats are
+ * kept on purpose: a project is a folder, so deleting one must not cost anyone a
+ * conversation.
+ * @param {string} projectId
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { id: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function deleteProject(projectId, options = {}) {
+  if (typeof projectId !== 'string' || projectId.trim() === '') {
+    return failure('PROJECT_INVALID_ID', 'deleting a project needs its id');
+  }
+
+  return withChatLock(async () => {
+    const read = await readStore('projects', options);
+    if (!read.ok) return read;
+
+    const index = read.data.findIndex((entry) => entry?.id === projectId);
+    if (index === -1) return failure('PROJECT_NOT_FOUND', `no project with id ${projectId}`);
+
+    // Release the chats first: if the project write then fails, the project is
+    // still listed and its chats merely sit in Chats, nothing is lost.
+    const chats = await readStore('chats', options);
+    if (!chats.ok) return chats;
+    let released = false;
+    for (const thread of chats.data) {
+      if (thread?.projectId === projectId) {
+        delete thread.projectId;
+        released = true;
+      }
+    }
+    if (released) {
+      const chatsWritten = await writeStore('chats', chats.data, options);
+      if (!chatsWritten.ok) return chatsWritten;
+    }
+
+    read.data.splice(index, 1);
+    const written = await writeStore('projects', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { id: projectId } };
+  });
+}
+
+/**
+ * Put one chat into a project, or back into plain Chats when `projectId` is blank.
+ * Moving a chat is not activity, so `updatedAt` stays and the sidebar order holds.
+ * @param {string} threadId
+ * @param {string} projectId A project id, or '' to take the chat out of its project.
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: any } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function setThreadProject(threadId, projectId, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'moving a chat needs a thread id');
+  }
+  if (typeof projectId !== 'string') {
+    return failure('PROJECT_INVALID_ID', 'a project id must be a string, or blank to leave the project');
+  }
+  const target = projectId.trim();
+
+  return withChatLock(async () => {
+    if (target !== '') {
+      const projects = await readStore('projects', options);
+      if (!projects.ok) return projects;
+      if (!projects.data.some((entry) => entry?.id === target)) {
+        return failure('PROJECT_NOT_FOUND', `no project with id ${target}`);
+      }
+    }
+
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+
+    if (target === '') delete thread.projectId;
+    else thread.projectId = target;
+
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: thread };
   });
 }
 

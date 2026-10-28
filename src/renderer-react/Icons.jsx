@@ -40,4 +40,9 @@ export {
   Download as DownloadIcon,
   LogOut as LogOutIcon,
   Image as ImageIcon,
+  FolderPlus as FolderPlusIcon,
+  FolderOpen as FolderOpenIcon,
+  Code as CodeIcon,
+  ChartColumn as ChartIcon,
+  Lightbulb as IdeaIcon,
 } from 'lucide-react';

@@ -13,6 +13,7 @@ import FeaturesView from './FeaturesView.jsx';
 import SignUpView from './SignUpView.jsx';
 import CloudView from './CloudView.jsx';
 import SignInView from './SignInView.jsx';
+import NewProjectView from './NewProjectView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const isOverlay = new URLSearchParams(window.location.search).has('overlay');
@@ -66,6 +67,21 @@ export default function App() {
       active = false;
       window.removeEventListener('zuri:signed-out', onSignedOut);
     };
+  }, [isOverlay]);
+
+  // Ctrl+K (Cmd+K on a Mac) starts a new chat from anywhere in the shell. Only the
+  // state setters run, so one listener for the life of the window is enough.
+  useEffect(() => {
+    if (isOverlay) return undefined;
+    const onKeyDown = (event) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== 'k') return;
+      event.preventDefault();
+      setRoute('chats');
+      setActiveThreadId('');
+      setChatSessionKey((key) => key + 1);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [isOverlay]);
 
   function toggleTheme() {
@@ -128,6 +144,7 @@ export default function App() {
     <div className="flex h-dvh w-full bg-background text-foreground">
       <Sidebar current={route} onNavigate={setRoute} onNewChat={startNewChat} onSelectThread={openThread} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
       {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} onNewChat={startNewChat} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} openingKind={chatSessionKey % 2 === 0 ? 'greeting' : 'question'} />}
+      {route === 'new-project' && <NewProjectView onCreated={() => { refreshChats(); setRoute('chats'); }} />}
       {route === 'agents' && <AgentsView />}
       {route === 'automations' && <AutomationsView />}
       {route === 'files' && <FilesView />}
