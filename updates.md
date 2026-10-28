@@ -961,3 +961,10 @@
 - Other OS action: run `npm test`, `npm run android:build`, and rebuild the platform installer.
 - Done on: Windows
 
+## 2026-10-28 - Windows
+
+- The desktop composer no longer shows native textarea scroll arrows in narrow windows, and its model picker uses the shorter model name below 700px so the message field keeps more room.
+- Key files: `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`, `scripts/selftest.js`.
+- Other OS action: run `npm run react:build` and `npm run selftest` after syncing.
+- Done on: Windows
+

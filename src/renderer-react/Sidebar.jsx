@@ -25,6 +25,14 @@ import {
 } from './Icons.jsx';
 import { projectIconFor } from './projectIcons.js';
 
+/*
+ * A Mac keyboard has no Ctrl and a Windows keyboard has no Command, so the hint
+ * names whichever key this machine has. The window's handler accepts both (see
+ * App.jsx), so only the label follows the platform.
+ */
+export const NEW_CHAT_HINT =
+  typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform ?? '') ? 'Cmd K' : 'Ctrl K';
+
 export const NAV_ITEMS = [
   { key: 'chats', label: 'Chats', Icon: ChatIcon },
   { key: 'agents', label: 'Agents', Icon: AgentIcon },
@@ -190,7 +198,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             isIconOnly
             size="sm"
             variant="ghost"
-            className={current === key || (key === 'chats' && current === 'history') ? 'zuri-selected-pill' : 'text-muted'}
+            className={current === key || (key === 'chats' && current === 'history') ? 'zuri-rail-active' : 'text-muted'}
             aria-label={label}
             title={label}
             aria-current={current === key ? 'page' : undefined}
@@ -274,7 +282,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           >
             <EditIcon size={16} />
             New chat
-            <kbd className="ml-auto text-xs text-muted" aria-hidden="true">Ctrl K</kbd>
+            <kbd className="ml-auto text-xs text-muted" aria-hidden="true">{NEW_CHAT_HINT}</kbd>
           </Button>
         </div>
 

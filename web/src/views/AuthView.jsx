@@ -2,36 +2,21 @@ import { useEffect, useState } from 'react';
 import AuthShell from '../components/AuthShell.jsx';
 import GoogleSignIn from '../components/GoogleSignIn.jsx';
 import { Button } from '../components/ui.jsx';
-import { CheckIcon } from '../components/Icons.jsx';
 
 const COPY = {
   signin: {
-    eyebrow: 'Welcome back',
-    title: 'Sign in to Zuri Cloud',
-    lead: 'Pick up your plan, your usage and your billing exactly where you left them.',
+    title: 'Sign in',
+    lead: 'Your plan, usage and chats are waiting.',
     submit: 'Sign in',
     busy: 'Signing in...',
-    switchText: 'New to Zuri Cloud?',
-    switchLabel: 'Create an account',
-    switchHref: '/signup',
   },
   signup: {
-    eyebrow: 'Get started',
-    title: 'Create your Zuri Cloud account',
-    lead: 'Create your account, choose a paid plan, and use the same assistant on this dashboard and the desktop app. Use an email and a password, or continue with Google below.',
+    title: 'Create your account',
+    lead: 'One account for the desktop app and this dashboard.',
     submit: 'Create account',
     busy: 'Creating your account...',
-    switchText: 'Already have an account?',
-    switchLabel: 'Sign in',
-    switchHref: '/signin',
   },
 };
-
-const BENEFITS = [
-  { icon: <CheckIcon />, text: 'Choose a paid plan after signing up, with clear monthly token limits.' },
-  { icon: <CheckIcon />, text: 'Company, school and custom-domain Google accounts work too.' },
-  { icon: <CheckIcon />, text: 'Same quota and history on the desktop app and in the browser.' },
-];
 
 // The server names each refusal. These are the sentences behind those names:
 // what went wrong, and what to do about it. A name we do not know falls through
@@ -68,8 +53,13 @@ function problemWith({ email, password, displayName }, mode) {
 }
 
 /**
- * The two account screens. The form is the main way in; Google sits under a
- * quiet "or" for people who signed up that way.
+ * The two account screens, kept short so the whole form fits a phone without
+ * scrolling: the tabs, one line of copy, the fields, the button, then Google.
+ *
+ * The rules and the server's own refusal sentences are unchanged; only the
+ * stacked explanations that used to sit under the button are gone, because the
+ * colour panel beside the card already says them and a phone had to scroll past
+ * them to reach the fields.
  *
  * @param {{
  *   mode: 'signin' | 'signup',
@@ -144,9 +134,10 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
         </button>
       </div>
 
-      <p className="eyebrow">{copy.eyebrow}</p>
-      <h2>{copy.title}</h2>
-      <p className="auth-lead">{copy.lead}</p>
+      <div className="auth-heading">
+        <h2>{copy.title}</h2>
+        <p className="auth-lead">{copy.lead}</p>
+      </div>
 
       <form className="form-stack" onSubmit={submit} noValidate>
         {mode === 'signup' && (
@@ -177,7 +168,23 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
         </label>
 
         <label className="field">
-          <span>Password</span>
+          <span className="field-head">
+            <span>Password</span>
+            {/* Beside its own field rather than on a row of its own: it belongs to
+                this input, and a separate line cost the form a whole row. */}
+            {mode === 'signin' && (
+              <a
+                className="field-aside"
+                href="/forgot-password"
+                onClick={(event) => {
+                  event.preventDefault();
+                  onNavigate('/forgot-password');
+                }}
+              >
+                Forgot?
+              </a>
+            )}
+          </span>
           <input
             type="password"
             name="password"
@@ -187,20 +194,6 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
             onChange={(event) => setPassword(event.target.value)}
           />
         </label>
-
-        {mode === 'signin' && (
-          <p className="auth-switch-line">
-            <a
-              href="/forgot-password"
-              onClick={(event) => {
-                event.preventDefault();
-                onNavigate('/forgot-password');
-              }}
-            >
-              Forgot your password?
-            </a>
-          </p>
-        )}
 
         {error && (
           <p className="form-error" role="alert">
@@ -219,38 +212,19 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
 
       <GoogleSignIn theme={theme} onCredential={onCredential} onError={onError} />
 
-      <ul className="auth-benefits">
-        {BENEFITS.map((item) => (
-          <li key={item.text}>
-            {item.icon}
-            <span>{item.text}</span>
-          </li>
-        ))}
-      </ul>
-
-      <p className="auth-switch-line">
-        {copy.switchText}{' '}
-        <a
-          href={copy.switchHref}
-          onClick={(event) => {
-            event.preventDefault();
-            onNavigate(copy.switchHref);
-          }}
-        >
-          {copy.switchLabel}
-        </a>
-      </p>
-
+      {/* One line instead of a paragraph: the full notices are one tap away and
+          nobody reads a wall of terms to sign in. */}
       <p className="auth-terms">
-        By continuing you agree to the <a href="/terms" target="_blank" rel="noreferrer">Terms and AI disclaimer</a> and
-        the <a href="/privacy" target="_blank" rel="noreferrer">Privacy and data</a> notice. Your messages are sent to
-        AI providers, some outside Nigeria, to write replies. AI can be wrong. A password is stored only as a
-        one-way hash, and Zuri never posts to your Google account.
+        By continuing you accept the{' '}
+        <a href="/terms" target="_blank" rel="noreferrer">
+          terms
+        </a>{' '}
+        and{' '}
+        <a href="/privacy" target="_blank" rel="noreferrer">
+          privacy notice
+        </a>
+        . AI can be wrong.
       </p>
-
-      <Button variant="ghost" block className="auth-back" onClick={() => onNavigate('/')}>
-        Back to home
-      </Button>
     </AuthShell>
   );
 }

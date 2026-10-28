@@ -42,9 +42,11 @@ export const QUIT_LABEL = 'Quit';
  * them (`registerAccelerator` stays off in the template built from these); main.js
  * registers the overlay one as a real global shortcut. It is not Win+Space, which
  * Windows keeps for switching the keyboard language and never hands to an app.
+ * CommandOrControl is Electron's name for the key this machine has: Ctrl on Windows
+ * and Linux, Command on a Mac, so the hint always names a key that exists.
  */
-export const NEW_CHAT_ACCELERATOR = 'Control+N';
-export const OVERLAY_ACCELERATOR = 'Control+Alt+Space';
+export const NEW_CHAT_ACCELERATOR = 'CommandOrControl+N';
+export const OVERLAY_ACCELERATOR = 'CommandOrControl+Alt+Space';
 
 /** The balloon's first two lines (0:13689, 0:13690). */
 export const BALLOON_TITLE = 'Zuri is running in the background';

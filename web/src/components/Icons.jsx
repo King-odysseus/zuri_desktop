@@ -16,10 +16,13 @@ import {
   Globe,
   LayoutGrid,
   Lock,
+  LogOut,
   Menu,
   MessageSquare,
   MonitorSmartphone,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Receipt,
   Shield,
   Sparkles,
@@ -78,6 +81,11 @@ export const MessageIcon = (props) => <MessageSquare {...base} {...props} />;
 export const BackIcon = (props) => <ArrowLeft {...base} {...props} />;
 /** The menu button that opens the navigation drawer on a phone. */
 export const MenuIcon = (props) => <Menu {...base} {...props} />;
+/** Closing the navigation panel, and opening it again from the icons left behind. */
+export const PanelLeftCloseIcon = (props) => <PanelLeftClose {...base} {...props} />;
+export const PanelLeftOpenIcon = (props) => <PanelLeftOpen {...base} {...props} />;
+/** Leaving the account: the signed-in shell carries it in its own panel. */
+export const SignOutIcon = (props) => <LogOut {...base} {...props} />;
 // The rail of the app preview on the landing page uses the same five glyphs as the desktop sidebar.
 export const SendIcon = (props) => <ArrowUp {...base} {...props} />;
 export const TaskIcon = (props) => <ListChecks {...base} {...props} />;

@@ -5,6 +5,9 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const ROOT = path.join(process.cwd(), 'server', 'public');
+// A second preview can run beside the first, so the port is not fixed. The
+// signed-in views are reviewed independently of any other agent's session.
+const PORT = Number(process.env.PORT) || 8099;
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
 const plans = [
   { code: 'starter', name: 'Starter', currency: 'NGN', amountKobo: 250000, monthlyTokens: 2000000 },
@@ -48,6 +51,14 @@ const adminOverview = {
     { code: 'max', name: 'Max', amountKobo: 4000000, monthlyTokens: 40000000, subscribers: 1, limits: { requestsPerMinute: 240, maxConcurrent: 8 } },
   ],
 };
+
+// Sample accounts for the People list, so the plan control can be reviewed. This
+// server is a look, not a store: a plan change only edits this array.
+const adminUsers = [
+  { id: 'u1', email: 'adedayo@example.com', displayName: 'Adedayo Balogun', status: 'active', isAdmin: true, planCode: 'max', planName: 'Max', subscriptionStatus: 'active', periodEnd: '2027-10-28T00:00:00.000Z', usedTokens: 380000, monthlyTokens: 40000000, lastSeenAt: '2026-10-28T08:00:00.000Z' },
+  { id: '22222222-2222-4222-8222-222222222222', email: 'ada@example.com', displayName: 'Ada Obi', status: 'active', isAdmin: false, planCode: 'starter', planName: 'Starter', subscriptionStatus: 'pending', periodEnd: null, usedTokens: 120000, monthlyTokens: 2000000, lastSeenAt: '2026-10-27T18:20:00.000Z' },
+  { id: '33333333-3333-4333-8333-333333333333', email: 'musa@example.com', displayName: 'Musa Ibrahim', status: 'suspended', isAdmin: false, planCode: 'pro', planName: 'Pro', subscriptionStatus: 'past_due', periodEnd: '2026-10-01T00:00:00.000Z', usedTokens: 5900000, monthlyTokens: 6000000, lastSeenAt: '2026-10-20T11:05:00.000Z' },
+];
 
 // Sample saved chats, so the signed-in chat screen can be reviewed without a
 // database. Kept in memory: the preview server is a look, not a store.
@@ -203,6 +214,34 @@ createServer(async (request, response) => {
   if (url.pathname === '/api/image-prices') return json(response, imagePrices);
   if (url.pathname === '/api/admin/overview') return json(response, adminOverview);
   if (url.pathname === '/api/admin/models') return json(response, JSON.parse(await readBody(request)));
+  if (url.pathname === '/api/admin/stats') {
+    return json(response, {
+      accounts: { active: adminUsers.filter((person) => person.status === 'active').length, seenToday: 2, joined: 3, suspended: 1 },
+      usage: { requestsToday: 18, tokensToday: 960000, requests: 240, people: 2 },
+      subscriptions: { paying: 2, monthlyKobo: 185000 },
+      payments: { paid: 4, failed: 1 },
+      server: { databaseMs: 6, uptimeSeconds: 86400, environment: 'preview', nodeVersion: process.version },
+      daily: [],
+      topUsers: [],
+    });
+  }
+  if (url.pathname === '/api/admin/users' && request.method === 'GET') return json(response, { users: adminUsers });
+  if (url.pathname.startsWith('/api/admin/users/') && request.method === 'PATCH') {
+    const body = JSON.parse(await readBody(request));
+    const id = decodeURIComponent(url.pathname.slice('/api/admin/users/'.length));
+    const person = adminUsers.find((entry) => entry.id === id);
+    if (!person) { response.writeHead(404, { 'content-type': 'application/json' }); response.end(JSON.stringify({ ok: false, error: { code: 'USER_NOT_FOUND', message: 'That account no longer exists.' } })); return; }
+    if (body.action === 'set-plan') {
+      const plan = plans.find((entry) => entry.code === body.planCode);
+      person.planCode = plan.code;
+      person.planName = plan.name;
+      person.subscriptionStatus = 'active';
+      person.periodEnd = new Date(Date.now() + Number(body.days) * 86400000).toISOString();
+    }
+    if (body.action === 'suspend') person.status = 'suspended';
+    if (body.action === 'restore') person.status = 'active';
+    return json(response, { user: person });
+  }
   if (url.pathname === '/api/public-config') return json(response, { googleClientId: '' });
   if (url.pathname === '/api/me') return json(response, { user: { id: 'u1', email: 'adedayo@example.com', displayName: 'Adedayo Balogun', status: 'active', isAdmin, createdAt: '2026-08-14T09:20:00.000Z' }, subscription });
   if (url.pathname === '/api/me/usage') return json(response, usage);
@@ -235,4 +274,4 @@ createServer(async (request, response) => {
   } catch {
     response.writeHead(404).end('not found');
   }
-}).listen(8099, '127.0.0.1', () => console.log('preview on http://127.0.0.1:8099'));
+}).listen(PORT, '127.0.0.1', () => console.log(`preview on http://127.0.0.1:${PORT}`));

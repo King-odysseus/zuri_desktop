@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
-import { IconButton } from '../components/ui.jsx';
-import { ChartIcon, CardIcon, CloseIcon, GridIcon, MenuIcon, MessageIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
+import { Button, IconButton } from '../components/ui.jsx';
+import { ChartIcon, CardIcon, CloseIcon, GridIcon, LogoMark, MenuIcon, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, ReceiptIcon, ShieldIcon, SignOutIcon, SunIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
@@ -9,6 +10,18 @@ import OverviewView from './OverviewView.jsx';
 import UsageView from './UsageView.jsx';
 import PlansView from './PlansView.jsx';
 import BillingView from './BillingView.jsx';
+
+const COLLAPSE_KEY = 'zuri-cloud-nav-collapsed';
+
+/** Whether the panel was left collapsed the last time this browser saw it. */
+function readCollapsed() {
+  try {
+    return window.localStorage.getItem(COLLAPSE_KEY) === '1';
+  } catch {
+    // Private browsing can refuse storage; the panel then simply starts open.
+    return false;
+  }
+}
 
 export const NAV_ITEMS = [
   { id: 'chat', label: 'Chat', icon: <MessageIcon /> },
@@ -38,15 +51,47 @@ function NavList({ view, onViewChange, isAdmin }) {
 }
 
 /**
- * The navigation panel: the account, the destinations and the download link.
+ * The navigation panel: the brand, the account, the destinations, the download
+ * link and the account actions.
  *
- * The chat renders this inside its own list column, so a chat has one sidebar holding
- * both the destinations and the conversations, the way the desktop app does. Every
- * other page renders it as the docked sidebar, or the drawer on a phone.
+ * The chat renders this inside its own list column, so a chat has one sidebar
+ * holding both the destinations and the conversations, the way the desktop app
+ * does. Every other page renders it as the docked sidebar, or the drawer on a
+ * phone.
  */
-function SidebarContents({ user, name, view, onViewChange, onCloseNav, withAccount = true }) {
+function SidebarContents({ user, name, view, onViewChange, onCloseNav, theme, onToggleTheme, onSignOut, collapsed = false, onToggleCollapsed = () => {}, withAccount = true }) {
   return (
     <>
+      {/* The shell has no top bar, so the app is named here, as the desktop app's
+          panel names it. On a phone this row also carries the way out of the drawer. */}
+      <div className="sidebar-brand">
+        <span className="brand-mark">
+          <LogoMark size={20} />
+        </span>
+        <span className="brand-name">Zuri Cloud</span>
+        <span className="sidebar-brand-actions">
+          <IconButton
+            size="sm"
+            className="sidebar-collapse"
+            label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+            aria-expanded={!collapsed}
+            onClick={onToggleCollapsed}
+          >
+            {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+          </IconButton>
+          <IconButton
+            size="sm"
+            label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={onToggleTheme}
+          >
+            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+          </IconButton>
+          <IconButton label="Close navigation" size="sm" className="sidebar-brand-close" onClick={onCloseNav}>
+            <CloseIcon />
+          </IconButton>
+        </span>
+      </div>
       {withAccount && (
         <div className="account-card">
           <span className="avatar">{initialsFor(user.displayName, user.email)}</span>
@@ -60,18 +105,18 @@ function SidebarContents({ user, name, view, onViewChange, onCloseNav, withAccou
           </span>
         </div>
       )}
-      {/* The bar already names the app once the panel is docked, so only the drawer shows this. */}
-      <div className="sidebar-drawer-head">
-        <span className="brand-name">Zuri Cloud</span>
-        <IconButton label="Close navigation" size="sm" onClick={onCloseNav}>
-          <CloseIcon />
-        </IconButton>
-      </div>
       <nav className="nav" aria-label="Dashboard sections">
         <NavList view={view} onViewChange={onViewChange} isAdmin={user.isAdmin === true} />
       </nav>
       <p className="stat-meta sidebar-note">Signed in to Zuri Cloud.</p>
       <DownloadLink className="sidebar-download" />
+      {/* At the foot, because leaving the account is not part of the workspace. */}
+      <div className="sidebar-foot">
+        <Button variant="ghost" size="sm" onClick={onSignOut}>
+          <SignOutIcon />
+          <span>Sign out</span>
+        </Button>
+      </div>
     </>
   );
 }
@@ -81,24 +126,43 @@ function SidebarContents({ user, name, view, onViewChange, onCloseNav, withAccou
  * floating button below 900px, so no bottom bar covers the chat composer. The chat
  * carries the navigation itself, which is why the docked sidebar is skipped there.
  */
-export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn, navOpen, onOpenNav, onCloseNav }) {
+export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn, onSignOut, theme, onToggleTheme, navOpen, onOpenNav, onCloseNav }) {
   const user = account.me?.user ?? {};
   const name = user.displayName || user.email || 'Zuri user';
   const isChat = view === 'chat';
+  // The panel can be folded away to its icons and opened again, as the desktop
+  // app allows. The choice is kept, so a reload does not undo it.
+  const [navCollapsed, setNavCollapsed] = useState(readCollapsed);
+  const toggleCollapsed = () => {
+    setNavCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0');
+      } catch {
+        // Nothing to do: the panel still collapses for this visit.
+      }
+      return next;
+    });
+  };
   const navigation = (
     <SidebarContents
+      collapsed={navCollapsed}
+      onToggleCollapsed={toggleCollapsed}
       user={user}
       name={name}
       view={view}
       onViewChange={onViewChange}
       onCloseNav={onCloseNav}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
+      onSignOut={onSignOut}
     />
   );
 
   return (
     <div className="app">
       {!isChat && (
-        <aside className={`sidebar${navOpen ? ' is-open' : ''}`} aria-label="Dashboard navigation">
+        <aside className={`sidebar${navOpen ? ' is-open' : ''}${navCollapsed ? ' is-collapsed' : ''}`} aria-label="Dashboard navigation">
           {navigation}
         </aside>
       )}
@@ -107,12 +171,16 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
         <div className="app-content">
           {isChat && (
             <ChatView
+              navCollapsed={navCollapsed}
+              onToggleCollapsed={toggleCollapsed}
               onSignIn={onSignIn}
               userName={user.displayName ?? ''}
               navigation={navigation}
             />
           )}
-          {view === 'overview' && <OverviewView me={account.me} usage={account.usage} />}
+          {view === 'overview' && (
+            <OverviewView me={account.me} usage={account.usage} onViewChange={onViewChange} />
+          )}
           {view === 'usage' && (
             <UsageView
               usage={account.usage}
@@ -133,6 +201,9 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
               busy={busy}
               onChoose={onChoose}
               onSignIn={onSignIn}
+              // An administrator never checks out: their plan, and every account's,
+              // is set on the Admin tab's People list at no cost.
+              admin={user.isAdmin === true}
             />
           )}
           {view === 'billing' && (

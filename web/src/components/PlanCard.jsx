@@ -18,6 +18,7 @@ export default function PlanCard({
   onChoose,
   onSignIn,
   imageLines = [],
+  admin = false,
 }) {
   const isCurrent = plan.code === currentPlan;
   const images = Array.isArray(imageLines) ? imageLines : [];
@@ -31,6 +32,10 @@ export default function PlanCard({
     );
   } else if (!signedIn) {
     action = <Button onClick={onSignIn}>Sign in to choose</Button>;
+  } else if (admin) {
+    // An administrator never pays, so the tile offers no checkout at all rather
+    // than a button the server would refuse.
+    action = <Button disabled>No payment needed</Button>;
   } else {
     action = (
       <Button disabled={busy} onClick={() => onChoose(plan.code)}>

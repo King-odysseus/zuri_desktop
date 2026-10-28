@@ -75,3 +75,68 @@ assert.ok(topupQueries.some((entry) => entry.text === 'COMMIT'), 'the grant comm
 assert.ok(!topupQueries.some((entry) => entry.text.startsWith('UPDATE subscriptions')), 'a top-up never changes the plan');
 
 console.log('PASS database top-up grants tokens only');
+
+// An administrator pays for nothing: a Starter row that is still pending is
+// switched on at the top plan while the account is created, so the account is
+// never sent through Paystack for a plan it gets for free.
+const adminQueries = [];
+const adminClient = {
+  async query(text, values = []) {
+    adminQueries.push({ text, values });
+    if (text.startsWith('INSERT INTO users')) {
+      return { rows: [{ id: 'admin-1', email: 'boss@example.com', is_admin: true }] };
+    }
+    return { rows: [] };
+  },
+  release() {},
+};
+const adminRepository = createRepository({ connect: async () => adminClient });
+const admin = await adminRepository.ensureAdminAccount({ email: 'boss@example.com', passwordHash: 'scrypt$hash' });
+assert.equal(admin.isAdmin, true);
+assert.ok(adminQueries.some((entry) => entry.text.startsWith('INSERT INTO users')), 'the administrator is created or promoted');
+assert.ok(!adminQueries.some((entry) => entry.text.includes("'starter', 'pending'")), 'an administrator never waits on a pending plan');
+assert.ok(
+  adminQueries.some(
+    (entry) =>
+      entry.text.startsWith("UPDATE subscriptions SET status = 'active'") &&
+      entry.text.includes("status = 'pending'") &&
+      entry.values[0] === 'admin-1',
+  ),
+  'a pending plan is switched on without any payment',
+);
+assert.ok(
+  adminQueries.some(
+    (entry) =>
+      entry.text.startsWith('INSERT INTO subscriptions') && entry.text.includes("'active', NOW()"),
+  ),
+  'an administrator with no plan row is given one outright',
+);
+assert.ok(adminQueries.some((entry) => entry.text === 'COMMIT'), 'the change commits');
+
+console.log('PASS database administrator gets a plan without payment');
+// An administrator putting an account on a plan is a gift, not a sale: the plan
+// becomes active at once and no payment row is written anywhere in the transaction.
+const grantQueries = [];
+const grantClient = {
+  async query(text, values = []) {
+    grantQueries.push({ text, values });
+    if (text.startsWith('SELECT id FROM users')) return { rows: [{ id: 'user-1' }], rowCount: 1 };
+    return { rows: [], rowCount: 1 };
+  },
+  release() {},
+};
+const grantRepository = createRepository({ connect: async () => grantClient });
+await grantRepository.adminSetUserPlan('user-1', 'max', 90);
+const grantInsert = grantQueries.find((entry) => entry.text.startsWith('INSERT INTO subscriptions'));
+assert.ok(grantInsert, 'the gift creates a subscription row');
+assert.equal(grantInsert.values[1], 'max', 'the account lands on the chosen plan');
+assert.equal(grantInsert.values[2], '90', 'for the chosen number of days');
+assert.ok(grantInsert.text.includes('active'), 'the plan is live straight away');
+assert.ok(
+  grantQueries.some((entry) => entry.text.startsWith('UPDATE subscriptions') && entry.text.includes('cancelled')),
+  'the previous live plan is retired so only one remains',
+);
+assert.ok(!grantQueries.some((entry) => entry.text.includes('INTO payments')), 'a gift writes no payment row');
+assert.ok(grantQueries.some((entry) => entry.text === 'COMMIT'), 'the grant commits');
+
+console.log('PASS database a gifted plan needs no payment');

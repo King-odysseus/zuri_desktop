@@ -113,6 +113,29 @@ export function createRepository(pool) {
     );
   }
 
+  /**
+   * An administrator pays for nothing, so a Starter row that is still pending is
+   * switched on at the top plan instead of waiting for Paystack. Only a pending
+   * row is touched: a plan an administrator chose on purpose is an active or
+   * past-due row, and re-planning that on every boot would undo the choice.
+   * @param {import('pg').PoolClient} client
+   * @param {string} userId
+   */
+  async function ensureAdminSubscription(client, userId) {
+    await client.query(
+      "UPDATE subscriptions SET status = 'active', plan_code = (SELECT code FROM plans ORDER BY amount_kobo DESC LIMIT 1), " +
+        "current_period_start = NOW(), current_period_end = NOW() + INTERVAL '1 year', updated_at = NOW() " +
+        "WHERE user_id = $1 AND status = 'pending'",
+      [userId],
+    );
+    await client.query(
+      'INSERT INTO subscriptions (user_id, plan_code, status, current_period_start, current_period_end) ' +
+        "SELECT $1, (SELECT code FROM plans ORDER BY amount_kobo DESC LIMIT 1), 'active', NOW(), NOW() + INTERVAL '1 year' " +
+        "WHERE NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = $1 AND status IN ('pending', 'active', 'past_due'))",
+      [userId],
+    );
+  }
+
   return {
     async findOrCreateGoogleUser(profile) {
       const client = await pool.connect();
@@ -248,9 +271,9 @@ export function createRepository(pool) {
      *
      * One statement rather than a read then a write, so two boots racing each other
      * cannot both insert: the loser lands on the conflict clause. An empty
-     * passwordHash keeps whatever hash the row holds. A new account also gets the
-     * Administrators still receive a pending Starter row so the account has a
-     * consistent billing record; admin routes do not require paid chat access.
+     * passwordHash keeps whatever hash the row holds. The account is then put on a
+     * plan without payment, so an administrator can use the product straight away
+     * and hand plans out from the People list instead of buying one through Paystack.
      * @param {{ email: string, passwordHash?: string }} request Email normalised by the caller.
      * @returns {Promise<object>} The public user, carrying isAdmin.
      */
@@ -265,7 +288,7 @@ export function createRepository(pool) {
           [email, passwordHash],
         );
         const user = result.rows[0];
-        await ensureStarterSubscription(client, user.id);
+        await ensureAdminSubscription(client, user.id);
         await client.query('COMMIT');
         return publicUser(user);
       } catch (error) {
@@ -683,8 +706,12 @@ export function createRepository(pool) {
           "FROM usage_events WHERE created_at >= CURRENT_DATE - ($1::int - 1) GROUP BY 1) r ON r.day = d::date ORDER BY d",
           [window],
         ),
+        // An administrator's plan is given, not sold, so counting it as income
+        // would report revenue the business never took.
         pool.query(
-          "SELECT COUNT(*)::INT AS paying, COALESCE(SUM(p.amount_kobo), 0)::BIGINT AS monthly_kobo FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.status IN ('active', 'past_due')",
+          "SELECT COUNT(*)::INT AS paying, COALESCE(SUM(p.amount_kobo), 0)::BIGINT AS monthly_kobo " +
+            'FROM subscriptions s JOIN plans p ON p.code = s.plan_code JOIN users u ON u.id = s.user_id ' +
+            "WHERE s.status IN ('active', 'past_due') AND u.is_admin = FALSE",
         ),
         pool.query(
           "SELECT u.email, u.display_name, COUNT(*)::INT AS requests, COALESCE(SUM(COALESCE(e.quota_tokens, e.total_tokens)), 0)::BIGINT AS tokens " +

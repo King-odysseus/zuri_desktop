@@ -45,10 +45,10 @@ function fakeRepository() {
   };
 }
 
-function appFor(isAdmin, repository) {
+function appFor(isAdmin, repository, extra = {}) {
   const service = createAuthService({ repository });
   const session = { user: { id: 'admin-1', email: 'boss@example.com', isAdmin }, subscription: { id: 's1', planCode: 'max', monthlyTokens: 1, currentPeriodStart: new Date(0), currentPeriodEnd: new Date(9e12) } };
-  return createApp({ auth: { ...service, authenticate: async () => session }, repository });
+  return createApp({ auth: { ...service, authenticate: async () => session }, repository, ...extra });
 }
 
 function call(app, path, options = {}) {
@@ -124,6 +124,11 @@ repo.state.userExists = false;
 assert.equal((await patch(admin, TARGET_ID, { action: 'set-plan', planCode: 'pro' })).status, 404);
 repo.state.userExists = true;
 
+// An administrator can put themselves on a plan too, which is the other half of the
+// same gesture: unlike suspend, a plan change on your own account is allowed.
+assert.equal((await patch(selfApp, TARGET_ID, { action: 'set-plan', planCode: 'max', days: 365 })).status, 200);
+assert.deepEqual(repo.calls.at(-1), { plan: { userId: TARGET_ID, planCode: 'max', days: 365 } });
+
 // A reset replaces the password and signs the person out everywhere.
 const reset = await (await patch(admin, TARGET_ID, { action: 'reset-password' })).json();
 assert.equal(reset.data.temporaryPassword.length, 14);
@@ -142,5 +147,36 @@ assert.ok(stats.data.server.databaseMs >= 0);
 
 // An unknown admin address is a 404, not the overview by accident.
 assert.equal((await call(admin, '/api/admin/nothing')).status, 404);
+
+// An administrator is never sent to Paystack. The route refuses before any payment
+// row is written, so no money can be taken for a plan the account gets for free.
+const billingRepo = fakeRepository();
+let paymentsWritten = 0;
+billingRepo.createPayment = async () => { paymentsWritten += 1; };
+billingRepo.markPaymentFailed = async () => {};
+const billing = {
+  paystack: {
+    async initializeTransaction() {
+      return { authorization_url: 'https://checkout.paystack.com/test', access_code: 'access-test' };
+    },
+  },
+  paystackPlanCodes: { starter: 'PLN_starter' },
+  paystackCallbackUrl: 'https://cloud.example.com/billing/callback',
+};
+const adminCheckout = await call(appFor(true, billingRepo, billing), '/api/billing/checkout', {
+  method: 'POST',
+  body: JSON.stringify({ planCode: 'starter' }),
+});
+assert.equal(adminCheckout.status, 409);
+assert.equal((await adminCheckout.json()).error.code, 'ADMIN_PLAN_IS_FREE');
+assert.equal(paymentsWritten, 0, 'a refused checkout writes no payment row');
+
+// The same request from a customer still starts a real checkout.
+const customerCheckout = await call(appFor(false, billingRepo, billing), '/api/billing/checkout', {
+  method: 'POST',
+  body: JSON.stringify({ planCode: 'starter' }),
+});
+assert.equal(customerCheckout.status, 200);
+assert.equal(paymentsWritten, 1);
 
 console.log('PASS admin user management');

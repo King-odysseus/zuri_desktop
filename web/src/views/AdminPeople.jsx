@@ -74,6 +74,10 @@ export default function AdminPeople({ days, plans }) {
   const [notice, setNotice] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // The account whose plan is being changed, with the choice being made. Changing a
+  // plan is an inline row rather than a browser prompt: a prompt cannot offer the
+  // plan names, and it cannot be cancelled once the first box is answered.
+  const [planEditor, setPlanEditor] = useState(null);
 
   const loadStats = useCallback(async () => {
     try {
@@ -127,12 +131,28 @@ export default function AdminPeople({ days, plans }) {
     });
   }
 
-  function changePlan(user) {
-    const planCode = window.prompt(`Plan for ${user.email} (${plans.map((plan) => plan.code).join(', ')})`, user.planCode || 'starter');
-    if (!planCode) return;
-    const length = window.prompt('For how many days?', '30');
-    if (!length) return;
-    act(user, { action: 'set-plan', planCode: planCode.trim(), days: Number(length) });
+  function openPlanEditor(user) {
+    setPlanEditor({
+      userId: user.id,
+      email: user.email,
+      name: user.displayName || user.email,
+      planCode: user.planCode || plans[0]?.code || 'starter',
+      days: 30,
+    });
+  }
+
+  function savePlan(event) {
+    event.preventDefault();
+    if (!planEditor) return;
+    const days = Number(planEditor.days);
+    if (!Number.isFinite(days) || days < 1) {
+      setError('Choose a whole number of days, at least 1.');
+      return;
+    }
+    const person = { id: planEditor.userId, email: planEditor.email };
+    const choice = { action: 'set-plan', planCode: planEditor.planCode, days };
+    setPlanEditor(null);
+    act(person, choice);
   }
 
   return (
@@ -207,6 +227,35 @@ export default function AdminPeople({ days, plans }) {
             <input type="search" placeholder="Search name or email" value={search} onChange={(event) => setSearch(event.target.value)} />
           </label>
         </div>
+        <p className="stat-meta">Plan puts an account on a plan straight away, with no payment step. It works for customers, for yourself, and for another administrator.</p>        {/* The editor is a card above the table, not a row inside it: the table is
+            wider than a phone and scrolls sideways, and a form in there would open
+            out of sight. */}
+        {planEditor && (
+          <form className="card admin-plan-form" onSubmit={savePlan}>
+            <p className="stat-label">Plan for {planEditor.name}</p>
+            <div className="admin-fields">
+              <label className="field"><span>Plan</span>
+                <select value={planEditor.planCode} onChange={(event) => setPlanEditor({ ...planEditor, planCode: event.target.value })}>
+                  {plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}
+                </select>
+              </label>
+              <label className="field"><span>Days active</span>
+                <input
+                  type="number"
+                  min="1"
+                  max="366"
+                  value={planEditor.days}
+                  onChange={(event) => setPlanEditor({ ...planEditor, days: event.target.value })}
+                />
+              </label>
+            </div>
+            <div className="card-actions">
+              <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Working' : 'Put on this plan'}</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setPlanEditor(null)}>Cancel</button>
+            </div>
+            <p className="stat-meta">Takes effect now. No payment step and no Paystack charge.</p>
+          </form>
+        )}
         <div className="admin-scroll">
           <table className="admin-table">
             <thead>
@@ -228,17 +277,29 @@ export default function AdminPeople({ days, plans }) {
                   <td>{since(user.lastSeenAt)}</td>
                   <td>{user.status}</td>
                   <td>
-                    {!user.isAdmin && (
-                      <span className="card-actions">
-                        <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => changePlan(user)}>Plan</button>
-                        <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'reset-password' }, `Reset the password for ${user.email}? They will be signed out everywhere.`)}>Reset</button>
-                        {user.status === 'suspended' ? (
-                          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'restore' })}>Restore</button>
-                        ) : (
-                          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'suspend' }, `Suspend ${user.email}? They are signed out and cannot sign in until restored.`)}>Suspend</button>
-                        )}
-                      </span>
-                    )}
+                    {/* The plan button is offered on every row, administrators and
+                        this account included: a plan here is given, never bought. */}
+                    <span className="card-actions">
+                      <button
+                        type="button"
+                        className={`btn ${planEditor?.userId === user.id ? 'btn-secondary' : 'btn-ghost'}`}
+                        disabled={busy}
+                        aria-expanded={planEditor?.userId === user.id}
+                        onClick={() => openPlanEditor(user)}
+                      >
+                        Plan
+                      </button>
+                      {!user.isAdmin && (
+                        <>
+                          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'reset-password' }, `Reset the password for ${user.email}? They will be signed out everywhere.`)}>Reset</button>
+                          {user.status === 'suspended' ? (
+                            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'restore' })}>Restore</button>
+                          ) : (
+                            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'suspend' }, `Suspend ${user.email}? They are signed out and cannot sign in until restored.`)}>Suspend</button>
+                          )}
+                        </>
+                      )}
+                    </span>
                   </td>
                 </tr>
               ))}

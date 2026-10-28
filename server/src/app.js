@@ -818,6 +818,10 @@ export function createApp(dependencies = {}) {
       const token = bearerToken(request);
       const session = await dependencies.auth.authenticate(token);
       if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      // An administrator never pays: their own plan, and everyone else's, is set
+      // from Admin > People. Refusing here too means a stale button cannot take
+      // money for something the account already gets for free.
+      if (session.user.isAdmin === true) return response(409, { ok: false, error: { code: 'ADMIN_PLAN_IS_FREE', message: 'Administrator accounts do not pay for a plan. Set your own plan, or anyone else\'s, in Admin on the People list.' } });
       try {
         const body = await readJson(request);
         const plan = findPlan(body.planCode);

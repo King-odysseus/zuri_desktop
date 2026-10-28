@@ -1,8 +1,9 @@
 const root = document.documentElement;
-const SCREENS = ['home', 'chat', 'tasks', 'settings'];
+const SCREENS = ['home', 'dashboard', 'chat', 'tasks', 'settings'];
 
-// The same destinations as src/renderer-react/Sidebar.jsx, so the mockup shell is the real shell.
+// The same destinations as src/renderer-react/Sidebar.jsx, plus the proposed Dashboard at the top.
 const NAV_ITEMS = [
+  { key: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', screen: 'dashboard' },
   { key: 'chats', label: 'Chats', icon: 'message-square', screen: 'chat' },
   { key: 'agents', label: 'Agents', icon: 'bot' },
   { key: 'tasks', label: 'Tasks', icon: 'list-checks', screen: 'tasks' },
@@ -14,7 +15,7 @@ const NAV_ITEMS = [
   { key: 'settings', label: 'Settings', icon: 'settings', screen: 'settings' },
 ];
 // On a phone the rail becomes a bottom bar of five, so the rest would not fit.
-const PHONE_KEYS = ['chats', 'tasks', 'reminders', 'files', 'settings'];
+const PHONE_KEYS = ['dashboard', 'chats', 'tasks', 'files', 'settings'];
 const RECENTS = ['Launch plan outline', 'Weekly report draft', 'Budget questions', 'Client proposal notes'];
 
 // Tailwind class sets, kept here so the tabs and chips can swap between two looks.

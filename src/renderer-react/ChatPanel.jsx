@@ -1333,10 +1333,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                 aria-expanded={modelMenu}
                 aria-label={`Chat model: ${chatModelLabel}`}
                 title={`${chatModelLabel}${chatModel !== null ? `. ${chatModel.note}` : ''} Change the model for this chat.`}
-                className="flex h-10 max-w-32 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted outline-none hover:text-foreground focus:ring-2 focus:ring-accent/30"
+                className="zuri-chat-model-trigger flex h-10 max-w-32 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted outline-none hover:text-foreground focus:ring-2 focus:ring-accent/30"
                 onClick={() => setModelMenu((open) => !open)}
               >
-                <span className="truncate">{chatModelLabel}</span>
+                <span className="zuri-chat-model-label-full truncate">{chatModelLabel}</span>
+                <span className="zuri-chat-model-label-short truncate" aria-hidden="true">
+                  {chatModelLabel.replace(/^Zuri\s+/, '')}
+                </span>
                 <ChevronDownIcon size={12} />
               </button>
               {modelMenu && (

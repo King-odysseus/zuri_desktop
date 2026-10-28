@@ -219,11 +219,39 @@ button,
 }
 
 .composer-textarea {
+  /* The draft auto-grows from ChatPanel. Hiding overflow here also covers the
+     first paint, before that effect runs, when Windows otherwise draws arrow
+     buttons inside an empty one-line textarea. */
+  overflow-y: hidden;
   scrollbar-width: none;
 }
 
 .composer-textarea::-webkit-scrollbar {
   display: none;
+}
+
+.zuri-chat-model-label-short {
+  display: none;
+}
+
+/* A narrow app window needs most of the composer for the message. Keep the full
+   model name in its accessible label, but show only "Flash", "Core", and so on
+   beside Send until the desktop row has room again. */
+@media (max-width: 700px) {
+  .zuri-chat-model-trigger {
+    height: 2.25rem;
+    max-width: 5rem;
+    padding-inline: 0.25rem;
+    font-size: 0.6875rem;
+  }
+
+  .zuri-chat-model-label-full {
+    display: none;
+  }
+
+  .zuri-chat-model-label-short {
+    display: inline;
+  }
 }
 
 /* Preserve wheel and keyboard scrolling without showing a second visual rail. */
@@ -430,6 +458,19 @@ button,
 .zuri-sidebar-panel .zuri-selected-pill {
   background: color-mix(in srgb, var(--accent) 26%, transparent) !important;
   color: #ffffff !important;
+}
+
+/* The rail marks the destination you are on with the accent itself. A filled
+   rounded pill inside a column of icons read as a button that had just been
+   pressed, so the rail now matches the web sidebar and keeps no fill. */
+.zuri-sidebar-rail .zuri-rail-active {
+  background: transparent !important;
+  color: var(--accent) !important;
+}
+
+.zuri-sidebar-rail .zuri-rail-active:hover,
+.zuri-sidebar-rail .zuri-rail-active:focus-visible {
+  background: color-mix(in srgb, var(--accent) 16%, transparent) !important;
 }
 
 /* Empty-chat overview: real counts from tasks, reminders and automations (see

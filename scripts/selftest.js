@@ -1286,6 +1286,7 @@ await Promise.all(pendingChecks);
 // has to leave the chat to change model, which is what this change removes.
 check('the composer offers the model chip and sends the choice with the message', async () => {
   const panel = read('src/renderer-react/ChatPanel.jsx');
+  const styles = read('src/renderer-react/app.css');
   const chipAt = panel.indexOf('aria-label={`Chat model: ');
   const boxAt = panel.indexOf('<ComposerTextarea');
   const sendAt = panel.indexOf('aria-label="Send"');
@@ -1296,6 +1297,12 @@ check('the composer offers the model chip and sends the choice with the message'
   if (chipAt < boxAt) throw new Error('the chip drifted back to the left of the message box');
   if (chipAt > sendAt) throw new Error('the chip is not beside Send');
   if (panel.includes('AgentIcon size={14}')) throw new Error('the robot icon is back in the chip');
+  if (!/\.composer-textarea\s*\{[^}]*overflow-y:\s*hidden;/.test(styles)) {
+    throw new Error('the composer textarea can draw an internal scrollbar');
+  }
+  for (const compactPart of ['zuri-chat-model-trigger', 'zuri-chat-model-label-full', 'zuri-chat-model-label-short']) {
+    if (!panel.includes(compactPart)) throw new Error(`the narrow model control is missing ${compactPart}`);
+  }
   // The chip is plain text plus a chevron, not a filled pill: a fourth rounded shape
   // in a row of round buttons read as another action rather than as the model name.
   const chipEnd = panel.indexOf('</button>', chipAt);
@@ -1444,24 +1451,32 @@ check('a phone reaches the navigation through a drawer with a floating button an
 check('the chat takes the whole window and only the transcript scrolls', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
   const styles = read('web/src/styles.css');
+  const topBar = read('web/src/components/TopBar.jsx');
   if (!dashboard.includes("isChat ? ' is-chat' : ''")) throw new Error('the chat view does not mark the shell');
-  if (!/\.app-main\.is-chat \.app-content \{[^}]*height: calc\(100dvh - var\(--bar-height\)\)/.test(styles)) {
-    throw new Error('the chat does not fill the window under the bar');
+  if (!/if \(signedIn\) return null;/.test(topBar)) throw new Error('the public bar still takes space above the signed-in shell');
+  // The shell is as tall as the window and the chat content fills whatever is left
+  // of it. A fixed 100dvh on the content ignored anything above the app, so the
+  // height comes from the shell instead.
+  if (!/\.app \{[^}]*min-height: 100dvh;/.test(styles)) throw new Error('the signed-in shell is not as tall as the window');
+  if (!/\.app-main\.is-chat \.app-content \{[^}]*height: 100%;/.test(styles)) {
+    throw new Error('the chat does not fill the signed-in window');
   }
   if (!/\.chat-transcript \{[^}]*overflow-y: auto;/.test(styles)) throw new Error('the transcript does not scroll on its own');
   if (!/\.chat-composer-wrap \{[^}]*flex: 0 0 auto;/.test(styles)) throw new Error('the composer is not pinned under the transcript');
   return 'full-height chat, scrolling transcript, fixed composer';
 });
 
-check('the model beside Send is a menu in the web chat, as it is in the app', () => {
+check('the model beside Send is a menu anchored to its own chip', () => {
   const source = read('web/src/views/ChatView.jsx');
-  if (!source.includes("import { Dropdown, DropdownItem, Textarea } from 'flowbite-react';")) {
-    throw new Error('the composer does not use the Flowbite components');
+  if (!source.includes('role="menu" aria-label="Choose a model"')) {
+    throw new Error('the model is not offered as a menu');
   }
-  if (!/<Dropdown label=\{modelName\}/.test(source)) throw new Error('the model is not offered as a menu');
-  if (!source.includes('onClick={() => setModel(entry.code)}')) throw new Error('a model cannot be picked');
+  // The chip carries its own list: a floating panel measured the shrunken phone
+  // chip and left its corner short of the button it belongs to.
+  if (!/\.chat-model-menu \{[^}]*position: absolute;[^}]*right: 0;/.test(read('web/src/styles.css'))) throw new Error('the model menu is not anchored to its chip');
+  if (!source.includes('setModel(entry.code);')) throw new Error('a model cannot be picked');
   if (!source.includes('setModel(data.model)')) throw new Error('a chat does not reopen on its own model');
-  return 'Flowbite dropdown, per-chat model restored on open';
+  return 'chip-anchored menu, per-chat model restored on open';
 });
 
 check('conversation search is capped and encoded before it reaches the server', () => {
@@ -1546,16 +1561,16 @@ check('the web chat is built from Flowbite components and lucide icons', () => {
   if (!ui.includes('aria-label={label}')) throw new Error('the icon button is unnamed for screen readers');
   for (const [name, source] of [['chat', chat], ['shell', dashboard]]) {
     const raw = (source.match(/<button[\s>]/g) ?? []).length;
-    // The chat keeps one plain button: a conversation row is a list row with two
-    // controls beside it, which no Flowbite item models without nesting a button
-    // inside a button. Everything else must be a component.
-    const allowed = name === 'chat' ? 1 : 2;
+    // The chat keeps two plain buttons: a conversation row is a list row with two
+    // controls beside it, and the model chip is a text trigger for its list.
+    // Everything else must be a component.
+    const allowed = 2;
     if (raw > allowed) throw new Error(`${name} still draws ${raw} raw buttons`);
   }
 
-  // The composer and the model menu are Flowbite, not reimplemented.
+  // The composer stays a Flowbite textarea; the model chip owns its list so the
   if (!chat.includes('Textarea')) throw new Error('the composer is not a Flowbite textarea');
-  if (!chat.includes('Dropdown')) throw new Error('the model menu is not a Flowbite dropdown');
+  if (!chat.includes('chat-model-menu')) throw new Error('the model menu is not anchored to its chip');
 
   return 'Flowbite controls, lucide icons, one copy path';
 });

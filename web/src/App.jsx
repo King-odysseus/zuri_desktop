@@ -351,6 +351,8 @@ export default function App() {
           onTopUp={handleTopUp}
           onSignIn={handleSignIn}
           onSignOut={() => handleSignOut('/signin')}
+          theme={theme}
+          onToggleTheme={toggleTheme}
           navOpen={navOpen}
           onOpenNav={() => setNavOpen(true)}
           onCloseNav={() => setNavOpen(false)}
@@ -407,7 +409,7 @@ export default function App() {
         onToggleTheme={toggleTheme}
         signedIn={status === 'signed-in'}
         onSignIn={handleSignIn}
-        onSignOut={() => handleSignOut('/')}
+
         onNavigate={navigate}
       />
       <NoticeBar notice={notice} />

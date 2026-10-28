@@ -3,19 +3,24 @@ import { Button } from './ui.jsx';
 import { themeLabel } from '../lib/theme.js';
 
 /**
- * The bar spans the whole window; only its inner row is capped, so no bare
- * strip appears beside it on a wide screen.
+ * The public pages' bar. It spans the whole window and only its inner row is
+ * capped, so no bare strip appears beside it on a wide screen.
+ *
+ * The signed-in shell does not draw it: the app names itself in its own sidebar
+ * and carries the theme switch and sign out there, which is the shape the desktop
+ * app and the design file both use.
  *
  * @param {{
  *   theme: 'dark' | 'light',
  *   onToggleTheme: () => void,
  *   signedIn: boolean,
  *   onSignIn: () => void,
- *   onSignOut: () => void,
  *   onNavigate: (path: string) => void,
  * }} props
  */
-export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onSignOut, onNavigate }) {
+export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onNavigate }) {
+  if (signedIn) return null;
+
   return (
     <header className="topbar">
       <div className="topbar-inner">
@@ -26,19 +31,17 @@ export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onSig
           <span className="brand-name">Zuri Cloud</span>
         </button>
 
-        {!signedIn && (
-          <nav className="topbar-nav" aria-label="Page sections">
-            <a href="#features" onClick={(event) => { event.preventDefault(); onNavigate('/#features'); }}>
-              Features
-            </a>
-            <a href="#how" onClick={(event) => { event.preventDefault(); onNavigate('/#how'); }}>
-              How it works
-            </a>
-            <a href="#pricing" onClick={(event) => { event.preventDefault(); onNavigate('/#pricing'); }}>
-              Pricing
-            </a>
-          </nav>
-        )}
+        <nav className="topbar-nav" aria-label="Page sections">
+          <a href="#features" onClick={(event) => { event.preventDefault(); onNavigate('/#features'); }}>
+            Features
+          </a>
+          <a href="#how" onClick={(event) => { event.preventDefault(); onNavigate('/#how'); }}>
+            How it works
+          </a>
+          <a href="#pricing" onClick={(event) => { event.preventDefault(); onNavigate('/#pricing'); }}>
+            Pricing
+          </a>
+        </nav>
 
         <div className="topbar-actions">
           <button
@@ -50,18 +53,10 @@ export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onSig
           >
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
           </button>
-          {signedIn ? (
-            <Button variant="ghost" onClick={onSignOut}>
-              Sign out
-            </Button>
-          ) : (
-            <>
-              <Button variant="ghost" className="topbar-signin" onClick={onSignIn}>
-                Sign in
-              </Button>
-              <Button onClick={() => onNavigate('/signup')}>Get started</Button>
-            </>
-          )}
+          <Button variant="ghost" className="topbar-signin" onClick={onSignIn}>
+            Sign in
+          </Button>
+          <Button onClick={() => onNavigate('/signup')}>Get started</Button>
         </div>
       </div>
     </header>

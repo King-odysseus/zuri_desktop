@@ -15,6 +15,9 @@ function statusChip(status) {
 export default function BillingView({ me, billing, usage }) {
   const subscription = me?.subscription ?? {};
   const payments = billing?.payments ?? [];
+  // An administrator is never charged: the plan is given in Admin, on the People
+  // list, so this screen says so instead of reading like an unpaid bill.
+  const isAdmin = me?.user?.isAdmin === true;
   // Purchased tokens that have not expired yet; they sit inside the period
   // allowance the Usage screen counts, so they are shown next to the plan.
   const extraTokens = Math.max(0, Math.floor(Number(usage?.extraTokens) || 0));
@@ -44,6 +47,11 @@ export default function BillingView({ me, billing, usage }) {
               {formatTokens(extraTokens)} tokens, counted in this period's allowance
             </DataRow>
           )}
+          {isAdmin && (
+            <DataRow label="Payment">
+              None due. This is an administrator's account, so its plan is given, not bought.
+            </DataRow>
+          )}
         </div>
       </article>
 
@@ -51,7 +59,9 @@ export default function BillingView({ me, billing, usage }) {
         <p className="stat-label">Payments</p>
         {payments.length === 0 ? (
           <p className="empty" style={{ marginTop: 8 }}>
-            No payments yet. Paid plans appear here after checkout.
+            {isAdmin
+              ? 'Nothing to pay: plans are put on an account from the Admin tab.'
+              : 'No payments yet. Paid plans appear here after checkout.'}
           </p>
         ) : (
           <div className="row-list" style={{ marginTop: 8 }}>

@@ -1,10 +1,14 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import { Dropdown, DropdownItem, Textarea } from 'flowbite-react';
+import { Textarea } from 'flowbite-react';
 import {
+  AlignLeft,
   ArrowUp,
   Check,
   ChevronLeft,
+  ChevronUp,
+  Command,
   Copy,
+  Paperclip,
   Pencil,
   Plus,
   RefreshCw,
@@ -56,6 +60,78 @@ const CHAT_MODELS = [
  * allowance, so a whole afternoon of history would cost more than the answer.
  */
 const HISTORY_LIMIT = 20;
+
+/*
+ * The three reply lengths, with the instruction each one adds to the question.
+ * The wording is the desktop app's own (`src/main/providers/chat.js`) so the same
+ * choice reads the same way on both surfaces. The cloud route carries no system
+ * prompt, so the rule travels with the message and is not saved with it.
+ */
+const ANSWER_LENGTH_CHOICES = [
+  ['concise', 'Concise', 'short'],
+  ['balanced', 'Balanced', 'default'],
+  ['detailed', 'Detailed', 'thorough'],
+];
+
+const ANSWER_LENGTH_RULES = {
+  concise: 'Length: as short as the question allows. Answer in one or two sentences, then at most three short bullets, and leave out background nobody asked for.',
+  balanced: 'Length: complete but not padded. The direct answer first, then the reasoning, the key steps or an example, and any caveat that changes what the person should do. Greetings and simple factual questions still get a short reply.',
+  detailed: 'Length: thorough. The direct answer first, then the reasoning, steps, caveats, alternatives and worked examples that support it. Use headings once the answer has more than three sections.',
+};
+
+/*
+ * Each command only fills the composer with a starter sentence, so nothing is
+ * sent until the person finishes the sentence and presses Send. Same list as the
+ * desktop composer, minus the ones only the desktop can carry out.
+ */
+const SLASH_COMMANDS = [
+  { label: 'Summarise', text: 'Summarise this: ' },
+  { label: 'Make a task', text: 'Turn this into a task: ' },
+  { label: 'Set a reminder', text: 'Remind me to ' },
+  { label: 'Draft a reply', text: 'Draft a reply to this: ' },
+];
+
+/* One row of the add menu. A menu item is a button, not a link, because nothing
+   here navigates: each row changes the message being written. */
+function MenuItem({ children, onSelect, role = 'menuitem', checked }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      role={role}
+      aria-checked={role === 'menuitemradio' ? checked : undefined}
+      className="chat-menu-row"
+      onClick={onSelect}
+    >
+      {children}
+    </Button>
+  );
+}
+
+/* A sub-list's header, doubling as the way back to the main list. */
+function MenuBack({ children, onBack }) {
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      className="chat-menu-back"
+      onClick={onBack}
+    >
+      <ChevronLeft size={14} aria-hidden="true" />
+      {children}
+    </Button>
+  );
+}
+
+/*
+ * What the browser can attach. The desktop app reads any file from disk and can
+ * send a photo; a web page cannot reach the disk and the account server has no
+ * upload route, so a file is read here and its text travels inside the message.
+ * That is why only text is offered, and why the contents are not written to the
+ * saved chat: the reply can quote the file, the account never stores it.
+ */
+const ATTACHMENT_TYPES = /.(txt|text|md|markdown|csv|tsv|json|log|yml|yaml|html|css|js|jsx|ts|tsx|py|sql|xml)$/i;
+const ATTACHMENT_MAX_BYTES = 200_000;
 
 /**
  * The name a model code is shown under. The picker already holds the names, but the
@@ -115,7 +191,13 @@ function failureOf(error, fallback) {
  * Below 900px only one pane is on screen at a time, because a 390px window has no
  * room for both, and the open chat carries a back button to the list.
  */
-export default function ChatView({ onSignIn, userName = '', navigation = null }) {
+export default function ChatView({
+  onSignIn,
+  userName = '',
+  navigation = null,
+  navCollapsed = false,
+  onToggleCollapsed = () => {},
+}) {
   const [conversations, setConversations] = useState([]);
   const [listStatus, setListStatus] = useState('loading');
   const [listError, setListError] = useState(null);
@@ -124,6 +206,13 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   const [openId, setOpenId] = useState(null);
   // A new chat has no conversation row yet: it is created on the first send.
   const [composing, setComposing] = useState(false);
+  /*
+   * A phone fits one pane at a time, so the saved chats are a screen of their own
+   * there and need a close control. True keeps that screen in front, as it was
+   * before this state existed. A wide screen docks both panes side by side and
+   * never reads it.
+   */
+  const [listOpen, setListOpen] = useState(true);
   const [thread, setThread] = useState({ title: 'New chat', messages: [] });
   const [threadStatus, setThreadStatus] = useState('idle');
   const [threadError, setThreadError] = useState(null);
@@ -134,6 +223,17 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   const [streamReply, setStreamReply] = useState('');
   const [streamError, setStreamError] = useState(null);
   const [saveWarning, setSaveWarning] = useState('');
+  // One file at a time, as the desktop composer allows, so the message stays one turn.
+  const [attachment, setAttachment] = useState(null);
+  const [attachNote, setAttachNote] = useState('');
+  // '' keeps the add menu closed. The desktop composer's own three views, minus
+  // the image list, which needs a route the cloud API does not have.
+  const [menuView, setMenuView] = useState('');
+  const [answerLength, setAnswerLength] = useState('balanced');
+  // The model list is its own popup, anchored to its own chip. It is not a
+  // floating-ui panel because that drifted off the trigger when the chip shrank
+  // to a few characters on a phone.
+  const [modelMenuOpen, setModelMenuOpen] = useState(false);
 
   const [renamingId, setRenamingId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
@@ -146,6 +246,9 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
 
   const messagesRef = useRef(null);
   const draftRef = useRef(null);
+  const fileRef = useRef(null);
+  const menuRef = useRef(null);
+  const modelMenuRef = useRef(null);
   const abortRef = useRef(null);
   /*
    * Bumped whenever the open chat changes. A reply still arriving from the chat
@@ -225,6 +328,33 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
     };
   }, [refreshHistory]);
 
+  /**
+   * Read the chosen file in the browser. Nothing is uploaded: the text is held in
+   * memory and travels with the next message, the way the desktop app puts an
+   * attached file in front of the question.
+   */
+  const chooseAttachment = useCallback(async (event) => {
+    const file = event.target.files?.[0];
+    // Cleared straight away so choosing the same file twice still fires a change.
+    event.target.value = '';
+    if (!file) return;
+
+    if (!ATTACHMENT_TYPES.test(file.name)) {
+      setAttachNote('The web chat can attach text files: txt, md, csv, json, log and code. Photos and documents work in the desktop app.');
+      return;
+    }
+    if (file.size > ATTACHMENT_MAX_BYTES) {
+      setAttachNote('That file is over 200 KB. Try a smaller one, or attach it in the desktop app.');
+      return;
+    }
+    try {
+      setAttachment({ name: file.name, size: file.size, text: await file.text() });
+      setAttachNote('');
+    } catch {
+      setAttachNote('That file could not be read. Try choosing it again.');
+    }
+  }, []);
+
   const resetReply = useCallback(() => {
     setStreamReply('');
     setStreamError(null);
@@ -276,11 +406,59 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
     atBottomRef.current = true;
   }, [resetReply]);
 
+  /*
+   * Clicking anywhere else, or pressing Escape, closes the add menu. The menu holds
+   * no form field, so a stray click behind it should dismiss it rather than leave a
+   * panel open over the composer.
+   */
+  useEffect(() => {
+    if (menuView === '') return undefined;
+    const close = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'mousedown' && menuRef.current?.contains(event.target)) return;
+      setMenuView('');
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [menuView]);
+
+  // The same dismissal for the model list: a click elsewhere or Escape closes it.
+  useEffect(() => {
+    if (!modelMenuOpen) return undefined;
+    const close = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'mousedown' && modelMenuRef.current?.contains(event.target)) return;
+      setModelMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [modelMenuOpen]);
+
+  // Every row closes the menu first, so a chosen item never leaves it hanging open.
+  function pickMenuItem(action) {
+    setMenuView('');
+    action();
+  }
+
+  function insertCommand(text) {
+    setDraft((current) => (current.trim() === '' ? text : `${current.trimEnd()}\n${text}`));
+    draftRef.current?.focus();
+  }
+
   const backToList = useCallback(() => {
     runRef.current += 1;
     abortRef.current?.abort();
     setOpenId(null);
     setComposing(false);
+    setListOpen(true);
     setThread({ title: 'New chat', messages: [] });
     setThreadStatus('idle');
     setThreadError(null);
@@ -328,21 +506,47 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
 
   const send = useCallback(async (questionOverride = null) => {
     const question = (typeof questionOverride === 'string' ? questionOverride : draft).trim();
-    if (!question || streaming) return;
+    // Regenerating re-asks an earlier question, so only a fresh send carries the file.
+    const attached = questionOverride === null ? attachment : null;
+    if ((!question && !attached) || streaming) return;
+
+    // What the model reads: the question with the file's text under a heading, the
+    // way an attachment is placed in front of the prompt on the desktop.
+    const withFile = attached
+      ? (question === ''
+        ? `Attached file: ${attached.name}\n\n${attached.text}`
+        : `${question}\n\nAttached file: ${attached.name}\n\n${attached.text}`)
+      : question;
+    // The length the person picked rides with the question, the way the attachment
+    // text does. It is sent but not saved, so the transcript keeps only the words
+    // said; a saved chat re-opened later answers at whatever length is chosen then.
+    const prompt = withFile === '' ? question : `${withFile}\n\n${ANSWER_LENGTH_RULES[answerLength]}`;
+    // What the bubble and the saved chat keep: the words, plus a line naming the
+    // file. The contents stay out of the account, because a web page cannot upload
+    // them and the server has nowhere to put them.
+    const said = attached
+      ? (question === ''
+        ? `[Attached file: ${attached.name}]`
+        : `${question}\n\n[Attached file: ${attached.name}]`)
+      : question;
 
     const run = (runRef.current += 1);
     const conversationId = openId;
-    const outgoing = [...thread.messages, { role: 'user', content: question }]
+    const outgoing = [...thread.messages, { role: 'user', content: said }]
       .slice(-HISTORY_LIMIT)
       .map(({ role, content }) => ({ role, content }));
+    // The question the model answers is the last turn, so it carries the file.
+    outgoing[outgoing.length - 1] = { role: 'user', content: prompt };
 
     setDraft('');
+    setAttachment(null);
+    setAttachNote('');
     clearChatDraft();
     resetReply();
     setStreaming(true);
     setThread((previous) => ({
       ...previous,
-      messages: [...previous.messages, { role: 'user', content: question }],
+      messages: [...previous.messages, { role: 'user', content: said }],
     }));
     atBottomRef.current = true;
 
@@ -374,7 +578,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
         messages: [...previous.messages, { role: 'assistant', content: answer }],
       }));
       setStreamReply('');
-      await saveExchange(conversationId, question, answer, run);
+      await saveExchange(conversationId, said, answer, run);
     } catch (error) {
       if (run !== runRef.current) return;
       // Stop, or a dropped connection, keeps what already arrived on screen: it
@@ -494,6 +698,10 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   }, []);
 
   const showThread = Boolean(openId || composing);
+  // Which pane a phone shows. An open chat always wins, so picking a conversation
+  // puts it in front without clearing the list flag first.
+  const pane = showThread || !listOpen ? 'thread' : 'list';
+  const closeList = () => setListOpen(false);
 
   useEffect(() => {
     if (atBottomRef.current) scrollToEnd();
@@ -503,6 +711,48 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   useEffect(() => {
     if (showThread) draftRef.current?.focus();
   }, [showThread, openId]);
+
+  /*
+   * The composer grows with the draft rather than scrolling inside a one-line box.
+   * Its scrollbar is hidden, so without this a long message would scroll out of
+   * sight instead of being readable. The desktop composer grows the same way and
+   * caps at 192px; this one stops a little sooner because a phone has less height
+   * to give the transcript.
+   */
+  useEffect(() => {
+    const node = draftRef.current;
+    if (!node) return;
+
+    const fit = () => {
+      // An empty draft needs no measurement: dropping the inline height hands the
+      // field back to its one-line floor, so clearing a long draft returns the
+      // composer to exactly the height it opened at.
+      if (node.value === '') {
+        node.style.height = '';
+        return;
+      }
+
+      // The one-line floor is lifted for the measurement: with it in place the box
+      // cannot resolve to its content height, and scrollHeight would report the
+      // floor instead of the text, leaving the field a line too tall.
+      const floor = node.style.minHeight;
+      node.style.minHeight = '0';
+      node.style.height = 'auto';
+      // scrollHeight covers the text only, and the site draws controls border-box, so
+      // the field's own padding has to be added or a one-line box clips its text.
+      const style = window.getComputedStyle(node);
+      const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      const measured = node.scrollHeight + padding;
+      node.style.minHeight = floor;
+      node.style.height = `${Math.min(measured, 160)}px`;
+    };
+
+    // Measured after layout: a box that has just mounted reports no content height,
+    // which would leave the field one line short of its own placeholder.
+    const frame = window.requestAnimationFrame(fit);
+    return () => window.cancelAnimationFrame(frame);
+    // showThread is a dependency because the field is not on screen until it is true.
+  }, [draft, showThread]);
 
   const onComposerKeyDown = (event) => {
     if (event.key !== 'Enter' || event.shiftKey) return;
@@ -514,28 +764,34 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
 
   const sessionExpired = listError?.status === 401 || threadError?.status === 401 || streamError?.status === 401;
   const modelName = modelNameFor(model);
+  // The phone row is short, so the label drops its "Zuri" prefix there rather than
+  // disappearing: an unlabelled chevron does not say which model will answer.
+  const modelShortName = modelName.replace(/^Zuri\s+/, '');
   // The newest reply carries the caption, as the desktop transcript does: repeating
   // the model above every bubble would say the same thing down the whole page.
   const lastAnswerIndex = thread.messages.reduce((last, message, index) => (message.role === 'assistant' ? index : last), -1);
 
   return (
-    <section className="chat-workspace" data-pane={showThread ? 'thread' : 'list'}>
+    <section className="chat-workspace" data-pane={pane}>
       {/*
         * The saved chats, drawn the way the desktop app's chat sidebar draws them:
-        * a New chat row, a Recents label, then one quiet row per thread. On a phone
-        * this pane slides over the thread, which is how ChatGPT treats the same list,
-        * and the thread keeps its own back control.
+        * a Recents label, then one quiet row per thread. Starting a chat is the Chat
+        * destination's own job, so the column carries no second button for it. On a
+        * phone this pane slides over the thread, which is how ChatGPT treats the
+        * same list, and the thread keeps its own back control.
         */}
-      <aside className="chat-recents" aria-label="Saved chats">
+      <aside className={`chat-recents${navCollapsed ? ' is-collapsed' : ''}`} aria-label="Saved chats">
+        {/* On a phone this column covers the chat, so it carries the way back to it.
+            The shared navigation panel's own close control is hidden here in CSS,
+            because this one closes the list rather than the drawer. */}
+        <div className="chat-list-head">
+          <IconButton label="Close saved chats" onClick={closeList}>
+            <X size={18} aria-hidden="true" />
+          </IconButton>
+        </div>
         {/* The same navigation panel the other pages show, so a chat has one sidebar
             holding both the destinations and the conversations. */}
         {navigation && <div className="chat-nav">{navigation}</div>}
-        <div className="chat-recents-head">
-          <Button variant="secondary" block className="chat-new" onClick={startNewChat}>
-            <Plus size={16} aria-hidden="true" />
-            <span>New chat</span>
-          </Button>
-        </div>
 
         <ConversationSearch
           value={conversationQuery}
@@ -636,13 +892,16 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
           * starting a new chat on the right. The transcript scrolls underneath them.
           */}
         <div className="chat-floats">
-          {/* On a phone the left corner is the way back to the chat list. A wide screen
-              has the list permanently beside the thread, so only the new-chat icon shows. */}
-          {showThread && (
-            <IconButton label="Back to saved chats" className="chat-back" onClick={backToList}>
-              <ChevronLeft size={18} aria-hidden="true" />
-            </IconButton>
-          )}
+          {/* A phone can hold only one pane, so this corner always carries the way
+              back to the list, even from the opening state with nothing open. A wide
+              screen keeps the list beside the thread and hides the button in CSS. */}
+          <IconButton
+            label={showThread ? 'Back to saved chats' : 'Open saved chats'}
+            className="chat-back"
+            onClick={backToList}
+          >
+            <ChevronLeft size={18} aria-hidden="true" />
+          </IconButton>
           <div className="chat-floats-end">
             <IconButton label="New chat" onClick={startNewChat}>
               <Plus size={18} aria-hidden="true" />
@@ -657,11 +916,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                 <LogoMark size={30} />
               </span>
               <h2>{greetingFor(userName)}</h2>
-              <p>Pick a chat from the list, or ask something new. A reply can carry code, a table or a list of links.</p>
-              <Button variant="secondary" onClick={startNewChat}>
-                <Plus size={16} aria-hidden="true" />
-                <span>Start a new chat</span>
-              </Button>
+              <p>Ask anything below to begin. A reply can carry code, a table or a list of links, and the chat is saved to your account.</p>
             </div>
           )}
 
@@ -761,6 +1016,25 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
           {saveWarning !== '' && <p className="chat-note">{saveWarning}</p>}
           {copyNote !== '' && <p className="chat-note is-error">{copyNote}</p>}
           {shareNote !== '' && <p className="chat-note">{shareNote}</p>}
+          {attachNote !== '' && <p className="chat-note is-error">{attachNote}</p>}
+          {attachment && (
+            <div className="chat-attachment">
+              <Paperclip size={14} aria-hidden="true" />
+              <span className="chat-attachment-name" title={attachment.name}>{attachment.name}</span>
+              <span className="chat-attachment-meta">
+                {/* Said plainly: the text is sent with the message and the file
+                    itself is never uploaded. */}
+                sent with this message
+              </span>
+              <IconButton
+                size="sm"
+                label="Remove attached file"
+                onClick={() => { setAttachment(null); setAttachNote(''); }}
+              >
+                <X size={14} aria-hidden="true" />
+              </IconButton>
+            </div>
+          )}
 
           <form
             className="chat-composer"
@@ -769,6 +1043,82 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
               void send();
             }}
           >
+            {/* The desktop composer leads with an add control, so the web one does too.
+                It carries only what a browser and this server can actually do: a file
+                a page can read, a reply length, and the starter sentences. Adding a
+                folder, searching the web and drawing a picture are desktop only
+                because they need the desktop app or a route the cloud API does not
+                have, and a menu item that cannot work is worse than no item. */}
+            <div ref={menuRef} className="relative">
+              <IconButton
+                className="chat-attach"
+                label="Add to message"
+                title="Add a file, a reply length or a command"
+                aria-haspopup="menu"
+                aria-expanded={menuView !== ''}
+                onClick={() => setMenuView((current) => (current === '' ? 'main' : ''))}
+              >
+                <Plus size={18} aria-hidden="true" />
+              </IconButton>
+              {menuView !== '' && (
+                <div
+                  role="menu"
+                  aria-label="Add to message"
+                  className="chat-menu"
+                >
+                  {menuView === 'main' ? (
+                    <>
+                      <MenuItem onSelect={() => pickMenuItem(() => fileRef.current?.click())}>
+                        <Paperclip size={16} aria-hidden="true" />
+                        <span>Attach a file</span>
+                      </MenuItem>
+                      <MenuItem onSelect={() => setMenuView('length')}>
+                        <AlignLeft size={16} aria-hidden="true" />
+                        <span className="flex-1">Reply length</span>
+                        <span className="text-xs capitalize text-[var(--muted)]">{answerLength}</span>
+                      </MenuItem>
+                      <MenuItem onSelect={() => setMenuView('commands')}>
+                        <Command size={16} aria-hidden="true" />
+                        <span>Slash commands</span>
+                      </MenuItem>
+                    </>
+                  ) : menuView === 'length' ? (
+                    <>
+                      <MenuBack onBack={() => setMenuView('main')}>Reply length</MenuBack>
+                      {ANSWER_LENGTH_CHOICES.map(([value, label, hint]) => (
+                        <MenuItem
+                          key={value}
+                          role="menuitemradio"
+                          checked={answerLength === value}
+                          onSelect={() => pickMenuItem(() => setAnswerLength(value))}
+                        >
+                          <span className="flex-1">{label}</span>
+                          <span className="text-xs text-[var(--muted)]">{hint}</span>
+                          {answerLength === value && <Check size={16} aria-hidden="true" />}
+                        </MenuItem>
+                      ))}
+                    </>
+                  ) : (
+                    <>
+                      <MenuBack onBack={() => setMenuView('main')}>Slash commands</MenuBack>
+                      {SLASH_COMMANDS.map((command) => (
+                        <MenuItem key={command.label} onSelect={() => pickMenuItem(() => insertCommand(command.text))}>
+                          <span>{command.label}</span>
+                        </MenuItem>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              className="chat-file-input"
+              aria-label="Attach a file"
+              accept=".txt,.text,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.html,.css,.js,.jsx,.ts,.tsx,.py,.sql,.xml"
+              onChange={(event) => void chooseAttachment(event)}
+            />
             <Textarea
               ref={draftRef}
               className="chat-input"
@@ -782,15 +1132,43 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
 
             {/* The model chip sits beside Send, exactly as the desktop composer places
                 it, and names the model that will answer this chat. */}
-            <div className="chat-model-slot">
-              <Dropdown label={modelName} size="sm" placement="top-end" dismissOnClick>
-                {CHAT_MODELS.map((entry) => (
-                  <DropdownItem key={entry.code} onClick={() => setModel(entry.code)}>
-                    <span className="chat-model-name">{entry.name}</span>
-                    {model === entry.code && <Check size={14} aria-hidden="true" />}
-                  </DropdownItem>
-                ))}
-              </Dropdown>
+            <div ref={modelMenuRef} className="chat-model-slot">
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={modelMenuOpen}
+                aria-label={`Model: ${modelName}`}
+                title="Choose the model that answers"
+                onClick={() => setModelMenuOpen((open) => !open)}
+              >
+                <span className="chat-model-label">
+                  <span className="chat-model-label-full">{modelName}</span>
+                  <span className="chat-model-label-short">{modelShortName}</span>
+                </span>
+                <ChevronUp
+                  size={16}
+                  aria-hidden="true"
+                  className={`chat-model-chevron${modelMenuOpen ? ' is-open' : ''}`}
+                />
+              </button>
+              {modelMenuOpen && (
+                <div role="menu" aria-label="Choose a model" className="chat-model-menu">
+                  {CHAT_MODELS.map((entry) => (
+                    <MenuItem
+                      key={entry.code}
+                      role="menuitemradio"
+                      checked={model === entry.code}
+                      onSelect={() => {
+                        setModel(entry.code);
+                        setModelMenuOpen(false);
+                      }}
+                    >
+                      <span className="chat-model-name">{entry.name}</span>
+                      {model === entry.code && <Check size={14} aria-hidden="true" />}
+                    </MenuItem>
+                  ))}
+                </div>
+              )}
             </div>
 
             {streaming ? (
@@ -798,7 +1176,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                 <Square size={14} aria-hidden="true" />
               </IconButton>
             ) : (
-              <IconButton type="submit" label="Send" className="chat-send" disabled={draft.trim() === ''}>
+              <IconButton type="submit" label="Send" className="chat-send" disabled={draft.trim() === '' && !attachment}>
                 <ArrowUp size={18} aria-hidden="true" />
               </IconButton>
             )}

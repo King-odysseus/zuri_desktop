@@ -5,7 +5,7 @@ import { fetchImagePrices } from '../lib/api.js';
 import { planImageLines } from '../lib/format.js';
 
 /** Plan picker for a signed-in customer. */
-export default function PlansView({ plans, currentPlan, busy, onChoose, onSignIn }) {
+export default function PlansView({ plans, currentPlan, busy, onChoose, onSignIn, admin = false }) {
   const [imagePrices, setImagePrices] = useState([]);
 
   // Plans arrive as props from the shell, so this effect only fetches the image
@@ -27,10 +27,17 @@ export default function PlansView({ plans, currentPlan, busy, onChoose, onSignIn
       <div className="view-head">
         <div>
           <h1>Plans</h1>
-          <p>
-            Choose a plan and pay with Paystack. Your new allowance starts as soon as the payment
-            clears.
-          </p>
+          {admin ? (
+            <p>
+              This is an administrator's account, so it pays for nothing. Put yourself on any plan,
+              or put anyone else on one, in Admin, on the People list.
+            </p>
+          ) : (
+            <p>
+              Choose a plan and pay with Paystack. Your new allowance starts as soon as the payment
+              clears.
+            </p>
+          )}
         </div>
       </div>
       {plans.length === 0 ? (
@@ -47,6 +54,7 @@ export default function PlansView({ plans, currentPlan, busy, onChoose, onSignIn
               busy={busy === plan.code}
               onChoose={onChoose}
               onSignIn={onSignIn}
+              admin={admin}
             />
           ))}
         </div>
