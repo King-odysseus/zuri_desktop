@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ArrowRightIcon } from './Icons.jsx';
-import { DOWNLOAD_PLATFORMS, fetchDownloads, formatDownloadSize, recommendedPlatform } from '../lib/downloads.js';
+import { DOWNLOAD_PLATFORMS, fetchDownloads, formatDownloadSize, recommendedPlatform, refreshDownloads } from '../lib/downloads.js';
 
 /**
  * Download cards, one per platform.
@@ -13,6 +13,7 @@ import { DOWNLOAD_PLATFORMS, fetchDownloads, formatDownloadSize, recommendedPlat
 export default function DownloadList() {
   const [files, setFiles] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const preferredPlatform = recommendedPlatform();
 
   useEffect(() => {
@@ -26,6 +27,13 @@ export default function DownloadList() {
       active = false;
     };
   }, []);
+
+  async function retry() {
+    setRetrying(true);
+    setFiles(await refreshDownloads());
+    setLoaded(true);
+    setRetrying(false);
+  }
 
   return (
     <div className="download-grid">
@@ -75,6 +83,11 @@ export default function DownloadList() {
             View release notes
           </a>
         </p>
+      )}
+      {loaded && files.length === 0 && (
+        <button type="button" className="download-release-note" onClick={() => void retry()} disabled={retrying}>
+          {retrying ? 'Checking again...' : 'Try checking for downloads again'}
+        </button>
       )}
     </div>
   );

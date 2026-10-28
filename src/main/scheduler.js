@@ -459,6 +459,7 @@ export async function runSchedule(schedule, options = {}) {
         prompt: String(schedule.prompt ?? '').trim(),
         agentId: schedule.agentId ?? null,
         allowedTools,
+        mode: schedule.mode,
         signal: options.signal,
         onStatus: (status) => options.onStatus?.(status),
       });

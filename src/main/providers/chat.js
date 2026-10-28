@@ -142,6 +142,11 @@ const FILE_TOOL_NAMES = new Set(FILE_TOOLS.map((tool) => tool.name));
  */
 const BASE_TOOLS = Object.freeze([...FILE_TOOLS, READ_TOOL, SUMMARY_TOOL]);
 
+// Ask and unattended Autopilot may inspect information but must not create or
+// edit files. Act is the explicit mode that allows the model to request changes;
+// the main-process confirmation gate still protects each destructive tool.
+const READ_ONLY_AUTOMATION_TOOLS = new Set(['webSearch', 'webFetch', 'readFile', 'summarizeDocument']);
+
 /** Every tool chat can run by name; which are offered on a given message is decided per send. */
 const ALL_CHAT_TOOLS = Object.freeze([...CHAT_TOOLS, ...BASE_TOOLS]);
 
@@ -1362,7 +1367,7 @@ export async function sendChatMessage(threadId, options = {}) {
  * "summarise my invoices and tell me which are overdue" ran a search. Routing the
  * prompt here instead lets the model decide what it needs, in the order it needs it.
  *
- * @param {{ prompt?: string, agentId?: string|null, allowedTools?: string[]|null, signal?: AbortSignal, onStatus?: (status: string) => void }} [request]
+ * @param {{ prompt?: string, agentId?: string|null, allowedTools?: string[]|null, mode?: 'ask'|'act'|'autopilot', signal?: AbortSignal, onStatus?: (status: string) => void }} [request]
  * @param {{ fetchImpl?: typeof fetch }} [options]
  * @returns {Promise<{ ok: true, data: { text: string, provider: string, model: string } } | { ok: false, error: { code: string, message: string } }>}
  */
@@ -1397,7 +1402,12 @@ export async function runPrompt(request = {}, options = {}) {
   // a run happens with nobody watching, and starting an app or opening a link then
   // is not something the person can agree to at the time.
   const allowed = Array.isArray(request.allowedTools) ? request.allowedTools : null;
-  const tools = ALL_CHAT_TOOLS.filter((tool) => allowed === null || allowed.includes(tool.name));
+  const mode = request.mode === 'act' || request.mode === 'autopilot' ? request.mode : request.mode === 'ask' ? 'ask' : null;
+  const tools = ALL_CHAT_TOOLS.filter((tool) => {
+    if (allowed !== null && !allowed.includes(tool.name)) return false;
+    if ((mode === 'ask' || mode === 'autopilot') && !READ_ONLY_AUTOMATION_TOOLS.has(tool.name)) return false;
+    return true;
+  });
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
 
   let fullText = '';

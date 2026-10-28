@@ -10,6 +10,7 @@ import {
   CloseIcon,
   CopyIcon,
   DownloadIcon,
+  EditIcon,
   ExpandIcon,
   FileIcon,
   FolderIcon,
@@ -482,6 +483,19 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     }
     setCopiedIndex(index);
     window.setTimeout(() => setCopiedIndex((current) => (current === index ? -1 : current)), 1500);
+  }
+
+  /**
+   * Put an earlier prompt back in the composer so it can be corrected and sent
+   * again without rewriting the saved transcript or losing the original wording.
+   */
+  function editPrompt(message) {
+    const content = typeof message?.content === 'string' ? message.content : '';
+    if (content.trim() === '' || replying) return;
+    setDraft(content);
+    setAttachment(null);
+    setError('');
+    window.requestAnimationFrame(() => composerRef.current?.focus());
   }
 
   async function stopReply() {
@@ -998,6 +1012,17 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                       onPress={() => void copyMessage(message, index)}
                     >
                       {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                    </Button>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7 rounded-lg text-muted"
+                      aria-label="Edit prompt"
+                      title="Edit prompt"
+                      onPress={() => editPrompt(message)}
+                    >
+                      <EditIcon size={14} />
                     </Button>
                   </div>
                 </div>

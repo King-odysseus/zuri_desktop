@@ -680,6 +680,28 @@ check('an Anthropic tool_use is answered with a tool_result in the next user tur
   if (!anthropicRun.data.text.includes('Here is your answer.')) throw new Error(`text was "${anthropicRun.data.text}"`);
 });
 
+const askModeBodies = [];
+const askModeRun = await runPrompt(
+  { prompt: 'Tell me what is in my file', mode: 'ask', allowedTools: ['createDocument', 'readFile'] },
+  {
+    fetchImpl: async (url, init) => {
+      askModeBodies.push(JSON.parse(init.body));
+      return sseResponse([
+        { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+        { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'Done.' } },
+        { type: 'message_stop' },
+      ]);
+    },
+  },
+);
+
+check('Ask mode cannot offer file-writing tools', () => {
+  if (!askModeRun.ok) throw new Error(askModeRun.error.message);
+  const names = (askModeBodies[0]?.tools ?? []).map((tool) => tool.name);
+  if (names.includes('createDocument') || names.includes('editDocument')) throw new Error('Ask mode offered a writing tool');
+  if (!names.includes('readFile')) throw new Error('Ask mode removed its read tool');
+});
+
 /* ---------------------------------------------------------------------------
    Automations ask the model
 

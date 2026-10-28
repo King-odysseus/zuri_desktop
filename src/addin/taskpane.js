@@ -2,6 +2,8 @@
 (function () {
   var token = document.querySelector('meta[name="zuri-token"]').content;
   var promptBox = document.getElementById('prompt');
+  var contextBox = document.getElementById('context');
+  var refreshContextButton = document.getElementById('refresh-context');
   var answerBox = document.getElementById('answer');
   var askButton = document.getElementById('ask');
   var replaceButton = document.getElementById('replace');
@@ -17,6 +19,28 @@
     var hasAnswer = answerBox.value.trim() !== '';
     replaceButton.disabled = !hasAnswer;
     insertButton.disabled = !hasAnswer;
+  }
+
+  function refreshContext() {
+    refreshContextButton.disabled = true;
+    setStatus('Reading the selection...', false);
+    return readContext()
+      .then(function (text) {
+        contextBox.value = text;
+        setStatus(text.trim() === '' ? 'Nothing selected in the document.' : 'Context refreshed.', false);
+        return text;
+      })
+      .catch(function (error) {
+        setStatus(error.message || 'Word would not provide the document text.', true);
+        throw error;
+      })
+      .then(function (text) {
+        refreshContextButton.disabled = false;
+        return text;
+      }, function (error) {
+        refreshContextButton.disabled = false;
+        throw error;
+      });
   }
 
   // The selection when there is one, otherwise the whole body.
@@ -40,7 +64,7 @@
     }
     askButton.disabled = true;
     setStatus('Zuri is working...', false);
-    readContext()
+    refreshContext()
       .then(function (text) {
         return fetch('/api/ask', {
           method: 'POST',
@@ -74,8 +98,10 @@
 
   Office.onReady(function () {
     askButton.addEventListener('click', ask);
+    refreshContextButton.addEventListener('click', function () { refreshContext(); });
     replaceButton.addEventListener('click', function () { place('replace'); });
     insertButton.addEventListener('click', function () { place('insert'); });
     answerBox.addEventListener('input', refreshActions);
+    refreshContext();
   });
 })();

@@ -873,3 +873,10 @@
 - Other OS action: run "npm test" after syncing.
 - Done on: Windows
 
+## 2026-10-28 - Windows
+
+- Desktop chat prompts can now be edited back into the composer without changing the saved transcript. Ask and unattended Autopilot runs are limited to read-only tools, while Act keeps the existing confirmation gate for writes. The Word task pane now shows and refreshes the exact document context sent to Zuri. The web download grid can retry an unavailable lookup without a full page reload.
+- Key files: src/renderer-react/ChatPanel.jsx, src/main/providers/chat.js, src/main/scheduler.js, src/addin/taskpane.js, web/src/components/DownloadList.jsx, web/src/lib/downloads.js, scripts/selftest.js.
+- Other OS action: run `npm test` and `npm run web:build`.
+- Done on: Windows
+

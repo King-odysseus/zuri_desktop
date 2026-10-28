@@ -28,6 +28,16 @@ export function fetchDownloads() {
   return cached;
 }
 
+/**
+ * Forget a failed or stale download lookup so a visible retry can ask the
+ * server again without forcing the visitor to reload the whole page.
+ * @returns {Promise<Array<{ platform: string, label: string, detail: string, name: string, size: number, version: string, url: string, releaseUrl?: string }>>}
+ */
+export function refreshDownloads() {
+  cached = null;
+  return fetchDownloads();
+}
+
 /** @param {number} bytes @returns {string} */
 export function formatDownloadSize(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '';
