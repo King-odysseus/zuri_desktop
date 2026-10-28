@@ -22,10 +22,11 @@ const CONTAINER = 'mx-auto w-full max-w-[1200px] px-5 sm:px-8 lg:px-10';
 // Section anchor offset: the site's top bar is sticky and 64px tall, so a jump to
 // #features would otherwise park the heading underneath it.
 const ANCHOR = 'scroll-mt-[72px]';
-// The frame colour of the app mock. The theme is an attribute on <html>, not a
-// class, so the dark variant is written against [data-theme=dark] rather than with
-// Tailwind's dark: variant.
-const NAVY = 'bg-[#0b1f3a] [[data-theme=dark]_&]:bg-[#0a1226]';
+// The closing band's frame. Dark navy in both themes, because the white button on
+// it is the only control that has to stay legible against it. The theme is an
+// attribute on <html>, not a class, so the dark variant is written against
+// [data-theme=dark] rather than with Tailwind's dark: variant.
+const NAVY = 'bg-[#0d1b3a] [[data-theme=dark]_&]:bg-[#0d1b3a]';
 // The accent's own foreground token, so a send glyph stays legible when
 // the dark theme swaps the accent for a pale lavender.
 const ON_ACCENT = 'text-[color:var(--accent-foreground)]';
@@ -188,7 +189,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             <ul className="flex flex-col gap-2 text-[13.5px] text-muted">
               {HERO_POINTS.map((point) => (
                 <li key={point} className="flex items-start gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden="true" />
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-body" aria-hidden="true" />
                   <span>{point}</span>
                 </li>
               ))}
@@ -402,7 +403,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate('/signup')}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-white px-6 text-[14px] font-semibold text-[#0b1f3a] transition-colors hover:bg-white/90 lg:w-auto lg:shrink-0"
+              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-white px-6 text-[14px] font-semibold text-[#0d1b3a] transition-colors hover:bg-white/90 lg:w-auto lg:shrink-0"
             >
               Start free
             </button>

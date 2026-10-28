@@ -26,3 +26,6 @@ server/downloads/
 
 # Screenshots captured while checking the UI; regenerated, never shipped.
 .shots/
+
+# Local scratch captures from agent runs
+.kai/tmp/

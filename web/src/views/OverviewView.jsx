@@ -342,7 +342,7 @@ export default function OverviewView({ me, usage, onViewChange }) {
                 <div key={bar.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
                   <div className="flex h-20 w-full items-end">
                     <div
-                      className={`mx-auto w-full max-w-11 rounded-t-[6px] ${bar.isToday ? 'bg-accent' : 'bg-accent-soft'}`}
+                      className={`mx-auto w-full max-w-11 rounded-t-[6px] ${bar.isToday ? 'bg-accent' : 'bg-faint'}`}
                       style={{ height: `${barHeight(bar.count)}%` }}
                     />
                   </div>

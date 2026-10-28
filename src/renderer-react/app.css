@@ -1,6 +1,5 @@
-/* Montserrat gives the workspace its confident editorial headings, while Roboto
-   keeps dense controls and assistant copy neutral and easy to scan. */
-@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap');
+/* No web fonts: one system sans across headings and body, as ChatGPT sets its own
+   interface, so the window never waits on a stylesheet to paint text. */
 
 /*
  * Flowbite React supplies the component classes while Tailwind v4 generates the
@@ -52,7 +51,15 @@ body,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Roboto', 'Segoe UI', sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* The mark is drawn in greys: a monochrome interface carries identity in the shape,
+   not in a hue, and the mark was the last colour left in the window. Vite renames
+   the file as it bundles it, so this matches the element rather than the URL. */
+img.zuri-chat-mark,
+img[alt='Zuri'] {
+  filter: grayscale(1);
 }
 
 h1,
@@ -63,7 +70,7 @@ h5,
 h6,
 button,
 [role='button'] {
-  font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif;
+  font-family: inherit;
 }
 
 /* Every non-chat page uses the same readable gutter and centred content width.
@@ -340,54 +347,55 @@ button,
  * renderer theme remains easy to compare with the design tokens.
  */
 @layer base {
-  /* Light is the default look, matching the reference screen: white cards,
-     navy structure, and blue emphasis. */
+  /* Light is the same scale as the web dashboard: a white page, a cool off-white
+     panel, dark navy ink, one hairline, and a primary control that is simply that
+     navy. */
   [data-theme="light"] {
-    --background: #f7f9fc;
-    --foreground: #10233f;
+    --background: #ffffff;
+    --foreground: #0d1b3a;
     --surface: #ffffff;
-    --surface-foreground: #10233f;
-    --surface-secondary: #0b1f3a;
-    --surface-secondary-foreground: #ffffff;
-    --surface-tertiary: #edf2f7;
-    --surface-tertiary-foreground: #10233f;
-    --default: #e5ebf2;
-    --default-foreground: #10233f;
-    --muted: #5f6d83;
-    --accent: #2563eb;
+    --surface-foreground: #0d1b3a;
+    --surface-secondary: #f7f8fc;
+    --surface-secondary-foreground: #0d1b3a;
+    --surface-tertiary: #ebedf3;
+    --surface-tertiary-foreground: #0d1b3a;
+    --default: #ebedf3;
+    --default-foreground: #0d1b3a;
+    --muted: #5a6480;
+    --accent: #0d1b3a;
     --accent-foreground: #ffffff;
-    --border: transparent;
-    --separator: transparent;
+    --border: #e6e8f0;
+    --separator: #e6e8f0;
     --field-background: #ffffff;
-    --selected: #dbeafe;
-    --selected-foreground: #1d4ed8;
-    --control-border: #c6d2df;
+    --selected: #ebedf3;
+    --selected-foreground: #0d1b3a;
+    --control-border: #e1e4ee;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%236b7f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
   [data-theme="dark"] {
-    /* The canvas is #040130; every other layer is a step lighter in the same
-       indigo hue so a card, a field and the canvas stay separable. */
+    /* The dark theme is the web dashboard's navy: the #040130 page, a lighter
+       panel beside it, and a white primary control with navy ink on it. */
     --background: #040130;
-    --foreground: #ecebff;
-    --surface: #0a0548;
-    --surface-foreground: #ecebff;
-    --surface-secondary: #100a5c;
-    --surface-secondary-foreground: #ecebff;
-    --surface-tertiary: #181072;
-    --surface-tertiary-foreground: #ecebff;
-    --default: #241c8c;
-    --default-foreground: #ecebff;
-    --muted: #b4b1e8;
-    --accent: #a9b4ff;
+    --foreground: #e9ebf7;
+    --surface: #0a0738;
+    --surface-foreground: #e9ebf7;
+    --surface-secondary: #070432;
+    --surface-secondary-foreground: #e9ebf7;
+    --surface-tertiary: #14114a;
+    --surface-tertiary-foreground: #e9ebf7;
+    --default: #14114a;
+    --default-foreground: #e9ebf7;
+    --muted: #b0b4dd;
+    --accent: #ffffff;
     --accent-foreground: #040130;
-    --border: transparent;
-    --separator: transparent;
-    --field-background: #070240;
-    --selected: #2a23a0;
-    --selected-foreground: #f2f1ff;
-    --control-border: #342eaa;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23b4b1e8' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --border: #221e63;
+    --separator: #221e63;
+    --field-background: #0b0838;
+    --selected: #14114a;
+    --selected-foreground: #ffffff;
+    --control-border: #2b2673;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23b0b4dd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 }
 
@@ -400,7 +408,6 @@ button,
 .zuri-selected-pill {
   background: var(--selected) !important;
   color: var(--selected-foreground) !important;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 42%, transparent) !important;
 }
 
 .zuri-selected-pill:hover {
@@ -418,14 +425,13 @@ button,
 .zuri-new-chat:focus-visible {
   background: color-mix(in srgb, var(--selected) 62%, var(--surface-secondary)) !important;
   color: var(--selected-foreground) !important;
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 28%, transparent) !important;
 }
 
-/* The reference uses a navy frame around quiet white work surfaces. Keep the
-   navigation visually anchored while leaving the transcript and cards bright. */
+/* The panel is a shade off the page with no rule between them, the way ChatGPT's
+   sidebar sits beside its thread. Nothing here carries a hue. */
 .zuri-sidebar-rail {
   background: var(--surface-secondary) !important;
-  border-color: color-mix(in srgb, #ffffff 16%, transparent) !important;
+  border-color: var(--border) !important;
 }
 
 .zuri-sidebar-panel {
@@ -435,42 +441,43 @@ button,
 
 .zuri-sidebar-panel .zuri-button,
 .zuri-sidebar-panel .text-muted {
-  color: color-mix(in srgb, #ffffff 72%, transparent) !important;
+  color: var(--muted) !important;
 }
 
 .zuri-sidebar-panel .zuri-button:hover,
 .zuri-sidebar-panel .zuri-button:focus-visible {
-  color: #ffffff !important;
-  background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+  color: var(--surface-secondary-foreground) !important;
+  background: var(--selected) !important;
 }
 
+/* New chat is a navy control on the light panel and a white one in the dark
+   theme, the pair the rest of the dashboard uses. */
 .zuri-sidebar-panel .zuri-new-chat {
   background: var(--accent) !important;
-  color: #ffffff !important;
+  color: var(--accent-foreground) !important;
 }
 
 .zuri-sidebar-panel .zuri-new-chat:hover,
 .zuri-sidebar-panel .zuri-new-chat:focus-visible {
-  background: var(--accent-hover) !important;
-  color: #ffffff !important;
+  background: color-mix(in srgb, var(--accent) 86%, var(--foreground)) !important;
+  color: var(--accent-foreground) !important;
 }
 
 .zuri-sidebar-panel .zuri-selected-pill {
-  background: color-mix(in srgb, var(--accent) 26%, transparent) !important;
-  color: #ffffff !important;
+  background: var(--selected) !important;
+  color: var(--selected-foreground) !important;
 }
 
-/* The rail marks the destination you are on with the accent itself. A filled
-   rounded pill inside a column of icons read as a button that had just been
-   pressed, so the rail now matches the web sidebar and keeps no fill. */
+/* Where you are is a soft grey row, the same marker the web panel uses. */
 .zuri-sidebar-rail .zuri-rail-active {
-  background: transparent !important;
-  color: var(--accent) !important;
+  background: var(--selected) !important;
+  color: var(--surface-secondary-foreground) !important;
+  border-radius: 0.5rem !important;
 }
 
 .zuri-sidebar-rail .zuri-rail-active:hover,
 .zuri-sidebar-rail .zuri-rail-active:focus-visible {
-  background: color-mix(in srgb, var(--accent) 16%, transparent) !important;
+  background: color-mix(in srgb, var(--selected) 80%, var(--foreground)) !important;
 }
 
 /* Empty-chat overview: real counts from tasks, reminders and automations (see
@@ -498,10 +505,9 @@ button,
 
 .zuri-opening-card {
   min-width: 0;
-  border: 1px solid var(--control-border);
+  border: 1px solid var(--border);
   border-radius: 1rem;
   background: var(--surface);
-  box-shadow: 0 8px 22px color-mix(in srgb, var(--foreground) 7%, transparent);
   padding: 0.9rem;
 }
 
@@ -520,7 +526,7 @@ button,
 
 .zuri-opening-card strong {
   color: var(--foreground);
-  font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif;
+  font-family: inherit;
   font-size: 0.76rem;
   font-weight: 600;
   white-space: nowrap;
@@ -620,7 +626,41 @@ button,
   width: 3.25rem;
   height: 3.25rem;
   border-radius: 0.9rem;
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 26%, transparent);
+}
+
+/* Vertical rhythm for a reply. The renderer emits flat blocks (heading, paragraph,
+   list, code, table), so the spacing lives here rather than in utilities: one
+   uniform gap left every heading sitting on the paragraph above it. A heading now
+   takes a wide gap above and a narrow one below, so it reads as the title of the
+   text that follows instead of a line crammed between two paragraphs. The cloud
+   dashboard's stylesheet carries the same rules for the same component. */
+.message-body > * + * {
+  margin-block-start: 0.875rem;
+}
+
+.message-body > * + h3 {
+  margin-block-start: 1.375rem;
+}
+
+.message-body > h3 + * {
+  margin-block-start: 0.375rem;
+}
+
+.message-body h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Lines inside one block keep the reading rhythm, and list items get a gap so a
+   seven-point list does not read as one paragraph with numbers in it. */
+.message-body p,
+.message-body li {
+  line-height: 1.6;
+}
+
+.message-body li + li {
+  margin-block-start: 0.375rem;
 }
 
 .zuri-dropdown-trigger {
@@ -758,9 +798,7 @@ label {
    elevation without duplicating a page-specific component library. */
 .zuri-page-content {
   gap: 1.25rem;
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 34rem),
-    var(--background);
+  background: var(--background);
 }
 
 .zuri-page-content > header {
@@ -785,10 +823,9 @@ label {
 }
 
 .zuri-page-content > section {
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent) !important;
+  border: 1px solid var(--border) !important;
   border-radius: 1rem !important;
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%) !important;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--foreground) 5%, transparent) !important;
+  background: var(--surface) !important;
 }
 
 .zuri-page-content > section h2 {
@@ -799,10 +836,9 @@ label {
 
 .zuri-page-content > form {
   align-items: flex-end;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 1px solid var(--border);
   border-radius: 1rem;
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--foreground) 4%, transparent);
+  background: var(--surface);
   padding: 1rem;
 }
 
@@ -880,8 +916,7 @@ label {
 
 .zuri-tool-card:hover,
 .zuri-tool-card:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--control-border)) !important;
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--foreground) 10%, transparent) !important;
+  border-color: var(--strong, var(--control-border)) !important;
 }
 
 .zuri-tool-icon {
@@ -943,9 +978,8 @@ label {
 
 .zuri-page-content > ul > li:hover,
 .zuri-page-content > section li:hover {
-  border-color: color-mix(in srgb, var(--accent) 38%, var(--control-border)) !important;
-  background: color-mix(in srgb, var(--selected) 22%, var(--surface));
-  box-shadow: 0 5px 16px color-mix(in srgb, var(--foreground) 6%, transparent);
+  border-color: var(--strong, var(--control-border)) !important;
+  background: var(--surface-secondary);
 }
 
 .zuri-page-content .zuri-field-label {
@@ -1146,20 +1180,11 @@ label {
   color-scheme: dark;
 }
 
-.border-border.bg-surface {
-  box-shadow: 0 10px 30px rgba(25, 42, 70, 0.08), 0 2px 8px rgba(25, 42, 70, 0.04);
-}
-
+/* Nothing on a page floats. Only a real overlay (a menu, the overlay window) casts
+   a shadow, because it has to sit visibly above what it covers. */
+.border-border.bg-surface,
 .border-border.bg-surface-secondary {
-  box-shadow: 0 8px 24px rgba(25, 42, 70, 0.06), 0 1px 4px rgba(25, 42, 70, 0.04);
-}
-
-.dark .border-border.bg-surface {
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.dark .border-border.bg-surface-secondary {
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22), 0 2px 6px rgba(0, 0, 0, 0.16);
+  box-shadow: none;
 }
 
 /* The overlay is a transparent BrowserWindow, not a second desktop shell. Keep
@@ -1192,9 +1217,9 @@ html:has(.zuri-overlay-root) #root {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--control-border) 86%, transparent);
+  border: 1px solid var(--border);
   border-radius: 24px;
-  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
+  background: var(--surface);
   /* The shadow must finish fading inside the 40px margin: 8px offset + 28px blur
      reaches 36px, so the fade completes before the window edge. A wider blur is
      sliced off there and shows as straight lines around an otherwise round card.
@@ -1280,10 +1305,9 @@ html:has(.zuri-overlay-root) #root {
 
 .zuri-overlay-composer {
   min-width: 0;
-  border-color: color-mix(in srgb, var(--accent) 26%, var(--control-border)) !important;
+  border-color: var(--control-border) !important;
   background: var(--surface) !important;
   padding: 0.375rem 0.5rem;
-  box-shadow: 0 6px 18px color-mix(in srgb, var(--foreground) 8%, transparent);
 }
 
 .zuri-overlay-composer .composer-textarea {

@@ -1408,6 +1408,29 @@ check('the web chat draws replies with the desktop renderer, not its own markup'
   return 'shared renderer for replies, plain text for prompts';
 });
 
+check("a reply's headings keep more air above them than between two paragraphs", () => {
+  const renderer = read('src/renderer-react/FormattedMessage.jsx');
+  if (!renderer.includes('className="message-body leading-6"')) {
+    throw new Error('the reply no longer names the block that carries its spacing');
+  }
+  // One uniform gap is what put every heading on top of the paragraph above it.
+  if (renderer.includes('space-y-3')) {
+    throw new Error('a uniform block gap is back, which crams each heading against the text above it');
+  }
+  const px = (value) => (value.endsWith('rem') ? Number.parseFloat(value) * 16 : Number.parseFloat(value));
+  for (const file of ['src/renderer-react/app.css', 'web/src/styles.css']) {
+    const css = read(file);
+    const block = /\.message-body > \* \+ \* \{\s*margin-block-start: ([\d.]+(?:rem|px));/.exec(css);
+    const above = /\.message-body > \* \+ h3 \{\s*margin-block-start: ([\d.]+(?:rem|px));/.exec(css);
+    const below = /\.message-body > h3 \+ \* \{\s*margin-block-start: ([\d.]+(?:rem|px));/.exec(css);
+    if (!block || !above || !below) throw new Error(`${file} is missing the reply's spacing rules`);
+    if (px(above[1]) <= px(block[1])) throw new Error(`${file} gives a heading no more room than a paragraph`);
+    if (px(above[1]) < 20) throw new Error(`${file} leaves only ${above[1]} above a heading`);
+    if (px(below[1]) >= px(block[1])) throw new Error(`${file} does not tie a heading to the text under it`);
+  }
+  return 'wide gap above a heading, tight gap below, in both stylesheets';
+});
+
 check("both the person's prompts and Zuri's replies carry a copy action", () => {
   const source = read('web/src/views/ChatView.jsx');
   const copyAt = source.indexOf('className="chat-copy"');

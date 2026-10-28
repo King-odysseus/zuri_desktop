@@ -53,57 +53,61 @@
 
 :root {
   color-scheme: light;
-  --canvas: #f8fafc;
+  /* The ChatGPT neutral scale with one deliberate change: the ink is a dark navy
+     instead of black, so a page reads as Zuri's rather than as someone else's
+     black. Every neutral keeps a hint of the same blue, which is why the panel
+     greys are cool rather than warm. A surface is still told apart by its fill
+     and by a 1px line, never by a brand colour or a shadow. */
+  --canvas: #ffffff;
   --surface: #ffffff;
-  --surface-secondary: #eef3f8;
-  --surface-tertiary: #e2eaf2;
-  --raised: #d9e3ed;
-  --glass: rgba(255, 255, 255, 0.82);
-  --hairline: rgba(20, 32, 51, 0.1);
-  --strong: rgba(20, 32, 51, 0.2);
-  /* No drawn lines anywhere: surfaces are told apart by their fill and their
-     shadow. The token is kept because focus states and the accent markers still
-     colour an edge, and they ask for it by name. */
-  --control-border: transparent;
-  --field-background: #e5ecf4;
-  --text: #142033;
-  /* Darkened from #6f7e95 so secondary text clears 4.5:1 on the canvas (#eef3f9)
-     as well as on white. The chat now draws on the canvas, and a 12px caption or a
-     16px opening line at 3.7:1 is below the minimum for normal-size text. */
-  --muted: #5f6d83;
-  --faint: #8b99ad;
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
+  --surface-secondary: #f5f6fa;
+  --surface-tertiary: #ebedf3;
+  --raised: #e3e6ee;
+  --glass: #ffffff;
+  --hairline: #e6e8f0;
+  --strong: #d2d6e3;
+  --control-border: #e1e4ee;
+  --field-background: #ffffff;
+  --text: #0d1b3a;
+  /* #5a6480 clears 4.5:1 on white and on the panel grey, so a caption is still
+     readable at 12px. */
+  --muted: #5a6480;
+  --faint: #8b93a8;
+  /* The accent is that same ink: a filled control is navy on white and every
+     marker that used to be blue is now the text colour. */
+  --accent: #0d1b3a;
+  --accent-hover: #1b2c52;
   --accent-foreground: #ffffff;
-  --accent-soft: #dbeafe;
-  --accent-text: #0b1f3a;
-  --selected: #dbe7f1;
-  --selected-foreground: #0b1f3a;
-  /* The navigation is a light panel on the light theme: a pale grey beside the
-     white cards, with the accent marking where you are. The dark theme below keeps
-     its deep indigo, so each theme reads as one piece rather than a navy stripe
-     down a bright page. */
-  --nav-surface: #e8eef6;
-  --nav-foreground: #142033;
-  --nav-muted: #5f6d83;
+  --accent-soft: #eef1f8;
+  --accent-text: #0d1b3a;
+  --selected: #ebedf3;
+  --selected-foreground: #0d1b3a;
+  /* The panel beside the page is a shade off white with no rule between them,
+     which is how the ChatGPT sidebar separates from its thread. */
+  --nav-surface: #f7f8fc;
+  --nav-foreground: #0d1b3a;
+  --nav-muted: #5a6480;
   --nav-border: transparent;
-  --nav-hover: rgba(20, 32, 51, 0.06);
-  --nav-active: #dbe7f1;
+  --nav-hover: #ebedf3;
+  --nav-active: #ebedf3;
   --nav-field: #ffffff;
-  --success: #157f4a;
-  --success-soft: #d9f2e4;
-  --warning: #9a6407;
-  --warning-soft: #fbeed4;
-  --danger: #c8394a;
-  --danger-soft: #fbdfe3;
-  --shadow-soft: 0 10px 30px rgba(25, 42, 70, 0.08), 0 2px 8px rgba(25, 42, 70, 0.04);
-  --shadow-glass: 0 18px 40px rgba(25, 42, 70, 0.12), 0 2px 8px rgba(25, 42, 70, 0.05);
-  --glow: radial-gradient(60% 60% at 100% 0%, rgba(11, 31, 58, 0.08), transparent 60%);
-  --radius-sm: 8px;
-  --radius-md: 10px;
-  --radius-lg: 12px;
-  --radius-xl: 16px;
-  --radius-2xl: 24px;
+  /* Status keeps meaning: a refusal, a warning and a live plan are still told
+     apart, but at a low saturation so they read as words rather than as paint. */
+  --success: #1a7f4b;
+  --success-soft: #eaf5ee;
+  --warning: #8a5a00;
+  --warning-soft: #fbf4e6;
+  --danger: #b4232f;
+  --danger-soft: #fbeced;
+  /* No elevation on the page. Only a floating layer (a menu, the phone's drawer)
+     casts anything, because it has to sit visibly above what it covers. */
+  --shadow-soft: none;
+  --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-2xl: 18px;
   /* One height for every button and field, as on the desktop pages. */
   --control-height: 44px;
   --bar-height: 64px;
@@ -113,46 +117,48 @@
   --gutter: clamp(20px, 4vw, 48px);
 }
 
+/* The dark theme keeps ChatGPT's shape and swaps its greys for navy: the page is
+   the deep #040130 this account already asked for, each surface is a step
+   lighter on the same blue, and the primary control stays white with navy ink
+   on it so it still reads as the main action. */
 :root[data-theme="dark"] {
   color-scheme: dark;
   --canvas: #040130;
-  --surface: #0a0548;
-  --surface-secondary: #100a5c;
-  --surface-tertiary: #181072;
-  --raised: #241c8c;
-  --glass: rgba(16, 10, 92, 0.78);
-  --hairline: rgba(180, 177, 232, 0.16);
-  --strong: rgba(180, 177, 232, 0.32);
-  --control-border: transparent;
-  --field-background: #03002a;
-  --text: #ecebff;
-  --muted: #b4b1e8;
-  --faint: #8b86cf;
-  --accent: #a9b4ff;
-  --accent-hover: #c6ceff;
+  --surface: #0a0738;
+  --surface-secondary: #070432;
+  --surface-tertiary: #14114a;
+  --raised: #1d1a56;
+  --glass: #040130;
+  --hairline: #221e63;
+  --strong: #332d86;
+  --control-border: #2b2673;
+  --field-background: #0b0838;
+  --text: #e9ebf7;
+  --muted: #b0b4dd;
+  --faint: #7e83ad;
+  --accent: #ffffff;
+  --accent-hover: #e2e4f5;
   --accent-foreground: #040130;
-  --accent-soft: #2a23a0;
-  --accent-text: #f2f1ff;
-  --selected: #2a23a0;
-  --selected-foreground: #f2f1ff;
-  /* One step above the indigo canvas, so the navigation still separates from
-     the page it sits beside, exactly as the desktop app's dark theme does. */
-  --nav-surface: #100a5c;
-  --nav-foreground: #ecebff;
-  --nav-muted: rgba(236, 235, 255, 0.72);
+  --accent-soft: #14114a;
+  --accent-text: #e9ebf7;
+  --selected: #14114a;
+  --selected-foreground: #ffffff;
+  /* The docked panel is one step darker than the page, as it is in ChatGPT. */
+  --nav-surface: #030028;
+  --nav-foreground: #e9ebf7;
+  --nav-muted: #b0b4dd;
   --nav-border: transparent;
-  --nav-hover: rgba(169, 180, 255, 0.12);
-  --nav-active: rgba(169, 180, 255, 0.24);
-  --nav-field: rgba(169, 180, 255, 0.14);
-  --success: #4ade80;
-  --success-soft: #0c3d24;
-  --warning: #f5a623;
-  --warning-soft: #3a2a05;
-  --danger: #ef6b7a;
-  --danger-soft: #3d1220;
-  --shadow-soft: 0 16px 36px rgba(0, 0, 0, 0.32), 0 2px 8px rgba(0, 0, 0, 0.24);
-  --shadow-glass: 0 18px 40px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.28);
-  --glow: radial-gradient(60% 60% at 100% 0%, rgba(169, 180, 255, 0.16), transparent 60%);
+  --nav-hover: #0e0b40;
+  --nav-active: #14114a;
+  --nav-field: #0b0838;
+  --success: #6fce9a;
+  --success-soft: #1d3227;
+  --warning: #e8b339;
+  --warning-soft: #33290f;
+  --danger: #f08a8a;
+  --danger-soft: #3a1f1f;
+  --shadow-soft: none;
+  --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 * {
@@ -176,16 +182,6 @@ body {
   color: var(--text);
   font: 15px/1.6 "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
-}
-
-/* The same top-right accent wash the desktop pages paint behind their cards. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: var(--glow);
-  pointer-events: none;
-  z-index: 0;
 }
 
 h1,
@@ -221,12 +217,10 @@ a {
   top: 0;
   z-index: 30;
   width: 100%;
-  background: var(--glass);
-  /* The page scrolls under this bar, so it separates by depth rather than by a
-     drawn line. */
-  box-shadow: 0 1px 0 rgba(20, 32, 51, 0.04), 0 8px 24px rgba(20, 32, 51, 0.06);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  /* A flat bar over a flat page. One hairline is the whole separation, which is
+     what ChatGPT uses in place of a shadow. */
+  background: var(--canvas);
+  border-bottom: 1px solid var(--hairline);
 }
 
 .topbar-inner {
@@ -250,20 +244,15 @@ a {
   letter-spacing: -0.01em;
 }
 
-/* The desktop brand tile: a 32px accent square carrying the mark. */
+/* The mark sits bare on the page: no tile, no gradient, no shadow. */
 .brand-mark {
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
   border-radius: var(--radius-md);
-  background: linear-gradient(
-    140deg,
-    var(--accent),
-    color-mix(in srgb, var(--accent) 62%, var(--surface))
-  );
-  color: var(--accent-foreground);
-  box-shadow: var(--shadow-soft);
+  background: transparent;
+  color: var(--text);
 }
 
 .brand-mark svg {
@@ -318,16 +307,15 @@ a {
   background: var(--accent-hover);
 }
 
-/* Secondary is the desktop's selected pill, not a second neutral button. */
+/* Secondary is a white control with a hairline, never a second filled pill. */
 .btn-secondary {
-  background: var(--selected);
-  border-color: color-mix(in srgb, var(--accent) 28%, var(--control-border));
-  color: var(--selected-foreground);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 42%, transparent);
+  background: var(--surface);
+  border-color: var(--control-border);
+  color: var(--text);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--selected) 82%, var(--surface));
+  background: var(--surface-secondary);
 }
 
 .btn-ghost {
@@ -376,7 +364,6 @@ a {
 .icon-btn.is-primary {
   background: var(--accent);
   color: var(--accent-foreground);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .icon-btn.is-primary:hover:not(:disabled) {
@@ -475,22 +462,20 @@ a {
   max-width: var(--max-width);
   margin: 16px auto 0;
   padding: 12px 16px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
-  border-left: 3px solid var(--accent);
+  border: 1px solid var(--hairline);
+  border-left: 0;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--selected) 55%, var(--surface));
+  background: var(--surface-secondary);
   color: var(--text);
   font-size: 14px;
 }
 
 .notice.is-error {
-  border-left-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 16%, var(--surface));
+  background: var(--danger-soft);
 }
 
 .notice.is-success {
-  border-left-color: var(--success);
-  background: color-mix(in srgb, var(--success) 16%, var(--surface));
+  background: var(--success-soft);
 }
 
 /* Landing */
@@ -587,13 +572,12 @@ a {
   stroke-linejoin: round;
 }
 
-/* Cards carry the desktop page language: a faint accent tint, a hairline and
-   depth from the shadow rather than a hard border. */
+/* A card is a white face with one hairline. No tint, no shadow: ChatGPT's own
+   panels are told apart by their edge alone. */
 .card {
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
-  box-shadow: var(--shadow-soft);
+  background: var(--surface);
   padding: 20px;
 }
 
@@ -616,12 +600,9 @@ a {
   flex-direction: column;
   gap: 16px;
   padding: 24px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
-  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
+  border: 1px solid var(--hairline);
+  background: var(--surface);
   border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-glass);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
 }
 
 .signin-card h2 {
@@ -808,26 +789,21 @@ a {
   flex-direction: column;
   gap: 12px;
   padding: 20px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
-  box-shadow: var(--shadow-soft);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  background: var(--surface);
+  transition: border-color 150ms ease;
 }
 
 .plan-card:hover {
-  border-color: transparent;
-  box-shadow: 0 14px 32px color-mix(in srgb, var(--text) 10%, transparent);
+  border-color: var(--strong);
 }
 
+/* Where you already are is marked by a darker edge and the ink of its title, not
+   by a tint or a gradient. */
 .plan-card.is-current {
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--control-border));
-  background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--selected) 70%, transparent),
-      transparent 55%
-    ),
-    var(--surface);
+  border-color: var(--text);
+  background: var(--surface);
 }
 
 .plan-top {
@@ -844,13 +820,24 @@ a {
 }
 
 .plan-price {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
   color: var(--text);
-  font-size: 26px;
+  /* 24px, not the 26px it started at: four cards across at 1280 leave 184px inside
+     a card, and the widest plan's "NGN 40,000 / month" needs 186px at 26px. It
+     wrapped onto a second line and pushed that card's feature list out of line
+     with the three beside it. */
+  font-size: 24px;
   font-weight: 600;
   letter-spacing: -0.02em;
 }
 
+/* The unit stays whole: at four across, the widest price used to break after the
+   slash and leave "/" dangling on the line above the week. */
 .plan-price span {
+  white-space: nowrap;
   color: var(--muted);
   font-size: 13px;
   font-weight: 400;
@@ -1247,7 +1234,7 @@ a {
   z-index: 55;
   padding: 0;
   border: 0;
-  background: rgba(9, 18, 33, 0.44);
+  background: rgba(0, 0, 0, 0.4);
   cursor: pointer;
 }
 
@@ -1266,9 +1253,9 @@ a {
   left: 12px;
   z-index: 40;
   border-radius: 999px;
-  border-color: color-mix(in srgb, var(--control-border) 55%, transparent);
+  border-color: var(--hairline);
   background: var(--surface);
-  box-shadow: 0 6px 18px rgba(9, 18, 33, 0.16);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
 }
 
 .nav-fab:hover {
@@ -1284,9 +1271,7 @@ a {
   flex: 1 1 auto;
   min-width: 0;
   padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
-  background:
-    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 34rem),
-    var(--canvas);
+  background: var(--canvas);
 }
 
 /* The chat owns the whole content area: no page padding, and the thread fills the
@@ -1459,24 +1444,25 @@ body:has(.app) .app {
 }
 
 .bar {
-  height: 10px;
+  height: 8px;
   margin-top: 14px;
   border-radius: 9999px;
   background: var(--surface-tertiary);
-  border: 1px solid color-mix(in srgb, var(--control-border) 60%, transparent);
   overflow: hidden;
 }
 
+/* One ink bar for a normal figure, and the warning colour only once the allowance
+   is nearly spent. A gradient said "decorative" where the number is the point. */
 .bar-fill {
   height: 100%;
   width: 0;
   border-radius: 9999px;
-  background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+  background: var(--text);
   transition: width 400ms ease;
 }
 
 .bar-fill.is-warning {
-  background: linear-gradient(90deg, var(--warning), var(--danger));
+  background: var(--warning);
 }
 
 .row-list {
@@ -1505,8 +1491,8 @@ body:has(.app) .app {
   font-size: 13px;
 }
 
-/* One empty state everywhere, as on the desktop pages: a dashed panel with a
-   centred sentence rather than a bare grey line. */
+/* One empty state everywhere: a quiet hairline panel with a centred sentence
+   rather than a dashed outline. */
 .empty {
   display: flex;
   flex-direction: column;
@@ -1516,9 +1502,9 @@ body:has(.app) .app {
   min-height: 10rem;
   margin-top: 8px;
   padding: 20px;
-  border: 1px dashed color-mix(in srgb, var(--control-border) 92%, transparent);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  background: var(--surface);
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
@@ -1527,29 +1513,27 @@ body:has(.app) .app {
 
 .alert {
   padding: 12px 16px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 60%, transparent);
-  border-left: 3px solid var(--warning);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--warning) 14%, var(--surface));
+  background: var(--warning-soft);
   color: var(--text);
   font-size: 14px;
 }
 
 .alert.is-danger {
-  border-left-color: var(--danger);
-  background: color-mix(in srgb, var(--danger) 14%, var(--surface));
+  background: var(--danger-soft);
 }
 
-/* On the navy chrome the account block is a translucent tile, so it reads as part
-   of the panel instead of a white hole punched in it. */
+/* The account sits on the panel as a plain row: avatar, name, address. No card,
+   no fill, no rule. */
 .account-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px;
-  border: 1px solid var(--nav-border);
-  border-radius: var(--radius-lg);
-  background: var(--nav-field);
+  padding: 8px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
   color: var(--nav-foreground);
 }
 
@@ -1586,26 +1570,25 @@ body:has(.app) .app {
 .nav {
   display: flex;
   flex-direction: column;
-  /* The desktop rail spaces its rows 8px apart, and the panel matches it, so the two
-     apps read as one panel rather than two lookalikes. */
-  gap: 8px;
+  /* Rows nearly touch, as they do in ChatGPT's panel: the list reads as one
+     column of destinations rather than a stack of separate buttons. */
+  gap: 2px;
 }
 
-/* Desktop navigation rows: quiet on the navy, one lit row for where you are. */
 .nav-item {
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: var(--control-height);
-  padding: 0 12px 0 10px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: transparent;
-  color: var(--nav-muted);
-  font: 500 14px/1 "Segoe UI", system-ui, sans-serif;
+  color: var(--nav-foreground);
+  font: 400 14px/1 "Segoe UI", system-ui, sans-serif;
   text-align: left;
   cursor: pointer;
-  transition: background 150ms ease, color 150ms ease, box-shadow 150ms ease;
+  transition: background 120ms ease, color 120ms ease;
 }
 
 .nav-item svg {
@@ -1624,13 +1607,11 @@ body:has(.app) .app {
   color: var(--nav-foreground);
 }
 
-/* Where you are is marked in the accent itself, with a square bar on the leading
-   edge. A filled rounded pill inside a column of rows read as a button that had
-   just been pressed, and it competed with the hover wash beside it. */
+/* Where you are is a soft grey row with the label picked out, which is the one
+   marker ChatGPT uses. No bar on the edge and no change of hue. */
 .nav-item.is-active {
-  background: transparent;
-  box-shadow: inset 2px 0 0 var(--accent);
-  color: var(--accent);
+  background: var(--nav-active);
+  color: var(--nav-foreground);
   font-weight: 600;
 }
 
@@ -1779,18 +1760,19 @@ body:has(.app) .app {
 /* ---------------------------------------------------------------------------
  * Brand, hero and account screens
  *
- * The hero and the two account pages are the only surfaces that carry motion:
- * a three.js point globe and a drifting particle field, both decorative and
- * both hidden from assistive tech. Everything else stays a still page.
+ * The hero and the account pages are still pages: no motion, no field of drifting
+ * shapes. The only image is the brand mark.
  * ------------------------------------------------------------------------- */
 
-/* The real app icon: already a rounded blue tile, so it needs no frame. */
+/* The mark is drawn in greys: a monochrome interface carries identity in the shape,
+   not in a hue, and the mark was the last colour left on the page. */
 .zuri-logo {
   display: block;
   flex: 0 0 auto;
   max-width: 100%;
   object-fit: contain;
   border-radius: 8px;
+  filter: grayscale(1);
 }
 
 .brand-mark {
@@ -1869,11 +1851,9 @@ body:has(.app) .app {
   max-width: 22ch;
 }
 
+/* The emphasised half of a headline is simply bolder, not a second colour. */
 .hero-accent {
-  background: linear-gradient(100deg, var(--accent), var(--accent-hover));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--text);
 }
 
 .hero-cta {
@@ -1962,11 +1942,9 @@ body:has(.app) .app {
   min-height: 220px;
   padding: clamp(16px, 2vw, 26px);
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
-  background:
-    radial-gradient(110% 100% at 15% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 60%),
-    linear-gradient(160deg, var(--surface-secondary), var(--canvas));
+  background: var(--surface-secondary);
 }
 
 .device-row {
@@ -2026,56 +2004,23 @@ body:has(.app) .app {
   min-height: calc(100dvh - var(--bar-height));
 }
 
-/* The panel behind the copy is a photograph, not a painted gradient: a soft
-   painted wash read as a smudge at this size. Photo: "Blue waves form a soft,
-   abstract gradient" by Hassaan Here, Unsplash License, stored under
-   web/public/img so the page never waits on another host to paint.
-   The scrim is the first of the two background layers. It is what keeps the
-   white copy readable over the bright top of the picture, and it deepens on
-   the dark theme, where the surrounding canvas is already navy. */
-/* On a phone the band carries no words, so it would be 148px of colour the reader
-   has to scroll past to reach the fields. It stays a thin strip there, and grows
-   into the full column once it has copy to hold. */
+/* A flat panel beside the form: no photograph, no scrim, no gradient. On a phone it
+   is gone rather than a 148px strip of colour to scroll past. */
 .auth-aside {
   position: relative;
-  min-height: 72px;
+  display: none;
   overflow: hidden;
-  background-color: #0d2a4d;
-  background-image:
-    linear-gradient(
-      180deg,
-      rgba(8, 20, 38, 0.74) 0%,
-      rgba(8, 20, 38, 0.34) 20%,
-      rgba(8, 20, 38, 0.66) 55%,
-      rgba(8, 20, 38, 0.9) 100%
-    ),
-    url("/img/auth-backdrop.jpg");
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background: var(--surface-secondary);
   isolation: isolate;
 }
 
-:root[data-theme="dark"] .auth-aside {
-  background-image:
-    linear-gradient(
-      180deg,
-      rgba(4, 1, 48, 0.72) 0%,
-      rgba(4, 1, 48, 0.38) 20%,
-      rgba(4, 1, 48, 0.62) 55%,
-      rgba(4, 1, 48, 0.92) 100%
-    ),
-    url("/img/auth-backdrop.jpg");
-}
-
-/* The copy stands on the photograph, so it is white in both themes rather than
-   following the page's text colour. */
+/* The copy sits on the panel now, so it takes the page's own ink. */
 .auth-aside .brand {
-  color: #ffffff;
+  color: var(--text);
 }
 
-/* Below 900px the aside is a photo band: the copy lives in the card, where a
-   thumb can reach it. */
+/* Below 900px the aside is not drawn at all: there is no picture to carry, and the
+   card holds every word. */
 .auth-aside-inner {
   display: none;
 }
@@ -2097,10 +2042,9 @@ body:has(.app) .app {
   flex-direction: column;
   gap: 14px;
   padding: 22px 20px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-2xl);
-  background: color-mix(in srgb, var(--surface) 96%, var(--accent) 4%);
-  box-shadow: var(--shadow-glass);
+  background: var(--surface);
 }
 
 /* Title and its one line of copy travel together, so the gap under the tabs is one
@@ -2247,27 +2191,24 @@ body:has(.app) .app {
   gap: 8px;
 }
 
-/* The chips are the only furniture on the photograph, so they are glass rather
-   than surface-coloured: a solid white chip would punch a hole in the picture. */
+/* The chips are plain surface with a hairline, the same furniture as the panel. */
 .auth-trust li {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 6px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid var(--hairline);
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
+  background: var(--surface);
+  color: var(--muted);
   font-size: 12px;
   font-weight: 600;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
 }
 
 .auth-trust svg {
   width: 14px;
   height: 14px;
-  stroke: #ffffff;
+  stroke: currentColor;
   fill: none;
 }
 
@@ -2582,7 +2523,7 @@ a.download-card:hover {
     min-height: 320px;
   }
 
-  /* The card column is a narrow rail and the photograph carries the page: a
+  /* The card column is a narrow rail and the copy column carries the page: a
      50/50 split left the form floating in half an empty window. It is 30% of
      the width, but never thinner than the card can be typed in comfortably,
      which is what happens on a 900px laptop window (30% would be 270px). */
@@ -2595,7 +2536,6 @@ a.download-card:hover {
   .auth-aside {
     display: block;
     min-height: 100%;
-    border-right: 1px solid color-mix(in srgb, var(--control-border) 55%, transparent);
   }
 
   .auth-aside-inner {
@@ -2611,20 +2551,18 @@ a.download-card:hover {
 
   .auth-aside-inner h1 {
     max-width: 16ch;
-    color: #ffffff;
+    color: var(--text);
     font-size: clamp(26px, 2.6vw, 38px);
     font-weight: 600;
     letter-spacing: -0.03em;
     line-height: 1.1;
-    text-shadow: 0 1px 18px rgba(4, 12, 28, 0.35);
   }
 
   .auth-aside-inner p {
     max-width: 40ch;
-    color: rgba(255, 255, 255, 0.92);
+    color: var(--muted);
     font-size: 15px;
     line-height: 1.6;
-    text-shadow: 0 1px 14px rgba(4, 12, 28, 0.45);
   }
 
   .auth-brand {
@@ -2720,13 +2658,13 @@ a.download-card:hover {
   white-space: nowrap;
 }
 
-/* Rows are told apart by a pale band rather than a rule under each one. */
-.admin-table tbody tr:nth-child(even) {
-  background: color-mix(in srgb, var(--surface-secondary) 55%, transparent);
+/* Rows are told apart by a hairline under each one, never by a coloured band. */
+.admin-table tbody tr {
+  border-top: 1px solid var(--hairline);
 }
 
 .admin-table tbody tr:hover {
-  background: color-mix(in srgb, var(--surface-secondary) 90%, transparent);
+  background: var(--surface-secondary);
 }
 
 /* These tables carry six columns and words that cannot wrap, so on a phone they
@@ -2775,15 +2713,13 @@ a.download-card:hover {
   font-size: 14px;
 }
 
-/* The plan editor is a card above the accounts table. A left accent marks it as the
-   one account waiting on a decision, and the fields line up two across until the
-   window is too narrow for that. */
+/* The plan editor is a card above the accounts table. A hairline on every edge
+   keeps it level with the rest of the page. */
 .admin-plan-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
   margin-bottom: 16px;
-  border-left: 3px solid var(--accent);
 }
 
 .admin-plan-form .admin-fields {
@@ -2950,15 +2886,14 @@ a.download-card:hover {
   min-height: 40px;
   margin: 10px 0 0;
   padding: 0 10px;
-  border: 1px solid var(--nav-border);
-  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
   background: var(--nav-field);
   color: var(--nav-muted);
 }
 
 .conversation-search:focus-within {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: var(--strong);
 }
 
 .conversation-search input {
@@ -3178,18 +3113,22 @@ a.download-card:hover {
   line-height: 1.6;
 }
 
+/* A prompt is a grey bubble with ink in it, and a reply is bare text on the page.
+   That is the pair ChatGPT draws, and it means only the person's own words ever
+   sit in a filled box. */
 .chat-bubble-user {
   align-self: flex-end;
   align-items: flex-end;
-  background: var(--accent);
-  color: var(--accent-foreground);
+  background: var(--surface-secondary);
+  color: var(--text);
 }
 
 .chat-bubble-assistant {
   align-self: flex-start;
   align-items: flex-start;
   border: 0;
-  background: var(--surface-secondary);
+  padding-inline: 0;
+  background: transparent;
   color: var(--text);
 }
 
@@ -3202,7 +3141,7 @@ a.download-card:hover {
 }
 
 .chat-bubble-user .chat-text {
-  color: var(--accent-foreground);
+  color: var(--text);
 }
 
 /* A prompt is not markup: its line breaks are kept and nothing else is
@@ -3238,6 +3177,42 @@ a.download-card:hover {
   padding-inline-start: 0.15rem;
 }
 
+/*
+ * Vertical rhythm for a reply. The renderer emits flat blocks (heading, paragraph,
+ * list, code, table), so the spacing belongs here rather than in utilities: one
+ * uniform gap left every heading sitting on the paragraph above it. A heading now
+ * takes a wide gap above and a narrow one below, so it reads as the title of the
+ * text that follows instead of a line crammed between two paragraphs.
+ */
+.message-body > * + * {
+  margin-block-start: 14px;
+}
+
+.message-body > * + h3 {
+  margin-block-start: 22px;
+}
+
+.message-body > h3 + * {
+  margin-block-start: 6px;
+}
+
+.message-body h3 {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+/* Lines inside one block keep the reading rhythm, and list items get a gap so a
+   seven-point list does not read as one paragraph with numbers in it. */
+.message-body p,
+.message-body li {
+  line-height: 1.6;
+}
+
+.message-body li + li {
+  margin-block-start: 6px;
+}
+
 .chat-bubble-actions {
   display: flex;
   flex-wrap: wrap;
@@ -3246,15 +3221,14 @@ a.download-card:hover {
   margin-top: 2px;
 }
 
-/* The copy control is the shared IconButton; inside a prompt bubble it only needs its
-   colour turned down, because the accent background would otherwise mute the glyph. */
+/* The copy control inside a prompt is a quiet glyph on the grey bubble. */
 .chat-bubble-user .chat-copy {
-  color: color-mix(in srgb, var(--accent-foreground) 82%, transparent);
+  color: var(--muted);
 }
 
 .chat-bubble-user .chat-copy:hover {
-  background: color-mix(in srgb, var(--accent-foreground) 16%, transparent);
-  color: var(--accent-foreground);
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
 }
 
 /* The opening screen, matching the desktop chat: the app mark, a greeting and one
@@ -3276,9 +3250,8 @@ a.download-card:hover {
   width: 52px;
   height: 52px;
   border-radius: 0.9rem;
-  background: var(--accent);
-  color: var(--accent-foreground);
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--accent) 26%, transparent);
+  background: transparent;
+  color: var(--text);
 }
 
 .chat-opening h2 {
@@ -3573,7 +3546,7 @@ a.download-card:hover {
   border: 1px solid var(--hairline);
   border-radius: var(--radius-xl);
   background: var(--surface);
-  box-shadow: 0 18px 40px -24px rgb(15 23 42 / 45%);
+  box-shadow: var(--shadow-glass);
 }
 
 .chat-model-chevron {
@@ -3632,7 +3605,6 @@ a.download-card:hover {
   border-radius: 999px;
   background: var(--accent);
   color: var(--accent-foreground);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent) 28%, transparent);
 }
 
 .chat-composer .chat-send:hover:not(:disabled) {
@@ -3736,12 +3708,12 @@ a.download-card:hover {
 }
 
 /*
- * Type, taken from the design file: Montserrat on the headings and Roboto on the
- * rest. Both load with display=swap, so the first paint uses the fallback and the
- * pages never wait on the network to show text.
+ * One system sans across headings and body. The two web fonts the old design
+ * asked for are gone with the rest of the decoration: ChatGPT sets its own
+ * interface in the system face, and this costs no request and no swap-in.
  */
 body {
-  font-family: 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
 
 h1,
@@ -3749,6 +3721,6 @@ h2,
 h3,
 h4,
 .brand-name {
-  font-family: 'Montserrat', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: inherit;
   letter-spacing: -0.01em;
 }

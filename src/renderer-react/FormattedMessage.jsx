@@ -146,7 +146,7 @@ export default function FormattedMessage({ content, onOpenCode }) {
     if (!list) return;
     const ListTag = list.type === 'ordered' ? 'ol' : 'ul';
     blocks.push(
-      <ListTag key={`list-${blocks.length}`} className={`list-inside space-y-1 ${list.type === 'ordered' ? 'list-decimal' : 'list-disc'}`}>
+      <ListTag key={`list-${blocks.length}`} className={`list-inside ${list.type === 'ordered' ? 'list-decimal' : 'list-disc'}`}>
         {list.items.map((item, index) => <li key={`${list.type}-${index}`}>{inlineContent(item, `list-${blocks.length}-${index}`)}</li>)}
       </ListTag>,
     );
@@ -245,5 +245,7 @@ export default function FormattedMessage({ content, onOpenCode }) {
   }
   flushText();
 
-  return <div className="space-y-3 leading-6">{blocks}</div>;
+  // The vertical rhythm lives in the stylesheets under .message-body: a heading
+  // needs more space above it than below, which one uniform gap cannot express.
+  return <div className="message-body leading-6">{blocks}</div>;
 }
