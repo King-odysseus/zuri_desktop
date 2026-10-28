@@ -1176,10 +1176,16 @@ export async function sendChatMessage(threadId, options = {}) {
     settings: modelSettings,
   });
 
+  // Desktop chat must always use the signed-in account route. Keeping a direct
+  // provider fallback here would let an older caller bypass Railway and revive the
+  // local-key flow that the shipped installers no longer expose.
+  if (typeof options.cloudReply !== 'function') {
+    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri to get replies. Open Zuri Cloud in the sidebar.');
+  }
+
   // The account is the only way in. main.js hands in a cloudReply whenever the app
   // asks for a reply, so a chat is answered from the person's Zuri plan and no
-  // supplier key is read, stored or needed. A caller with no account route (the
-  // automation runner, the checks) keeps the direct-provider path below.
+  // supplier key is read, stored or needed.
   if (typeof options.cloudReply === 'function') {
     let reached;
     try {
