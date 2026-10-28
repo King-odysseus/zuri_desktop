@@ -5,19 +5,6 @@ import SelectField from './SelectField.jsx';
 // the same six names, and two copies of a supplier id would drift apart.
 import { ZURI_MODELS } from './zuriModels.js';
 
-const PROVIDERS = [
-  ['openai', 'OpenAI'],
-  ['anthropic', 'Anthropic'],
-  ['deepseek', 'DeepSeek'],
-  ['moonshot', 'Kimi (Moonshot)'],
-  ['zai', 'Z.ai (GLM)'],
-];
-
-/** The person-facing name of the provider whose key a model spends. */
-function providerLabel(provider) {
-  return PROVIDERS.find(([value]) => value === provider)?.[1] ?? provider;
-}
-
 // The ids match store.js ANSWER_STYLE_CHOICES, which refuses anything else; the
 // labels are here because the renderer cannot import main-process code.
 const ANSWER_STYLE_OPTIONS = {
@@ -37,14 +24,6 @@ const FIELD_LABELS = [
 
 const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 2000;
 
-const KEY_STATE_LABELS = {
-  checking: 'Checking...',
-  saved: 'Key saved',
-  missing: 'No key saved',
-  unavailable: 'Status unavailable',
-  error: 'Status unavailable',
-};
-
 function applyTheme(theme) {
   const next = theme === 'light' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
@@ -57,9 +36,6 @@ function applyTheme(theme) {
 export default function SettingsView() {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [settings, setSettings] = useState(null);
-  const [provider, setProvider] = useState('openai');
-  const [key, setKey] = useState('');
-  const [keyState, setKeyState] = useState('checking');
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
   const [allowKind, setAllowKind] = useState('apps');
@@ -85,7 +61,6 @@ export default function SettingsView() {
       setSettings(next);
       applyTheme(next.theme);
       setStatus('ready');
-      await refreshKeyStatus(provider);
       await refreshAddinStatus();
     } catch (error) {
       setStatus('error');
@@ -98,16 +73,6 @@ export default function SettingsView() {
     // The bridge is stable for the lifetime of the window.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function refreshKeyStatus(nextProvider) {
-    if (typeof api?.settings?.keyStatus !== 'function') {
-      setKeyState('unavailable');
-      return;
-    }
-    setKeyState('checking');
-    const result = await api.settings.keyStatus({ provider: nextProvider });
-    setKeyState(result?.ok && result.data?.hasKey === true ? 'saved' : result?.ok ? 'missing' : 'error');
-  }
 
   async function refreshAddinStatus() {
     if (typeof api?.settings?.addinStatus !== 'function') return;
@@ -173,54 +138,6 @@ export default function SettingsView() {
     }
   }
 
-  async function submitKey(event) {
-    event.preventDefault();
-    const typed = key.trim();
-    setKey('');
-    if (typed === '') {
-      setMessage('Paste a key first.');
-      return;
-    }
-    if (typeof api?.settings?.setKey !== 'function') {
-      setMessage('Keys can only be saved inside Zuri.');
-      return;
-    }
-    setBusy(true);
-    try {
-      const result = await api.settings.setKey({ provider, key: typed });
-      if (!result?.ok) {
-        setMessage(result?.error?.message ?? 'The key was not saved.');
-        return;
-      }
-      setKeyState(result.data?.hasKey === true ? 'saved' : 'missing');
-      setMessage('Provider key saved.');
-    } catch (error) {
-      setMessage(error?.message ?? 'The key was not saved.');
-      await refreshKeyStatus(provider);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function removeKey() {
-    if (typeof api?.settings?.clearKey !== 'function') return;
-    setBusy(true);
-    try {
-      const result = await api.settings.clearKey({ provider });
-      if (!result?.ok) {
-        setMessage(result?.error?.message ?? 'The key was not removed.');
-        return;
-      }
-      setKeyState('missing');
-      setMessage('Provider key removed.');
-    } catch (error) {
-      setMessage(error?.message ?? 'The key was not removed.');
-      await refreshKeyStatus(provider);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function listFor(kind) {
     return Array.isArray(settings?.[kind === 'apps' ? 'allowedApps' : 'allowedUrls'])
       ? settings[kind === 'apps' ? 'allowedApps' : 'allowedUrls']
@@ -264,7 +181,7 @@ export default function SettingsView() {
       <div className="zuri-page-content zuri-scrollbar-hidden">
         <header>
           <h1 className="text-3xl font-medium tracking-tight">Settings</h1>
-          <p className="mt-2 text-sm text-muted">Appearance, provider keys, and what Zuri is allowed to open.</p>
+          <p className="mt-2 text-sm text-muted">Appearance, cloud connection, and what Zuri is allowed to open.</p>
         </header>
 
         {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
@@ -302,7 +219,6 @@ export default function SettingsView() {
                 ? 'This model was chosen outside the Zuri list, so it is shown by its provider id.'
                 : `${zuriModel.name}: ${zuriModel.note} Billed to your Zuri plan.`}
             </p>
-            <p className="mt-2 text-xs text-muted">Your selected provider key is stored only on this computer. Cloud model usage and allowance are separate from local provider usage.</p>
             <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
           </section>
 
@@ -339,29 +255,6 @@ export default function SettingsView() {
             <h2 className="text-lg font-medium">Zuri Cloud connection</h2>
             <p className="mt-1 text-sm text-muted">Choose the Railway server used for Google sign-in, usage and subscriptions.</p>
             <Input className="mt-4" label="Cloud server URL" value={current.cloudUrl ?? ''} onChange={(event) => setSettings((value) => ({ ...(value ?? {}), cloudUrl: event.target.value }))} onBlur={() => void savePatch({ cloudUrl: String(current.cloudUrl ?? '').trim() }, 'Cloud server URL saved.')} placeholder="https://your-cloud-service.up.railway.app" />
-          </section>
-
-          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <h2 className="text-lg font-medium">Provider key (optional)</h2>
-            <p className="mt-1 text-sm text-muted">You do not need a key to chat: replies are billed to your Zuri plan through the account you signed in with. A key is only used by the Word add-in, which talks to a provider directly. Keys are stored on this computer and Zuri only knows whether one is saved.</p>
-            <p className="mt-1 text-sm text-muted">Your messages, and the text of any file you attach, are sent to the provider you pick to write replies. Some providers are outside Nigeria. AI can be wrong, so check anything important. Read the privacy and terms notices at the Zuri Cloud site (/privacy and /terms).</p>
-            <p role="note" className="mt-3 rounded-xl border border-border bg-surface-secondary px-4 py-3 text-sm text-muted">
-              Your messages are sent to the AI company behind the model you use, so it can write a reply. Some of these
-              companies operate outside Nigeria, including in China and the United States, and handle data under their own
-              policies. Do not send passwords, card details, ID numbers or confidential information you may not share.
-              AI can be wrong: check anything important. Your chats, tasks and files stay on this computer.
-            </p>
-            <form onSubmit={submitKey} className="mt-4 flex flex-col gap-3">
-              <div className="flex flex-wrap items-end gap-3">
-                <SelectField label="Provider" value={provider} options={PROVIDERS.map(([value, label]) => ({ value, label }))} onChange={(value) => { setProvider(value); void refreshKeyStatus(value); }} />
-                <Chip className="mb-2" color={keyState === 'saved' ? 'primary' : 'default'}>{KEY_STATE_LABELS[keyState] ?? 'Status unavailable'}</Chip>
-                <Input type="password" label="API key" value={key} onChange={(event) => setKey(event.target.value)} placeholder="Paste your key" autoComplete="off" className="min-w-64 flex-1" />
-                <Button type="submit" variant="primary" isDisabled={busy}>Save key</Button>
-              </div>
-              <div>
-                <Button type="button" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeKey()} isDisabled={busy || keyState !== 'saved'}>Remove key</Button>
-              </div>
-            </form>
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
