@@ -1,104 +1,253 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Zuri Nigeria visual mockups</title>
-  <meta name="description" content="Interactive visual mockups for the Nigeria-rooted Zuri product direction.">
-  <link rel="stylesheet" href="../../web/src/styles.css">
+  <title>Zuri design mockups</title>
+  <meta name="description" content="Interactive mockups of the Zuri home page and desktop app, built only from Tailwind utilities and Lucide icons.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Roboto:wght@400;500;700&display=swap">
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    // The app's palette as Tailwind colours; dark values live under "night" and are used with dark: variants.
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Roboto', 'Segoe UI', 'sans-serif'], display: ['Montserrat', 'Roboto', 'sans-serif'] },
+          colors: {
+            navy: '#0b1f3a', ink: '#10233f', mute: '#5f6d83', line: '#d9e1ea', canvas: '#f7f9fc',
+            night: { bg: '#040130', surface: '#0a0548', rail: '#100a5c', line: '#342eaa', field: '#070240', sel: '#2a23a0', muted: '#b4b1e8', text: '#ecebff', accent: '#a9b4ff' },
+          },
+        },
+      },
+    };
+  </script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 </head>
-<body class="mockup-page">
-  <header class="mockup-header">
-    <div class="mockup-header-inner">
-      <a class="mockup-brand" href="#overview" data-screen-link="overview" aria-label="Zuri mockups home">
-        <span class="mockup-brand-mark">Z</span>
-        <span>ZURI</span>
-      </a>
-      <div class="mockup-header-actions">
-        <span class="mockup-kicker">Nigeria visual direction</span>
-        <button class="mockup-icon-button" type="button" data-theme-toggle aria-label="Toggle theme">Light</button>
-      </div>
+<body class="min-h-dvh bg-canvas font-sans text-ink antialiased dark:bg-night-bg dark:text-night-text">
+
+  <header class="sticky top-0 z-50 h-12 border-b border-line bg-white dark:border-night-line dark:bg-night-surface md:h-10">
+    <div class="mx-auto flex h-full w-[calc(100%-24px)] max-w-[1240px] items-center gap-3">
+      <span class="hidden font-display text-[10px] font-bold uppercase tracking-[0.12em] text-mute dark:text-night-muted md:inline">Mockups</span>
+      <nav class="-ml-1 mr-auto flex gap-1 overflow-x-auto [scrollbar-width:none] md:ml-2" aria-label="Mockup screens">
+        <button type="button" data-screen="home" data-tab class="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 font-display text-xs font-semibold text-mute hover:text-ink dark:text-night-muted dark:hover:text-night-text md:min-h-7"><i data-lucide="layout-grid" class="size-[15px] shrink-0"></i>Home page</button>
+        <button type="button" data-screen="chat" data-tab class="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 font-display text-xs font-semibold text-mute hover:text-ink dark:text-night-muted dark:hover:text-night-text md:min-h-7"><i data-lucide="message-square" class="size-[15px] shrink-0"></i>Chat</button>
+        <button type="button" data-screen="tasks" data-tab class="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 font-display text-xs font-semibold text-mute hover:text-ink dark:text-night-muted dark:hover:text-night-text md:min-h-7"><i data-lucide="list-checks" class="size-[15px] shrink-0"></i>Tasks</button>
+        <button type="button" data-screen="settings" data-tab class="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 font-display text-xs font-semibold text-mute hover:text-ink dark:text-night-muted dark:hover:text-night-text md:min-h-7"><i data-lucide="settings" class="size-[15px] shrink-0"></i>Settings</button>
+      </nav>
+      <button type="button" data-theme-toggle aria-label="Switch to dark mode" class="inline-flex size-9 shrink-0 items-center justify-center rounded-full text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel md:size-7"><i data-lucide="moon" class="size-4"></i></button>
     </div>
   </header>
 
-  <div class="mockup-shell">
-    <aside class="mockup-sidebar" aria-label="Mockup screens">
-      <div class="mockup-sidebar-intro">
-        <span class="mockup-eyebrow">Concept set 01</span>
-        <h1>Built for the way Nigerians work.</h1>
-        <p>Warm, confident, practical. A product identity with Lagos energy and room to breathe.</p>
+  <!-- HOME PAGE -->
+  <div data-screen-panel="home" class="hidden w-full">
+    <header class="sticky top-12 z-40 w-full border-b border-line bg-white/95 backdrop-blur dark:border-night-line dark:bg-night-surface/95 md:top-10">
+      <div class="mx-auto flex min-h-14 w-[calc(100%-32px)] max-w-[1120px] items-center gap-6 md:w-[calc(100%-48px)]">
+        <a href="#home" data-screen="home" class="inline-flex items-center gap-2.5 font-display text-lg font-bold"><img src="./assets/zuri-logo.png" alt="" width="26" height="26" class="rounded-lg"><span>Zuri</span></a>
+        <nav class="ml-2 hidden gap-1 lg:flex" aria-label="Sections">
+          <a href="#features" class="inline-flex min-h-9 items-center rounded-full px-3 text-[13px] font-medium text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel dark:hover:text-night-text">Features</a>
+          <a href="#how" class="inline-flex min-h-9 items-center rounded-full px-3 text-[13px] font-medium text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel dark:hover:text-night-text">How it works</a>
+          <a href="#pricing" class="inline-flex min-h-9 items-center rounded-full px-3 text-[13px] font-medium text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel dark:hover:text-night-text">Pricing</a>
+        </nav>
+        <div class="ml-auto flex gap-2">
+          <button type="button" class="hidden min-h-11 items-center justify-center rounded-full px-4 font-display text-[13px] font-semibold text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel sm:inline-flex md:min-h-9">Sign in</button>
+          <button type="button" data-screen="chat" class="inline-flex min-h-11 items-center justify-center rounded-full bg-blue-600 px-4 font-display text-[13px] font-semibold text-white hover:bg-blue-700 dark:bg-night-accent dark:text-night-bg dark:hover:bg-[#c6ceff] md:min-h-9">Get started</button>
+        </div>
       </div>
-      <nav class="mockup-nav">
-        <button class="mockup-nav-item is-active" type="button" data-screen="overview">Overview</button>
-        <button class="mockup-nav-item" type="button" data-screen="chat">Chat workspace</button>
-        <button class="mockup-nav-item" type="button" data-screen="tasks">Tasks and calendar</button>
-        <button class="mockup-nav-item" type="button" data-screen="settings">Onboarding and settings</button>
-      </nav>
-      <div class="mockup-sidebar-note">
-        <span class="mockup-pattern-swatch" aria-hidden="true"></span>
-        <span>Adire-inspired geometry, used as texture rather than decoration.</span>
-      </div>
-    </aside>
+    </header>
 
-    <main class="mockup-main">
-      <section class="mockup-screen is-visible" data-screen-panel="overview">
-        <div class="mockup-hero">
-          <div>
-            <span class="mockup-eyebrow">Zuri product direction</span>
-            <h2>More character. More local context. Less generic SaaS.</h2>
-            <p>These screens use indigo and clay as the core system, then bring Nigeria into the product through language, work examples, Naira, West Africa Time, and a restrained woven pattern.</p>
+    <section class="w-full bg-gradient-to-b from-blue-50/60 to-canvas dark:from-night-surface dark:to-night-bg">
+      <div class="mx-auto grid w-[calc(100%-32px)] max-w-[1120px] items-center gap-10 py-10 md:w-[calc(100%-48px)] md:py-14 lg:grid-cols-2 lg:gap-10">
+        <div>
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-3.5 py-1.5 font-display text-xs font-semibold text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="sparkles" class="size-3.5"></i>Your AI workspace</span>
+          <h1 class="mb-3 mt-4 font-display text-3xl font-extrabold leading-[1.08] tracking-tight md:text-[40px]">Chats, tasks and documents in one calm place.</h1>
+          <p class="mb-6 max-w-[520px] text-[15px] leading-relaxed text-mute dark:text-night-muted">Zuri is an assistant that remembers what you are working on. Ask a question, set a reminder or draft a document, on the desktop or in the browser.</p>
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="button" data-screen="chat" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-blue-600 px-5 font-display text-sm font-semibold text-white hover:bg-blue-700 dark:bg-night-accent dark:text-night-bg dark:hover:bg-[#c6ceff] sm:w-auto">Start with Zuri<i data-lucide="arrow-right" class="size-[18px]"></i></button>
+            <button type="button" data-screen="tasks" class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-white px-5 font-display text-sm font-semibold hover:border-blue-600 hover:bg-blue-50 dark:border-night-line dark:bg-night-surface dark:hover:bg-night-sel sm:w-auto">See the app</button>
           </div>
-          <div class="mockup-hero-stamp"><strong>LAGOS</strong><span>Built for real work</span></div>
+          <ul class="mt-6 grid gap-2.5 text-[13px] text-mute dark:text-night-muted">
+            <li class="flex items-center gap-2.5"><i data-lucide="check" class="size-[18px] shrink-0 rounded-full bg-emerald-700 p-[3px] text-white"></i>One account for desktop and web</li>
+            <li class="flex items-center gap-2.5"><i data-lucide="check" class="size-[18px] shrink-0 rounded-full bg-emerald-700 p-[3px] text-white"></i>Pay monthly, cancel any time</li>
+            <li class="flex items-center gap-2.5"><i data-lucide="check" class="size-[18px] shrink-0 rounded-full bg-emerald-700 p-[3px] text-white"></i>See your usage before you hit a limit</li>
+          </ul>
         </div>
-        <div class="mockup-overview-grid">
-          <button class="mockup-preview-card preview-chat" type="button" data-screen="chat">
-            <span class="mockup-preview-label">01 / Chat workspace</span>
-            <span class="mockup-preview-title">A focused place to think, write and do.</span>
-            <span class="mockup-mini-screen">
-              <span class="mini-sidebar"><b>ZURI</b><i></i><i></i><i></i><i></i></span>
-              <span class="mini-content"><b>Good morning, Tolu</b><small>What would you like to get done today?</small><em>Ask Zuri anything</em></span>
-            </span>
-          </button>
-          <button class="mockup-preview-card preview-tasks" type="button" data-screen="tasks">
-            <span class="mockup-preview-label">02 / Tasks and calendar</span>
-            <span class="mockup-preview-title">Turn ideas into progress.</span>
-            <span class="mockup-mini-screen">
-              <span class="mini-content"><b>Today</b><small>Good morning, Tolu. 3 key items.</small><em>N45,000 <small>total value</small></em></span>
-              <span class="mini-calendar"><i></i><i></i><i></i></span>
-            </span>
-          </button>
-          <button class="mockup-preview-card preview-settings" type="button" data-screen="settings">
-            <span class="mockup-preview-label">03 / Onboarding and settings</span>
-            <span class="mockup-preview-title">A small start, built around you.</span>
-            <span class="mockup-mini-settings"><b>Choose your workspace</b><span>For me</span><span>My team</span><span>West Africa Time</span></span>
-          </button>
-        </div>
-        <div class="mockup-principles">
-          <article><strong>Indigo foundation</strong><p>Grounds the product in depth and trust instead of default blue.</p></article>
-          <article><strong>Clay actions</strong><p>Gives primary actions a warm, human energy without shouting.</p></article>
-          <article><strong>Local proof</strong><p>Names, currency, timezone and work examples make the product feel lived in.</p></article>
-        </div>
-      </section>
 
-      <section class="mockup-screen" data-screen-panel="chat">
-        <div class="mockup-screen-heading"><div><span class="mockup-eyebrow">01 / Chat workspace</span><h2>Good morning, Tolu</h2><p>A confident workspace for real conversations and real work.</p></div><span class="mockup-status-pill">Product direction</span></div>
-        <div class="mock-chat-window">
-          <aside class="mock-chat-sidebar"><div class="mock-chat-logo">ZURI<span>.</span></div><button class="mock-primary-button">+ <span>New chat</span></button><div class="mock-chat-links"><button class="is-current">Chat</button><button>Tasks</button><button>Calendar</button><button>Knowledge</button><button>Team</button><button>Settings</button></div><div class="mock-chat-pattern" aria-hidden="true"></div><div class="mock-profile"><span class="mock-avatar">TA</span><span><b>Tolu Adebayo</b><small>Pro plan</small></span></div></aside>
-          <div class="mock-chat-content"><div class="mock-topline"><span>Search chats, files, people...</span><span class="mock-top-user">Tolu <small>Product Lead</small></span></div><div class="mock-chat-welcome"><h3>Good morning, Tolu</h3><p>What would you like to get done today?</p><div class="mock-chat-input">Ask Zuri anything <button class="mock-send-button" type="button" data-action="send">Send</button></div></div><div class="mock-action-grid"><button type="button" data-action="draft"><b>Draft</b><span>Emails, reports, proposals</span></button><button type="button" data-action="plan"><b>Plan</b><span>Projects and timelines</span></button><button type="button"><b>Analyse</b><span>Data and insights</span></button><button type="button"><b>Create</b><span>Content, decks and more</span></button></div><div class="mock-week-heading"><h4>This week</h4><span>View all</span></div><div class="mock-task-row"><article><span class="mock-thumb bridge-thumb"></span><b>Lagos launch</b><small>Prepare launch plan, partners and comms</small><em>60%</em></article><article><span class="mock-icon-tile brass-tile">N</span><b>Budget review</b><small>Finalise vendor costs</small><strong>N45,000</strong></article><article><span class="mock-icon-tile green-tile">+</span><b>Team update</b><small>Summarise progress for leadership</small><em>Today</em></article></div></div>
+        <div aria-hidden="true" class="min-w-0 overflow-hidden rounded-[20px] border border-line bg-white shadow-2xl shadow-navy/20 dark:border-night-line dark:bg-night-surface">
+          <div class="flex gap-1.5 bg-navy px-4 py-3 dark:bg-night-rail"><i class="size-2.5 rounded-full bg-white/30"></i><i class="size-2.5 rounded-full bg-white/30"></i><i class="size-2.5 rounded-full bg-white/30"></i></div>
+          <div class="grid min-h-[300px] grid-cols-[48px_minmax(0,1fr)]">
+            <div class="flex flex-col items-center gap-2 bg-navy py-3.5 text-white/70 dark:bg-night-rail">
+              <span class="grid size-8 place-items-center rounded-full bg-blue-100 text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="message-square" class="size-4"></i></span>
+              <span class="grid size-8 place-items-center"><i data-lucide="list-checks" class="size-4"></i></span>
+              <span class="grid size-8 place-items-center"><i data-lucide="bell" class="size-4"></i></span>
+              <span class="grid size-8 place-items-center"><i data-lucide="folder" class="size-4"></i></span>
+              <span class="grid size-8 place-items-center"><i data-lucide="settings" class="size-4"></i></span>
+            </div>
+            <div class="flex min-w-0 flex-col items-center justify-center gap-1.5 px-5 py-6 text-center">
+              <img src="./assets/zuri-logo.png" alt="" width="34" height="34" class="rounded-[10px]">
+              <b class="mt-1.5 font-display text-lg font-semibold">Good morning, Tolu</b>
+              <small class="text-xs text-mute dark:text-night-muted">Ask me to remind you about something tomorrow.</small>
+              <div class="my-3 grid w-full grid-cols-1 gap-2 text-left sm:grid-cols-3">
+                <span class="rounded-2xl border border-line bg-white p-2.5 dark:border-night-line dark:bg-night-surface"><b class="block font-display text-[11px] font-semibold">Writing sprint</b><small class="text-[11px] text-mute dark:text-night-muted">Brief in progress</small></span>
+                <span class="rounded-2xl border border-line bg-white p-2.5 dark:border-night-line dark:bg-night-surface"><b class="block font-display text-[11px] font-semibold">Design review</b><small class="text-[11px] text-mute dark:text-night-muted">3 updates</small></span>
+                <span class="rounded-2xl border border-line bg-white p-2.5 dark:border-night-line dark:bg-night-surface"><b class="block font-display text-[11px] font-semibold">Launch plan</b><small class="text-[11px] text-mute dark:text-night-muted">On track</small></span>
+              </div>
+              <div class="flex w-full items-center justify-between rounded-full border border-line bg-white py-2 pl-[18px] pr-2 text-[13px] text-mute dark:border-night-line dark:bg-night-field dark:text-night-muted"><span>Ask Zuri</span><i data-lucide="arrow-up" class="size-8 rounded-full bg-blue-600 p-[7px] text-white dark:bg-night-accent dark:text-night-bg"></i></div>
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <section class="mockup-screen" data-screen-panel="tasks">
-        <div class="mockup-screen-heading"><div><span class="mockup-eyebrow">02 / Tasks and calendar</span><h2>Make the week feel possible.</h2><p>Projects, priorities and value in one calm view.</p></div><button class="mock-primary-button" type="button" data-action="add-task">+ Add task</button></div>
-        <div class="mock-dashboard"><div class="mock-stat-grid"><article><span>Active projects</span><strong>4</strong><small>2 due this week</small></article><article><span>Total value</span><strong>N45,000</strong><small>+12% this month</small></article><article><span>Completed this month</span><strong>8</strong><small>On track</small></article></div><div class="mock-dashboard-grid"><section class="mock-panel"><div class="mock-panel-heading"><h3>My tasks</h3><span>Today 3</span></div><label class="mock-check-row"><input type="checkbox"><span><b>Client proposal - Lagos retail brand</b><small>Today 11:00 AM</small></span><em>High</em></label><label class="mock-check-row"><input type="checkbox"><span><b>Review campaign creatives</b><small>Today 2:00 PM</small></span><em>Medium</em></label><label class="mock-check-row"><input type="checkbox"><span><b>Send contract and next steps</b><small>Today 4:00 PM</small></span><em>Low</em></label></section><section class="mock-panel mock-calendar-panel"><div class="mock-panel-heading"><h3>Calendar</h3><span>West Africa Time</span></div><div class="mock-calendar-grid"><span>9 AM</span><b>Team standup</b><span>11 AM</span><b class="clay-block">Client proposal review</b><span>2 PM</span><b class="green-block">Creative direction session</b><span>4 PM</span><b class="brass-block">Send proposal to client</b></div></section></div></div>
-      </section>
+    <section id="features" class="py-14">
+      <div class="mx-auto w-[calc(100%-32px)] max-w-[1120px] md:w-[calc(100%-48px)]">
+        <div class="mx-auto mb-8 max-w-[620px] text-center">
+          <span class="font-display text-xs font-bold uppercase tracking-[0.12em] text-blue-700 dark:text-night-accent">Features</span>
+          <h2 class="my-2.5 font-display text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">Everything you need, nothing in the way</h2>
+          <p class="text-sm leading-relaxed text-mute dark:text-night-muted">A small set of tools that do their job well.</p>
+        </div>
+        <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <article class="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="grid size-[38px] place-items-center rounded-full bg-blue-100 text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="message-square" class="size-[18px]"></i></span><h3 class="mb-1.5 mt-3 font-display text-[15px] font-bold">Chat that keeps context</h3><p class="text-[13px] leading-relaxed text-mute dark:text-night-muted">Pick up any conversation where you left it, on any device.</p></article>
+          <article class="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="grid size-[38px] place-items-center rounded-full bg-blue-100 text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="list-checks" class="size-[18px]"></i></span><h3 class="mb-1.5 mt-3 font-display text-[15px] font-bold">Tasks and reminders</h3><p class="text-[13px] leading-relaxed text-mute dark:text-night-muted">A reminder that fires on time and a task that stays visible until done.</p></article>
+          <article class="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="grid size-[38px] place-items-center rounded-full bg-blue-100 text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="clock-3" class="size-[18px]"></i></span><h3 class="mb-1.5 mt-3 font-display text-[15px] font-bold">Automations</h3><p class="text-[13px] leading-relaxed text-mute dark:text-night-muted">Schedule a recurring research run and find the result waiting.</p></article>
+          <article class="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="grid size-[38px] place-items-center rounded-full bg-blue-100 text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="file-text" class="size-[18px]"></i></span><h3 class="mb-1.5 mt-3 font-display text-[15px] font-bold">Files in, documents out</h3><p class="text-[13px] leading-relaxed text-mute dark:text-night-muted">Read a PDF or sheet, then ask for a Word file, workbook or deck.</p></article>
+          <article class="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="grid size-[38px] place-items-center rounded-full bg-blue-100 text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="bot" class="size-[18px]"></i></span><h3 class="mb-1.5 mt-3 font-display text-[15px] font-bold">Agents</h3><p class="text-[13px] leading-relaxed text-mute dark:text-night-muted">Save an assistant with its own instructions for work you repeat.</p></article>
+          <article class="rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="grid size-[38px] place-items-center rounded-full bg-blue-100 text-blue-700 dark:bg-night-sel dark:text-night-text"><i data-lucide="chart-column" class="size-[18px]"></i></span><h3 class="mb-1.5 mt-3 font-display text-[15px] font-bold">Usage you can see</h3><p class="text-[13px] leading-relaxed text-mute dark:text-night-muted">Tokens used and tokens left, always one click away.</p></article>
+        </div>
+      </div>
+    </section>
 
-      <section class="mockup-screen" data-screen-panel="settings">
-        <div class="mockup-screen-heading"><div><span class="mockup-eyebrow">03 / Onboarding and settings</span><h2>Choose your workspace.</h2><p>Set up Zuri to match how you work, from Lagos to Abuja and beyond.</p></div><span class="mockup-progress">Step 2 of 3</span></div>
-        <div class="mock-settings-layout"><div class="mock-settings-preview"><div class="mock-settings-logo">ZURI<span>.</span></div><div class="mock-settings-art"><span></span><span></span><span></span></div><h3>For ambitious Nigerians.</h3><p>Plan, create, collaborate and do more with AI that understands your pace.</p></div><form class="mock-settings-form" data-settings-form><label>Workspace mode</label><div class="mock-choice-grid"><button type="button" class="is-selected"><b>For me</b><small>Manage my work, ideas and goals</small></button><button type="button"><b>My team</b><small>Collaborate with my team</small></button><button type="button"><b>My business</b><small>Run projects, clients and operations</small></button></div><label for="mock-language">Language</label><select id="mock-language"><option>English</option><option>Pidgin English</option></select><label for="mock-timezone">Time zone</label><select id="mock-timezone"><option>West Africa Time</option><option>West Africa Summer Time</option></select><div class="mock-user-card"><span class="mock-avatar">TA</span><span><b>Tolu Adebayo</b><small>Product Designer</small></span></div><button class="mock-primary-button" type="submit">Get started <span>-></span></button><p class="mock-form-note" data-form-note>Built for local time, local work, and your goals.</p></form></div>
-      </section>
+    <section id="how" class="bg-slate-100/70 py-14 dark:bg-night-surface/60">
+      <div class="mx-auto grid w-[calc(100%-32px)] max-w-[1120px] items-center gap-10 md:w-[calc(100%-48px)] lg:grid-cols-2 lg:gap-12">
+        <div>
+          <span class="font-display text-xs font-bold uppercase tracking-[0.12em] text-blue-700 dark:text-night-accent">How it works</span>
+          <h2 class="my-2.5 font-display text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">Start in minutes</h2>
+          <p class="mb-5 text-sm leading-relaxed text-mute dark:text-night-muted">No long set-up. Create an account, pick a plan and ask for your first piece of work.</p>
+          <button type="button" data-screen="settings" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-blue-600 px-4 font-display text-[13px] font-semibold text-white hover:bg-blue-700 dark:bg-night-accent dark:text-night-bg dark:hover:bg-[#c6ceff] md:min-h-9">See set-up<i data-lucide="arrow-right" class="size-[18px]"></i></button>
+        </div>
+        <ol class="grid gap-3">
+          <li class="flex items-center gap-4 rounded-2xl border border-line bg-white px-4 py-3.5 dark:border-night-line dark:bg-night-surface"><span class="grid size-[34px] shrink-0 place-items-center rounded-full bg-navy font-display text-[13px] font-bold text-white dark:bg-night-sel">1</span><div><b class="block font-display text-sm font-semibold">Create your account</b><small class="text-[13px] text-mute dark:text-night-muted">Sign in with Google or email.</small></div></li>
+          <li class="flex items-center gap-4 rounded-2xl border border-line bg-white px-4 py-3.5 dark:border-night-line dark:bg-night-surface"><span class="grid size-[34px] shrink-0 place-items-center rounded-full bg-navy font-display text-[13px] font-bold text-white dark:bg-night-sel">2</span><div><b class="block font-display text-sm font-semibold">Choose a plan</b><small class="text-[13px] text-mute dark:text-night-muted">Start small and change plans as your work grows.</small></div></li>
+          <li class="flex items-center gap-4 rounded-2xl border border-line bg-white px-4 py-3.5 dark:border-night-line dark:bg-night-surface"><span class="grid size-[34px] shrink-0 place-items-center rounded-full bg-navy font-display text-[13px] font-bold text-white dark:bg-night-sel">3</span><div><b class="block font-display text-sm font-semibold">Ask Zuri</b><small class="text-[13px] text-mute dark:text-night-muted">Chat, draft, plan and set reminders.</small></div></li>
+        </ol>
+      </div>
+    </section>
+
+    <section id="pricing" class="py-14">
+      <div class="mx-auto w-[calc(100%-32px)] max-w-[1120px] md:w-[calc(100%-48px)]">
+        <div class="mx-auto mb-8 max-w-[620px] text-center">
+          <span class="font-display text-xs font-bold uppercase tracking-[0.12em] text-blue-700 dark:text-night-accent">Pricing</span>
+          <h2 class="my-2.5 font-display text-2xl font-extrabold leading-tight tracking-tight md:text-3xl">Simple monthly plans</h2>
+          <p class="text-sm leading-relaxed text-mute dark:text-night-muted">Priced in Naira and paid through Paystack. Tokens reset each billing period.</p>
+        </div>
+        <div class="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <article class="flex flex-col gap-2.5 rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><h3 class="font-display text-[15px] font-bold">Starter</h3><strong class="font-display text-xl tracking-tight">NGN 2,499<small class="ml-1 font-sans text-[13px] font-normal text-mute dark:text-night-muted">/month</small></strong><p class="flex-1 text-[13px] text-mute dark:text-night-muted">2m tokens each month.</p><button type="button" class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-white font-display text-[13px] font-semibold hover:border-blue-600 hover:bg-blue-50 dark:border-night-line dark:bg-night-surface dark:hover:bg-night-sel md:min-h-9">Choose Starter</button></article>
+          <article class="relative flex flex-col gap-2.5 rounded-2xl border-2 border-blue-600 bg-white p-5 shadow-sm dark:border-night-accent dark:bg-night-surface"><span class="absolute -top-3 left-6 rounded-full bg-blue-600 px-3 py-1 font-display text-xs font-semibold text-white dark:bg-night-accent dark:text-night-bg">Popular</span><h3 class="font-display text-[15px] font-bold">Pro</h3><strong class="font-display text-xl tracking-tight">NGN 6,000<small class="ml-1 font-sans text-[13px] font-normal text-mute dark:text-night-muted">/month</small></strong><p class="flex-1 text-[13px] text-mute dark:text-night-muted">More room for daily work.</p><button type="button" class="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-blue-600 font-display text-[13px] font-semibold text-white hover:bg-blue-700 dark:bg-night-accent dark:text-night-bg dark:hover:bg-[#c6ceff] md:min-h-9">Choose Pro</button></article>
+          <article class="flex flex-col gap-2.5 rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><h3 class="font-display text-[15px] font-bold">Power</h3><strong class="font-display text-xl tracking-tight">NGN 15,000<small class="ml-1 font-sans text-[13px] font-normal text-mute dark:text-night-muted">/month</small></strong><p class="flex-1 text-[13px] text-mute dark:text-night-muted">For heavy users and small teams.</p><button type="button" class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-white font-display text-[13px] font-semibold hover:border-blue-600 hover:bg-blue-50 dark:border-night-line dark:bg-night-surface dark:hover:bg-night-sel md:min-h-9">Choose Power</button></article>
+          <article class="flex flex-col gap-2.5 rounded-2xl border border-line bg-white p-5 shadow-sm dark:border-night-line dark:bg-night-surface"><h3 class="font-display text-[15px] font-bold">Max</h3><strong class="font-display text-xl tracking-tight">NGN 40,000<small class="ml-1 font-sans text-[13px] font-normal text-mute dark:text-night-muted">/month</small></strong><p class="flex-1 text-[13px] text-mute dark:text-night-muted">The largest allowance.</p><button type="button" class="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-line bg-white font-display text-[13px] font-semibold hover:border-blue-600 hover:bg-blue-50 dark:border-night-line dark:bg-night-surface dark:hover:bg-night-sel md:min-h-9">Choose Max</button></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="w-full bg-navy py-11 text-white dark:bg-night-rail">
+      <div class="mx-auto flex w-[calc(100%-32px)] max-w-[1120px] flex-wrap items-center justify-between gap-6 md:w-[calc(100%-48px)]">
+        <div><h2 class="mb-1.5 font-display text-2xl font-extrabold md:text-[28px]">Ready to try Zuri?</h2><p class="text-sm text-white/75">Create an account and ask for your first task today.</p></div>
+        <button type="button" data-screen="chat" class="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-5 font-display text-sm font-semibold text-navy hover:bg-blue-50 sm:w-auto">Start with Zuri<i data-lucide="arrow-right" class="size-[18px]"></i></button>
+      </div>
+    </section>
+    <footer class="w-full border-t border-line py-6 text-[13px] text-mute dark:border-night-line dark:text-night-muted">
+      <div class="mx-auto flex w-[calc(100%-32px)] max-w-[1120px] flex-wrap items-center gap-x-7 gap-y-3 md:w-[calc(100%-48px)]"><a href="#home" data-screen="home" class="mr-auto inline-flex items-center gap-2 font-display text-[17px] font-bold text-ink dark:text-night-text"><img src="./assets/zuri-logo.png" alt="" width="22" height="22" class="rounded-md"><span>Zuri</span></a><span>Terms</span><span>Privacy</span></div>
+    </footer>
+  </div>
+
+  <!-- APP SCREENS: mockups.js adds the rail and panel to each one, so all three share one shell -->
+  <div data-screen-panel="chat" data-shell="chats" class="hidden md:h-[calc(100dvh-40px)]">
+    <main class="flex min-w-0 flex-1 items-start justify-center overflow-y-auto bg-canvas px-4 pb-28 pt-7 dark:bg-night-bg md:items-center md:p-4">
+      <div class="flex w-full max-w-[640px] flex-col items-center text-center">
+        <img src="./assets/zuri-logo.png" alt="" width="52" height="52" class="size-12 rounded-[14px] shadow-lg shadow-blue-600/25 md:size-11">
+        <h1 class="mb-1.5 mt-3 font-display text-2xl font-medium tracking-tight">Good morning, Tolu</h1>
+        <p class="mb-2 text-[13px] text-mute dark:text-night-muted">I can draft a reply for you to edit.</p>
+
+        <div class="mt-3.5 grid w-full gap-2.5 text-left sm:grid-cols-3">
+          <div class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><b class="block font-display text-xs font-semibold">Writing sprint</b><small class="mt-0.5 block text-[11px] text-mute dark:text-night-muted">Brief in progress</small></div>
+          <div class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><b class="block font-display text-xs font-semibold">Design review</b><small class="mt-0.5 block text-[11px] text-mute dark:text-night-muted">3 updates</small></div>
+          <div class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><b class="block font-display text-xs font-semibold">Launch plan</b><small class="mt-0.5 block text-[11px] text-mute dark:text-night-muted">On track</small></div>
+        </div>
+        <div class="mt-2.5 grid w-full gap-2.5 text-left sm:grid-cols-2">
+          <section class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="block text-[11px] font-medium uppercase tracking-wider text-mute dark:text-night-muted">Project statistics</span><div class="mb-1.5 mt-2 flex h-[52px] items-end gap-2" aria-hidden="true"><i class="h-[64%] flex-1 rounded-t-md bg-blue-600 dark:bg-night-accent"></i><i class="h-[42%] flex-1 rounded-t-md bg-blue-600/60 dark:bg-night-accent/60"></i><i class="h-[76%] flex-1 rounded-t-md bg-blue-600 dark:bg-night-accent"></i><i class="h-[52%] flex-1 rounded-t-md bg-blue-600/60 dark:bg-night-accent/60"></i><i class="h-[90%] flex-1 rounded-t-md bg-blue-600 dark:bg-night-accent"></i><i class="h-[60%] flex-1 rounded-t-md bg-blue-600/60 dark:bg-night-accent/60"></i></div><small class="text-[11px] text-mute dark:text-night-muted"><b class="text-emerald-700 dark:text-emerald-300">On target</b> 12 tasks this week</small></section>
+          <section class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="block text-[11px] font-medium uppercase tracking-wider text-mute dark:text-night-muted">Project calendar</span><div class="mt-3 grid gap-2.5"><div class="flex items-center gap-2.5"><b class="grid size-8 place-items-center rounded-[10px] bg-blue-100 text-xs text-blue-700 dark:bg-night-sel dark:text-night-text">14</b><span class="text-xs text-mute dark:text-night-muted">Creating app design</span></div><div class="flex items-center gap-2.5"><b class="grid size-8 place-items-center rounded-[10px] bg-blue-100 text-xs text-blue-700 dark:bg-night-sel dark:text-night-text">19</b><span class="text-xs text-mute dark:text-night-muted">Meeting with a client</span></div></div></section>
+        </div>
+
+        <form data-composer class="mt-3 w-full rounded-[20px] border border-line bg-white px-2 py-1.5 text-left shadow-lg shadow-ink/5 dark:border-night-line dark:bg-night-field">
+          <textarea rows="1" placeholder="Ask Zuri" aria-label="Message" class="block min-h-8 w-full resize-none border-0 bg-transparent px-2 py-1.5 text-sm text-ink placeholder:text-mute focus:outline-none focus:ring-0 dark:text-night-text dark:placeholder:text-night-muted"></textarea>
+          <div class="flex flex-wrap items-center justify-between gap-1">
+            <div class="flex items-center gap-1">
+              <button type="button" aria-label="Add" class="inline-flex size-10 items-center justify-center rounded-full text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel md:size-[34px]"><i data-lucide="plus" class="size-[18px]"></i></button>
+              <button type="button" aria-label="Attach a file" class="inline-flex size-10 items-center justify-center rounded-full text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel md:size-[34px]"><i data-lucide="paperclip" class="size-[18px]"></i></button>
+              <button type="button" data-toggle aria-pressed="true" class="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-blue-600 bg-blue-100 px-3 text-xs font-medium text-blue-700 dark:border-night-accent dark:bg-night-sel dark:text-night-text md:min-h-[30px]"><i data-lucide="globe" class="size-[15px]"></i>Web search</button>
+              <button type="button" class="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-line px-3 text-xs font-medium text-mute dark:border-night-line dark:text-night-muted md:min-h-[30px]">Zuri Fast<i data-lucide="chevron-down" class="size-[15px]"></i></button>
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" aria-label="Voice typing" class="inline-flex size-10 items-center justify-center rounded-full text-mute hover:bg-blue-50 hover:text-blue-700 dark:text-night-muted dark:hover:bg-night-sel md:size-[34px]"><i data-lucide="mic" class="size-[18px]"></i></button>
+              <button type="submit" aria-label="Send" class="inline-flex size-10 items-center justify-center rounded-full bg-blue-600 text-white hover:bg-blue-700 dark:bg-night-accent dark:text-night-bg md:size-[34px]"><i data-lucide="arrow-up" class="size-[18px]"></i></button>
+            </div>
+          </div>
+        </form>
+        <p data-note aria-live="polite" class="mt-3 min-h-[18px] text-xs text-mute dark:text-night-muted">Zuri can make mistakes. Check important answers.</p>
+      </div>
     </main>
   </div>
-  <script type="module" src="./mockups.js"></script>
+
+  <div data-screen-panel="tasks" data-shell="tasks" class="hidden md:h-[calc(100dvh-40px)]">
+    <main class="min-w-0 flex-1 overflow-y-auto bg-canvas px-4 pb-28 pt-6 dark:bg-night-bg md:px-6 md:pb-6">
+      <div class="mx-auto flex w-full max-w-[1100px] flex-col gap-4">
+        <header class="flex flex-wrap items-start justify-between gap-4">
+          <div><h1 class="mb-1 font-display text-[22px] font-semibold tracking-tight">Tasks</h1><p class="text-sm text-mute dark:text-night-muted">Turn ideas into progress. Three items are due today.</p></div>
+          <button type="button" data-add-task class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-blue-600 px-4 font-display text-[13px] font-semibold text-white hover:bg-blue-700 dark:bg-night-accent dark:text-night-bg dark:hover:bg-[#c6ceff] md:min-h-9"><i data-lucide="plus" class="size-[18px]"></i>Add task</button>
+        </header>
+        <section class="grid gap-3 sm:grid-cols-3">
+          <article class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="block text-[11px] font-medium uppercase tracking-wider text-mute dark:text-night-muted">Open tasks</span><strong class="mb-0.5 mt-1.5 block font-display text-[22px]">12</strong><small class="text-xs text-emerald-700 dark:text-emerald-300">3 due today</small></article>
+          <article class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="block text-[11px] font-medium uppercase tracking-wider text-mute dark:text-night-muted">Completed this month</span><strong class="mb-0.5 mt-1.5 block font-display text-[22px]">8</strong><small class="text-xs text-emerald-700 dark:text-emerald-300">On track</small></article>
+          <article class="rounded-2xl border border-line bg-white p-3 shadow-sm dark:border-night-line dark:bg-night-surface"><span class="block text-[11px] font-medium uppercase tracking-wider text-mute dark:text-night-muted">Reminders</span><strong class="mb-0.5 mt-1.5 block font-display text-[22px]">5</strong><small class="text-xs text-mute dark:text-night-muted">Next at 2:00 PM</small></article>
+        </section>
+        <section class="rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-night-line dark:bg-night-surface">
+          <h2 class="mb-3 font-display text-[15px] font-semibold">My tasks</h2>
+          <ul data-task-list class="grid gap-2">
+            <li class="flex min-h-12 items-center justify-between gap-3 rounded-[14px] border border-line px-3.5 py-1.5 hover:border-blue-600 dark:border-night-line dark:hover:border-night-accent"><label class="flex min-h-11 flex-1 cursor-pointer items-center gap-3 md:min-h-9"><input type="checkbox" class="size-5 shrink-0 rounded-md border-line accent-blue-600"><span><b class="block font-display text-[13px] font-semibold">Client proposal</b><small class="text-xs text-mute dark:text-night-muted">Today, 11:00 AM</small></span></label><span class="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700 dark:bg-[#4a1530] dark:text-red-200">High</span></li>
+            <li class="flex min-h-12 items-center justify-between gap-3 rounded-[14px] border border-line px-3.5 py-1.5 hover:border-blue-600 dark:border-night-line dark:hover:border-night-accent"><label class="flex min-h-11 flex-1 cursor-pointer items-center gap-3 md:min-h-9"><input type="checkbox" class="size-5 shrink-0 rounded-md border-line accent-blue-600"><span><b class="block font-display text-[13px] font-semibold">Review campaign creatives</b><small class="text-xs text-mute dark:text-night-muted">Today, 2:00 PM</small></span></label><span class="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700 dark:bg-night-sel dark:text-night-text">Medium</span></li>
+            <li class="flex min-h-12 items-center justify-between gap-3 rounded-[14px] border border-line px-3.5 py-1.5 hover:border-blue-600 dark:border-night-line dark:hover:border-night-accent"><label class="flex min-h-11 flex-1 cursor-pointer items-center gap-3 md:min-h-9"><input type="checkbox" class="size-5 shrink-0 rounded-md border-line accent-blue-600"><span><b class="block font-display text-[13px] font-semibold">Send contract and next steps</b><small class="text-xs text-mute dark:text-night-muted">Today, 4:00 PM</small></span></label><span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-mute dark:bg-night-bg dark:text-night-muted">Low</span></li>
+          </ul>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div data-screen-panel="settings" data-shell="settings" class="hidden md:h-[calc(100dvh-40px)]">
+    <main class="min-w-0 flex-1 overflow-y-auto bg-canvas px-4 pb-28 pt-6 dark:bg-night-bg md:px-6 md:pb-6">
+      <div class="mx-auto flex w-full max-w-[1100px] flex-col gap-4">
+        <header><h1 class="mb-1 font-display text-[22px] font-semibold tracking-tight">Settings</h1><p class="text-sm text-mute dark:text-night-muted">Set Zuri up to match how you work.</p></header>
+        <form data-settings-form class="grid max-w-[640px] gap-4 rounded-2xl border border-line bg-white p-4 shadow-sm dark:border-night-line dark:bg-night-surface">
+          <div class="grid gap-1.5"><label for="mk-name" class="text-[13px] font-medium">Your name</label><input id="mk-name" value="Tolu Adebayo" class="min-h-11 w-full rounded-full border border-line bg-white px-4 text-[13px] text-ink focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30 dark:border-night-line dark:bg-night-field dark:text-night-text md:min-h-[38px]"></div>
+          <div class="grid gap-1.5"><label for="mk-model" class="text-[13px] font-medium">Model</label><select id="mk-model" class="min-h-11 w-full rounded-full border border-line bg-white px-4 text-[13px] text-ink focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30 dark:border-night-line dark:bg-night-field dark:text-night-text md:min-h-[38px]"><option>Zuri Fast</option><option>Zuri Balanced</option><option>Zuri Deep</option></select></div>
+          <div class="grid gap-1.5"><label for="mk-length" class="text-[13px] font-medium">Answer length</label><select id="mk-length" class="min-h-11 w-full rounded-full border border-line bg-white px-4 text-[13px] text-ink focus:border-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-600/30 dark:border-night-line dark:bg-night-field dark:text-night-text md:min-h-[38px]"><option>Balanced</option><option>Concise</option><option>Detailed</option></select></div>
+          <div class="grid gap-1.5"><span class="text-[13px] font-medium">Workspace</span>
+            <div class="flex flex-wrap gap-2">
+              <button type="button" data-choice class="inline-flex min-h-11 items-center gap-2 rounded-full border border-blue-600 bg-blue-100 px-4 text-[13px] font-medium text-blue-700 dark:border-night-accent dark:bg-night-sel dark:text-night-text md:min-h-9"><i data-lucide="user" class="size-[18px]"></i>For me</button>
+              <button type="button" data-choice class="inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-[13px] font-medium dark:border-night-line dark:bg-night-surface md:min-h-9"><i data-lucide="users" class="size-[18px]"></i>My team</button>
+              <button type="button" data-choice class="inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-[13px] font-medium dark:border-night-line dark:bg-night-surface md:min-h-9"><i data-lucide="briefcase" class="size-[18px]"></i>My business</button>
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <button type="submit" class="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-blue-600 px-4 font-display text-[13px] font-semibold text-white hover:bg-blue-700 dark:bg-night-accent dark:text-night-bg dark:hover:bg-[#c6ceff] md:min-h-9"><i data-lucide="check" class="size-[18px]"></i>Save changes</button>
+            <button type="button" class="inline-flex min-h-11 items-center justify-center rounded-full border border-line bg-white px-4 font-display text-[13px] font-semibold hover:border-blue-600 hover:bg-blue-50 dark:border-night-line dark:bg-night-surface dark:hover:bg-night-sel md:min-h-9">Cancel</button>
+          </div>
+          <p data-form-note aria-live="polite" class="min-h-[18px] text-xs text-mute dark:text-night-muted"></p>
+        </form>
+      </div>
+    </main>
+  </div>
+
+  <script src="./mockups.js"></script>
 </body>
 </html>
