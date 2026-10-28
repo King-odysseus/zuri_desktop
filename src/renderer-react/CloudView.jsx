@@ -108,6 +108,7 @@ export default function CloudView({ onNavigate }) {
     const result = await api?.cloud?.signOut?.();
     setAccount(null);
     setStatus('signed-out');
+    window.dispatchEvent(new Event('zuri:signed-out'));
     setMessage(result?.ok ? 'Signed out of Zuri Cloud.' : result?.error?.message ?? 'The cloud session was cleared locally.');
     setBusy(false);
   }

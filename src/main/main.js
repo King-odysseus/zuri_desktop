@@ -747,8 +747,13 @@ function applyNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'light' ? 'light' : 'dark';
 }
 
-function cloudBaseUrl(settings) {
-  const raw = typeof settings?.cloudUrl === 'string' ? settings.cloudUrl.trim() : '';
+// The installed app always talks to the deployed API, so a person never types a
+// server address. ZURI_CLOUD_URL exists only so a developer can point a build at a
+// local server; the old stored cloudUrl setting is ignored on purpose.
+const DEFAULT_CLOUD_URL = 'https://zuricloud-production.up.railway.app';
+
+function cloudBaseUrl() {
+  const raw = String(process.env.ZURI_CLOUD_URL ?? DEFAULT_CLOUD_URL).trim();
   let url;
   try {
     url = new URL(raw);
@@ -776,8 +781,8 @@ function cloudBaseUrl(settings) {
 async function cloudRequest(pathname, options = {}, requireSession = false) {
   const settings = await readSettings();
   if (!settings.ok) return settings;
-  const base = cloudBaseUrl(settings.data);
-  if (!base) return { ok: false, error: { code: 'CLOUD_URL_INVALID', message: 'Set a valid Zuri Cloud server URL in Settings.' } };
+  const base = cloudBaseUrl();
+  if (!base) return { ok: false, error: { code: 'CLOUD_URL_INVALID', message: 'Zuri Cloud address is not valid. Reinstall Zuri.' } };
   const headers = { accept: 'application/json', ...(options.headers ?? {}) };
   if (requireSession) {
     const saved = await readCloudSession();
@@ -877,8 +882,8 @@ async function cloudIdOfThread(threadId) {
 async function handleCloudConfig() {
   const settings = await readSettings();
   if (!settings.ok) return settings;
-  const base = cloudBaseUrl(settings.data);
-  if (!base) return { ok: false, error: { code: 'CLOUD_URL_INVALID', message: 'Set a valid Zuri Cloud server URL in Settings.' } };
+  const base = cloudBaseUrl();
+  if (!base) return { ok: false, error: { code: 'CLOUD_URL_INVALID', message: 'Zuri Cloud address is not valid. Reinstall Zuri.' } };
   const config = await cloudFetch('/api/public-config');
   if (!config.ok) return config;
   return { ok: true, data: { cloudUrl: base, googleClientId: config.data?.googleClientId ?? '' } };
@@ -1185,7 +1190,7 @@ async function handleSettingsAddinStatus() {
     return { ok: true, data: await addinStatus(getStoreRoot()) };
   } catch (error) {
     console.error('[zuri:addin] status', error);
-    return { ok: false, error: { code: 'ADDIN_STATUS_FAILED', message: error?.message ?? 'Word add-in status is unavailable.' } };
+    return { ok: false, error: { code: 'ADDIN_STATUS_FAILED', message: 'Office add-in status is unavailable.' } };
   }
 }
 
@@ -1195,7 +1200,7 @@ async function handleSettingsAddinInstall() {
     return { ok: true, data: await addinStatus(getStoreRoot()) };
   } catch (error) {
     console.error('[zuri:addin] install', error);
-    return { ok: false, error: { code: 'ADDIN_INSTALL_FAILED', message: error?.message ?? 'The Word add-in could not be installed.' } };
+    return { ok: false, error: { code: 'ADDIN_INSTALL_FAILED', message: 'The Office add-in could not be installed. If Windows asked about a certificate, choose Yes and try again.' } };
   }
 }
 
@@ -1205,7 +1210,7 @@ async function handleSettingsAddinRemove() {
     return { ok: true, data: await addinStatus(getStoreRoot()) };
   } catch (error) {
     console.error('[zuri:addin] remove', error);
-    return { ok: false, error: { code: 'ADDIN_REMOVE_FAILED', message: error?.message ?? 'The Word add-in could not be removed.' } };
+    return { ok: false, error: { code: 'ADDIN_REMOVE_FAILED', message: 'The Office add-in could not be removed. Try again.' } };
   }
 }
 

@@ -1092,7 +1092,7 @@ export async function summarizeText(document = {}, options = {}) {
 }
 
 const WORD_ADDIN_SYSTEM_PROMPT =
-  'You are Zuri, an AI assistant made by Tijha, working inside Microsoft Word. Never call yourself Claude or name another assistant or AI company as your maker. ' +
+  'You are Zuri, an AI assistant made by Tijha, working inside Microsoft Word, Excel or PowerPoint. Never call yourself Claude or name another assistant or AI company as your maker. ' +
   'Do what the person asks using the document text they give you. ' +
   'Reply with only the text to put in the document: no greeting, no explanation, no markdown fences.';
 
@@ -1128,7 +1128,7 @@ export async function askForAddin(request = {}, options = {}) {
   const { provider, model } = resolveChatTarget(settings.data);
   const key = getKey(provider);
   if (key === null) {
-    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri Cloud to use the Word add-in.');
+    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri Cloud to use the Office add-in.');
   }
 
   const context = typeof request.context === 'string' ? request.context.slice(0, ADDIN_CONTEXT_LIMIT) : '';

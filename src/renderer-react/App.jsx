@@ -12,7 +12,7 @@ import HistoryView from './HistoryView.jsx';
 import FeaturesView from './FeaturesView.jsx';
 import SignUpView from './SignUpView.jsx';
 import CloudView from './CloudView.jsx';
-import OnboardingView from './OnboardingView.jsx';
+import SignInView from './SignInView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const isOverlay = new URLSearchParams(window.location.search).has('overlay');
@@ -25,11 +25,11 @@ export default function App() {
   // state lives here rather than inside Sidebar where the chat view could not
   // reach it without opening the rail first.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // Setup has to be decided before the shell paints: a returning user must not see
-  // the chat view flash before the saved answers arrive, and a new one should not
-  // see it at all. The quick-ask window never runs setup, so it starts ready.
+  // Sign-in has to be decided before the shell paints: a returning user must not see
+  // the chat view flash before the session is checked, and a signed-out one should not
+  // see it at all. The quick-ask window never signs in, so it starts ready.
   const [startup, setStartup] = useState(isOverlay ? 'ready' : 'pending');
-  const [needsOnboarding, setNeedsOnboarding] = useState(false);
+  const [needsSignIn, setNeedsSignIn] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -38,22 +38,32 @@ export default function App() {
   useEffect(() => {
     if (isOverlay) return undefined;
     let active = true;
-    // One read answers both questions the shell asks before it paints: the saved
-    // theme, and whether setup has ever been finished. runOnboardingSetup requires
-    // a name, so an empty one is the first-run signal.
+    // Two reads answer what the shell asks before it paints: the saved theme, and
+    // whether a Zuri session exists. Only "sign in required" shows the sign-in
+    // screen; a network failure lets a signed-in person into their saved chats.
     const loadSettings = async () => {
-      const result = await window.zuri?.settings?.get?.();
+      const [result, account] = await Promise.all([
+        window.zuri?.settings?.get?.(),
+        window.zuri?.cloud?.account?.(),
+      ]);
       if (!active) return;
       const savedTheme = result?.ok && result.data?.theme === 'light' ? 'light' : result?.ok ? 'dark' : null;
       if (savedTheme) {
         document.documentElement.dataset.theme = savedTheme;
         setTheme(savedTheme);
       }
-      setNeedsOnboarding(result?.ok === true && result.data?.name === '');
+      setNeedsSignIn(account?.ok !== true && (account?.error?.code === 'CLOUD_AUTH_REQUIRED' || account?.status === 401));
       setStartup('ready');
     };
     void loadSettings();
-    return () => { active = false; };
+    // Signing out anywhere in the app (the account page, Settings) returns to the
+    // sign-in screen instead of leaving a signed-out shell on screen.
+    const onSignedOut = () => setNeedsSignIn(true);
+    window.addEventListener('zuri:signed-out', onSignedOut);
+    return () => {
+      active = false;
+      window.removeEventListener('zuri:signed-out', onSignedOut);
+    };
   }, [isOverlay]);
 
   function toggleTheme() {
@@ -79,7 +89,7 @@ export default function App() {
     setChatRefreshKey((key) => key + 1);
   }
 
-  function finishOnboarding(saved) {
+  function finishSignIn(saved) {
     // The card already painted its choice; store it in state so the shell and the
     // title bar agree with what the person picked. The painted value is the answer
     // when main echoes nothing back, so an empty reply cannot flip the window.
@@ -91,7 +101,7 @@ export default function App() {
           : 'light';
     document.documentElement.dataset.theme = chosen;
     setTheme(chosen);
-    setNeedsOnboarding(false);
+    setNeedsSignIn(false);
   }
 
   if (isOverlay) {
@@ -102,14 +112,14 @@ export default function App() {
     );
   }
 
-  // The page behind the first-run check: no sidebar, no chat, nothing that would
-  // read as a loaded app to someone who is about to be asked to set one up.
+  // The page behind the sign-in check: no sidebar, no chat, nothing that would
+  // read as a loaded app to someone who may be asked to sign in.
   if (startup === 'pending') {
     return <div className="flex h-dvh w-full bg-background text-foreground" />;
   }
 
-  if (needsOnboarding) {
-    return <OnboardingView onDone={finishOnboarding} />;
+  if (needsSignIn) {
+    return <SignInView onDone={finishSignIn} />;
   }
 
   return (

@@ -243,20 +243,20 @@ check('answer style choices are validated and stored trimmed', async () => {
 // First run is a sign-in, not a developer setup screen. The card has to offer the
 // Zuri account and must not ask for a provider key; a key belongs in Settings, for
 // the person who would rather pay a provider directly.
-check('first run asks for a Zuri account, not a provider key', () => {
-  const source = read('src/renderer-react/OnboardingView.jsx');
+check('launch shows the Zuri sign-in, not a provider key or a server address', () => {
+  const source = read('src/renderer-react/SignInView.jsx');
   for (const required of ['GoogleSignInButton', 'CloudAuthForm', 'Sign in to Zuri']) {
     if (!source.includes(required)) throw new Error('missing ' + required);
   }
-  for (const forbidden of ['API key', 'onboarding-provider', 'providerLabel', 'type="password"']) {
+  for (const forbidden of ['API key', 'onboarding-provider', 'providerLabel', 'Cloud server URL', 'cloudUrl']) {
     if (source.includes(forbidden)) throw new Error('the card still asks for ' + forbidden);
   }
   // The payload that closes setup carries no key either, which is what the
   // main-process check below then proves it accepts.
-  if (!source.includes('api.onboarding.complete({ name: trimmedName, theme })')) {
+  if (!source.includes('api?.onboarding?.complete?.({')) {
     throw new Error('setup still sends a provider key');
   }
-  return 'name and theme, then the Zuri account';
+  return 'one sign-in screen; the name comes from the account';
 });
 
 check('setup completes without a provider key', async () => {

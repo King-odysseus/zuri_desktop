@@ -1,7 +1,7 @@
 /**
- * Microsoft Word add-in support. Zuri serves a small task pane over HTTPS on this
- * computer only (Word refuses plain-HTTP add-ins), and registers a manifest for the
- * current Windows user so Word lists the add-in. Nothing here needs administrator
+ * Microsoft Office add-in support (Word, Excel and PowerPoint share one manifest). Zuri
+ * serves a small task pane over HTTPS on this computer only (Office refuses plain-HTTP
+ * add-ins), and registers a manifest for the current Windows user so each app lists it. Nothing here needs administrator
  * rights: the certificate goes into the user's own store and the manifest into the
  * user's own registry hive. The pane asks Zuri for text; Zuri forwards it to the
  * configured AI provider, so the API key never reaches Word.
@@ -60,7 +60,7 @@ export function buildManifest({ id, port }) {
   <ProviderName>Zuri</ProviderName>
   <DefaultLocale>en-US</DefaultLocale>
   <DisplayName DefaultValue="Zuri"/>
-  <Description DefaultValue="Ask Zuri to write, rewrite or summarise text in your document."/>
+  <Description DefaultValue="Ask Zuri to write, rewrite or summarise text in Word, Excel and PowerPoint."/>
   <IconUrl DefaultValue="${origin}/icon.png"/>
   <HighResolutionIconUrl DefaultValue="${origin}/icon.png"/>
   <AppDomains>
@@ -68,6 +68,8 @@ export function buildManifest({ id, port }) {
   </AppDomains>
   <Hosts>
     <Host Name="Document"/>
+    <Host Name="Workbook"/>
+    <Host Name="Presentation"/>
   </Hosts>
   <DefaultSettings>
     <SourceLocation DefaultValue="${origin}/taskpane.html"/>
@@ -92,7 +94,7 @@ function sameSecret(left, right) {
  */
 function runPowerShell(script, env = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
       env: { ...process.env, ...env },
       windowsHide: true,
     });
@@ -235,7 +237,7 @@ export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, ask
 
       if (request.method === 'POST' && route === '/api/ask') {
         if (!sameSecret(request.headers['x-zuri-token'] ?? '', token)) {
-          return sendJson(response, 401, { ok: false, error: { message: 'Reopen the Zuri pane in Word and try again.' } });
+          return sendJson(response, 401, { ok: false, error: { message: 'Reopen the Zuri pane in Office and try again.' } });
         }
         const body = await readJsonBody(request);
         const answer = await ask({ prompt: String(body?.prompt ?? ''), context: String(body?.context ?? '') });
@@ -251,7 +253,7 @@ export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, ask
 
   await new Promise((resolve, reject) => {
     server.once('error', (error) => {
-      reject(error?.code === 'EADDRINUSE' ? new Error(`Port ${port} is already in use, so the Word add-in cannot start.`) : error);
+      reject(error?.code === 'EADDRINUSE' ? new Error(`Port ${port} is already in use, so the Office add-in cannot start.`) : error);
     });
     server.listen(port, '127.0.0.1', resolve);
   });
@@ -289,7 +291,7 @@ export async function addinStatus(dataRoot) {
  * @param {(request: { prompt: string, context: string }) => Promise<any>} ask
  */
 export async function installAddin(dataRoot, ask) {
-  if (process.platform !== 'win32') throw new Error('The Word add-in is only available on Windows.');
+  if (process.platform !== 'win32') throw new Error('The Office add-in is only available on Windows.');
   const paths = addinPaths(dataRoot);
   const state = await ensureCertificate(paths);
 

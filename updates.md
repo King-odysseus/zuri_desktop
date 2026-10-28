@@ -1,3 +1,22 @@
+## 2026-10-28 - Windows (sign-in first)
+
+- The desktop app now opens on a Zuri sign-in screen when there is no session, and the Android app opens on sign-in instead of the marketing page. The cloud address is built in (the Railway API, or ZURI_CLOUD_URL for developers); the stored cloudUrl setting is gone.
+- Settings is shorter: account and sign out, theme, model, standing instructions and the Office add-in. The four answer-style dropdowns and the server URL are removed; the Act allow-lists sit under a collapsed Advanced section.
+- The add-in is one Office add-in for Word, PowerPoint and Excel. The install no longer runs PowerShell with -NonInteractive, which caused the "UI is not allowed in this operation" error.
+- Key files: src/renderer-react/SignInView.jsx (replaces OnboardingView.jsx), App.jsx, SettingsView.jsx, src/main/main.js, src/main/addin.js, src/addin/taskpane.js, web/src/App.jsx.
+- Other OS action: run "npm run react:build" (and "npm run android:build" for Android).
+- Done on: Windows
+
+## 2026-10-28 - Windows
+
+- Added a Nigerian-inspired public home-page mockup with a Lagos editorial hero image, local work context, and links into the existing chat, tasks, and onboarding concepts.
+- Refined the mockup toward a Flowbite-style system with white surfaces, navy structure, bronze accents, and less city-specific wording.
+- Added a reference-inspired dashboard collage to the home hero with compact activity cards, project statistics, and a mini calendar.
+- Applied the same dashboard composition to the real web landing page and changed the shared light web tokens to white, navy, and bronze.
+- Key files: docs/mockups/index.html, docs/mockups/mockups.js, docs/mockups/assets/zuri-lagos-hero.png, web/src/styles.css.
+- Other OS action: none required for the static mockup; run "npm run react:build" if rebuilding the renderer bundle.
+- Done on: Windows
+
 ## 2026-10-25 - Windows
 
 - Version 0.2.2 is published for all three platforms. The Windows setup and the Android APK were built here (release/Zuri-0.2.2-Setup.exe, and an APK reporting versionCode 3 and versionName 0.2.2); the macOS dmg came from the "Build macOS installer" workflow run on GitHub, because a dmg can only be produced on a Mac. The download page now offers 0.2.2 for Windows, macOS and Android. Before this it offered 0.1.0 on Windows, 0.2.1 on macOS, and no Android build at all.

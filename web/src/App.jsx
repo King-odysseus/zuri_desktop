@@ -27,6 +27,8 @@ import { applyTheme, preferredTheme } from './lib/theme.js';
 const VIEWS = ['chat', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
 const CHAT_PATH = '/chat';
 const LEGAL_PATHS = ['/privacy', '/terms'];
+// The Android app has no marketing page to land on: signed out, it opens on sign-in.
+const ANDROID_APP = import.meta.env.VITE_ANDROID_BUILD === '1';
 const AUTH_PATHS = ['/signin', '/signup', '/forgot-password', '/reset-password', ...LEGAL_PATHS];
 
 /**
@@ -355,7 +357,7 @@ export default function App() {
         />
       );
     }
-    if (route.path === '/signin' || route.path === '/signup') {
+    if (route.path === '/signin' || route.path === '/signup' || ANDROID_APP) {
       return (
         <AuthView
           mode={route.path === '/signup' ? 'signup' : 'signin'}

@@ -5,23 +5,6 @@ import SelectField from './SelectField.jsx';
 // the same six names, and two copies of a supplier id would drift apart.
 import { ZURI_MODELS } from './zuriModels.js';
 
-// The ids match store.js ANSWER_STYLE_CHOICES, which refuses anything else; the
-// labels are here because the renderer cannot import main-process code.
-const ANSWER_STYLE_OPTIONS = {
-  answerLength: [['concise', 'Concise'], ['balanced', 'Balanced'], ['detailed', 'Detailed']],
-  answerTone: [['neutral', 'Neutral'], ['professional', 'Professional'], ['friendly', 'Friendly'], ['direct', 'Direct']],
-  answerDetail: [['simple', 'Simple'], ['standard', 'Standard'], ['expert', 'Expert']],
-  answerLayout: [['auto', 'Automatic'], ['plain', 'Plain text'], ['structured', 'Structured']],
-};
-
-// Field, label and one line of help, in the order the card shows them.
-const FIELD_LABELS = [
-  ['answerLength', 'Length', 'How much each reply carries.'],
-  ['answerTone', 'Tone', 'The voice it writes in.'],
-  ['answerDetail', 'Explanation level', 'Who the answer is pitched at.'],
-  ['answerLayout', 'Layout', 'Whether replies use headings, lists and tables.'],
-];
-
 const CUSTOM_INSTRUCTIONS_MAX_LENGTH = 2000;
 
 function applyTheme(theme) {
@@ -43,6 +26,7 @@ export default function SettingsView() {
   const [busy, setBusy] = useState(false);
   const [addin, setAddin] = useState({ supported: false, installed: false, running: false });
   const [addinBusy, setAddinBusy] = useState(false);
+  const [user, setUser] = useState(null);
 
   async function load() {
     if (typeof api?.settings?.get !== 'function') {
@@ -62,6 +46,8 @@ export default function SettingsView() {
       applyTheme(next.theme);
       setStatus('ready');
       await refreshAddinStatus();
+      const account = await api.cloud?.account?.();
+      if (account?.ok) setUser(account.data?.user ?? null);
     } catch (error) {
       setStatus('error');
       setMessage(error?.message ?? 'Settings could not be read.');
@@ -80,38 +66,45 @@ export default function SettingsView() {
     if (result?.ok && result.data) setAddin(result.data);
   }
 
-  async function installWordAddin() {
+  async function installOfficeAddin() {
     if (typeof api?.settings?.addinInstall !== 'function') return;
     setAddinBusy(true);
     try {
       const result = await api.settings.addinInstall();
-      if (!result?.ok) setMessage(result?.error?.message ?? 'The Word add-in could not be installed.');
+      if (!result?.ok) setMessage(result?.error?.message ?? 'The Office add-in could not be installed.');
       else {
         setAddin(result.data ?? {});
-        setMessage('Word add-in installed for this Windows user. Restart Word if it is already open.');
+        setMessage('Office add-in installed for this Windows user. Restart Word, Excel or PowerPoint if it is already open.');
       }
     } catch (error) {
-      setMessage(error?.message ?? 'The Word add-in could not be installed.');
+      setMessage(error?.message ?? 'The Office add-in could not be installed.');
     } finally {
       setAddinBusy(false);
     }
   }
 
-  async function removeWordAddin() {
+  async function removeOfficeAddin() {
     if (typeof api?.settings?.addinRemove !== 'function') return;
     setAddinBusy(true);
     try {
       const result = await api.settings.addinRemove();
-      if (!result?.ok) setMessage(result?.error?.message ?? 'The Word add-in could not be removed.');
+      if (!result?.ok) setMessage(result?.error?.message ?? 'The Office add-in could not be removed.');
       else {
         setAddin(result.data ?? {});
-        setMessage('Word add-in removed from this Windows user.');
+        setMessage('Office add-in removed from this Windows user.');
       }
     } catch (error) {
-      setMessage(error?.message ?? 'The Word add-in could not be removed.');
+      setMessage(error?.message ?? 'The Office add-in could not be removed.');
     } finally {
       setAddinBusy(false);
     }
+  }
+
+  async function signOut() {
+    setBusy(true);
+    await api?.cloud?.signOut?.();
+    // App listens for this and returns to the sign-in screen.
+    window.dispatchEvent(new Event('zuri:signed-out'));
   }
 
   async function savePatch(patch, successMessage) {
@@ -159,11 +152,6 @@ export default function SettingsView() {
     await savePatch({ [field]: listFor(kind).filter((entry) => entry !== value) }, 'Allow-list updated.');
   }
 
-  async function openDataFolder() {
-    const result = await api?.settings?.openDataFolder?.();
-    setMessage(result?.ok ? 'Opened the Zuri data folder.' : result?.error?.message ?? 'The data folder could not be opened.');
-  }
-
   const current = settings ?? {};
 
   // What the picker shows. A model saved before this list existed, or one set
@@ -181,7 +169,7 @@ export default function SettingsView() {
       <div className="zuri-page-content zuri-scrollbar-hidden">
         <header>
           <h1 className="text-3xl font-medium tracking-tight">Settings</h1>
-          <p className="mt-2 text-sm text-muted">Appearance, cloud connection, and what Zuri is allowed to open.</p>
+          <p className="mt-2 text-sm text-muted">Your account, how Zuri looks, and the Office add-in.</p>
         </header>
 
         {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
@@ -189,6 +177,16 @@ export default function SettingsView() {
         {status === 'ready' && message !== '' && <p role="status" className="text-sm text-muted">{message}</p>}
 
         {status === 'ready' && <div className="grid gap-5 lg:grid-cols-2">
+          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-medium">Account</h2>
+                <p className="mt-1 text-sm text-muted">{user ? `Signed in as ${user.displayName || user.email}` : 'Signed in to Zuri Cloud.'}</p>
+              </div>
+              <Button variant="ghost" onPress={() => void signOut()} isDisabled={busy}>Sign out</Button>
+            </div>
+          </section>
+
           <section className="rounded-xl border border-border bg-surface p-5">
             <h2 className="text-lg font-medium">Appearance</h2>
             <p className="mt-1 text-sm text-muted">Pick how Zuri looks. Applied straight away.</p>
@@ -198,8 +196,8 @@ export default function SettingsView() {
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="text-lg font-medium">Model and overlay</h2>
-            <p className="mt-1 text-sm text-muted">Choose the Zuri model that answers your chats. It is billed to your Zuri plan, so it needs no key of your own.</p>
+            <h2 className="text-lg font-medium">Model</h2>
+            <p className="mt-1 text-sm text-muted">The Zuri model that answers your chats. It is billed to your Zuri plan.</p>
             <div className="mt-4">
               <SelectField
                 label="Model"
@@ -214,33 +212,14 @@ export default function SettingsView() {
                 }}
               />
             </div>
-            <p className="mt-2 text-xs text-muted">
-              {zuriModel === null
-                ? 'This model was chosen outside the Zuri list, so it is shown by its provider id.'
-                : `${zuriModel.name}: ${zuriModel.note} Billed to your Zuri plan.`}
-            </p>
             <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <h2 className="text-lg font-medium">How Zuri answers</h2>
-            <p className="mt-1 text-sm text-muted">Every reply follows these choices, whichever model is answering.</p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {FIELD_LABELS.map(([field, label, hint]) => (
-                <div key={field}>
-                  <SelectField
-                    label={label}
-                    value={String(current[field] ?? ANSWER_STYLE_OPTIONS[field][0][0])}
-                    options={ANSWER_STYLE_OPTIONS[field].map(([value, optionLabel]) => ({ value, label: optionLabel }))}
-                    onChange={(value) => void savePatch({ [field]: value }, `${label} set to ${value}.`)}
-                  />
-                  <p className="mt-1 text-xs text-muted">{hint}</p>
-                </div>
-              ))}
-            </div>
+            <h2 className="text-lg font-medium">Standing instructions</h2>
             <Textarea
-              className="mt-4"
-              label="Standing instructions (optional)"
+              className="mt-3"
+              label="Added to every request (optional)"
               rows={3}
               maxLength={CUSTOM_INSTRUCTIONS_MAX_LENGTH}
               value={current.customInstructions ?? ''}
@@ -248,34 +227,22 @@ export default function SettingsView() {
               onBlur={() => void savePatch({ customInstructions: String(current.customInstructions ?? '') }, 'Standing instructions saved.')}
               placeholder="For example: answer in British English, and always show the cost in naira."
             />
-            <p className="mt-1 text-xs text-muted">Added to every request. These win over the four choices above when the two disagree.</p>
-          </section>
-
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="text-lg font-medium">Zuri Cloud connection</h2>
-            <p className="mt-1 text-sm text-muted">Choose the Railway server used for Google sign-in, usage and subscriptions.</p>
-            <Input className="mt-4" label="Cloud server URL" value={current.cloudUrl ?? ''} onChange={(event) => setSettings((value) => ({ ...(value ?? {}), cloudUrl: event.target.value }))} onBlur={() => void savePatch({ cloudUrl: String(current.cloudUrl ?? '').trim() }, 'Cloud server URL saved.')} placeholder="https://your-cloud-service.up.railway.app" />
           </section>
 
           <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <h2 className="text-lg font-medium">Microsoft Word add-in</h2>
-            <p className="mt-1 text-sm text-muted">Install Zuri's local Word task pane for this Windows user. It needs Zuri running to answer requests.</p>
-            {!addin.supported && <p className="mt-3 text-sm text-muted">The Word add-in is available on Windows only.</p>}
+            <h2 className="text-lg font-medium">Office add-in</h2>
+            <p className="mt-1 text-sm text-muted">Adds Zuri to Word, PowerPoint and Excel for this Windows user. It needs Zuri running to answer requests.</p>
+            {!addin.supported && <p className="mt-3 text-sm text-muted">The Office add-in is available on Windows only.</p>}
             {addin.supported && <div className="mt-4 flex flex-wrap items-center gap-3">
               <Chip color={addin.installed ? 'primary' : 'default'}>{addin.installed ? 'Installed' : 'Not installed'}</Chip>
-              <Button variant="secondary" onPress={() => void installWordAddin()} isDisabled={addinBusy || addin.installed}>Install for Word</Button>
-              <Button variant="ghost" className="zuri-danger-quiet" onPress={() => void removeWordAddin()} isDisabled={addinBusy || !addin.installed}>Remove add-in</Button>
+              <Button variant="secondary" onPress={() => void installOfficeAddin()} isDisabled={addinBusy || addin.installed}>Install for Word, PowerPoint and Excel</Button>
+              <Button variant="ghost" className="zuri-danger-quiet" onPress={() => void removeOfficeAddin()} isDisabled={addinBusy || !addin.installed}>Remove add-in</Button>
             </div>}
           </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-lg font-medium">Allowed apps and sites</h2>
-                <p className="mt-1 text-sm text-muted">Act mode can only open apps and sites listed here. Empty lists block everything.</p>
-              </div>
-              <Button variant="ghost" onPress={() => void openDataFolder()}>Open data folder</Button>
-            </div>
+          <details className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
+            <summary className="cursor-pointer text-lg font-medium">Advanced: apps and sites Act mode may open</summary>
+            <p className="mt-2 text-sm text-muted">Act mode can only open apps and sites listed here. Empty lists block everything.</p>
             <form onSubmit={addAllowed} className="mt-4 flex flex-wrap items-end gap-2">
               <SelectField label="Type" value={allowKind} options={[{ value: 'apps', label: 'App' }, { value: 'urls', label: 'Site' }]} onChange={setAllowKind} className="min-w-32" />
               <Input label="App or site" value={allowValue} onChange={(event) => setAllowValue(event.target.value)} placeholder={allowKind === 'apps' ? 'notepad.exe' : 'https://example.com'} className="min-w-64 flex-1" />
@@ -291,7 +258,7 @@ export default function SettingsView() {
                 {listFor('urls').length === 0 ? <p className="text-sm text-muted">No sites added yet.</p> : <ul className="flex flex-col gap-2">{listFor('urls').map((value) => <li key={value} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeAllowed('urls', value)}>Remove</Button></li>)}</ul>}
               </div>
             </div>
-          </section>
+          </details>
         </div>}
       </div>
     </main>

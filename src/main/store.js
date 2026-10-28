@@ -56,7 +56,6 @@ export const DEFAULT_DATA = Object.freeze({
     // so a question asked from over another application lands in the conversation the
     // person was reading. Written by the chat view; empty until a thread is opened.
     activeThreadId: '',
-    cloudUrl: 'http://localhost:8080',
     // How replies are written. providers/chat.js turns these into one instruction
     // block on every request, so every model answers in a shape the person chose
     // once instead of one that drifts with whichever model is active. The defaults
