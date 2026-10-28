@@ -1,3 +1,10 @@
+## 2026-10-28 - Windows (Office add-in packaging)
+
+- Word showed "ADD-IN ERROR: this add-in could not be started" because the packaged app was missing the task pane files. The installer's file list only carried src/main and dist-react, so src/addin (taskpane.html, taskpane.js, taskpane.css) never reached the installed app, and the add-in server answered 500 for the page while /icon.png worked. package.json now packages src/addin/**/*.
+- Key files: package.json.
+- Other OS action: none; the Office add-in is Windows only. Rebuild the installer (npm run dist) and reinstall before the pane works.
+- Done on: Windows
+
 ## 2026-10-28 - Windows (cleanup before release)
 
 - The empty-chat screen now shows real counts and lists: open tasks, reminders and automations, the next tasks and the coming reminders, read from the same stores as those pages. The example cards (Writing sprint, 12 tasks this week and the calendar) are gone, along with the bar-chart styles in app.css.
