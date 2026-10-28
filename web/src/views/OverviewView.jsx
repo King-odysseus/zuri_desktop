@@ -7,6 +7,7 @@ export default function OverviewView({ me, usage }) {
   const subscription = me?.subscription ?? {};
   const name = user.displayName || user.email || 'Zuri user';
   const chipTone = usage.overQuota ? ' chip-danger' : usage.nearLimit ? ' chip-warning' : '';
+  const pending = subscription.status === 'pending';
 
   return (
     <section className="view">
@@ -24,6 +25,7 @@ export default function OverviewView({ me, usage }) {
           you move to a bigger plan.
         </Alert>
       )}
+      {pending && <Alert>Choose a paid plan to unlock chat and model access.</Alert>}
       {!usage.overQuota && usage.nearLimit && (
         <Alert>You are close to your monthly token allowance. Consider a bigger plan before you run out.</Alert>
       )}
@@ -31,7 +33,7 @@ export default function OverviewView({ me, usage }) {
       <div className="stat-grid">
         <article className="card">
           <p className="stat-label">Current plan</p>
-          <p className="stat-value">{subscription.planName ?? 'Starter'}</p>
+          <p className="stat-value">{pending ? 'No active plan' : subscription.planName ?? 'Starter'}</p>
           <p className="stat-meta">{formatTokens(usage.monthlyTokens)} tokens each month</p>
         </article>
         <article className="card">

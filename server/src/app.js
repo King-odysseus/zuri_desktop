@@ -350,6 +350,14 @@ async function sessionPayload(dependencies, result) {
   return { ...result, usage: usageStatus(session.subscription, usage.usedTokens, usageOptions(usage)) };
 }
 
+/** @param {{ subscription?: { status?: string } } | null | undefined } session */
+function hasPaidSubscription(session) {
+  const status = session?.subscription?.status;
+  // Older repository adapters omit status, and their subscription rows are active
+  // by contract. Live rows always carry an explicit status.
+  return status === undefined || status === 'active' || status === 'past_due';
+}
+
 /** @param {unknown} value @returns {string} */
 function trimmedText(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -560,6 +568,7 @@ export function createApp(dependencies = {}) {
       const token = bearerToken(request);
       const session = await dependencies.auth.authenticate(token);
       if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to use chat.' } });
       try {
         const body = await readJson(request, MAX_CHAT_BODY_BYTES);
         const messages = validateMessages(body.messages);
@@ -933,6 +942,7 @@ export function createApp(dependencies = {}) {
 
       if (url.pathname === '/api/models') {
         if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for this endpoint.' } });
+        if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to view available models.' } });
         const catalogue = (await loadModels(dependencies)).filter((model) => model.isActive);
         return response(200, { ok: true, data: catalogue.map((model) => publicModel(model, session.subscription.planCode)) });
       }

@@ -98,16 +98,16 @@ export function createDatabase(connectionString, environment = process.env) {
 /** @param {import('pg').Pool} pool @returns {object} */
 export function createRepository(pool) {
   /**
-   * Every new account starts on the paid Starter plan; without a subscription row the
-   * account cannot chat, so both sign-up paths go through here.
+   * New accounts need a subscription row so checkout can be started, but the row stays
+   * pending until Paystack confirms payment. Pending accounts cannot reserve usage.
    * @param {import('pg').PoolClient} client
    * @param {string} userId
    */
   async function ensureStarterSubscription(client, userId) {
     await client.query(
       'INSERT INTO subscriptions (user_id, plan_code, status, current_period_start, current_period_end) ' +
-      "SELECT $1, 'starter', 'active', NOW(), NOW() + INTERVAL '1 month' " +
-      "WHERE NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = $1 AND status IN ('active', 'past_due'))",
+      "SELECT $1, 'starter', 'pending', NOW(), NOW() + INTERVAL '1 month' " +
+      "WHERE NOT EXISTS (SELECT 1 FROM subscriptions WHERE user_id = $1 AND status IN ('pending', 'active', 'past_due'))",
       [userId],
     );
   }
@@ -166,9 +166,9 @@ export function createRepository(pool) {
       const nextExpiry = new Date(at.getTime() + idleTtlMs);
       const result = await pool.query(
         'SELECT u.*, s.id AS session_id, s.last_used_at AS session_last_used_at, s.expires_at AS session_expires_at, ' +
-        's2.id AS subscription_id, s2.plan_code, s2.current_period_start, s2.current_period_end, p.name AS plan_name, p.monthly_tokens ' +
+        's2.id AS subscription_id, s2.plan_code, s2.status AS subscription_status, s2.current_period_start, s2.current_period_end, p.name AS plan_name, p.monthly_tokens ' +
         'FROM sessions s JOIN users u ON u.id = s.user_id ' +
-        "JOIN subscriptions s2 ON s2.user_id = u.id AND s2.status IN ('active', 'past_due') " +
+        "JOIN subscriptions s2 ON s2.user_id = u.id AND s2.status IN ('pending', 'active', 'past_due') " +
         'JOIN plans p ON p.code = s2.plan_code ' +
         "WHERE s.token_hash = $1 AND s.revoked_at IS NULL AND s.expires_at > $2 AND s.last_used_at >= $3 AND u.status = 'active' LIMIT 1",
         [tokenHash, at, idleSince],
@@ -183,6 +183,7 @@ export function createRepository(pool) {
           id: row.subscription_id,
           planCode: row.plan_code,
           planName: row.plan_name,
+          status: row.subscription_status,
           monthlyTokens: Number(row.monthly_tokens),
           currentPeriodStart: row.current_period_start,
           currentPeriodEnd: row.current_period_end,
@@ -247,8 +248,8 @@ export function createRepository(pool) {
      * One statement rather than a read then a write, so two boots racing each other
      * cannot both insert: the loser lands on the conflict clause. An empty
      * passwordHash keeps whatever hash the row holds. A new account also gets the
-     * Starter subscription sign-up hands out, because a user with no subscription
-     * resolves no session, and the administrator would sign in to an empty page.
+     * Administrators still receive a pending Starter row so the account has a
+     * consistent billing record; admin routes do not require paid chat access.
      * @param {{ email: string, passwordHash?: string }} request Email normalised by the caller.
      * @returns {Promise<object>} The public user, carrying isAdmin.
      */
@@ -552,7 +553,7 @@ export function createRepository(pool) {
           return { applied: true, planCode: null, packCode: payment.pack_code, tokensGranted: tokens };
         }
         await client.query(
-          "UPDATE subscriptions SET plan_code = $2, status = 'active', current_period_start = NOW(), current_period_end = NOW() + INTERVAL '1 month', paystack_customer_code = COALESCE($3, paystack_customer_code), paystack_authorization_code = COALESCE($4, paystack_authorization_code), paystack_subscription_code = COALESCE($5, paystack_subscription_code), updated_at = NOW() WHERE user_id = $1 AND status IN ('active', 'past_due')",
+          "UPDATE subscriptions SET plan_code = $2, status = 'active', current_period_start = NOW(), current_period_end = NOW() + INTERVAL '1 month', paystack_customer_code = COALESCE($3, paystack_customer_code), paystack_authorization_code = COALESCE($4, paystack_authorization_code), paystack_subscription_code = COALESCE($5, paystack_subscription_code), updated_at = NOW() WHERE user_id = $1 AND status IN ('pending', 'active', 'past_due')",
           [payment.user_id, payment.plan_code, customerCode || null, authorizationCode || null, subscriptionCode || null],
         );
         await client.query('COMMIT');
@@ -582,7 +583,7 @@ export function createRepository(pool) {
     },
     async getBilling(userId) {
       const subscriptionResult = await pool.query(
-        'SELECT s.id, s.plan_code, s.status, s.current_period_start, s.current_period_end, s.paystack_subscription_code, p.name AS plan_name, p.monthly_tokens FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.user_id = $1 AND s.status IN (\'active\', \'past_due\', \'cancelled\') ORDER BY s.updated_at DESC LIMIT 1',
+        'SELECT s.id, s.plan_code, s.status, s.current_period_start, s.current_period_end, s.paystack_subscription_code, p.name AS plan_name, p.monthly_tokens FROM subscriptions s JOIN plans p ON p.code = s.plan_code WHERE s.user_id = $1 AND s.status IN (\'pending\', \'active\', \'past_due\', \'cancelled\') ORDER BY s.updated_at DESC LIMIT 1',
         [userId],
       );
       const payments = await pool.query(

@@ -34,7 +34,7 @@ export default function BillingView({ me, billing, usage }) {
       <article className="card">
         <p className="stat-label">Subscription</p>
         <div className="row-list" style={{ marginTop: 8 }}>
-          <DataRow label="Plan">{subscription.planName ?? billing?.subscription?.plan_name ?? 'Starter'}</DataRow>
+          <DataRow label="Plan">{subscription.status === 'pending' ? 'No active plan' : subscription.planName ?? billing?.subscription?.plan_name ?? 'Starter'}</DataRow>
           <DataRow label="Status">{statusChip(billing?.subscription?.status ?? subscription.status ?? 'active')}</DataRow>
           <DataRow label="Current period">
             {periodEnd ? `${formatDate(periodStart)} to ${formatDate(periodEnd)}` : 'Your plan renews every month'}

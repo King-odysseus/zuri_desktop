@@ -6,7 +6,6 @@
 - Key files: package.json, package-lock.json, android/app/build.gradle, scripts/publish-release.mjs, README.md, release/** (installers, not tracked).
 - Other OS action: none for the published files, they serve both. If you change the site, run "npm run test && npm run web:build". Rebuilding the Windows installer needs "npm run react:build" first.
 - Done on: Windows
-
 ## 2026-10-25 - Windows
 
 - Both installers were rebuilt at 0.2.1, because neither had caught up with the code. The Windows setup sitting in release/ was still 0.1.0, so it carried none of the cloud chat, the streamed replies, the five-hour window, the extra-usage packs or the browser chat work, and there was no Android APK on disk at all. Built: release/Zuri-0.2.1-Setup.exe and release/Zuri-0.2.1.apk, the APK reporting versionCode 2 and versionName 0.2.1, packaged from a bundle that contains the styles below.
@@ -859,3 +858,11 @@
 - Key files: `src/renderer-react/ChatPanel.jsx`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build` after syncing. No dependency, database or catalogue change.
 - Done on: Windows
+## 2026-10-28 - Windows
+
+- Free access is removed from the cloud service. New accounts receive a pending Starter subscription so they can open billing and pay, but chat and model access return a subscription-required response until Paystack confirms payment. The database status check now supports pending, and successful checkout activates it.
+- The landing and account screens now describe paid access clearly instead of implying that account creation grants a Starter allowance.
+- Key files: server/db/schema.sql, server/src/db.js, server/src/app.js, web/src/views/Landing.jsx, web/src/views/OverviewView.jsx, web/src/views/BillingView.jsx.
+- Other OS action: run `npm run test` after pulling these source changes. No dependency changes.
+- Done on: Windows
+

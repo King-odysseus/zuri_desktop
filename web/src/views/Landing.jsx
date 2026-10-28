@@ -105,7 +105,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
 
           <div className="hero-cta">
             <Button size="lg" onClick={() => onNavigate('/signup')}>
-              Create Starter account
+              Choose a paid plan
               <ArrowRightIcon />
             </Button>
             <Button size="lg" variant="outline" onClick={() => onNavigate('/signin')}>

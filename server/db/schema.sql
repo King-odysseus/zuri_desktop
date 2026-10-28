@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   plan_code TEXT NOT NULL REFERENCES plans(code),
-  status TEXT NOT NULL CHECK (status IN ('active', 'past_due', 'cancelled', 'expired')),
+  status TEXT NOT NULL CHECK (status IN ('pending', 'active', 'past_due', 'cancelled', 'expired')),
   current_period_start TIMESTAMPTZ NOT NULL,
   current_period_end TIMESTAMPTZ NOT NULL,
   paystack_customer_code TEXT,
@@ -117,6 +117,12 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 ALTER TABLE subscriptions ADD COLUMN IF NOT EXISTS paystack_subscription_code TEXT;
+DO $$
+BEGIN
+  ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS subscriptions_status_check;
+  ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_status_check CHECK (status IN ('pending', 'active', 'past_due', 'cancelled', 'expired'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 -- Databases created before password accounts existed get the new columns here.
 ALTER TABLE users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 ALTER TABLE sessions ADD COLUMN IF NOT EXISTS last_used_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
