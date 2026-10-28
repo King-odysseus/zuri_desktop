@@ -8,6 +8,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Share2,
   Square,
   Trash2,
   X,
@@ -20,6 +21,7 @@ import { LogoMark } from '../components/Icons.jsx';
 // on both surfaces, and the code block's own copy button behaves the same way.
 import FormattedMessage from '../../../src/renderer-react/FormattedMessage.jsx';
 import { copyText } from '../../../src/renderer-react/clipboard.js';
+import { shareText } from '../lib/share.js';
 import {
   DEFAULT_CHAT_MODEL,
   appendMessage,
@@ -31,6 +33,7 @@ import {
   streamChat,
 } from '../lib/api.js';
 import { formatRelativeTime, greetingFor } from '../lib/format.js';
+import { clearChatDraft, readChatDraft, saveChatDraft } from '../lib/drafts.js';
 
 /*
  * The chat models a customer can choose, in the order the plans climb. The codes
@@ -125,7 +128,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   const [threadStatus, setThreadStatus] = useState('idle');
   const [threadError, setThreadError] = useState(null);
 
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => readChatDraft());
   const [model, setModel] = useState(DEFAULT_CHAT_MODEL);
   const [streaming, setStreaming] = useState(false);
   const [streamReply, setStreamReply] = useState('');
@@ -139,6 +142,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
   // none, because index 0 is a real message.
   const [copiedIndex, setCopiedIndex] = useState(-1);
   const [copyNote, setCopyNote] = useState('');
+  const [shareNote, setShareNote] = useState('');
 
   const messagesRef = useRef(null);
   const draftRef = useRef(null);
@@ -169,6 +173,10 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
     }, conversationQuery.trim() === '' ? 0 : 220);
     return () => window.clearTimeout(timer);
   }, [conversationQuery, loadConversations]);
+
+  useEffect(() => {
+    saveChatDraft(draft);
+  }, [draft]);
 
   /*
    * The same conversation can be moving on another device: the desktop app mirrors
@@ -263,6 +271,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
     setRenamingId(null);
     setConfirmId(null);
     setDraft('');
+    clearChatDraft();
     resetReply();
     atBottomRef.current = true;
   }, [resetReply]);
@@ -328,6 +337,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
       .map(({ role, content }) => ({ role, content }));
 
     setDraft('');
+    clearChatDraft();
     resetReply();
     setStreaming(true);
     setThread((previous) => ({
@@ -466,6 +476,21 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
     setCopyNote('');
     setCopiedIndex(index);
     window.setTimeout(() => setCopiedIndex((current) => (current === index ? -1 : current)), 1500);
+  }, []);
+
+  const shareMessage = useCallback(async (message) => {
+    const content = String(message?.content ?? '').trim();
+    if (!content) return;
+    const result = await shareText({
+      title: message?.role === 'assistant' ? "Zuri's reply" : 'My message',
+      text: content,
+    });
+    if (result === 'shared') {
+      setShareNote('');
+      return;
+    }
+    const copied = await copyText(content);
+    setShareNote(copied ? 'Sharing is not available here, so the message was copied.' : 'This message could not be shared.');
   }, []);
 
   const showThread = Boolean(openId || composing);
@@ -697,6 +722,14 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
                   >
                     {copiedIndex === index ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
                   </IconButton>
+                  <IconButton
+                    size="sm"
+                    className="chat-share"
+                    label="Share message"
+                    onClick={() => void shareMessage(message)}
+                  >
+                    <Share2 size={14} aria-hidden="true" />
+                  </IconButton>
                 </div>
               </article>
             </Fragment>
@@ -727,6 +760,7 @@ export default function ChatView({ onSignIn, userName = '', navigation = null })
           {streamError && <InlineAlert tone="danger">{streamError.message}</InlineAlert>}
           {saveWarning !== '' && <p className="chat-note">{saveWarning}</p>}
           {copyNote !== '' && <p className="chat-note is-error">{copyNote}</p>}
+          {shareNote !== '' && <p className="chat-note">{shareNote}</p>}
 
           <form
             className="chat-composer"

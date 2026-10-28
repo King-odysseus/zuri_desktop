@@ -887,3 +887,10 @@
 - Other OS action: run `npm test` and `npm run web:build`.
 - Done on: Windows
 
+## 2026-10-28 - Windows
+
+- Android/web chat now restores unsent drafts from local storage and adds a Share message action using the Android share sheet, with a copy fallback when sharing is unavailable. No dependency changes. Real biometric lock remains pending because the Capacitor app has no biometric plugin or native bridge.
+- Key files: web/src/views/ChatView.jsx, web/src/lib/drafts.js, web/src/lib/share.js, scripts/selftest.js.
+- Other OS action: run `npm test` and `npm run web:build`.
+- Done on: Windows
+

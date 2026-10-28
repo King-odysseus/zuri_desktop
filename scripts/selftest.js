@@ -1203,6 +1203,28 @@ check('web chat prompts can be edited and the latest reply regenerated', () => {
   return 'prompt edit and latest-reply regeneration controls are wired';
 });
 
+check('Android chat drafts persist locally and clear on send', () => {
+  const view = read('web/src/views/ChatView.jsx');
+  const drafts = read('web/src/lib/drafts.js');
+  if (!view.includes("useState(() => readChatDraft())")) throw new Error('the composer does not restore a draft');
+  if (!view.includes('saveChatDraft(draft)')) throw new Error('draft changes are not persisted');
+  if (!view.includes('clearChatDraft()')) throw new Error('the draft is not cleared after an action');
+  for (const required of ['localStorage.getItem', 'localStorage.setItem', 'localStorage.removeItem']) {
+    if (!drafts.includes(required)) throw new Error(`draft storage is missing ${required}`);
+  }
+  return 'unsent text survives reloads without blocking private browsing';
+});
+
+check('web chat messages can use the Android share sheet', () => {
+  const view = read('web/src/views/ChatView.jsx');
+  const share = read('web/src/lib/share.js');
+  if (!view.includes("import { shareText } from '../lib/share.js'")) throw new Error('the chat has no share helper');
+  if (!view.includes('label="Share message"')) throw new Error('messages have no share action');
+  if (!share.includes('navigator.share')) throw new Error('the share helper does not use the platform share sheet');
+  if (!view.includes('the message was copied')) throw new Error('share fallback is not explained');
+  return 'Android share sheet with a copy fallback';
+});
+
 check('a chat continued in the browser refreshes the desktop without a restart', () => {
   const main = read('src/main/main.js');
   if (!main.includes("(Number(result.data?.appended) || 0) > 0) announceState({ area: 'chats' })")) {
