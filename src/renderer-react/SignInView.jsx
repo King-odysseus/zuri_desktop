@@ -94,9 +94,12 @@ export default function SignInView({ onDone }) {
 
   return (
     <main className="flex h-dvh w-full flex-col bg-background text-foreground">
-      <div className="zuri-page-content zuri-scrollbar-hidden flex items-center justify-center">
+      {/* my-auto on the card, not justify-center on the scroller: centring an
+          overflowing box pushes its top above the scroll range, which cut off the
+          logo and heading on the taller create-account form. */}
+      <div className="zuri-page-content zuri-scrollbar-hidden">
         <section
-          className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
+          className="my-auto w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
           aria-labelledby="signin-title"
         >
           <img src={zuriMarkUrl} alt="Zuri" width={52} height={52} className="zuri-chat-mark" decoding="async" />
