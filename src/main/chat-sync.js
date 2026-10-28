@@ -352,6 +352,11 @@ export function createChatSync({ request, log = defaultLog } = {}) {
       const id = textOf(message.cloudId);
       if (id !== '') known.add(id);
     }
+    // A reply replaced by Regenerate is gone here but still in the account, which has
+    // no way to delete one message. Counting it as known keeps it from coming back.
+    for (const id of Array.isArray(thread.droppedCloudIds) ? thread.droppedCloudIds : []) {
+      if (textOf(id) !== '') known.add(textOf(id));
+    }
 
     const remote = Array.isArray(fetched.data?.messages) ? fetched.data.messages : [];
     for (const entry of remote) {

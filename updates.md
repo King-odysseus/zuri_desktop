@@ -5,7 +5,7 @@
 - Side panel: code blocks have Open in panel, and files Zuri makes have Preview. The panel sits beside the chat on a wide window and over it on a narrow one.
 - Skills: new Skills page (rail icon). Up to 20 saved, 5 on at once because each is added to every message. New channels zuri:skills:list, create, update, delete; skills.json is a new store file.
 - Projects now carry instructions (edit icon on a project row), added to every chat filed under it.
-- Regenerate button on the newest reply. The cloud copy of the chat keeps the old reply until it is deleted in the browser.
+- Regenerate button on the newest reply (hidden on picture replies). The account has no way to delete one message, so the browser copy of the chat keeps the old reply; the thread remembers the replaced reply's cloud id (droppedCloudIds) so sync never pulls it back into the desktop.
 - The overlay hotkey is Ctrl+Alt+Space, registered for real (Win+Space is reserved by Windows). The tray hint says the same.
 - Key files: src/main/providers/chat.js, store.js, main.js, preload.js, tray-menu.js, src/renderer-react/ChatPanel.jsx, ActControls.jsx, ResultPanel.jsx, SkillsView.jsx, NewProjectView.jsx, Sidebar.jsx, App.jsx, FormattedMessage.jsx, scripts/selftest.js.
 - Other OS action: run "npm run react:build".

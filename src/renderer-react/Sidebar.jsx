@@ -40,7 +40,7 @@ export const NAV_ITEMS = [
 ];
 
 // The reference app pairs a narrow icon rail (where you are) with a list panel
-// (what you have). The rail carries the eight destinations; the panel is the
+// (what you have). The rail carries the destinations; the panel is the
 // conversation list, which routing in App.jsx keeps in step with the rail.
 export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);

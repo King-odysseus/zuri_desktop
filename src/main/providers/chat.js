@@ -1,9 +1,10 @@
 /**
- * providers/chat.js - the one place Zuri talks to an AI provider in Ask mode.
+ * providers/chat.js - the one place Zuri talks to an AI provider for a chat reply.
  *
- * Ask mode is a single request/response with streaming: take the stored thread's
- * messages, ask the configured provider, push each token out as it arrives, and
- * append the finished reply to the thread once the stream closes. Nothing outside
+ * A reply is a request/response with streaming: take the stored thread's messages,
+ * ask the provider, push each token out as it arrives, run any tools the model asks
+ * for (Ask, Act and Autopilot decide which ones and which need a yes), and append
+ * the finished reply to the thread once the stream closes. Nothing outside
  * this module knows which provider answered, so switching provider is a settings
  * change rather than a code change.
  *
@@ -30,9 +31,7 @@ import { agentAllowedTools, runTool, TOOLS } from '../tools/index.js';
 /**
  * Tools the model may call on its own in chat, only when the person has switched web
  * search on for the message. Each call costs another provider request, so the default
- * is no tools. Attached files are already inlined into the message, and the
- * confirmation-gated tools have no approval step in a streaming reply, so none of
- * those are offered.
+ * is no web tools. The confirmation-gated tools are in GATED_TOOLS below.
  */
 const CHAT_TOOLS = Object.freeze([
   {
@@ -438,7 +437,9 @@ export const ZURI_IDENTITY_PROMPT = [
  * Project instructions and switched-on skills sit right after the agent: they are the
  * person's own standing wishes for this work, so they come before the thread's prompt
  * and the app's own style block.
- * @param {{ agentPrompt?: string, projectPrompt?: string, skillsPrompt?: string, threadPrompt?: string, settings?: object, now?: Date }} [parts]
+ * The mode note (what Act or Autopilot may do) comes after the style block and still
+ * before the language rule, which stays last.
+ * @param {{ agentPrompt?: string, projectPrompt?: string, skillsPrompt?: string, threadPrompt?: string, modePrompt?: string, settings?: object, now?: Date }} [parts]
  * @returns {string}
  */
 export function chatSystemPrompt(parts = {}) {
@@ -450,6 +451,7 @@ export function chatSystemPrompt(parts = {}) {
     parts.threadPrompt,
     currentTimeContext(parts.now instanceof Date ? parts.now : new Date()),
     answerStylePolicy(parts.settings ?? {}),
+    parts.modePrompt,
     RESPONSE_LANGUAGE_POLICY,
   ]
     .map((part) => (typeof part === 'string' ? part.trim() : ''))
@@ -1401,9 +1403,9 @@ export async function sendChatMessage(threadId, options = {}) {
     projectPrompt: projectPolicy(project),
     skillsPrompt: skillsPolicy(skillsStore.ok ? skillsStore.data : []),
     threadPrompt: conversation.system,
+    modePrompt: MODE_PROMPTS[mode],
     settings: modelSettings,
   });
-  if (MODE_PROMPTS[mode] !== '') conversation.system = `${conversation.system}\n\n${MODE_PROMPTS[mode]}`;
 
   // Desktop chat must always use the signed-in account route. Keeping a direct
   // provider fallback here would let an older caller bypass Railway and revive the

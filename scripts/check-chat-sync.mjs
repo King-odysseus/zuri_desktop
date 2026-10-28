@@ -17,7 +17,7 @@ import path from 'node:path';
 
 import { createChatSync } from '../src/main/chat-sync.js';
 import { readCloudSession, writeCloudSession } from '../src/main/cloud-session.js';
-import { appendMessage, createThread, listThreads, setStoreRoot } from '../src/main/store.js';
+import { appendMessage, createThread, listThreads, removeTrailingReply, setStoreRoot } from '../src/main/store.js';
 
 let failures = 0;
 
@@ -262,6 +262,22 @@ async function main() {
   const onlyResult = await chatSync.syncThread(onlyId);
   check(onlyResult?.ok === true, 'a chat of only attachments is not reported as a failure', JSON.stringify(onlyResult?.error ?? null));
   check(account.conversations.size === beforeOnly, 'a chat of only attachments opens no conversation in the account', `saw ${account.conversations.size}`);
+
+  // Regenerate replaces a reply the account already holds, and the account has no way
+  // to delete one message. Without a record of the replaced reply, the next pull would
+  // see an id this machine does not know and put the old answer back under the new one.
+  const regenerated = await createThread({ title: 'Regenerate' });
+  const regenId = regenerated?.data?.id;
+  await appendMessage(regenId, { role: 'user', content: 'Name a colour.' });
+  await appendMessage(regenId, { role: 'assistant', content: 'Blue.' });
+  await chatSync.syncThread(regenId);
+  await removeTrailingReply(regenId);
+  await appendMessage(regenId, { role: 'assistant', content: 'Green.' });
+  const regenRun = await chatSync.syncThread(regenId);
+  const regenLocal = (await storedThreads()).find((thread) => thread.id === regenId);
+  check(regenRun?.ok === true, 'a sync after regenerating is not reported as a failure', JSON.stringify(regenRun?.error ?? null));
+  check(!regenLocal?.messages.some((message) => message.content === 'Blue.'), 'a regenerated reply is not pulled back in from the account');
+  check(regenLocal?.messages.at(-1)?.content === 'Green.', 'the new reply stays the last message', String(regenLocal?.messages.at(-1)?.content));
 
   // The link written above is gone, so the thread is uploaded fresh under a new id;
   // what matters is that the run succeeded and did not keep retrying a dead id.

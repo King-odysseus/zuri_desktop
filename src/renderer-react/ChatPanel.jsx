@@ -1188,7 +1188,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                     >
                       {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
                     </Button>
-                    {index === lastAnswerIndex && !replying && (
+                    {/* A picture reply was drawn by an image model, not written by the chat
+                        model, so writing it again would swap the picture for text. */}
+                    {index === lastAnswerIndex && !replying && !(message.files ?? []).some((file) => file?.kind === 'image') && (
                       <Button
                         isIconOnly
                         size="sm"

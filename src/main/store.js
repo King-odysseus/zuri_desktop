@@ -693,6 +693,8 @@ export async function setThreadCloudId(threadId, cloudId, options = {}) {
 
     if (linked === '') {
       delete thread.cloud;
+      // Those ids belonged to the conversation being forgotten, so they mean nothing now.
+      delete thread.droppedCloudIds;
       const messages = Array.isArray(thread.messages) ? thread.messages : [];
       for (const message of messages) {
         if (message !== null && typeof message === 'object') delete message.cloudId;
@@ -1233,6 +1235,9 @@ export async function deleteSkill(skillId, options = {}) {
   });
 }
 
+/** How many replaced replies a thread remembers so sync does not bring them back. */
+const DROPPED_CLOUD_IDS_MAX = 100;
+
 /**
  * Drop the newest message of a thread when it is an assistant reply, so that reply
  * can be written again. A thread that ends on the person's own message is left as
@@ -1256,7 +1261,14 @@ export async function removeTrailingReply(threadId, options = {}) {
     const messages = Array.isArray(thread.messages) ? thread.messages : [];
     if (messages.at(-1)?.role !== 'assistant') return { ok: true, data: { removed: false } };
 
-    messages.pop();
+    const dropped = messages.pop();
+    // The account keeps its copy of an uploaded reply, so the next sync would pull it
+    // straight back in. The sync skips every id on this list. Capped, because a
+    // thread regenerated many times must not grow without end.
+    if (typeof dropped?.cloudId === 'string' && dropped.cloudId !== '') {
+      const previous = Array.isArray(thread.droppedCloudIds) ? thread.droppedCloudIds : [];
+      thread.droppedCloudIds = [...previous, dropped.cloudId].slice(-DROPPED_CLOUD_IDS_MAX);
+    }
     thread.updatedAt = new Date().toISOString();
     const written = await writeStore('chats', read.data, options);
     if (!written.ok) return written;
