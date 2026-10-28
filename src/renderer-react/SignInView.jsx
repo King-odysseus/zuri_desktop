@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { CloudIcon } from './Icons.jsx';
 import CloudAuthForm from './CloudAuthForm.jsx';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
+// The same mark the chat screen opens with, so the first screen already looks like Zuri.
+import zuriMarkUrl from './assets/zuri-logo.png';
 
 // Mirrors SETUP_NAME_MAX_LENGTH in onboarding.js; main still has the final word.
 const NAME_MAX_LENGTH = 60;
@@ -98,9 +99,7 @@ export default function SignInView({ onDone }) {
           className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
           aria-labelledby="signin-title"
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
-            <CloudIcon size={22} />
-          </div>
+          <img src={zuriMarkUrl} alt="Zuri" width={52} height={52} className="zuri-chat-mark" decoding="async" />
           <h1 id="signin-title" className="mt-5 text-3xl font-medium tracking-tight">
             {resetting ? 'Reset your password' : creating ? 'Create your Zuri account' : 'Sign in to Zuri'}
           </h1>
