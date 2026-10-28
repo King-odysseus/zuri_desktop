@@ -125,7 +125,11 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           {view === 'plans' && (
             <PlansView
               plans={plans}
-              currentPlan={account.me?.subscription?.planCode ?? null}
+              // Pending Starter is only a checkout placeholder. Keep the
+              // Starter action visible so a new account can activate it.
+              currentPlan={account.me?.subscription?.status === 'pending'
+                ? null
+                : account.me?.subscription?.planCode ?? null}
               busy={busy}
               onChoose={onChoose}
               onSignIn={onSignIn}

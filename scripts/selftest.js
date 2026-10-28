@@ -108,6 +108,18 @@ check('the sidebar refreshes after chat history changes', () => {
   return 'Recents follows clear and delete events';
 });
 
+check('saved chats can be renamed without losing the continue action', () => {
+  const history = read('src/renderer-react/HistoryView.jsx');
+  const main = read('src/main/main.js');
+  const preload = read('src/main/preload.js');
+  for (const required of ['window.zuri?.chats?.rename?.', 'Rename chat', 'Continue chat']) {
+    if (!history.includes(required)) throw new Error(`history is missing ${required}`);
+  }
+  if (!main.includes("['zuri:chats:rename', handleChatRename]")) throw new Error('main rename handler is missing');
+  if (!preload.includes("'zuri:chats:rename'")) throw new Error('preload rename channel is missing');
+  return 'rename is validated in the store and exposed through the guarded bridge';
+});
+
 // A prompt is worth copying as much as a reply, so the user branch keeps its own copy button.
 check('own prompts carry a copy action, not only replies', () => {
   const source = read('src/renderer-react/ChatPanel.jsx');
@@ -531,9 +543,10 @@ const madeDocx = await runTool('createDocument', { kind: 'docx', fileName: 'edit
 const madeXlsx = await runTool('createDocument', { kind: 'xlsx', fileName: 'edit-me', content: OFFICE_SAMPLES.xlsx });
 const madePptx = await runTool('createDocument', { kind: 'pptx', fileName: 'edit-me', content: OFFICE_SAMPLES.pptx });
 const originalDocxBytes = fs.readFileSync(madeDocx.data.path);
-const editedDocx = await runTool('editDocument', { path: madeDocx.data.path, edits: [{ find: 'Hello', replace: 'Goodbye & <more>' }] });
-const editedXlsx = await runTool('editDocument', { path: madeXlsx.data.path, edits: [{ sheet: 'Budget', cell: 'B2', value: 250 }, { sheet: 'Budget', appendRow: ['Tax', 25] }] });
-const editedPptx = await runTool('editDocument', { path: madePptx.data.path, edits: [{ find: 'One', replace: 'First slide' }] });
+const unconfirmedEdit = await runTool('editDocument', { path: madeDocx.data.path, edits: [{ find: 'Hello', replace: 'Nope' }] });
+const editedDocx = await runTool('editDocument', { path: madeDocx.data.path, edits: [{ find: 'Hello', replace: 'Goodbye & <more>' }] }, { confirmed: true });
+const editedXlsx = await runTool('editDocument', { path: madeXlsx.data.path, edits: [{ sheet: 'Budget', cell: 'B2', value: 250 }, { sheet: 'Budget', appendRow: ['Tax', 25] }] }, { confirmed: true });
+const editedPptx = await runTool('editDocument', { path: madePptx.data.path, edits: [{ find: 'One', replace: 'First slide' }] }, { confirmed: true });
 
 const readBack = async (result) => {
   const parser = await import('officeparser');
@@ -541,6 +554,7 @@ const readBack = async (result) => {
 };
 
 check('editDocument changes a Word file text in a new copy and leaves the original alone', async () => {
+  if (unconfirmedEdit.ok || unconfirmedEdit.error.code !== 'TOOL_CONFIRMATION_REQUIRED') throw new Error('document edits ran without approval');
   if (!editedDocx.ok) throw new Error(editedDocx.error.message);
   if (!editedDocx.data.name.includes('-edited')) throw new Error(`copy was named ${editedDocx.data.name}`);
   if (!fs.readFileSync(madeDocx.data.path).equals(originalDocxBytes)) throw new Error('the original file was modified');
@@ -561,13 +575,15 @@ check('editDocument changes PowerPoint slide text', async () => {
 
 const outsideFile = path.join(os.tmpdir(), `zuri-outside-${process.pid}.docx`);
 fs.copyFileSync(madeDocx.data.path, outsideFile);
-const refusedOutside = await runTool('editDocument', { path: outsideFile, edits: [{ find: 'Hello', replace: 'x' }] });
+const unconfirmedOutside = await runTool('editDocument', { path: outsideFile, edits: [{ find: 'Hello', replace: 'x' }] });
+const refusedOutside = await runTool('editDocument', { path: outsideFile, edits: [{ find: 'Hello', replace: 'x' }] }, { confirmed: true });
 registerChosenFile(outsideFile);
-const allowedOutside = await runTool('editDocument', { path: outsideFile, edits: [{ find: 'Hello', replace: 'x' }] });
-const nothingMatched = await runTool('editDocument', { path: madeDocx.data.path, edits: [{ find: 'not in the file', replace: 'x' }] });
+const allowedOutside = await runTool('editDocument', { path: outsideFile, edits: [{ find: 'Hello', replace: 'x' }] }, { confirmed: true });
+const nothingMatched = await runTool('editDocument', { path: madeDocx.data.path, edits: [{ find: 'not in the file', replace: 'x' }] }, { confirmed: true });
 fs.rmSync(outsideFile, { force: true });
 
 check('editDocument only touches files in the workspace or ones the person picked, and reports misses', () => {
+  if (unconfirmedOutside.ok || unconfirmedOutside.error.code !== 'TOOL_CONFIRMATION_REQUIRED') throw new Error('document edit did not require approval');
   if (refusedOutside.ok || refusedOutside.error.code !== 'TOOL_PATH_NOT_CHOSEN') throw new Error('an unpicked outside file was accepted');
   if (!allowedOutside.ok) throw new Error(allowedOutside.error.message);
   if (nothingMatched.ok || nothingMatched.error.code !== 'TOOL_NOTHING_CHANGED') throw new Error('a no-op edit was reported as success');
@@ -744,6 +760,55 @@ check('an automation with no model available still runs its single-call plan', (
   if (offlineMarkdown.includes('## Answer')) throw new Error('a model answer was invented');
   if (ranWithoutModel.data.run.stepsTotal !== 1) throw new Error('the plan was not kept');
   if (ranWithoutModel.data.run.status !== 'completed') throw new Error('the planned step did not run');
+});
+
+const previewAutomation = await createAutomation(
+  {
+    prompt: 'Preview a workspace report',
+    mode: 'autopilot',
+    dryRun: true,
+    cadence: { type: 'once', at: new Date(Date.now() + 60_000).toISOString() },
+  },
+  { root: schedulerRoot },
+);
+if (!previewAutomation.ok) throw new Error(previewAutomation.error.message);
+let attemptedPreviewStep = false;
+const previewRun = await runSchedule(previewAutomation.data, {
+  root: schedulerRoot,
+  notify: () => true,
+  plan: () => [{ name: 'writeFile', args: { path: 'preview.md', content: 'not written' } }],
+  runStep: async () => {
+    attemptedPreviewStep = true;
+    return { ok: true, data: {} };
+  },
+});
+
+check('autopilot dry-run previews steps without running or saving them', () => {
+  if (!previewRun.ok || previewRun.data.run.status !== 'completed') throw new Error('preview run did not complete');
+  if (attemptedPreviewStep) throw new Error('preview run executed a tool');
+  if (previewRun.data.resultPath !== null) throw new Error('preview run wrote a result file');
+});
+
+let retryAttempts = 0;
+const retryRun = await runSchedule(
+  { id: 'retry-test', prompt: 'Retry one step', mode: 'autopilot', steps: [{ name: 'readFile', args: { path: 'x' } }] },
+  {
+    root: schedulerRoot,
+    notify: () => true,
+    retryDelayMs: 0,
+    runStep: async (name, args) => {
+      if (name === 'readFile') {
+        retryAttempts += 1;
+        if (retryAttempts < 2) return { ok: false, error: { code: 'TEMPORARY', message: 'try again' } };
+      }
+      return { ok: true, data: { relative: `${name}.txt` } };
+    },
+  },
+);
+
+check('autopilot retries a transient tool failure', () => {
+  if (!retryRun.ok || retryRun.data.run.status !== 'completed') throw new Error('retry run did not complete');
+  if (retryAttempts !== 2) throw new Error(`expected 2 attempts, got ${retryAttempts}`);
 });
 
 /* The overlay card's shadow is painted by CSS inside a transparent window, and CSS

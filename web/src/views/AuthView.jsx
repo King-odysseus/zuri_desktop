@@ -18,7 +18,7 @@ const COPY = {
   signup: {
     eyebrow: 'Get started',
     title: 'Create your Zuri Cloud account',
-    lead: 'One account for this dashboard and the desktop app. Use an email and a password, or continue with Google below.',
+    lead: 'Create your account, choose a paid plan, and use the same assistant on this dashboard and the desktop app. Use an email and a password, or continue with Google below.',
     submit: 'Create account',
     busy: 'Creating your account...',
     switchText: 'Already have an account?',
@@ -28,7 +28,7 @@ const COPY = {
 };
 
 const BENEFITS = [
-  { icon: <CheckIcon />, text: 'Starter includes 2 million tokens every month.' },
+  { icon: <CheckIcon />, text: 'Choose a paid plan after signing up, with clear monthly token limits.' },
   { icon: <CheckIcon />, text: 'Company, school and custom-domain Google accounts work too.' },
   { icon: <CheckIcon />, text: 'Same quota and history on the desktop app and in the browser.' },
 ];

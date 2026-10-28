@@ -148,7 +148,11 @@ export default function CloudView({ onNavigate }) {
   // plan figure. Show the difference rather than repeating the plan number.
   const rolling = usage?.window;
   const windowExtra = Math.max(0, Math.floor(Number(rolling?.tokens) || 0) - Math.floor(Number(rolling?.planTokens) || 0));
-  const currentPlan = account?.subscription?.planCode ?? usage?.planCode ?? 'starter';
+  // A pending Starter row is only a checkout placeholder, not an active plan.
+  // Treating it as current hid the Starter purchase button from new accounts.
+  const subscriptionStatus = account?.subscription?.status;
+  const hasActivePlan = subscriptionStatus === undefined || subscriptionStatus === 'active' || subscriptionStatus === 'past_due';
+  const currentPlan = hasActivePlan ? (account?.subscription?.planCode ?? usage?.planCode ?? 'starter') : '';
   const resetting = authMode === 'forgot' || authMode === 'reset';
 
   return (

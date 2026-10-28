@@ -90,11 +90,14 @@ CREATE TABLE IF NOT EXISTS usage_reservations (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
   reserved_tokens BIGINT NOT NULL CHECK (reserved_tokens > 0),
+  reserved_credit_tokens BIGINT NOT NULL DEFAULT 0 CHECK (reserved_credit_tokens >= 0),
   status TEXT NOT NULL CHECK (status IN ('reserved', 'committed', 'released')),
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   committed_at TIMESTAMPTZ
 );
+
+ALTER TABLE usage_reservations ADD COLUMN IF NOT EXISTS reserved_credit_tokens BIGINT NOT NULL DEFAULT 0 CHECK (reserved_credit_tokens >= 0);
 
 CREATE INDEX IF NOT EXISTS usage_reservations_quota_idx
   ON usage_reservations(user_id, subscription_id, status, expires_at);
@@ -294,8 +297,16 @@ CREATE TABLE IF NOT EXISTS usage_credits (
   payment_id UUID REFERENCES payments(id) ON DELETE SET NULL,
   pack_code TEXT NOT NULL,
   tokens BIGINT NOT NULL CHECK (tokens > 0),
+  used_tokens BIGINT NOT NULL DEFAULT 0 CHECK (used_tokens >= 0 AND used_tokens <= tokens),
   expires_at TIMESTAMPTZ NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE usage_credits ADD COLUMN IF NOT EXISTS used_tokens BIGINT NOT NULL DEFAULT 0;
+DO $$
+BEGIN
+  ALTER TABLE usage_credits ADD CONSTRAINT usage_credits_used_tokens_check CHECK (used_tokens >= 0 AND used_tokens <= tokens);
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 CREATE INDEX IF NOT EXISTS usage_credits_user_expiry_idx ON usage_credits (user_id, expires_at);

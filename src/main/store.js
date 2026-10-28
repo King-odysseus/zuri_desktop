@@ -885,6 +885,27 @@ export async function createThread(input = {}, options = {}) {
   });
 }
 
+/** Rename one saved conversation without changing its messages. */
+export async function renameThread(threadId, title, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'renaming a chat needs a thread id');
+  }
+  const nextTitle = normaliseTitle(title);
+  if (nextTitle === '') return failure('CHAT_INVALID_TITLE', 'a chat title cannot be blank');
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+    thread.title = nextTitle;
+    thread.updatedAt = new Date().toISOString();
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+    return { ok: true, data: thread };
+  });
+}
+
 /**
  * Permanently remove one chat thread and its inline messages.
  * @param {string} threadId
@@ -1653,7 +1674,7 @@ export async function listAutomations(options = {}) {
  * Add one automation and return it. The id, `lastRunAt: null` and `nextRunAt` are
  * set here rather than accepted from the caller, so a renderer cannot hand the
  * tick an automation it would then skip forever.
- * @param {{ prompt?: unknown, mode?: unknown, cadence?: unknown, agentId?: unknown, allowedTools?: unknown }} input
+ * @param {{ prompt?: unknown, mode?: unknown, cadence?: unknown, agentId?: unknown, allowedTools?: unknown, dryRun?: unknown }} input
  * @param {{ root?: string, now?: number }} [options]
  * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
  */
@@ -1689,6 +1710,8 @@ export async function createAutomation(input, options = {}) {
     cadence: cadence.data,
     agentId: normaliseAutomationAgentId(input.agentId),
     allowedTools: normaliseAutomationTools(input.allowedTools),
+    // Dry-run is explicit and opt-in. Missing values preserve the existing live behavior.
+    dryRun: input.dryRun === true,
     lastRunAt: null,
     enabled: true,
     // Kept alongside the rule so the tick only has to compare one moment with the
@@ -1719,7 +1742,7 @@ export async function createAutomation(input, options = {}) {
  * the page can save a new prompt without resending the cadence, and the next run
  * moves only when the rule or the pause state does.
  * @param {string} automationId
- * @param {{ prompt?: unknown, mode?: unknown, cadence?: unknown, agentId?: unknown, allowedTools?: unknown, enabled?: unknown, lastRunAt?: unknown }} patch
+ * @param {{ prompt?: unknown, mode?: unknown, cadence?: unknown, agentId?: unknown, allowedTools?: unknown, dryRun?: unknown, enabled?: unknown, lastRunAt?: unknown }} patch
  * @param {{ root?: string, now?: number }} [options]
  * @returns {Promise<{ ok: true, data: object } | { ok: false, error: { code: string, message: string } }>}
  */
@@ -1764,6 +1787,9 @@ export async function updateAutomation(automationId, patch = {}, options = {}) {
   }
   if (Object.hasOwn(patch, 'allowedTools')) {
     next.allowedTools = normaliseAutomationTools(patch.allowedTools);
+  }
+  if (Object.hasOwn(patch, 'dryRun')) {
+    next.dryRun = patch.dryRun === true;
   }
   if (Object.hasOwn(patch, 'enabled')) {
     next.enabled = patch.enabled !== false;

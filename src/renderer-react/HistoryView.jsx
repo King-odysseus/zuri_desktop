@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from './ui.jsx';
-import { DeleteIcon, EditIcon } from './Icons.jsx';
+import { ChatIcon, DeleteIcon, EditIcon } from './Icons.jsx';
 
 function formatDate(value) {
   if (typeof value !== 'string' || value === '') return '';
@@ -12,6 +12,8 @@ function formatDate(value) {
 export default function HistoryView({ onSelectThread }) {
   const [threads, setThreads] = useState([]);
   const [status, setStatus] = useState('loading');
+  const [renamingId, setRenamingId] = useState('');
+  const [renameValue, setRenameValue] = useState('');
 
   async function reload() {
     const result = await window.zuri?.chats?.list?.();
@@ -40,6 +42,21 @@ export default function HistoryView({ onSelectThread }) {
     if (result?.ok) await reload();
   }
 
+  function beginRename(thread) {
+    setRenamingId(thread.id);
+    setRenameValue(thread.title || 'New chat');
+  }
+
+  async function saveRename(thread) {
+    if (renameValue.trim() === '') return;
+    const result = await window.zuri?.chats?.rename?.({ threadId: thread.id, title: renameValue });
+    if (result?.ok) {
+      setRenamingId('');
+      setRenameValue('');
+      await reload();
+    }
+  }
+
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
@@ -64,9 +81,33 @@ export default function HistoryView({ onSelectThread }) {
             {threads.map((thread) => (
               <div key={thread.id} className="flex items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 shadow-sm">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{thread.title || 'New chat'}</p>
+                  {renamingId === thread.id ? (
+                    <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void saveRename(thread); }}>
+                      <input
+                        aria-label="Chat title"
+                        autoFocus
+                        className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm"
+                        value={renameValue}
+                        onChange={(event) => setRenameValue(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === 'Escape') setRenamingId(''); }}
+                      />
+                      <Button type="submit" size="sm" variant="secondary" isDisabled={renameValue.trim() === ''}>Save</Button>
+                    </form>
+                  ) : <p className="truncate text-sm font-medium">{thread.title || 'New chat'}</p>}
                   <p className="mt-1 text-xs text-muted">{formatDate(thread.updatedAt) || 'No date available'}</p>
                 </div>
+                {renamingId !== thread.id && (
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={`Rename ${thread.title || 'chat'}`}
+                    title="Rename chat"
+                    onPress={() => beginRename(thread)}
+                  >
+                    <EditIcon size={16} />
+                  </Button>
+                )}
                 <Button
                   isIconOnly
                   size="sm"
@@ -75,7 +116,7 @@ export default function HistoryView({ onSelectThread }) {
                   title="Continue chat"
                   onPress={() => onSelectThread(thread.id)}
                 >
-                  <EditIcon size={16} />
+                  <ChatIcon size={16} />
                 </Button>
                 <Button
                   isIconOnly

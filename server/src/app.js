@@ -837,6 +837,7 @@ export function createApp(dependencies = {}) {
       const token = bearerToken(request);
       const session = await dependencies.auth.authenticate(token);
       if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan before buying extra usage.' } });
       try {
         const body = await readJson(request);
         const pack = findTopupPack(body.packCode);

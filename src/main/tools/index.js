@@ -913,7 +913,9 @@ export const TOOLS = Object.freeze([
     name: 'editDocument',
     label: 'Edit a Word, Excel or PowerPoint file',
     description: 'Change text or cells in an attached .docx, .xlsx or .pptx file. The result is saved as a new copy; the original is never changed.',
-    requiresConfirmation: false,
+    // A new copy is safer than overwriting, but it still writes a user document.
+    // Keep the approval gate in the main process so model output cannot bypass it.
+    requiresConfirmation: true,
     handler: editDocumentTool,
   }),
   Object.freeze({

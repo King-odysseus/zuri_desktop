@@ -133,6 +133,7 @@ assert.deepEqual(normalizeGoogleProfile({ sub: 'workspace-1', email: 'person@com
 });
 
 const user = { id: 'user-1', email: 'user@example.com', status: 'active' };
+let subscriptionStatus = 'active';
 const sessions = new Map();
 const paymentCalls = [];
 const repository = {
@@ -140,7 +141,7 @@ const repository = {
   async createSession(userId, tokenHash, expiresAt) { sessions.set(tokenHash, { userId, expiresAt }); },
   // The idle check reads the session row itself, so the stored record travels
   // back with the user.
-  async findSessionUser(tokenHash) { const session = sessions.get(tokenHash); return session ? { user, subscription: { id: 'subscription-1', planCode: 'starter', monthlyTokens: 2_000_000, currentPeriodStart: fixedNow(), currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z') }, session: { expiresAt: session.expiresAt, lastUsedAt: fixedNow(), revoked: false } } : null; },
+  async findSessionUser(tokenHash) { const session = sessions.get(tokenHash); return session ? { user, subscription: { id: 'subscription-1', planCode: 'starter', status: subscriptionStatus, monthlyTokens: 2_000_000, currentPeriodStart: fixedNow(), currentPeriodEnd: new Date('2026-11-24T12:00:00.000Z') }, session: { expiresAt: session.expiresAt, lastUsedAt: fixedNow(), revoked: false } } : null; },
   // The window and the credits travel with the period total, because both the
   // dashboard and the refusal path read the same measurement.
   async getUsage() { return { usedTokens: 125, windowUsedTokens: 60_000, windowOldestAt: fixedNow().toISOString(), creditTokens: 0 }; },
@@ -281,6 +282,15 @@ const unknownPack = await app(new Request('https://cloud.example.com/api/billing
   body: JSON.stringify({ packCode: 'topup-huge' }),
 }));
 assert.equal(unknownPack.status, 400);
+subscriptionStatus = 'pending';
+const pendingTopup = await app(new Request('https://cloud.example.com/api/billing/topup', {
+  method: 'POST',
+  headers: { authorization: 'Bearer ' + signedIn.token, 'content-type': 'application/json' },
+  body: JSON.stringify({ packCode: 'topup-medium' }),
+}));
+assert.equal(pendingTopup.status, 402);
+assert.equal((await pendingTopup.json()).error.code, 'SUBSCRIPTION_REQUIRED');
+subscriptionStatus = 'active';
 const topup = await app(new Request('https://cloud.example.com/api/billing/topup', {
   method: 'POST',
   headers: { authorization: 'Bearer ' + signedIn.token, 'content-type': 'application/json' },

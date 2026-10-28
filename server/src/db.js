@@ -306,7 +306,7 @@ export function createRepository(pool) {
         [userId, QUOTA_WINDOW_HOURS],
       );
       const creditResult = await pool.query(
-        'SELECT COALESCE(SUM(tokens), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
+        'SELECT COALESCE(SUM(GREATEST(tokens - used_tokens, 0)), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
         [userId],
       );
       return {
@@ -349,12 +349,23 @@ export function createRepository(pool) {
         // Purchased tokens raise the ceiling for this period. They expire on
         // their own clock, so the filter is on expires_at, not on the period.
         const creditResult = await client.query(
-          'SELECT COALESCE(SUM(tokens), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
+          "SELECT COALESCE(SUM(GREATEST(tokens - used_tokens, 0)), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()",
+          [userId],
+        );
+        const reservedCreditResult = await client.query(
+          "SELECT COALESCE(SUM(reserved_credit_tokens), 0)::BIGINT AS tokens FROM usage_reservations WHERE user_id = $1 AND status = 'reserved' AND expires_at > NOW()",
           [userId],
         );
         const creditTokens = Number(creditResult.rows[0]?.tokens ?? 0) || 0;
-        const allowance = Number(subscription.monthly_tokens) + creditTokens;
-        if (!Number.isSafeInteger(committedTokens) || committedTokens + requested > allowance) {
+        const reservedCreditTokens = Number(reservedCreditResult.rows[0]?.tokens ?? 0) || 0;
+        const availableCreditTokens = Math.max(0, creditTokens - reservedCreditTokens);
+        // Only this request's portion beyond the remaining plan allowance needs
+        // purchased credit. Historical usage already accounted for in
+        // committedTokens must not be reserved a second time.
+        const monthlyAllowance = Number(subscription.monthly_tokens);
+        const monthlyRemaining = Math.max(0, monthlyAllowance - committedTokens);
+        const creditNeeded = Math.max(0, requested - monthlyRemaining);
+        if (!Number.isSafeInteger(committedTokens) || committedTokens + requested > monthlyAllowance + creditTokens || creditNeeded > availableCreditTokens) {
           const error = new Error('This request would exceed the plan quota.');
           error.code = 'QUOTA_EXCEEDED';
           throw error;
@@ -380,8 +391,8 @@ export function createRepository(pool) {
           throw error;
         }
         const reservationResult = await client.query(
-          "INSERT INTO usage_reservations (user_id, subscription_id, reserved_tokens, status, expires_at) VALUES ($1, $2, $3, 'reserved', $4) RETURNING id",
-          [userId, subscription.id, requested, expiresAt],
+          "INSERT INTO usage_reservations (user_id, subscription_id, reserved_tokens, reserved_credit_tokens, status, expires_at) VALUES ($1, $2, $3, $4, 'reserved', $5) RETURNING id",
+          [userId, subscription.id, requested, creditNeeded, expiresAt],
         );
         await client.query('COMMIT');
         return { id: reservationResult.rows[0].id, reservedTokens: requested };
@@ -404,7 +415,7 @@ export function createRepository(pool) {
       try {
         await client.query('BEGIN');
         const reservationResult = await client.query(
-          'SELECT id, subscription_id, reserved_tokens, status FROM usage_reservations WHERE id = $1 AND user_id = $2 FOR UPDATE',
+          'SELECT id, subscription_id, reserved_tokens, reserved_credit_tokens, status FROM usage_reservations WHERE id = $1 AND user_id = $2 FOR UPDATE',
           [reservationId, userId],
         );
         const reservation = reservationResult.rows[0];
@@ -419,6 +430,24 @@ export function createRepository(pool) {
           const error = new Error('The provider usage exceeded the reserved budget.');
           error.code = 'RESERVATION_EXCEEDED';
           throw error;
+        }
+        const creditToConsume = Math.min(Number(reservation.reserved_credit_tokens) || 0, counted);
+        if (creditToConsume > 0) {
+          const credits = await client.query(
+            'SELECT id, tokens, used_tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW() AND used_tokens < tokens ORDER BY expires_at, created_at, id FOR UPDATE',
+            [userId],
+          );
+          let remaining = creditToConsume;
+          for (const credit of credits.rows) {
+            if (remaining <= 0) break;
+            const available = Math.max(0, Number(credit.tokens) - Number(credit.used_tokens));
+            const consumed = Math.min(available, remaining);
+            if (consumed > 0) {
+              await client.query('UPDATE usage_credits SET used_tokens = used_tokens + $2 WHERE id = $1', [credit.id, consumed]);
+              remaining -= consumed;
+            }
+          }
+          if (remaining > 0) throw new Error('The usage credit reservation could not be fulfilled.');
         }
         await client.query(
           'INSERT INTO usage_events (user_id, subscription_id, provider, model, model_code, input_tokens, output_tokens, quota_tokens, cost_micro_usd, request_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
@@ -576,9 +605,20 @@ export function createRepository(pool) {
         ? ", current_period_start = NOW(), current_period_end = NOW() + INTERVAL '1 month'"
         : '';
       const result = await pool.query(
-        `UPDATE subscriptions s SET status = $1, paystack_subscription_code = COALESCE($2, s.paystack_subscription_code), paystack_customer_code = COALESCE($3, s.paystack_customer_code), updated_at = NOW()${periodSql} FROM users u WHERE s.user_id = u.id AND s.status IN ('active', 'past_due') AND ($2 IS NOT NULL AND s.paystack_subscription_code = $2 OR $3 IS NOT NULL AND s.paystack_customer_code = $3 OR $4 <> '' AND u.email = $4) RETURNING s.id`,
+        `UPDATE subscriptions s SET status = $1, paystack_subscription_code = COALESCE($2, s.paystack_subscription_code), paystack_customer_code = COALESCE($3, s.paystack_customer_code), updated_at = NOW()${periodSql} FROM users u WHERE s.user_id = u.id AND s.status IN ('active', 'past_due') AND ($2 IS NOT NULL AND s.paystack_subscription_code = $2 OR $3 IS NOT NULL AND s.paystack_customer_code = $3 OR $4 <> '' AND u.email = $4) RETURNING s.id, s.user_id, s.plan_code`,
         [status, subscriptionCode || null, customerCode || null, email],
       );
+      // A recurring charge has no initialized payment row, unlike first checkout.
+      // Record it here so revenue history and reconciliation include renewals.
+      const renewalReference = text(data.reference);
+      const renewalAmount = Number(data.amount);
+      if (event.event === 'charge.success' && result.rowCount > 0 && renewalReference !== '' && Number.isSafeInteger(renewalAmount) && renewalAmount > 0) {
+        const subscription = result.rows[0];
+        await pool.query(
+          "INSERT INTO payments (user_id, plan_code, reference, amount_kobo, currency, status, paystack_transaction_id, paystack_customer_code, paystack_authorization_code, paystack_subscription_code, raw_event, paid_at) VALUES ($1, $2, $3, $4, 'NGN', 'success', $5, $6, $7, $8, $9, NOW()) ON CONFLICT (reference) DO UPDATE SET status = 'success', raw_event = EXCLUDED.raw_event, paid_at = COALESCE(payments.paid_at, EXCLUDED.paid_at)",
+          [subscription.user_id, subscription.plan_code, renewalReference, renewalAmount, Number.isSafeInteger(Number(data.id)) ? Number(data.id) : null, customerCode || null, text(data.authorization?.authorization_code) || null, subscriptionCode || null, event],
+        );
+      }
       return { applied: result.rowCount > 0 };
     },
     async getBilling(userId) {
@@ -591,7 +631,7 @@ export function createRepository(pool) {
         [userId],
       );
       const credits = await pool.query(
-        'SELECT COALESCE(SUM(tokens), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
+        'SELECT COALESCE(SUM(GREATEST(tokens - used_tokens, 0)), 0)::BIGINT AS tokens FROM usage_credits WHERE user_id = $1 AND expires_at > NOW()',
         [userId],
       );
       return {

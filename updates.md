@@ -866,3 +866,10 @@
 - Other OS action: run `npm run test` after pulling these source changes. No dependency changes.
 - Done on: Windows
 
+## 2026-10-28 - Windows
+
+- Cloud checkout now keeps Starter visible until payment activates it, refuses top-ups for unpaid accounts, records recurring Paystack charges, and consumes purchased tokens once rather than restoring them each period. Document edits require explicit approval. Autopilot supports preview-only runs and bounded retries. Saved chats can be renamed, and signup explains the paid-plan step.
+- Key files: server/db/schema.sql, server/src/app.js, server/src/db.js, src/main/tools/index.js, src/main/scheduler.js, src/main/store.js, src/renderer-react/AutomationsView.jsx, src/renderer-react/CloudView.jsx, src/renderer-react/HistoryView.jsx, web/src/views/AuthView.jsx, web/src/views/Dashboard.jsx.
+- Other OS action: run "npm test" after syncing.
+- Done on: Windows
+

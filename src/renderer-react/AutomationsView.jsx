@@ -62,6 +62,7 @@ export default function AutomationsView() {
   const [timeOfDay, setTimeOfDay] = useState('09:00');
   const [agentId, setAgentId] = useState('');
   const [allowedTools, setAllowedTools] = useState([]);
+  const [dryRun, setDryRun] = useState(false);
 
   const editing = useMemo(
     () => automations.find((automation) => automation.id === editingId) ?? null,
@@ -128,6 +129,7 @@ export default function AutomationsView() {
     setTimeOfDay('09:00');
     setAgentId('');
     setAllowedTools([]);
+    setDryRun(false);
   }
 
   function startEdit(automation) {
@@ -147,6 +149,7 @@ export default function AutomationsView() {
     setTimeOfDay(String(cadence.timeOfDay ?? '09:00'));
     setAgentId(typeof automation.agentId === 'string' ? automation.agentId : '');
     setAllowedTools(Array.isArray(automation.allowedTools) ? automation.allowedTools : []);
+    setDryRun(automation.dryRun === true);
     setMessage('Editing this automation. Save changes or cancel.');
   }
 
@@ -197,7 +200,7 @@ export default function AutomationsView() {
     }
     const wasEditing = editingId !== '';
     setMessage(wasEditing ? 'Saving changes...' : 'Saving...');
-    const payload = { prompt: trimmedPrompt, mode, cadence: cadencePayload(), agentId, allowedTools };
+    const payload = { prompt: trimmedPrompt, mode, cadence: cadencePayload(), agentId, allowedTools, dryRun };
     const result = wasEditing
       ? await automationsApi.update({ id: editingId, ...payload })
       : await automationsApi.create(payload);
@@ -281,6 +284,12 @@ export default function AutomationsView() {
               {cadenceType === 'daily' && <Input type="time" label="Time of day" value={timeOfDay} onChange={(event) => setTimeOfDay(event.target.value)} />}
               <SelectField label="Agent" value={agentId} options={[{ value: '', label: 'Whoever is active' }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={setAgentId} />
             </div>
+            <div className="mt-4 rounded-lg border border-border bg-surface-secondary p-3">
+              <Checkbox isSelected={dryRun} onChange={setDryRun}>
+                Preview only (do not change files)
+              </Checkbox>
+              <p className="mt-1 text-xs text-muted">The run will show the planned steps and save no output file.</p>
+            </div>
             {tools.length > 0 && <div className="mt-4"><p className="mb-2 text-sm font-medium">Tools it may use</p><div className="grid gap-2 sm:grid-cols-2">{tools.map((tool) => <Checkbox key={tool.name} isSelected={allowedTools.includes(tool.name)} onChange={(checked) => setAllowedTools((current) => checked ? [...new Set([...current, tool.name])] : current.filter((name) => name !== tool.name))}>{tool.label}</Checkbox>)}</div></div>}
             <div className="mt-5 flex justify-end border-t border-border pt-4">
               <Button variant="primary" onPress={() => void save()}>{editing ? 'Save changes' : 'Add automation'}</Button>
@@ -307,7 +316,7 @@ export default function AutomationsView() {
                       <p className="truncate text-sm font-medium">{automation.prompt}</p>
                       <p className="mt-1 text-xs text-muted">{describeCadence(automation.cadence)} - {describeNextRun(automation.nextRunAt)}</p>
                     </div>
-                    <Chip size="sm" color={automation.enabled === false ? 'default' : 'primary'}>{automation.enabled === false ? 'Paused' : 'Enabled'}</Chip>
+                    <Chip size="sm" color={automation.enabled === false ? 'default' : 'primary'}>{automation.enabled === false ? 'Paused' : automation.dryRun === true ? 'Preview' : 'Enabled'}</Chip>
                     <Checkbox aria-label={`Enable ${automation.prompt}`} isSelected={automation.enabled !== false} onChange={() => void toggleEnabled(automation)}>Enabled</Checkbox>
                     <Button size="sm" variant="ghost" onPress={() => openEdit(automation)}>Edit</Button>
                     <Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void remove(automation)}>Delete</Button>

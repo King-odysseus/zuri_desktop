@@ -395,12 +395,15 @@ export async function runSchedule(schedule, options = {}) {
 
   const startedMs = Number.isFinite(options.now) ? options.now : Date.now();
   const startedAt = new Date(startedMs).toISOString();
+  const dryRun = schedule.dryRun === true;
 
   // A model run replaces the heuristic with the prompt itself. A schedule that was
   // taught explicit steps still replays them exactly as written, and a caller with no
   // model wired in (the offline demo) keeps the single-call plan.
   const declaredSteps = Array.isArray(schedule.steps) && schedule.steps.length > 0;
-  const askModel = declaredSteps === false && typeof options.runPrompt === 'function';
+  // Preview mode must not enter the model tool loop: even a tool that is normally
+  // safe in a scheduled run could write before the preview is shown.
+  const askModel = !dryRun && declaredSteps === false && typeof options.runPrompt === 'function';
   const planned = askModel
     ? []
     : typeof options.plan === 'function'
@@ -411,6 +414,12 @@ export async function runSchedule(schedule, options = {}) {
       ? options.runStep
       : (name, args, stepOptions) => runTool(name, args, stepOptions);
   const notify = typeof options.notify === 'function' ? options.notify : createRunNotifier();
+  const maxRetries = Number.isInteger(options.maxRetries) && options.maxRetries >= 0
+    ? Math.min(3, options.maxRetries)
+    : 2;
+  const retryDelayMs = Number.isFinite(options.retryDelayMs) && options.retryDelayMs >= 0
+    ? Math.min(5_000, options.retryDelayMs)
+    : 100;
 
   const opened = await store.startRun(
     {
@@ -481,18 +490,25 @@ export async function runSchedule(schedule, options = {}) {
   }
 
   for (const step of planned) {
+    if (dryRun) {
+      steps.push({ name: step.name, ok: true, preview: true, data: step.args });
+      stepsDone += 1;
+      continue;
+    }
     let outcome;
-    try {
-      outcome = await runStep(step.name, step.args, {
-        confirmed: true,
-        allowedTools,
-        settings: options.settings,
-        dependencies: options.dependencies,
-      });
-    } catch (error) {
-      // runTool reports its failures as values; a throw here is a bug in an
-      // injected step, and it must still leave the row closed.
-      outcome = { ok: false, error: { code: 'TOOL_FAILED', message: String(error?.message ?? error) } };
+    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+      try {
+        outcome = await runStep(step.name, step.args, {
+          confirmed: true,
+          allowedTools,
+          settings: options.settings,
+          dependencies: options.dependencies,
+        });
+      } catch (error) {
+        outcome = { ok: false, error: { code: 'TOOL_FAILED', message: String(error?.message ?? error) } };
+      }
+      if (outcome?.ok === true || attempt === maxRetries) break;
+      if (retryDelayMs > 0) await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
     }
 
     const stepOk = outcome?.ok === true;
@@ -523,8 +539,10 @@ export async function runSchedule(schedule, options = {}) {
     needsAttention,
     error: failureText,
   });
-  const saved = await runStep('writeFile', { path: savePath, content: markdown }, { confirmed: true, allowedTools });
-  const resultPath = saved?.ok === true ? saved.data?.relative ?? savePath : null;
+  const saved = dryRun
+    ? { ok: true, data: { relative: null }, preview: true }
+    : await runStep('writeFile', { path: savePath, content: markdown }, { confirmed: true, allowedTools });
+  const resultPath = dryRun ? null : saved?.ok === true ? saved.data?.relative ?? savePath : null;
   if (saved?.ok !== true) {
     // Every step may have worked, but an automation whose answer cannot be kept
     // has still failed the person waiting for it.

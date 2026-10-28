@@ -52,6 +52,7 @@ import {
   listThreads,
   readSettings,
   readStore,
+  renameThread,
   saveSettings,
   updateAutomation,
   updateTask,
@@ -308,6 +309,7 @@ const HANDLERS = new Map([
   ['zuri:chats:list', handleChatList],
   ['zuri:chats:create', handleChatCreate],
   ['zuri:chats:delete', handleChatDelete],
+  ['zuri:chats:rename', handleChatRename],
   ['zuri:chats:clear', handleChatClear],
   ['zuri:chats:append-message', handleChatAppendMessage],
   ['zuri:chat:send', handleChatSend],
@@ -498,6 +500,13 @@ async function handleChatDelete(payload) {
   // asked for it. A copy left behind in the account is the cheaper mistake of the
   // two: an error dialog over a chat already deleted is worse than a stray record.
   if (result?.ok === true && cloudId !== '') backgroundSync(chatSync.deleteConversation(cloudId));
+  if (result?.ok === true) announceState({ area: 'chats' });
+  return result;
+}
+
+/** Rename a saved conversation and announce it to the sidebar. */
+async function handleChatRename(payload) {
+  const result = await renameThread(payload?.threadId, payload?.title);
   if (result?.ok === true) announceState({ area: 'chats' });
   return result;
 }
