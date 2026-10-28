@@ -33,6 +33,10 @@ jobs:
       - run: npm ci
       - name: Build the Android debug APK
         run: npm run android:build
+        env:
+          # Keep the mobile bundle on the deployed API. Do not put supplier keys
+          # in the APK or in this workflow; the server owns those credentials.
+          VITE_API_BASE_URL: https://zuricloud-production.up.railway.app
       - name: Give the APK a release name
         run: |
           mkdir -p release

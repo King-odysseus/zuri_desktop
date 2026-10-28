@@ -6,7 +6,13 @@ import process from 'node:process';
 const androidDir = path.resolve('android');
 
 const npmCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
-const apiBaseUrl = String(process.env.VITE_API_BASE_URL ?? 'https://zuricloud-production.up.railway.app').replace(/\/+$/, '');
+const DEFAULT_API_BASE_URL = 'https://zuricloud-production.up.railway.app';
+const apiBaseUrl = String(process.env.VITE_API_BASE_URL ?? DEFAULT_API_BASE_URL).trim().replace(/\/+$/, '');
+
+if (!/^https:\/\//i.test(apiBaseUrl)) {
+  console.error('Android builds require an HTTPS VITE_API_BASE_URL so the APK cannot target a local or insecure API.');
+  process.exit(1);
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
