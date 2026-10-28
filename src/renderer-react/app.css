@@ -1,3 +1,7 @@
+/* Montserrat gives the workspace its confident editorial headings, while Roboto
+   keeps dense controls and assistant copy neutral and easy to scan. */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Roboto:wght@400;500;700&display=swap');
+
 /*
  * Flowbite React supplies the component classes while Tailwind v4 generates the
  * layout utilities used by the renderer. Scanning both our JSX and Flowbite's
@@ -48,6 +52,18 @@ body,
 body {
   background: var(--background);
   color: var(--foreground);
+  font-family: 'Roboto', 'Segoe UI', sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+button,
+[role='button'] {
+  font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif;
 }
 
 /* Every non-chat page uses the same readable gutter and centred content width.
@@ -296,28 +312,28 @@ body {
  * renderer theme remains easy to compare with the design tokens.
  */
 @layer base {
-  /* Light is the default look, matching the reference screen: white page, a
-     barely-grey list panel, near-black text and a single blue accent. */
+  /* Light is the default look, matching the reference screen: white cards,
+     navy structure, and blue emphasis. */
   [data-theme="light"] {
-    --background: #eef3f9;
-    --foreground: #142033;
+    --background: #f7f9fc;
+    --foreground: #10233f;
     --surface: #ffffff;
-    --surface-foreground: #142033;
-    --surface-secondary: #e7eef8;
-    --surface-secondary-foreground: #142033;
-    --surface-tertiary: #dbe7f4;
-    --surface-tertiary-foreground: #142033;
-    --default: #dce6f1;
-    --default-foreground: #142033;
-    --muted: #6f7e95;
-    --accent: #3478e5;
+    --surface-foreground: #10233f;
+    --surface-secondary: #0b1f3a;
+    --surface-secondary-foreground: #ffffff;
+    --surface-tertiary: #edf2f7;
+    --surface-tertiary-foreground: #10233f;
+    --default: #e5ebf2;
+    --default-foreground: #10233f;
+    --muted: #5f6d83;
+    --accent: #2563eb;
     --accent-foreground: #ffffff;
     --border: transparent;
     --separator: transparent;
     --field-background: #ffffff;
-    --selected: #d4e5ff;
-    --selected-foreground: #174b91;
-    --control-border: #b8c7da;
+    --selected: #dbeafe;
+    --selected-foreground: #1d4ed8;
+    --control-border: #c6d2df;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%236b7f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
@@ -375,6 +391,173 @@ body {
   background: color-mix(in srgb, var(--selected) 62%, var(--surface-secondary)) !important;
   color: var(--selected-foreground) !important;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 28%, transparent) !important;
+}
+
+/* The reference uses a navy frame around quiet white work surfaces. Keep the
+   navigation visually anchored while leaving the transcript and cards bright. */
+.zuri-sidebar-rail {
+  background: var(--surface-secondary) !important;
+  border-color: color-mix(in srgb, #ffffff 16%, transparent) !important;
+}
+
+.zuri-sidebar-panel {
+  background: var(--surface-secondary) !important;
+  color: var(--surface-secondary-foreground) !important;
+}
+
+.zuri-sidebar-panel .zuri-button,
+.zuri-sidebar-panel .text-muted {
+  color: color-mix(in srgb, #ffffff 72%, transparent) !important;
+}
+
+.zuri-sidebar-panel .zuri-button:hover,
+.zuri-sidebar-panel .zuri-button:focus-visible {
+  color: #ffffff !important;
+  background: color-mix(in srgb, var(--accent) 22%, transparent) !important;
+}
+
+.zuri-sidebar-panel .zuri-new-chat {
+  background: var(--accent) !important;
+  color: #ffffff !important;
+}
+
+.zuri-sidebar-panel .zuri-new-chat:hover,
+.zuri-sidebar-panel .zuri-new-chat:focus-visible {
+  background: var(--accent-hover) !important;
+  color: #ffffff !important;
+}
+
+.zuri-sidebar-panel .zuri-selected-pill {
+  background: color-mix(in srgb, var(--accent) 26%, transparent) !important;
+  color: #ffffff !important;
+}
+
+/* Empty-chat dashboard: these cards echo the supplied reference without
+   pretending to be live analytics. They are a visual starting point before the
+   first message and disappear as soon as a conversation begins. */
+.zuri-opening-dashboard {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+  margin: 1.5rem 0 1rem;
+}
+
+.zuri-opening-activity,
+.zuri-opening-dashboard-grid {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.zuri-opening-activity {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.zuri-opening-dashboard-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+}
+
+.zuri-opening-card {
+  min-width: 0;
+  border: 1px solid var(--control-border);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--foreground) 7%, transparent);
+  padding: 0.9rem;
+}
+
+.zuri-opening-activity .zuri-opening-card {
+  min-height: 5rem;
+}
+
+.zuri-opening-card strong,
+.zuri-opening-card span,
+.zuri-opening-card small {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.zuri-opening-card strong {
+  color: var(--foreground);
+  font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif;
+  font-size: 0.76rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.zuri-opening-card span,
+.zuri-opening-card small {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.zuri-opening-label {
+  color: var(--muted) !important;
+  font-size: 0.68rem !important;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.zuri-opening-bars {
+  display: flex;
+  align-items: end;
+  gap: 0.45rem;
+  height: 5rem;
+  margin: 0.7rem 0 0.45rem;
+}
+
+.zuri-opening-bars i {
+  flex: 1 1 0;
+  min-width: 0;
+  border-radius: 0.35rem 0.35rem 0.1rem 0.1rem;
+  background: var(--accent);
+}
+
+.zuri-opening-bars i:nth-child(1) { height: 64%; }
+.zuri-opening-bars i:nth-child(2) { height: 42%; background: #60a5fa; }
+.zuri-opening-bars i:nth-child(3) { height: 76%; }
+.zuri-opening-bars i:nth-child(4) { height: 52%; background: #60a5fa; }
+.zuri-opening-bars i:nth-child(5) { height: 88%; }
+.zuri-opening-bars i:nth-child(6) { height: 60%; background: #60a5fa; }
+
+.zuri-opening-stat-note b {
+  color: #176b5b;
+  font-weight: 600;
+}
+
+.zuri-opening-calendar-list {
+  display: grid;
+  gap: 0.6rem;
+  margin-top: 0.9rem;
+}
+
+.zuri-opening-calendar-item {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.zuri-opening-calendar-item b {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.65rem;
+  background: var(--selected);
+  color: var(--selected-foreground);
+  font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif;
+  font-size: 0.72rem;
+}
+
+@media (max-width: 700px) {
+  .zuri-opening-activity,
+  .zuri-opening-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Chat controls that float over the conversation: the sidebar toggle keeps the

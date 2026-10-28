@@ -59,7 +59,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   return (
     <div className="flex h-full shrink-0">
       <nav
-        className="flex w-14 flex-col items-center gap-2 border-r border-border bg-background py-4"
+        className="zuri-sidebar-rail flex w-14 flex-col items-center gap-2 border-r border-border py-4"
         aria-label="Destinations"
       >
         {/* The chat view carries this control as a floating button over the
@@ -95,7 +95,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
       </nav>
 
       <aside
-        className={`flex flex-col bg-surface-secondary text-foreground transition-[width] duration-200 ${collapsed ? 'w-0 overflow-hidden' : 'w-72'}`}
+        className={`zuri-sidebar-panel flex flex-col transition-[width] duration-200 ${collapsed ? 'w-0 overflow-hidden' : 'w-72'}`}
         aria-label="Conversations"
         aria-hidden={collapsed}
       >
