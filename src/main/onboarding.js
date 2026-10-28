@@ -1,18 +1,15 @@
 /**
  * onboarding.js - the main-process half of the first-run setup card.
  *
- * The card asks two things (name and theme) and offers a Zuri account; a provider
- * key is now an optional extra that only Settings collects. This module is the one
+ * The card asks two things (name and theme) and offers a Zuri account. This module is the one
  * place that turns those answers into stored state, so the window and
  * scripts/firstrun.js run the same code: `zuri:onboarding:complete` calls
  * runOnboardingSetup, and so does the headless check.
  *
  * It answers in the store's `{ ok, data | error }` shape so the IPC handler can
- * hand main's answer straight to the renderer without reshaping it. The key goes
- * to secrets.js and comes back as a boolean, never as the key itself.
+ * hand main's answer straight to the renderer without reshaping it.
  */
 import { resolveStorePath, saveSettings } from './store.js';
-import { DEFAULT_PROVIDER, setKey } from './secrets.js';
 
 /** Long enough for a full name, short enough to stay one line in the top bar. */
 export const SETUP_NAME_MAX_LENGTH = 60;
@@ -58,26 +55,13 @@ export async function runOnboardingSetup(payload = {}) {
   const settings = await saveSettings({ name, theme, ...(model === '' ? {} : { model }) });
   if (settings.ok !== true) return settings;
 
-  // A key is optional: the first-run card now signs people into their Zuri account
-  // instead of asking for a provider key, and an account carries the plan. setKey
-  // refuses an empty string, so an absent key means there is nothing to store
-  // rather than a failure.
-  const key = typeof payload?.key === 'string' ? payload.key.trim() : '';
-  const provider =
-    typeof payload?.provider === 'string' && payload.provider.trim() !== ''
-      ? payload.provider.trim()
-      : DEFAULT_PROVIDER;
-  const storedKey =
-    key === '' ? { ok: true, data: { provider, hasKey: false } } : await setKey(provider, key);
-  if (storedKey.ok !== true) return storedKey;
-
   return {
     ok: true,
     data: {
       name,
       theme,
-      provider: storedKey.data.provider,
-      hasKey: storedKey.data.hasKey === true,
+      provider: 'zuri-cloud',
+      hasKey: false,
       settingsPath: resolveStorePath('settings'),
     },
   };

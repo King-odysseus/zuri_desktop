@@ -1,7 +1,7 @@
 /**
  * Firstrun: run the first-run setup step with no window and check what it stored.
  *
- * The setup card asks for three answers - a name, a theme and a provider key - and hands them over on
+ * The setup card asks for a name and a theme, then hands them over on
  * `zuri:onboarding:complete`, which main answers with runOnboardingSetup
  * (src/main/onboarding.js). This script calls that same function, so what it checks
  * is the code the window runs, not a second copy of it.
@@ -19,15 +19,10 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { runOnboardingSetup } from '../src/main/onboarding.js';
-import { hasKey } from '../src/main/secrets.js';
 import { resolveStorePath, setStoreRoot } from '../src/main/store.js';
 
 const NAME = 'First Run Check';
 const THEME = 'light';
-const PROVIDER = 'anthropic';
-// Key-shaped, but not a key: secrets.js only checks length and spacing, and nothing
-// here ever calls a provider with it.
-const KEY = 'sk-ant-firstrun-check-not-a-real-key';
 
 const SCRATCH_ROOT = path.join(os.tmpdir(), 'zuri-firstrun');
 
@@ -75,8 +70,6 @@ app.whenReady().then(async () => {
   const setup = await runOnboardingSetup({
     name: NAME,
     theme: THEME,
-    provider: PROVIDER,
-    key: KEY,
   });
   check(
     'setup completes',
@@ -89,8 +82,6 @@ app.whenReady().then(async () => {
   const refused = await runOnboardingSetup({
     name: '   ',
     theme: THEME,
-    provider: PROVIDER,
-    key: KEY,
   });
   check(
     'setup refuses a blank name',
@@ -113,10 +104,7 @@ app.whenReady().then(async () => {
 
   check('settings.json holds the name', stored.name === NAME, String(stored.name));
   check('settings.json holds the theme', stored.theme === THEME, String(stored.theme));
-  check(`a key is stored for ${PROVIDER}`, hasKey(PROVIDER) === true);
-  // The key belongs to secrets.json; settings.json is read by the renderer, so a
-  // key in it would be a key in the renderer.
-  check('settings.json does not hold the key', raw !== null && !raw.includes(KEY));
+  check('setup selects the cloud account', setup.data?.provider === 'zuri-cloud', String(setup.data?.provider));
 
   if (failures.length === 0) {
     console.log(`settings path: ${settingsPath}`);

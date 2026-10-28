@@ -1018,12 +1018,44 @@ export async function summarizeText(document = {}, options = {}) {
   const settings = await readStore('settings');
   if (!settings.ok) return settings;
 
+  if (typeof options.cloudReply === 'function') {
+    const name = typeof document.fileName === 'string' && document.fileName.trim() !== '' ? document.fileName.trim() : 'the document';
+    const instruction = typeof document.instruction === 'string' ? document.instruction.trim() : '';
+    const truncated = fullText.length > SUMMARY_TEXT_LIMIT;
+    const body = truncated ? fullText.slice(0, SUMMARY_TEXT_LIMIT) : fullText;
+    const prompt = [
+      instruction === '' ? null : `Extra instruction from the person: ${instruction}`,
+      `Document name: ${name}`,
+      '',
+      'Document text:',
+      body,
+    ].filter((line) => line !== null).join('\n');
+    const reply = await options.cloudReply({
+      conversation: { system: SUMMARY_SYSTEM_PROMPT, turns: [{ role: 'user', content: prompt }] },
+      settings: settings.data,
+      signal: options.signal,
+      emit: options.emit,
+      tools: [],
+    });
+    if (reply?.ok !== true) return reply ?? failure('SUMMARY_CLOUD_FAILED', 'Zuri could not summarize that document.');
+    return {
+      ok: true,
+      data: {
+        summary: String(reply.data?.content ?? '').trim(),
+        provider: 'zuri-cloud',
+        model: String(reply.data?.modelCode ?? 'zuri-flash'),
+        label: String(reply.data?.modelName ?? reply.data?.modelCode ?? 'Zuri Cloud'),
+        truncated,
+      },
+    };
+  }
+
   const { provider, model } = resolveChatTarget(settings.data);
   const config = PROVIDER_CONFIG[provider];
 
   const key = getKey(provider);
   if (key === null) {
-    return failure('SUMMARY_NO_KEY', `No ${config.label} key is saved. Add one in Settings, then try again.`);
+    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri Cloud to summarize documents.');
   }
 
   const name = typeof document.fileName === 'string' && document.fileName.trim() !== '' ? document.fileName.trim() : 'the document';
@@ -1080,10 +1112,23 @@ export async function askForAddin(request = {}, options = {}) {
 
   const settings = await readStore('settings');
   if (!settings.ok) return settings;
+  if (typeof options.cloudReply === 'function') {
+    const context = typeof request.context === 'string' ? request.context.slice(0, ADDIN_CONTEXT_LIMIT) : '';
+    const content = context === '' ? prompt : `${prompt}\n\nDocument text:\n${context}`;
+    const reply = await options.cloudReply({
+      conversation: { system: [WORD_ADDIN_SYSTEM_PROMPT, currentTimeContext()].join('\n\n'), turns: [{ role: 'user', content }] },
+      settings: settings.data,
+      signal: options.signal,
+      emit: options.emit,
+      tools: [],
+    });
+    if (reply?.ok !== true) return reply ?? failure('ADDIN_CLOUD_FAILED', 'Zuri could not answer that document request.');
+    return { ok: true, data: { text: String(reply.data?.content ?? '').trim() } };
+  }
   const { provider, model } = resolveChatTarget(settings.data);
   const key = getKey(provider);
   if (key === null) {
-    return failure('ADDIN_NO_KEY', `No ${PROVIDER_CONFIG[provider].label} key is saved. Add one in Zuri Settings, then try again.`);
+    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri Cloud to use the Word add-in.');
   }
 
   const context = typeof request.context === 'string' ? request.context.slice(0, ADDIN_CONTEXT_LIMIT) : '';
@@ -1281,7 +1326,7 @@ export async function sendChatMessage(threadId, options = {}) {
   if (key === null) {
     return failure(
       'CHAT_NO_KEY',
-      `No ${config.label} key is saved. Sign in to Zuri, or add a key in Settings.`,
+      'Sign in to Zuri Cloud to get replies.',
     );
   }
 
@@ -1391,9 +1436,26 @@ export async function runPrompt(request = {}, options = {}) {
   );
   const config = PROVIDER_CONFIG[provider];
 
+  if (typeof options.cloudReply === 'function') {
+    const reply = await options.cloudReply({
+      conversation: {
+        system: chatSystemPrompt({ agentPrompt: agent !== null ? agent.systemPrompt : '', settings }),
+        turns: [{ role: 'user', content: prompt }],
+      },
+      settings,
+      signal: request.signal,
+      emit: (event) => request.onStatus?.(event?.status ?? ''),
+      tools: [],
+    });
+    if (reply?.ok !== true) return reply ?? failure('CHAT_CLOUD_FAILED', 'Zuri could not run that automation.');
+    const text = String(reply.data?.content ?? '').trim();
+    if (text === '') return failure('CHAT_EMPTY_REPLY', 'Zuri sent an empty answer for this automation.');
+    return { ok: true, data: { text, provider: 'zuri-cloud', model: String(reply.data?.modelCode ?? 'zuri-flash') } };
+  }
+
   const key = getKey(provider);
   if (key === null) {
-    return failure('CHAT_NO_KEY', `No ${config.label} key is saved. Add one in Settings so automations can run.`);
+    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri Cloud so automations can run.');
   }
 
   const conversation = {

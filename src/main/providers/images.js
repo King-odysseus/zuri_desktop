@@ -142,6 +142,11 @@ export async function generateImage({ prompt, modelCode, providers, save } = {})
   if (text === '') {
     return failure('IMAGE_PROMPT_REQUIRED', 'Describe the picture you want first.');
   }
+  // Supplier credentials belong on Railway. Keeping this guard in the legacy
+  // adapter prevents an older caller from bypassing the account-backed API.
+  return failure('CLOUD_IMAGE_REQUIRED', 'Image generation is handled by Zuri Cloud. Sign in to use it.');
+
+  /* istanbul ignore next - legacy supplier adapter retained for migration history */
   if (text.length > MAX_PROMPT_LENGTH) {
     return failure('IMAGE_PROMPT_REQUIRED', `Keep the picture description to ${MAX_PROMPT_LENGTH} characters or fewer.`);
   }

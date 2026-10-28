@@ -894,3 +894,10 @@
 - Other OS action: run `npm test` and `npm run web:build`.
 - Done on: Windows
 
+## 2026-10-28 - Windows
+
+- Desktop AI actions now use the signed-in Zuri Cloud route, local provider-key settings and IPC channels are removed, onboarding ignores legacy key fields, Android builds default to the Railway HTTPS API, and image generation no longer calls supplier APIs from the desktop process.
+- Key files: src/main/providers/chat.js, src/main/main.js, src/main/onboarding.js, src/main/preload.js, src/renderer-react/SettingsView.jsx, scripts/firstrun.js, scripts/build-android.mjs, .github/workflows/build-android.yml.
+- Other OS action: run `npm test`, `npm run android:build`, and rebuild the platform installer.
+- Done on: Windows
+

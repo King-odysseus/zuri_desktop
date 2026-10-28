@@ -8,7 +8,7 @@ import { CHAT_STREAM_CHANNEL, askForAddin, runPrompt, sendChatMessage, summarize
 import { lastQuestion, replyThroughAccount, webSearchContext } from './providers/cloud-chat.js';
 import { readChatStream } from './providers/sse.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
-import { IMAGE_MODELS, defaultImageModel, generateImage } from './providers/images.js';
+import { IMAGE_MODELS } from './providers/images.js';
 import { runOnboardingSetup } from './onboarding.js';
 import {
   closeOverlay,
@@ -30,7 +30,7 @@ import {
   trayMenuTemplate,
 } from './tray-menu.js';
 import { bringToFront } from './second-launch.js';
-import { PROVIDERS, clearKey, getKey, keyStatus, setKey } from './secrets.js';
+import { PROVIDERS } from './secrets.js';
 import { clearCloudSession, readCloudSession, writeCloudSession } from './cloud-session.js';
 import { createChatSync } from './chat-sync.js';
 import { addinStatus, installAddin, removeAddin, resumeAddin } from './addin.js';
@@ -316,10 +316,7 @@ const HANDLERS = new Map([
   ['zuri:chat:stop', handleChatStop],
   ['zuri:settings:get', handleSettingsGet],
   ['zuri:settings:save', handleSettingsSave],
-  ['zuri:settings:setKey', handleSettingsSetKey],
-  ['zuri:settings:clearKey', handleSettingsClearKey],
   ['zuri:onboarding:complete', handleOnboardingComplete],
-  ['zuri:settings:keyStatus', handleSettingsKeyStatus],
   ['zuri:settings:open-data-folder', handleSettingsOpenDataFolder],
   ['zuri:settings:addin-status', handleSettingsAddinStatus],
   ['zuri:settings:addin-install', handleSettingsAddinInstall],
@@ -1154,37 +1151,6 @@ function handleOnboardingComplete(payload) {
 }
 
 /**
- * Store one provider key. The key crosses the IPC boundary exactly once, in this
- * payload, and nothing sends it back: secrets.setKey answers with the provider and
- * a boolean, so the key cannot reach renderer state or a log line from here.
- * @param {{ provider?: string, key?: string }} [payload]
- * @returns {Promise<object>}
- */
-function handleSettingsSetKey(payload) {
-  return setKey(payload?.provider, payload?.key);
-}
-
-/**
- * Forget a provider key, for the Settings view's Remove key button. Like setKey it
- * answers with a boolean, never with the key it just deleted.
- * @param {{ provider?: string }} [payload]
- * @returns {Promise<object>}
- */
-function handleSettingsClearKey(payload) {
-  return clearKey(payload?.provider);
-}
-
-/**
- * Whether a key is stored, for the Settings view's status line. The renderer
- * learns a boolean and nothing else.
- * @param {{ provider?: string }} [payload]
- * @returns {object}
- */
-function handleSettingsKeyStatus(payload) {
-  return keyStatus(payload?.provider);
-}
-
-/**
  * Open the local data folder in the OS file manager, for the Account view's
  * "Open folder". It hands back only the path it opened: the JSON files inside
  * (and secrets.json) stay in main.
@@ -1225,7 +1191,7 @@ async function handleSettingsAddinStatus() {
 
 async function handleSettingsAddinInstall() {
   try {
-    await installAddin(getStoreRoot(), (request) => askForAddin(request));
+    await installAddin(getStoreRoot(), (request) => askForAddin(request, { cloudReply: cloudChatReply }));
     return { ok: true, data: await addinStatus(getStoreRoot()) };
   } catch (error) {
     console.error('[zuri:addin] install', error);
@@ -1508,7 +1474,7 @@ async function handleFilesSummarize(payload, event) {
       },
       // The tool layer stays provider-free: main injects the one function that
       // reaches the chat provider, as it does for every other summarise caller.
-      { dependencies: { summarize: summarizeText } },
+      { dependencies: { summarize: (document, options) => summarizeText(document, { ...options, cloudReply: cloudChatReply }) } },
     );
     if (!summary.ok) return summary;
 
@@ -1566,7 +1532,6 @@ const IMAGES_DIR_NAME = 'images';
  * @returns {object}
  */
 function handleImagesModels() {
-  const providers = PROVIDERS.filter((provider) => getKey(provider) !== null);
   return {
     ok: true,
     data: IMAGE_MODELS.map((model) => ({
@@ -1575,7 +1540,9 @@ function handleImagesModels() {
       hint: model.hint,
       minPlan: model.minPlan,
       nairaPerImage: model.nairaPerImage,
-      available: providers.includes(model.provider),
+      // Image generation is account-backed; supplier keys are never read by the
+      // desktop, so availability is determined by the cloud account at request time.
+      available: true,
     })),
   };
 }
@@ -1649,37 +1616,13 @@ async function handleImagesGenerate(payload, event) {
     return { ok: false, error: { code: 'IMAGE_PROMPT_REQUIRED', message: 'Describe the picture you want first.' } };
   }
 
-  const providers = PROVIDERS.filter((provider) => getKey(provider) !== null);
-  const requested = typeof payload?.modelCode === 'string' ? payload.modelCode.trim() : '';
-  // The file name carries the model code and generateImage owns the choice, so the
-  // code is resolved once here and passed down. A wrong code or a missing key fails
-  // before save is ever called, so the empty fallback cannot reach a file name.
-  const modelCode = requested !== '' ? requested : (defaultImageModel(providers)?.code ?? '');
-
-  try {
-    const result = await generateImage({
-      prompt,
-      modelCode,
-      providers,
-      save: (bytes, extension) => saveGeneratedImage(bytes, extension, modelCode),
-    });
-    if (result?.ok !== true) return result;
-
-    // The same push handleFilesSummarize sends: a view that did not start this flow
-    // still needs to know the workspace changed, and Files re-lists on it.
-    const sender = event?.sender;
-    const relative = result.data?.image?.relative;
-    if (sender && sender.isDestroyed?.() !== true && typeof relative === 'string') {
-      sender.send(STATE_CHANGED_CHANNEL, { area: 'files', path: relative });
-    }
-
-    return result;
-  } catch (error) {
-    // generateImage is built not to throw; this is the last line that keeps a fault
-    // from reaching the renderer as a rejected IPC call with no shape to show.
-    console.error('[zuri:images] generate', error);
-    return { ok: false, error: { code: 'IMAGE_PROVIDER_FAILED', message: 'Zuri could not make that picture. Try again.' } };
-  }
+  return {
+    ok: false,
+    error: {
+      code: 'CLOUD_IMAGE_REQUIRED',
+      message: 'Image generation is handled by Zuri Cloud. Sign in to use your account-backed image allowance.',
+    },
+  };
 }
 
 /* --------------------------------------------------------------- reminders */
@@ -2050,7 +1993,7 @@ app.whenReady().then(async () => {
   }
 
   try {
-    await resumeAddin(getStoreRoot(), (request) => askForAddin(request));
+    await resumeAddin(getStoreRoot(), (request) => askForAddin(request, { cloudReply: cloudChatReply }));
   } catch (error) {
     console.error('[zuri:addin] resume', error);
   }
@@ -2081,7 +2024,7 @@ app.whenReady().then(async () => {
     // Without this the scheduler would fall back to picking one tool from the prompt
     // text, so an automation asking for a judgement would run a web search instead.
     // With it, the prompt goes through the same pipeline a chat message does.
-    runPrompt: (request) => runPrompt(request),
+    runPrompt: (request) => runPrompt(request, { cloudReply: cloudChatReply }),
     onProgress: (change) => announceState(change),
     onCatchUp: (report) => {
       announceCatchUp(report);
