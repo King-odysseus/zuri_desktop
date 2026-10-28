@@ -38,6 +38,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   createAutomation,
+  listAutomations,
   listNotifications,
   listReminders,
   listRuns,
@@ -50,7 +51,9 @@ import { listWorkspaceFiles, setWorkspaceRoot } from '../src/main/tools/index.js
 const PROMPT = 'Check the Zuri demo page for new posts';
 
 const SCRIPT_PATH = fileURLToPath(import.meta.url);
-const SCRATCH_ROOT = path.join(os.tmpdir(), 'zuri-demo-autopilot');
+// One folder per run, as demo-act does. A fixed name let two copies of the suite
+// open the same store at once, and each one's writes dropped the other's rows.
+const SCRATCH_ROOT = path.join(os.tmpdir(), `zuri-demo-autopilot-${process.pid}-${Date.now()}`);
 const STORE_DIR = path.join(SCRATCH_ROOT, 'store');
 const WORKSPACE_DIR = path.join(SCRATCH_ROOT, 'workspace');
 
@@ -82,9 +85,26 @@ function check(label, passed, detail = '') {
   console.log(`FAIL ${label}${suffix}`);
 }
 
-/** @param {number} ms @returns {Promise<void>} */
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Wait until one automation's lastRunAt is readable on disk, before the second
+ * process opens the same store. Re-reading beats sleeping a fixed moment: the store
+ * finishes its queued writes in its own time, so a guess either wastes a second or
+ * lets the child read the row as it was before the patch.
+ * @param {string} automationId
+ * @param {string} expected ISO moment the patch wrote.
+ * @returns {Promise<void>}
+ */
+async function waitForStoredLastRun(automationId, expected) {
+  const deadline = Date.now() + 5_000;
+  for (;;) {
+    const listed = await listAutomations({ root: STORE_DIR });
+    const stored = listed.ok === true ? listed.data.find((entry) => entry.id === automationId) : undefined;
+    if (stored?.lastRunAt === expected) return;
+    // Past the deadline the restart half reports what it actually found, which says
+    // more about the cause than a timeout here would.
+    if (Date.now() >= deadline) return;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
 }
 
 /**
@@ -248,20 +268,25 @@ async function runFirstPhase() {
   const moved = await updateAutomation(automationId, { lastRunAt: closedSince }, { root: STORE_DIR });
   check('the last run looks ten minutes old', moved.ok === true, moved.ok === true ? closedSince : moved.error.code);
 
-  // Let the store finish any queued write before the second process reads the same
-  // files: two processes must not write the same JSON at once.
-  await wait(50);
+  // Wait for the patch to be readable on disk rather than for a guessed number of
+  // milliseconds. A fixed sleep raced the store write queue, and the second process
+  // then read the old lastRunAt, found nothing missed and skipped the catch-up the
+  // demo exists to prove.
+  await waitForStoredLastRun(automationId, closedSince);
 
   console.log('6. restart in a second process and let the launch catch-up run');
   const childCode = await runRestartPhase();
   check('the restarted app exits cleanly', childCode === 0, `exit ${childCode}`);
 
   if (failures.length > 0) {
+    // Only a failing run keeps its store, and it names it so the files can be read.
+    console.log(`data folder: ${STORE_DIR}`);
     console.log(`FAIL demo:autopilot: ${failures.length} assertion(s) failed`);
     process.exit(1);
   }
 
-  console.log(`data folder: ${STORE_DIR}`);
+  // A passing run has no store worth keeping, and this folder is new every time.
+  await fs.rm(SCRATCH_ROOT, { recursive: true, force: true });
   console.log('PASS demo:autopilot');
   process.exit(0);
 }
