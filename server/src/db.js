@@ -973,6 +973,26 @@ export function createRepository(pool) {
       }
     },
     /**
+     * Delete one message from a thread the caller owns.
+     *
+     * The desktop's Regenerate replaces a reply it already uploaded, and without this
+     * the browser copy would keep the old answer next to the new one. Ownership is
+     * checked in the same statement through the conversation, so a message id from
+     * another account matches nothing.
+     * @param {string} userId
+     * @param {string} conversationId
+     * @param {string} messageId
+     * @returns {Promise<boolean>} false when the caller owns no such message.
+     */
+    async deleteMessage(userId, conversationId, messageId) {
+      if (!isUuid(conversationId) || !isUuid(messageId)) return false;
+      const result = await pool.query(
+        'DELETE FROM conversation_messages AS m USING conversations AS c WHERE m.id = $3 AND m.conversation_id = $1 AND c.id = m.conversation_id AND c.user_id = $2 RETURNING m.id',
+        [conversationId, userId, messageId],
+      );
+      return result.rowCount > 0;
+    },
+    /**
      * Rename a thread.
      *
      * The rename moves it to the top of the history list, which is ordered by what

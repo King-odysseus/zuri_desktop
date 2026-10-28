@@ -201,6 +201,20 @@ const foreignRename = recordingPool([{ match: 'UPDATE conversations SET title', 
 assert.equal(await createRepository(foreignRename.pool).renameConversation(USER_B, CONVERSATION_ID, 'Mine now'), null);
 console.log('PASS a rename only lands on a thread the caller owns');
 
+const MESSAGE_ID = '44444444-4444-4444-8444-444444444444';
+const deletingMessage = recordingPool([{ match: 'DELETE FROM conversation_messages', reply: { rows: [{ id: MESSAGE_ID }], rowCount: 1 } }]);
+assert.equal(await createRepository(deletingMessage.pool).deleteMessage(USER_A, CONVERSATION_ID, MESSAGE_ID), true);
+// Ownership rides in the same statement, through the conversation, not in a later check.
+assert.match(deletingMessage.queries[0].text, /c\.user_id = \$2/);
+assert.deepEqual(deletingMessage.queries[0].values, [CONVERSATION_ID, USER_A, MESSAGE_ID]);
+const foreignMessage = recordingPool([{ match: 'DELETE FROM conversation_messages', reply: { rows: [], rowCount: 0 } }]);
+assert.equal(await createRepository(foreignMessage.pool).deleteMessage(USER_B, CONVERSATION_ID, MESSAGE_ID), false);
+const badIds = recordingPool([]);
+assert.equal(await createRepository(badIds.pool).deleteMessage(USER_A, 'not-a-uuid', MESSAGE_ID), false);
+assert.equal(await createRepository(badIds.pool).deleteMessage(USER_A, CONVERSATION_ID, 'nope'), false);
+assert.equal(badIds.queries.length, 0, 'a malformed id never reaches the database');
+console.log('PASS one message is deleted only from a thread the caller owns');
+
 const removing = recordingPool([{ match: 'DELETE FROM conversations', reply: { rows: [{ id: CONVERSATION_ID }], rowCount: 1 } }]);
 assert.equal(await createRepository(removing.pool).deleteConversation(USER_A, CONVERSATION_ID), true);
 assert.match(removing.queries[0].text, /WHERE id = \$1 AND user_id = \$2/);
@@ -272,6 +286,13 @@ function createMemoryRepository() {
       if (row.title === 'New chat' && role === 'user') row.title = content.trim().slice(0, 60);
       row.updatedAt = createdAt;
       return { message: { ...message }, conversation: view(row) };
+    },
+    async deleteMessage(userId, id, messageId) {
+      const row = owned(userId, id);
+      const index = row ? row.messages.findIndex((message) => message.id === messageId) : -1;
+      if (index === -1) return false;
+      row.messages.splice(index, 1);
+      return true;
     },
     async renameConversation(userId, id, title) {
       const row = owned(userId, id);
@@ -479,6 +500,21 @@ assert.equal((await blankRename.json()).error.code, 'INVALID_MESSAGE');
 const longRename = (await (await call('PATCH', `/api/me/conversations/${threadId}`, { token: tokenA, body: { title: 'y'.repeat(90) } })).json()).data.conversation;
 assert.equal(longRename.title.length, 60);
 console.log('PASS a rename is trimmed, capped and refuses to be blank');
+
+const threadBefore = (await (await call('GET', `/api/me/conversations/${threadId}`, { token: tokenA })).json()).data;
+const doomed = threadBefore.messages.at(-1);
+const crossMessageDelete = await call('DELETE', `/api/me/conversations/${threadId}/messages/${doomed.id}`, { token: tokenB });
+assert.equal(crossMessageDelete.status, 404);
+assert.equal((await crossMessageDelete.json()).error.code, 'MESSAGE_NOT_FOUND');
+const messageRemoved = await call('DELETE', `/api/me/conversations/${threadId}/messages/${doomed.id}`, { token: tokenA });
+assert.equal(messageRemoved.status, 200);
+assert.deepEqual(await messageRemoved.json(), { ok: true, data: { deleted: true } });
+const afterRemoval = (await (await call('GET', `/api/me/conversations/${threadId}`, { token: tokenA })).json()).data;
+assert.equal(afterRemoval.messages.length, threadBefore.messages.length - 1);
+assert.ok(!afterRemoval.messages.some((message) => message.id === doomed.id), 'the message is gone');
+assert.equal((await call('DELETE', `/api/me/conversations/${threadId}/messages/${doomed.id}`, { token: tokenA })).status, 404, 'a second delete finds nothing');
+assert.equal((await call('POST', `/api/me/conversations/${threadId}/messages/${doomed.id}`, { token: tokenA })).status, 405);
+console.log('PASS a single message is deleted for its owner only');
 
 assert.equal((await call('PUT', '/api/me/conversations', { token: tokenA })).status, 405);
 assert.equal((await call('GET', `/api/me/conversations/${threadId}/messages`, { token: tokenA })).status, 405);

@@ -29,6 +29,7 @@ import { DEFAULT_CLOUD_MODEL, zuriModelCode } from './providers/cloud-chat.js';
 import {
   UNTITLED_THREAD,
   appendSyncedMessage,
+  forgetDroppedCloudIds,
   listThreads,
   setMessageCloudId,
   setThreadCloudId,
@@ -45,6 +46,9 @@ const RETRY_DELAY_MS = 400;
 
 /** The code the cloud answers with when the conversation is not there any more. */
 const NOT_FOUND_CODE = 'CONVERSATION_NOT_FOUND';
+
+/** The code the cloud answers with when one message is not there (already deleted). */
+const MESSAGE_NOT_FOUND_CODE = 'MESSAGE_NOT_FOUND';
 
 /**
  * Codes that mean "nothing to do right now" rather than "the sync is broken". Being
@@ -321,6 +325,40 @@ export function createChatSync({ request, log = defaultLog } = {}) {
   }
 
   /**
+   * Ask the account to delete the replies Regenerate replaced.
+   *
+   * An id is only forgotten once the account confirms the message is gone (or says it
+   * never had it). A server that predates the delete route answers with a generic
+   * "not found", which is not a confirmation: the id stays, so the pull below keeps
+   * skipping that reply, and the next run tries again once the server is updated.
+   * Failing here never fails the sync; the reply simply stays remembered.
+   * @param {any} thread
+   * @returns {Promise<void>}
+   */
+  async function deleteReplacedReplies(thread) {
+    const cloudId = cloudIdOf(thread);
+    const ids = (Array.isArray(thread.droppedCloudIds) ? thread.droppedCloudIds : []).map(textOf).filter((id) => id !== '');
+    if (cloudId === '' || ids.length === 0) return;
+
+    const confirmed = [];
+    for (const id of ids) {
+      const removed = await call(conversationPath(cloudId, `/messages/${encodeURIComponent(id)}`), { method: 'DELETE' });
+      const code = removed.error?.code;
+      if (removed.ok === true || code === MESSAGE_NOT_FOUND_CODE) {
+        confirmed.push(id);
+        continue;
+      }
+      // Offline, signed out, an old server or any other refusal: leave the rest for later.
+      break;
+    }
+    if (confirmed.length === 0) return;
+
+    const forgotten = await forgetDroppedCloudIds(thread.id, confirmed);
+    if (forgotten.ok !== true) return;
+    thread.droppedCloudIds = ids.filter((id) => !confirmed.includes(id));
+  }
+
+  /**
    * Append whatever the account has that this machine has not seen yet.
    * @param {any} thread
    * @param {{ appended: number, forgotten: boolean }} outcome Counted into the run report.
@@ -403,6 +441,7 @@ export function createChatSync({ request, log = defaultLog } = {}) {
 
     // Nothing to pull until the thread has a conversation to read.
     if (cloudIdOf(thread) !== '') {
+      await deleteReplacedReplies(thread);
       const pulled = await pullThread(thread, outcome);
       if (pulled.ok !== true) return pulled;
     }

@@ -1148,6 +1148,7 @@ export function createApp(dependencies = {}) {
       const userId = session.user.id;
       const [conversationId, ...remainder] = url.pathname.slice(CONVERSATIONS_PATH.length).split('/').filter(Boolean);
       const isMessagesPath = remainder.length === 1 && remainder[0] === 'messages';
+      const isOneMessagePath = remainder.length === 2 && remainder[0] === 'messages';
 
       try {
         if (!conversationId) {
@@ -1204,6 +1205,14 @@ export function createApp(dependencies = {}) {
           const appended = await dependencies.repository.appendMessage({ userId, conversationId, role: checked.role, content: checked.content });
           if (!appended) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation does not exist.' } });
           return response(200, { ok: true, data: appended });
+        }
+
+        if (isOneMessagePath) {
+          if (request.method !== 'DELETE') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use DELETE to remove a message.' } });
+          if (!dependencies.repository.deleteMessage) return response(503, { ok: false, error: { code: 'HISTORY_NOT_CONFIGURED', message: 'Chat history is not configured yet.' } });
+          const removed = await dependencies.repository.deleteMessage(userId, conversationId, remainder[1]);
+          if (!removed) return response(404, { ok: false, error: { code: 'MESSAGE_NOT_FOUND', message: 'That message does not exist.' } });
+          return response(200, { ok: true, data: { deleted: true } });
         }
 
         return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } });

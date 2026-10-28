@@ -30,6 +30,7 @@ import {
 import FormattedMessage from './FormattedMessage.jsx';
 import { ApprovalCard, ModeMenu, readChatMode, saveChatMode } from './ActControls.jsx';
 import ResultPanel from './ResultPanel.jsx';
+import WorkspaceOverview from './WorkspaceOverview.jsx';
 import { copyText } from './clipboard.js';
 // The app mark that sits above the opening line. Importing it lets the bundler
 // fingerprint the file and rewrite the URL relative to the built index.html,
@@ -1090,29 +1091,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             />
             <h1 className="mt-5 text-center text-3xl font-medium tracking-tight">{openingHeading}</h1>
             <p className="mt-3 text-center text-base text-muted">{capabilityHint}</p>
-            <div className="zuri-opening-dashboard" aria-label="Workspace overview">
-              <div className="zuri-opening-activity">
-                <div className="zuri-opening-card"><strong>Writing sprint</strong><span>Brief in progress</span></div>
-                <div className="zuri-opening-card"><strong>Design review</strong><span>3 updates</span></div>
-                <div className="zuri-opening-card"><strong>Launch plan</strong><span>On track</span></div>
-              </div>
-              <div className="zuri-opening-dashboard-grid">
-                <section className="zuri-opening-card">
-                  <span className="zuri-opening-label">Project statistics</span>
-                  <div className="zuri-opening-bars" aria-hidden="true">
-                    <i></i><i></i><i></i><i></i><i></i><i></i>
-                  </div>
-                  <small className="zuri-opening-stat-note"><b>On target</b> 12 tasks this week</small>
-                </section>
-                <section className="zuri-opening-card">
-                  <span className="zuri-opening-label">Interactive project calendar</span>
-                  <div className="zuri-opening-calendar-list">
-                    <div className="zuri-opening-calendar-item"><b>14</b><span>Creating app design</span></div>
-                    <div className="zuri-opening-calendar-item"><b>19</b><span>Meeting with AI client</span></div>
-                  </div>
-                </section>
-              </div>
-            </div>
+            <WorkspaceOverview />
           </div>
         )}
 

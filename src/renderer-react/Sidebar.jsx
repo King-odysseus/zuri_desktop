@@ -6,7 +6,6 @@ import {
   BellIcon,
   ChatIcon,
   CloudIcon,
-  ChevronDownIcon,
   EditIcon,
   FeaturesIcon,
   HistoryIcon,
@@ -48,12 +47,20 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   // Which projects are open in the list, and which chat is choosing a project.
   const [openProjectIds, setOpenProjectIds] = useState([]);
   const [movingThreadId, setMovingThreadId] = useState('');
+  // Reminders whose time has come and that are still open: what the bell counts.
+  const [dueReminders, setDueReminders] = useState(0);
 
   useEffect(() => {
     let active = true;
     const loadThreads = async () => {
       const result = await window.zuri?.chats?.list?.();
       if (active && result?.ok) setThreads(Array.isArray(result.data) ? result.data : []);
+    };
+    const loadDueReminders = async () => {
+      const result = await window.zuri?.reminders?.list?.();
+      if (!active || !result?.ok || !Array.isArray(result.data)) return;
+      const now = Date.now();
+      setDueReminders(result.data.filter((reminder) => Date.parse(reminder?.dueAt) <= now).length);
     };
     const loadProjects = async () => {
       const result = await window.zuri?.projects?.list?.();
@@ -64,9 +71,13 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
     const stopListening = window.zuri?.state?.onChanged?.((change) => {
       if (change?.area === 'chats') void loadThreads();
       if (change?.area === 'projects') void loadProjects();
+      // The reminder ticker announces every few seconds, so this also catches a
+      // reminder that has just come due without a timer of its own.
+      if (change?.area === 'reminders') void loadDueReminders();
     });
     void loadThreads();
     void loadProjects();
+    void loadDueReminders();
     return () => {
       active = false;
       stopListening?.();
@@ -196,10 +207,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         aria-hidden={collapsed}
       >
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
-          <Button type="button" variant="ghost" className="flex items-center gap-1 text-lg font-semibold tracking-tight">
-            Zuri
-            <ChevronDownIcon size={14} />
-          </Button>
+          <span className="px-2 text-lg font-semibold tracking-tight">Zuri</span>
           <div className="flex items-center gap-1 text-muted">
             {/* On the chat view the same control floats over the conversation, so
                 keeping a second copy here would give the person two toggles. */}
@@ -225,8 +233,21 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             >
               <OverlayIcon size={16} />
             </Button>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="Notifications">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className="relative"
+              aria-label={dueReminders > 0 ? `Reminders, ${dueReminders} due` : 'Reminders'}
+              title={dueReminders > 0 ? `${dueReminders} reminder${dueReminders === 1 ? '' : 's'} due` : 'Reminders'}
+              onPress={() => onNavigate('reminders')}
+            >
               <BellIcon size={16} />
+              {dueReminders > 0 && (
+                <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-accent px-1 text-[10px] font-semibold leading-4 text-accent-foreground">
+                  {dueReminders > 9 ? '9+' : dueReminders}
+                </span>
+              )}
             </Button>
             <Button isIconOnly size="sm" variant="ghost" aria-label="Search conversations" onPress={() => onNavigate('search')}>
               <SearchIcon size={16} />

@@ -1235,6 +1235,39 @@ export async function deleteSkill(skillId, options = {}) {
   });
 }
 
+/**
+ * Stop remembering replaced replies the account has now deleted. Only the sync calls
+ * this, after the account confirmed each one is gone: forgetting an id too early would
+ * let a reply that is still in the account be pulled back in.
+ * @param {string} threadId
+ * @param {string[]} cloudIds
+ * @param {{ root?: string }} [options]
+ * @returns {Promise<{ ok: true, data: { remaining: number } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function forgetDroppedCloudIds(threadId, cloudIds, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'forgetting replaced replies needs a thread id');
+  }
+  const gone = new Set(Array.isArray(cloudIds) ? cloudIds : []);
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+
+    const remaining = (Array.isArray(thread.droppedCloudIds) ? thread.droppedCloudIds : []).filter((id) => !gone.has(id));
+    if (remaining.length > 0) thread.droppedCloudIds = remaining;
+    else delete thread.droppedCloudIds;
+
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+
+    return { ok: true, data: { remaining: remaining.length } };
+  });
+}
+
 /** How many replaced replies a thread remembers so sync does not bring them back. */
 const DROPPED_CLOUD_IDS_MAX = 100;
 

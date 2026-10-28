@@ -41,10 +41,15 @@ function check(condition, label, detail = '') {
  */
 function fakeAccount() {
   let serial = 0;
+  let olderServer = false;
   const conversations = new Map();
 
   return {
     conversations,
+    /** True makes the account answer like a server that predates the delete-message route. */
+    setOlderServer(value) {
+      olderServer = value === true;
+    },
     /** @param {string} pathname @param {object} [options] */
     async request(pathname, options = {}) {
       const method = options.method ?? 'GET';
@@ -69,6 +74,16 @@ function fakeAccount() {
 
       if (method === 'GET') {
         return { ok: true, data: { conversation: found, messages: found.messages } };
+      }
+
+      const messageId = (pathname.match(/\/messages\/([^/]+)$/) ?? [])[1];
+      if (method === 'DELETE' && messageId) {
+        // An older server has no such route and answers the generic not-found.
+        if (olderServer) return { ok: false, error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } };
+        const at = found.messages.findIndex((message) => message.id === messageId);
+        if (at === -1) return { ok: false, error: { code: 'MESSAGE_NOT_FOUND', message: 'That message does not exist.' } };
+        found.messages.splice(at, 1);
+        return { ok: true, data: { deleted: true } };
       }
 
       if (isMessagePost) {
@@ -278,6 +293,31 @@ async function main() {
   check(regenRun?.ok === true, 'a sync after regenerating is not reported as a failure', JSON.stringify(regenRun?.error ?? null));
   check(!regenLocal?.messages.some((message) => message.content === 'Blue.'), 'a regenerated reply is not pulled back in from the account');
   check(regenLocal?.messages.at(-1)?.content === 'Green.', 'the new reply stays the last message', String(regenLocal?.messages.at(-1)?.content));
+  const regenCloud = [...account.conversations.values()].find((row) => row.title === 'Regenerate');
+  check(!regenCloud?.messages.some((message) => message.content === 'Blue.'), 'the account no longer holds the replaced reply', JSON.stringify(regenCloud?.messages.map((message) => message.content)));
+  check(regenLocal?.droppedCloudIds === undefined, 'the replaced reply is forgotten once the account has deleted it', JSON.stringify(regenLocal?.droppedCloudIds));
+
+  // A server that has not been updated yet answers the delete with a generic not-found.
+  // That is not a confirmation, so the reply must stay remembered (and stay out of the
+  // desktop thread), and be deleted on a later run once the server catches up.
+  const oldServerThread = await createThread({ title: 'Old server' });
+  const oldId = oldServerThread?.data?.id;
+  await appendMessage(oldId, { role: 'user', content: 'Name an animal.' });
+  await appendMessage(oldId, { role: 'assistant', content: 'Cat.' });
+  await chatSync.syncThread(oldId);
+  await removeTrailingReply(oldId);
+  await appendMessage(oldId, { role: 'assistant', content: 'Dog.' });
+  account.setOlderServer(true);
+  await chatSync.syncThread(oldId);
+  let oldLocal = (await storedThreads()).find((thread) => thread.id === oldId);
+  check(!oldLocal?.messages.some((message) => message.content === 'Cat.'), 'with an older server the replaced reply still does not come back');
+  check(oldLocal?.droppedCloudIds?.length === 1, 'with an older server the replaced reply stays remembered', JSON.stringify(oldLocal?.droppedCloudIds));
+  account.setOlderServer(false);
+  await chatSync.syncThread(oldId);
+  oldLocal = (await storedThreads()).find((thread) => thread.id === oldId);
+  const oldCloud = [...account.conversations.values()].find((row) => row.title === 'Old server');
+  check(!oldCloud?.messages.some((message) => message.content === 'Cat.'), 'once the server is updated the replaced reply is deleted from the account');
+  check(oldLocal?.droppedCloudIds === undefined, 'and then it is forgotten here', JSON.stringify(oldLocal?.droppedCloudIds));
 
   // The link written above is gone, so the thread is uploaded fresh under a new id;
   // what matters is that the run succeeded and did not keep retrying a dead id.

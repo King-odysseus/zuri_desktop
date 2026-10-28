@@ -1345,7 +1345,6 @@ export async function sendChatMessage(threadId, options = {}) {
   }
 
   const emit = typeof options.emit === 'function' ? options.emit : () => {};
-  const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const mode = normaliseChatMode(options.mode);
   /** Files the tools build this turn; filled by the account loop and saved with the reply. */
   const builtFiles = [];
@@ -1380,10 +1379,9 @@ export async function sendChatMessage(threadId, options = {}) {
   // An agent's own provider wins over Settings; its model then falls back to that
   // provider's default because the saved model belongs to the Settings provider.
   const agentProvider = agent !== null && PROVIDERS.includes(agent.provider) ? agent.provider : null;
-  const { provider, model } = resolveChatTarget(
+  const { provider } = resolveChatTarget(
     agentProvider === null ? modelSettings : { ...modelSettings, provider: agentProvider },
   );
-  const config = PROVIDER_CONFIG[provider];
   conversation.turns = await withImageParts(provider, conversation.turns);
 
   // An agent's system prompt rides in front of any the thread already carries, so
@@ -1417,187 +1415,100 @@ export async function sendChatMessage(threadId, options = {}) {
   // The account is the only way in. main.js hands in a cloudReply whenever the app
   // asks for a reply, so a chat is answered from the person's Zuri plan and no
   // supplier key is read, stored or needed.
-  if (typeof options.cloudReply === 'function') {
-    let reached;
-    try {
-      // The account route is a conversation of rounds now: the model may ask for a
-      // tool, the app runs it, and the result goes back. The tools themselves always
-      // run here, on this computer, because that is where the workspace is; the
-      // server only ever forwards the definitions and returns the request.
-      const allowedForAccount = agentAllowedTools(settings, options.agentId);
-      const offeredForAccount = toolsForMode(mode, options.webSearch)
-        .filter((tool) => allowedForAccount === null || allowedForAccount.includes(tool.name));
+  let reached;
+  try {
+    // The account route is a conversation of rounds now: the model may ask for a
+    // tool, the app runs it, and the result goes back. The tools themselves always
+    // run here, on this computer, because that is where the workspace is; the
+    // server only ever forwards the definitions and returns the request.
+    const allowedForAccount = agentAllowedTools(settings, options.agentId);
+    const offeredForAccount = toolsForMode(mode, options.webSearch)
+      .filter((tool) => allowedForAccount === null || allowedForAccount.includes(tool.name));
 
-      // The wire conversation grows as rounds go by: an assistant turn that asked
-      // for a tool, then one result per call.
-      const wire = conversation.turns.map((turn) => ({ ...turn }));
-      let rounds = 0;
-      let textSoFar = '';
-      for (;;) {
-        const toolsForRound = rounds < MAX_TOOL_ROUNDS ? offeredForAccount : [];
-        reached = await options.cloudReply({
-          conversation: { system: conversation.system, turns: wire },
-          settings: modelSettings,
-          tools: toolsForRound,
-          signal: options.signal,
-          emit: (event) => {
-            if (typeof event.delta === 'string') textSoFar += event.delta;
-            emit({ threadId, ...event });
-          },
+    // The wire conversation grows as rounds go by: an assistant turn that asked
+    // for a tool, then one result per call.
+    const wire = conversation.turns.map((turn) => ({ ...turn }));
+    let rounds = 0;
+    let textSoFar = '';
+    for (;;) {
+      const toolsForRound = rounds < MAX_TOOL_ROUNDS ? offeredForAccount : [];
+      reached = await options.cloudReply({
+        conversation: { system: conversation.system, turns: wire },
+        settings: modelSettings,
+        tools: toolsForRound,
+        signal: options.signal,
+        emit: (event) => {
+          if (typeof event.delta === 'string') textSoFar += event.delta;
+          emit({ threadId, ...event });
+        },
+      });
+      if (!reached.ok) break;
+
+      const calls = Array.isArray(reached.data?.toolCalls) ? reached.data.toolCalls : [];
+      if (calls.length === 0 || toolsForRound.length === 0) break;
+
+      // The call and its results have to travel with the next round, or the model
+      // cannot see what it asked for or what came back.
+      wire.push({ role: 'assistant', content: reached.data.content || '', toolCalls: calls });
+      for (const call of calls) {
+        const args = parseToolInput(call.arguments);
+        const offered = offeredForAccount.some((tool) => tool.name === call.name);
+        // The mode and the person decide whether a risky step runs; the registry
+        // still refuses it unless `confirmed` is set, so this is the only way in.
+        const decision = offered
+          ? await approveToolCall({ name: call.name, args, mode, requestApproval: options.requestApproval })
+          : null;
+        let outcome;
+        if (decision === null) outcome = failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
+        else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed });
+        else outcome = failure('TOOL_DECLINED', decision.reason);
+        const madeFile = FILE_TOOL_NAMES.has(call.name) && outcome.ok;
+        if (madeFile) {
+          const { path: filePath, name, kind, bytes } = outcome.data;
+          builtFiles.push({ path: filePath, name, kind, bytes });
+          emit({ threadId, files: [{ path: filePath, name, kind, bytes }] });
+        }
+        emit({ threadId, status: madeFile ? `Made ${outcome.data.name}` : '' });
+        wire.push({
+          role: 'tool',
+          toolCallId: call.id,
+          content: JSON.stringify(madeFile
+            ? { ok: true, data: { name: outcome.data.name, kind: outcome.data.kind, note: 'The file is ready and shown to the person as a download card.' } }
+            : outcome,
+          ).slice(0, TOOL_RESULT_LIMIT),
         });
-        if (!reached.ok) break;
-
-        const calls = Array.isArray(reached.data?.toolCalls) ? reached.data.toolCalls : [];
-        if (calls.length === 0 || toolsForRound.length === 0) break;
-
-        // The call and its results have to travel with the next round, or the model
-        // cannot see what it asked for or what came back.
-        wire.push({ role: 'assistant', content: reached.data.content || '', toolCalls: calls });
-        for (const call of calls) {
-          const args = parseToolInput(call.arguments);
-          const offered = offeredForAccount.some((tool) => tool.name === call.name);
-          // The mode and the person decide whether a risky step runs; the registry
-          // still refuses it unless `confirmed` is set, so this is the only way in.
-          const decision = offered
-            ? await approveToolCall({ name: call.name, args, mode, requestApproval: options.requestApproval })
-            : null;
-          let outcome;
-          if (decision === null) outcome = failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
-          else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed });
-          else outcome = failure('TOOL_DECLINED', decision.reason);
-          const madeFile = FILE_TOOL_NAMES.has(call.name) && outcome.ok;
-          if (madeFile) {
-            const { path: filePath, name, kind, bytes } = outcome.data;
-            builtFiles.push({ path: filePath, name, kind, bytes });
-            emit({ threadId, files: [{ path: filePath, name, kind, bytes }] });
-          }
-          emit({ threadId, status: madeFile ? `Made ${outcome.data.name}` : '' });
-          wire.push({
-            role: 'tool',
-            toolCallId: call.id,
-            content: JSON.stringify(madeFile
-              ? { ok: true, data: { name: outcome.data.name, kind: outcome.data.kind, note: 'The file is ready and shown to the person as a download card.' } }
-              : outcome,
-            ).slice(0, TOOL_RESULT_LIMIT),
-          });
-        }
-        rounds += 1;
       }
-
-      // The per-round tool files are already in builtFiles; the shared code below
-      // saves one message from reached.data.content, so it is told the whole text.
-      if (reached.ok) reached.data.content = textSoFar !== '' ? textSoFar : reached.data.content;
-    } catch (error) {
-      // Stop aborts the request under the stream, which surfaces as a failed read
-      // rather than an answer. That is the person's own doing and must not appear
-      // as a network fault, so it gets the same wording the direct route uses.
-      if (options.signal?.aborted) return failure('CHAT_STOPPED', 'That reply was stopped before it arrived.');
-      if (error?.name === 'TimeoutError') return failure('CHAT_TIMEOUT', 'Zuri Cloud did not answer in time. Try again.');
-      return failure('CHAT_NETWORK_ERROR', 'The reply from Zuri Cloud was cut off. Try again.');
+      rounds += 1;
     }
-    // The stream stopped early or the server reported a failure; say so plainly.
+
+    // The per-round tool files are already in builtFiles; the shared code below
+    // saves one message from reached.data.content, so it is told the whole text.
+    if (reached.ok) reached.data.content = textSoFar !== '' ? textSoFar : reached.data.content;
+  } catch (error) {
+    // Stop aborts the request under the stream, which surfaces as a failed read
+    // rather than an answer. That is the person's own doing and must not appear
+    // as a network fault, so it gets the same wording the direct route uses.
     if (options.signal?.aborted) return failure('CHAT_STOPPED', 'That reply was stopped before it arrived.');
-    if (!reached.ok) return reached;
-    const saved = await appendMessage(threadId, {
-      role: 'assistant',
-      content: reached.data.content,
-      files: builtFiles,
-      // Saved with the reply so the chip can name the model that answered, and so
-      // reopening this chat sends the next message to the same one.
-      model: { provider: modelSettings.provider, model: modelSettings.model },
-    });
-    if (!saved.ok) return saved;
-    emit({ threadId, done: true });
-    return {
-      ok: true,
-      data: { ...saved.data, provider: 'zuri-cloud', model: reached.data.modelCode },
-    };
+    if (error?.name === 'TimeoutError') return failure('CHAT_TIMEOUT', 'Zuri Cloud did not answer in time. Try again.');
+    return failure('CHAT_NETWORK_ERROR', 'The reply from Zuri Cloud was cut off. Try again.');
   }
-
-  const key = getKey(provider);
-  if (key === null) {
-    return failure(
-      'CHAT_NO_KEY',
-      'Sign in to Zuri Cloud to get replies.',
-    );
-  }
-
-  // Every provider gets tools now: requestBody and answerToolCalls translate the list
-  // into Anthropic's shape when that is the provider. An agent's allow-list still
-  // narrows what the model may call.
-  const allowedTools = agentAllowedTools(settings, options.agentId);
-  const candidateTools = options.webSearch === true ? ALL_CHAT_TOOLS : BASE_TOOLS;
-  const tools = candidateTools.filter((tool) => allowedTools === null || allowedTools.includes(tool.name));
-
-  // Text from every round is kept because it was all streamed to the window, so the
-  // saved message matches what the person watched arrive.
-  let fullText = '';
-  let nudged = false;
-  for (let round = 0; ; round += 1) {
-    const toolsOffered = round < MAX_TOOL_ROUNDS ? tools : [];
-
-    // Once tools are withdrawn (or a round came back empty) the model must be told to
-    // answer; otherwise it keeps writing tool markup that is stripped to nothing.
-    if (round > 0 && !nudged && (toolsOffered.length === 0 || conversation.needsAnswer === true)) {
-      conversation.turns.push({ role: 'user', content: 'Answer now in plain text using the results above. Do not call any tools.' });
-      nudged = true;
-    }
-
-    const reply = await streamReply(provider, model, key, conversation, {
-      fetchImpl,
-      signal: options.signal,
-      tools: toolsOffered,
-      onDelta: (text) => emit({ threadId, delta: text }),
-    });
-
-    if (!reply.ok) {
-      // An empty round after tools ran is not worth losing the text already shown.
-      if (reply.error.code === 'CHAT_EMPTY_REPLY' && round > 0) {
-        if (fullText.trim() !== '') break;
-        if (!nudged) {
-          conversation.needsAnswer = true;
-          continue;
-        }
-      }
-      return reply;
-    }
-
-    // Rounds are joined with a blank line so "...licence." and "Let me read" do not run together.
-    if (fullText !== '' && reply.text !== '') {
-      emit({ threadId, delta: '\n\n' });
-      fullText += '\n\n';
-    }
-    fullText += reply.text;
-    if (reply.toolCalls.length === 0) break;
-    const made = await answerToolCalls(
-      conversation,
-      reply,
-      allowedTools,
-      (status) => emit({ threadId, status }),
-      tools,
-      provider,
-    );
-    emit({ threadId, status: '' });
-    if (made.length > 0) {
-      builtFiles.push(...made);
-      emit({ threadId, files: made });
-    }
-  }
-
-  if (fullText.trim() === '') {
-    return failure('CHAT_EMPTY_REPLY', `${config.label} sent an empty reply. Try again.`);
-  }
-
+  // The stream stopped early or the server reported a failure; say so plainly.
+  if (options.signal?.aborted) return failure('CHAT_STOPPED', 'That reply was stopped before it arrived.');
+  if (!reached.ok) return reached;
   const saved = await appendMessage(threadId, {
     role: 'assistant',
-    content: fullText,
+    content: reached.data.content,
     files: builtFiles,
-    model: { provider, model },
+    // Saved with the reply so the chip can name the model that answered, and so
+    // reopening this chat sends the next message to the same one.
+    model: { provider: modelSettings.provider, model: modelSettings.model },
   });
   if (!saved.ok) return saved;
-
   emit({ threadId, done: true });
-  return { ok: true, data: { ...saved.data, provider, model } };
+  return {
+    ok: true,
+    data: { ...saved.data, provider: 'zuri-cloud', model: reached.data.modelCode },
+  };
 }
 
 /**

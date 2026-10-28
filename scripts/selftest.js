@@ -1158,6 +1158,43 @@ check('regenerate drops only a trailing reply and never the person\'s own messag
   }
 });
 
+check('editing a skill changes its words and leaves the on/off switch alone', async () => {
+  const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-skill-edit-'));
+  const here = { root: scratch };
+  try {
+    const made = (await store.createSkill({ name: 'Tone', instructions: 'Be brief.' }, here)).data;
+    await store.updateSkill(made.id, { enabled: true }, here);
+    const edited = await store.updateSkill(made.id, { name: 'Tone v2', instructions: 'Be brief and kind.' }, here);
+    if (!edited.ok) throw new Error(edited.error.message);
+    if (edited.data.enabled !== true) throw new Error('editing the words switched the skill off');
+    if (edited.data.name !== 'Tone v2' || edited.data.instructions !== 'Be brief and kind.') throw new Error('the new words were not saved');
+    const blanked = await store.updateSkill(made.id, { instructions: '   ' }, here);
+    if (blanked.ok) throw new Error('a skill was saved with no instructions');
+    return 'words change, switch stays, blanking is refused';
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
+// The first screen used to show example tasks and a calendar as if they were the
+// person's own, and the bell had no action. Both are about trust, so they are pinned.
+check('the opening screen and the bell show real data, not examples', () => {
+  const chat = read('src/renderer-react/ChatPanel.jsx');
+  for (const example of ['Writing sprint', 'Design review', 'Launch plan', '12 tasks this week', 'Meeting with AI client']) {
+    if (chat.includes(example)) throw new Error(`example text is back on the opening screen: ${example}`);
+  }
+  if (!chat.includes('<WorkspaceOverview />')) throw new Error('the opening screen does not show the overview');
+  const overview = read('src/renderer-react/WorkspaceOverview.jsx');
+  for (const source of ['tasks?.list', 'reminders?.list', 'automations?.list']) {
+    if (!overview.includes(source)) throw new Error(`the overview does not read ${source}`);
+  }
+  const sidebar = read('src/renderer-react/Sidebar.jsx');
+  if (!sidebar.includes("onPress={() => onNavigate('reminders')}")) throw new Error('the bell does not open Reminders');
+  if (!sidebar.includes('reminders?.list')) throw new Error('the bell does not count real reminders');
+  return 'no example text; bell opens Reminders with a real count';
+});
+
 // The whole path in one go, on the real send code with a stand-in account. It uses the
 // shared store location, so the checks around it must be finished first and this one
 // must finish before the next starts.

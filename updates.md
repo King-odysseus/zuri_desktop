@@ -1,3 +1,14 @@
+## 2026-10-28 - Windows (cleanup before release)
+
+- The empty-chat screen now shows real counts and lists: open tasks, reminders and automations, the next tasks and the coming reminders, read from the same stores as those pages. The example cards (Writing sprint, 12 tasks this week and the calendar) are gone, along with the bar-chart styles in app.css.
+- The bell opens Reminders and shows how many reminders are due now. It does not use the notification count because nothing ever marks a notification read, so that number would only grow. The "Zuri" title is plain text now; it had a dropdown arrow that did nothing.
+- Skills can be edited (pencil on a skill). Editing changes the words and leaves the on/off switch alone.
+- Removed the local-key reply route in sendChatMessage that could never run, since chat always goes through the account.
+- New server route DELETE /api/me/conversations/<id>/messages/<messageId>, with tests. Regenerate now asks the account to delete the replaced reply; the desktop keeps remembering it (droppedCloudIds) until the account confirms, so an older server cannot bring it back.
+- Key files: src/renderer-react/WorkspaceOverview.jsx (new), ChatPanel.jsx, Sidebar.jsx, SkillsView.jsx, app.css, src/main/providers/chat.js, store.js, chat-sync.js, server/src/app.js, server/src/db.js, server/test/conversations.test.js, scripts/selftest.js, scripts/check-chat-sync.mjs.
+- Other OS action: run "npm run react:build". Railway must redeploy for the server route; until then Regenerate still works and the old reply stays in the browser copy only.
+- Done on: Windows
+
 ## 2026-10-28 - Windows (act mode, skills, side panel)
 
 - Ask, Act and Autopilot are real. A mode picker sits beside the model chip. Ask answers and reads, and no longer offers the edit tool, which could never run there. Act also offers editDocument, writeFile, openUrl and openApp, and asks the person first through an approval card above the composer; no answer, Stop or five minutes counts as no. Autopilot skips the question only for copy-only edits and allow-listed links and apps; writeFile always asks. The new channel is zuri:chat:approve.
