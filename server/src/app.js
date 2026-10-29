@@ -13,6 +13,11 @@ import { CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJEC
 import { checkedAttachment, signUpload } from './uploads.js';
 import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './images.js';
 import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, answerStyleLength } from './text.js';
+import { searchWeb } from './tools.js';
+// The fixed DuckDuckGo search lives in tools.js. This module only decides who may
+// call it.
+
+
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const ASSETS_DIR = `${PUBLIC_DIR}${path.sep}assets`;
@@ -42,6 +47,16 @@ const JSON_HEADERS = Object.freeze({
 });
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_CHAT_BODY_BYTES = 256 * 1024;
+// A web search body is one short query: 4 KB is generous for that and still
+// refuses anything that is trying to arrive as a document.
+const MAX_SEARCH_BODY_BYTES = 4 * 1024;
+const SEARCH_QUERY_MIN_LENGTH = 2;
+const SEARCH_QUERY_MAX_LENGTH = 400;
+// Fixed and modest, and deliberately separate from the plan's chat limits: a
+// search costs this server a request to the engine rather than a supplier bill,
+// so the ceiling is there to stop one account hammering DuckDuckGo, not to sell
+// searches by the minute.
+const SEARCH_REQUEST_LIMITS = Object.freeze({ requestsPerMinute: 10, maxConcurrent: 2 });
 const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 // Keep the lease longer than the provider timeout so a slow request cannot be
 // released while it is still in flight and allow another request to overspend.
@@ -977,6 +992,55 @@ export function createApp(dependencies = {}) {
           return response(mapped.status, mapped.body);
         } finally {
           releaseLease();
+        }
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        throw error;
+      }
+    }
+
+    // Web search for the browser. A page cannot ask a search engine directly (the
+    // engine sends no cross-origin headers), so this server asks on the person's
+    // behalf and hands back plain results. The engine's address is fixed inside
+    // tools.js and no caller-supplied URL ever reaches fetch, which is what keeps
+    // this route free of server-side request forgery.
+    if (request.method === 'POST' && url.pathname === '/api/tools/web-search') {
+      // Tests and self-hosted deployments can inject fetch; a stock Node has it.
+      const doFetch = dependencies.fetch ?? globalThis.fetch;
+      if (!dependencies.auth || typeof doFetch !== 'function') {
+        return response(503, { ok: false, error: { code: 'TOOLS_NOT_CONFIGURED', message: 'Web search is not switched on yet.' } });
+      }
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      // A search spends one request to the engine, so a lapsed account cannot use it.
+      if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to search the web.' } });
+      try {
+        const body = await readJson(request, MAX_SEARCH_BODY_BYTES);
+        const query = typeof body.query === 'string' ? body.query.trim() : '';
+        if (query.length < SEARCH_QUERY_MIN_LENGTH || query.length > SEARCH_QUERY_MAX_LENGTH) {
+          return response(400, { ok: false, error: { code: 'INVALID_QUERY', message: `Send a search query of between ${SEARCH_QUERY_MIN_LENGTH} and ${SEARCH_QUERY_MAX_LENGTH} characters.` } });
+        }
+        // Keyed per account and per tool: a search cannot spend a chat model's
+        // allowance, and a chat request cannot spend the search allowance.
+        const lease = limiter.acquire(`${session.user.id}:web-search`, SEARCH_REQUEST_LIMITS);
+        if (!lease.allowed) {
+          return response(429, { ok: false, error: { code: lease.reason === 'concurrency_limit' ? 'CONCURRENCY_LIMIT' : 'RATE_LIMITED', message: 'This account has reached its search limit. Try again shortly.' } }, { 'retry-after': String(lease.retryAfterSeconds) });
+        }
+        try {
+          // searchWeb already answers { query, results }; wrapping it again would
+          // nest the list inside itself.
+          const found = await searchWeb({ query, fetch: doFetch });
+          return response(200, { ok: true, data: found });
+        } catch (error) {
+          // The engine's status and its own markup stay in the log; the person gets a
+          // sentence they can act on instead of a wall of HTML.
+          console.error('[zuri-cloud] web search', error?.code ?? 'SEARCH_FAILED', error?.message ?? error);
+          if (error?.code === 'SEARCH_INVALID_RESPONSE') {
+            return response(502, { ok: false, error: { code: 'SEARCH_INVALID_RESPONSE', message: 'The search service answered with a page that could not be read. Try again later.' } });
+          }
+          return response(502, { ok: false, error: { code: 'SEARCH_FAILED', message: 'The search service could not be reached. Try again later.' } });
+        } finally {
+          lease.release();
         }
       } catch (error) {
         if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });

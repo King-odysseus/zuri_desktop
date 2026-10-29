@@ -589,15 +589,21 @@ async function streamFailure(response) {
  * library is needed.
  *
  * @param {{
- *   messages: Array<{ role: string, content: string }>,
+ *   messages: Array<object>,
  *   model?: string,
  *   projectId?: string,
  *   signal?: AbortSignal,
  *   onDelta?: (text: string) => void,
+ *   tools?: Array<{ name: string, description: string, parameters: object }>,
  * }} input
- * @returns {Promise<{ content: string, model?: string, modelName?: string, usage?: object }>}
+ * @returns {Promise<{ content: string, toolCalls: Array<{ id: string, name: string, arguments: string }>, model?: string, modelName?: string, usage?: object }>}
  */
-export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, projectId = '', signal, onDelta }) {
+export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, projectId = '', signal, onDelta, tools = [] }) {
+  // A round that offers tools is answered in one JSON body rather than a stream,
+  // because that answer is words plus the calls the model wants run, and the two
+  // cannot be told apart while they are being written. No tools at all leaves the
+  // field out, so a round that is not a tool round is the request it always was.
+  const offered = Array.isArray(tools) ? tools : [];
   // A project rides with the question so the server can put that project's own
   // instructions and reference files in front of it. Outside a project the field
   // is left out rather than sent empty.
@@ -610,11 +616,36 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, project
       accept: 'text/event-stream',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ messages, model, stream: true, ...(project === '' ? {} : { projectId: project }) }),
+    body: JSON.stringify({
+      messages,
+      model,
+      stream: true,
+      ...(project === '' ? {} : { projectId: project }),
+      ...(offered.length === 0 ? {} : { tools: offered }),
+    }),
     signal,
   });
 
   if (!response.ok) throw await streamFailure(response);
+  // The two answers share this route, so they are told apart by what the server
+  // said it sent rather than by asking for one shape and hoping. A tool round
+  // comes back as one JSON body: the words and the calls arrive together.
+  if (!(response.headers.get('content-type') ?? '').includes('text/event-stream')) {
+    const body = await response.json().catch(() => null);
+    if (!body?.ok) {
+      const error = new Error(body?.error?.message ?? 'The chat request failed.');
+      error.status = response.status;
+      error.code = body?.error?.code ?? '';
+      throw error;
+    }
+    const data = body?.data ?? {};
+    return {
+      content: typeof data.content === 'string' ? data.content : '',
+      toolCalls: Array.isArray(data.toolCalls) ? data.toolCalls : [],
+      ...(data.model === undefined ? {} : { model: data.model }),
+      ...(data.modelName === undefined ? {} : { modelName: data.modelName }),
+    };
+  }
   // A browser without ReadableStream support would hang on a reply it can never
   // read, so say so instead of leaving a bubble waiting for ever.
   if (!response.body) throw new Error('This browser cannot read a streamed reply. Update it or use a current Chrome, Edge, Safari or Firefox.');
@@ -656,7 +687,7 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, project
           continue;
         }
 
-        if (event.type === 'done') return { ...(event.data ?? {}), content: event.data?.content || content };
+        if (event.type === 'done') return { ...(event.data ?? {}), content: event.data?.content || content, toolCalls: [] };
 
         if (event.type === 'error') {
           const error = new Error(event.error?.message ?? 'The chat request failed.');
@@ -674,7 +705,27 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, project
 
   // The stream ended without `done`, which means the network dropped mid-reply.
   // What did arrive is still worth keeping on screen, so it is returned.
-  return { content };
+  // Kept in the same shape as every other answer, so a caller reads one thing
+  // either way.
+  return { content, toolCalls: [] };
+}
+
+/**
+ * Run a web search for the model.
+ *
+ * The search key lives on the server, so the browser asks for results and never
+ * for the key, and the model only ever reads the list this hands back. A failure
+ * throws, which is the caller's cue to tell the model the search did not run
+ * rather than to end the person's reply.
+ * @param {string} query
+ * @returns {Promise<Array<{ title: string, url: string, snippet: string }>>}
+ */
+export async function searchWeb(query) {
+  const data = await api('/api/tools/web-search', {
+    method: 'POST',
+    body: JSON.stringify({ query }),
+  });
+  return Array.isArray(data?.results) ? data.results : [];
 }
 
 // Every password route in one place: signing up, signing in, and the three

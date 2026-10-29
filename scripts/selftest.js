@@ -668,6 +668,128 @@ check('editDocument only touches files in the workspace or ones the person picke
   if (nothingMatched.ok || nothingMatched.error.code !== 'TOOL_NOTHING_CHANGED') throw new Error('a no-op edit was reported as success');
 });
 
+// A to-do the person asks for in chat has to land on the Tasks page, not in a text
+// reply. Both the add and the refusal are proved by reading the store back through
+// listTasks, so the tool's own return value is never the only witness. The store root
+// is pointed at a scratch folder for the duration and put back afterwards, because the
+// checks above and below read the folder they set up themselves.
+const taskToolStore = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+const taskToolChat = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+const taskToolScratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-task-tool-'));
+const taskToolRootBefore = taskToolStore.getStoreRoot();
+let taskToolAdded = null;
+let taskToolListed = null;
+let taskToolNoTitle = null;
+let taskToolCountAfterRefusal = null;
+try {
+  taskToolStore.setStoreRoot(taskToolScratch);
+  taskToolAdded = await runTool('createTask', { title: 'Send Zuri to Greg' });
+  taskToolListed = await taskToolStore.listTasks();
+  // No title at all. The refusal has to come from the store, so its own code reaches
+  // the model and it can correct the call instead of guessing.
+  taskToolNoTitle = await runTool('createTask', { notes: 'no title given' });
+  const afterRefusal = await taskToolStore.listTasks();
+  taskToolCountAfterRefusal = Array.isArray(afterRefusal.data) ? afterRefusal.data.length : -1;
+} finally {
+  taskToolStore.setStoreRoot(taskToolRootBefore);
+  fs.rmSync(taskToolScratch, { recursive: true, force: true });
+}
+
+check('createTask is offered in Ask mode, so adding a task needs no mode switch', () => {
+  const offered = taskToolChat.toolsForMode('ask', false).map((tool) => tool.name);
+  if (!offered.includes('createTask')) throw new Error(`Ask mode only offers ${offered.join(', ')}`);
+});
+
+check('createTask from chat adds the task the person asked for to the Tasks store', () => {
+  if (!taskToolAdded?.ok) throw new Error(taskToolAdded?.error?.message ?? 'the tool refused a plain task');
+  if (taskToolAdded.data?.title !== 'Send Zuri to Greg') throw new Error(`the saved title was "${taskToolAdded.data?.title}"`);
+  const listed = Array.isArray(taskToolListed?.data) ? taskToolListed.data : [];
+  if (!listed.some((task) => task.id === taskToolAdded.data.id)) throw new Error('the Tasks store does not list the task');
+});
+
+check('createTask with no title is refused and writes nothing', () => {
+  if (taskToolNoTitle?.ok) throw new Error('a task with no title was saved');
+  if (taskToolNoTitle?.error?.code !== 'TASK_TITLE_REQUIRED') throw new Error(`the refusal was ${taskToolNoTitle?.error?.code}`);
+  // The one task added above is the whole list, so the refusal added nothing.
+  if (taskToolCountAfterRefusal !== 1) throw new Error(`the store held ${taskToolCountAfterRefusal} tasks after the refusal`);
+});
+
+check('createTask is described in plain words for an approval card or status line', () => {
+  const said = taskToolChat.describeToolCall('createTask', { title: 'Send Zuri to Greg' });
+  if (typeof said !== 'string' || said.trim() === '') throw new Error('no sentence was produced');
+  if (!said.includes('Send Zuri to Greg')) throw new Error(`the sentence was "${said}"`);
+});
+
+// A reminder is how Zuri tells the person something later; an automation is a prompt it
+// repeats by itself. They are checked separately from task because each can break alone,
+// and because the automation gate is the one step in the registry that must never slip.
+const noteToolScratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-note-tool-'));
+const noteToolRootBefore = taskToolStore.getStoreRoot();
+let noteToolAdded = null;
+let noteToolListed = null;
+let noteToolNoMoment = null;
+let autoToolUnconfirmed = null;
+let autoToolAdded = null;
+let autoToolListed = null;
+let autoToolBadCadence = null;
+try {
+  taskToolStore.setStoreRoot(noteToolScratch);
+  noteToolAdded = await runTool('createReminder', { title: 'Check the new job adverts', dueAt: '2026-11-02T18:00:00', repeat: 'once' });
+  noteToolListed = await taskToolStore.listReminders();
+  // One that can never fire is not a reminder, so the store refuses it and its own
+  // reason goes back to the model, which can ask for a moment instead of guessing one.
+  noteToolNoMoment = await runTool('createReminder', { title: 'No moment given' });
+  // Offered in Act, and it has to stop here: an automation outlives the conversation.
+  autoToolUnconfirmed = await runTool('createAutomation', { prompt: 'Check for new jobs', cadenceType: 'daily', timeOfDay: '09:00' });
+  autoToolAdded = await runTool('createAutomation', { prompt: 'Check for new jobs', cadenceType: 'daily', timeOfDay: '09:00' }, { confirmed: true });
+  autoToolListed = await taskToolStore.listAutomations();
+  autoToolBadCadence = await runTool('createAutomation', { prompt: 'x', cadenceType: 'every-second' }, { confirmed: true });
+} finally {
+  taskToolStore.setStoreRoot(noteToolRootBefore);
+  fs.rmSync(noteToolScratch, { recursive: true, force: true });
+}
+
+check('createReminder is offered in Ask mode, so Zuri can set one without a mode switch', () => {
+  const offered = taskToolChat.toolsForMode('ask', false).map((tool) => tool.name);
+  if (!offered.includes('createReminder')) throw new Error(`Ask mode only offers ${offered.join(', ')}`);
+});
+
+check('createReminder from chat sets a reminder the Reminders store then lists', () => {
+  if (!noteToolAdded?.ok) throw new Error(noteToolAdded?.error?.message ?? 'the tool refused a plain reminder');
+  const listed = Array.isArray(noteToolListed?.data) ? noteToolListed.data : [];
+  if (!listed.some((reminder) => reminder.id === noteToolAdded.data.id)) throw new Error('the Reminders store does not list the reminder');
+});
+
+check('createReminder with no moment is refused, because it could never fire', () => {
+  if (noteToolNoMoment?.ok) throw new Error('a reminder with no moment was saved');
+  if (noteToolNoMoment?.error?.code !== 'REMINDER_INVALID_DUE') throw new Error(`the refusal was ${noteToolNoMoment?.error?.code}`);
+});
+
+check('createAutomation is withheld in Ask and offered in Act', () => {
+  const ask = taskToolChat.toolsForMode('ask', false).map((tool) => tool.name);
+  const act = taskToolChat.toolsForMode('act', false).map((tool) => tool.name);
+  if (ask.includes('createAutomation')) throw new Error('Ask mode offers automations');
+  if (!act.includes('createAutomation')) throw new Error(`Act mode only offers ${act.join(', ')}`);
+});
+
+check('createAutomation refuses to save until the person approves it', () => {
+  if (autoToolUnconfirmed?.ok) throw new Error('an automation was saved without confirmation');
+  if (autoToolUnconfirmed?.error?.code !== 'TOOL_CONFIRMATION_REQUIRED') throw new Error(`the refusal was ${autoToolUnconfirmed?.error?.code}`);
+});
+
+check('createAutomation saves the schedule that was approved, with a next run', () => {
+  if (!autoToolAdded?.ok) throw new Error(autoToolAdded?.error?.message ?? 'the tool refused a plain automation');
+  const listed = Array.isArray(autoToolListed?.data) ? autoToolListed.data : [];
+  const entry = listed.find((item) => item.id === autoToolAdded.data.id);
+  if (!entry) throw new Error('the Automations store does not list the automation');
+  if (entry.cadence?.type !== 'daily') throw new Error(`the cadence was ${JSON.stringify(entry.cadence)}`);
+  if (!entry.nextRunAt) throw new Error('the automation has no next run, so it would never fire');
+});
+
+check('createAutomation with a cadence it cannot schedule is refused', () => {
+  if (autoToolBadCadence?.ok) throw new Error('an unschedulable cadence was saved');
+  if (autoToolBadCadence?.error?.code !== 'AUTOMATION_INVALID_CADENCE') throw new Error(`the refusal was ${autoToolBadCadence?.error?.code}`);
+});
 check('readFile reads Word text and Excel cells with addresses', async () => {
   const word = await runTool('readFile', { path: madeDocx.data.path });
   const sheet = await runTool('readFile', { path: madeXlsx.data.path });

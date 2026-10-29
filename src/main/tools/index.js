@@ -25,7 +25,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { readStore, findAgent } from '../store.js';
+import { readStore, findAgent, createTask, createReminder, createAutomation } from '../store.js';
 import { OFFICE_KINDS, OfficeError, buildOfficeFile } from '../office.js';
 import { describeWorkbook, editOfficeFile } from '../office-edit.js';
 
@@ -866,6 +866,68 @@ async function openAppTool(args, context) {
 }
 
 /**
+ * Add one task to the person's Tasks page.
+ *
+ * The store owns the rules - a title is required, a due date has to be a real date,
+ * a priority has to be one of three - so its refusal is passed through with its own
+ * code and message. The model can read that message and correct the arguments on the
+ * next round, instead of being told only that something went wrong.
+ * @param {{ title?: string, notes?: string, due?: string, priority?: string }} args
+ * @returns {Promise<{ ok: true, data: object }>}
+ */
+async function createTaskTool(args) {
+  // Every field is passed on as it arrived: the store treats undefined as "not given",
+  // so an empty optional field never turns into an empty string in the saved task.
+  const created = await createTask({
+    title: args?.title,
+    notes: args?.notes,
+    due: args?.due,
+    priority: args?.priority,
+  });
+  if (!created.ok) throw new ToolError(created.error.code, created.error.message);
+  return ok(created.data);
+}
+
+/**
+ * A reminder is the only way Zuri can put something in front of the person later, so the
+ * call is passed straight through: the store already decides what a moment, a repeat and
+ * an interval may look like, and refuses anything it could not schedule.
+ */
+async function createReminderTool(args) {
+  const created = await createReminder({
+    title: args?.title,
+    dueAt: args?.dueAt,
+    repeat: args?.repeat,
+    intervalMinutes: args?.intervalMinutes,
+    timeOfDay: args?.timeOfDay,
+  });
+  if (!created.ok) throw new ToolError(created.error.code, created.error.message);
+  return ok(created.data);
+}
+
+/**
+ * The cadence arrives flattened as cadenceType plus one matching field, which keeps the
+ * tool schema a plain list a model can fill in. It is rebuilt here into the nested shape
+ * the store validates, so a half-specified schedule is refused there rather than saved as
+ * something that could never fire.
+ */
+async function createAutomationTool(args) {
+  const type = typeof args?.cadenceType === 'string' ? args.cadenceType.trim().toLowerCase() : '';
+  const cadence = { type };
+  if (type === 'once') cadence.at = args?.at;
+  if (type === 'interval') cadence.minutes = args?.minutes;
+  if (type === 'daily') cadence.timeOfDay = args?.timeOfDay;
+
+  const created = await createAutomation({
+    prompt: args?.prompt,
+    mode: args?.mode,
+    cadence,
+  });
+  if (!created.ok) throw new ToolError(created.error.code, created.error.message);
+  return ok(created.data);
+}
+
+/**
  * The tool list from the card. `requiresConfirmation` is true for anything that
  * changes something outside Zuri: the file system (writeFile) and the desktop
  * (openUrl, openApp). The main process holds the gate, per risks.md.
@@ -873,6 +935,25 @@ async function openAppTool(args, context) {
  * kept here so the registry stays the one list of tools.
  */
 export const TOOLS = Object.freeze([
+  // A to-do the person asked for is reversible: it can be ticked off or deleted on
+  // the Tasks page, and it stays inside Zuri. Asking for permission to write down a
+  // list item they just asked for would be noise, so this needs no confirmation.
+  Object.freeze({
+    name: 'createTask',
+    label: 'Add a task to the Tasks page',
+    description: 'Add one task to the Tasks page in Zuri, with an optional note, due date and priority.',
+    requiresConfirmation: false,
+    handler: createTaskTool,
+  }),
+  // Setting a reminder is the other half of "tell me later": one row they can edit or
+  // delete, so it needs no confirmation either.
+  Object.freeze({
+    name: 'createReminder',
+    label: 'Set a reminder',
+    description: 'Set a reminder that notifies the person at a moment they choose, once or on a repeat.',
+    requiresConfirmation: false,
+    handler: createReminderTool,
+  }),
   Object.freeze({
     name: 'webSearch',
     label: 'Search the web',
@@ -938,6 +1019,14 @@ export const TOOLS = Object.freeze([
     description: 'Start an application. Only app names on the Settings allow-list are accepted.',
     requiresConfirmation: true,
     handler: openAppTool,
+  }),
+  // An automation keeps running after the conversation ends, so it always asks first.
+  Object.freeze({
+    name: 'createAutomation',
+    label: 'Create an automation',
+    description: 'Create a prompt Zuri runs on a schedule by itself: a one-off moment, an interval or a daily time.',
+    requiresConfirmation: true,
+    handler: createAutomationTool,
   }),
 ]);
 

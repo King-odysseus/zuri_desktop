@@ -131,6 +131,79 @@ const SUMMARY_TOOL = Object.freeze({
   },
 });
 
+/**
+ * Adding a to-do. It rides with the tools offered on every message because it is the
+ * answer to "add a task to send Zuri to Greg": without it the model can only say it has
+ * no way to keep a list. A task is reversible on the Tasks page, so nothing is asked.
+ */
+const CREATE_TASK_TOOL = Object.freeze({
+  name: 'createTask',
+  description:
+    'Add one task to the Tasks page in Zuri. Use it whenever they ask you to add, remember or schedule a to-do, ' +
+    'with a due date when they gave one. It is saved immediately; tell them it is on their Tasks page in one short sentence.',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'What the task is, in a few words, such as "Send Zuri to Greg".' },
+      notes: { type: 'string', description: 'Optional detail to keep with the task, such as what to include.' },
+      due: { type: 'string', description: 'Optional due date: an ISO date like 2026-11-02, or any date they said, such as 2 November 2026.' },
+      priority: { type: 'string', enum: ['low', 'medium', 'high'], description: 'Optional priority; medium when left out.' },
+    },
+    required: ['title'],
+  },
+});
+
+/**
+ * Setting a reminder. This is what makes "search for jobs and tell me when you are done"
+ * possible: without it the model can search but has no way to put the answer in front of
+ * the person later. A reminder is a row on the Reminders page they can change or delete,
+ * so it needs no approval.
+ */
+const CREATE_REMINDER_TOOL = Object.freeze({
+  name: 'createReminder',
+  description:
+    'Set a reminder so Zuri notifies the person at a moment of their choosing. Use it when they say "remind me", ' +
+    '"let me know at 6", "tell me tomorrow morning", or when they ask to hear about a search result later. ' +
+    'A reminder always needs a moment: if they gave none, ask for one instead of guessing.',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'What to remind them of, such as "Check the new project manager jobs in Scotland".' },
+      dueAt: { type: 'string', description: 'When to notify them: a date and time such as 2026-11-02T18:00, or a moment they named such as "tomorrow at 9".' },
+      repeat: { type: 'string', enum: ['once', 'interval', 'daily'], description: 'Optional: once by default. daily repeats at timeOfDay, interval repeats every intervalMinutes.' },
+      intervalMinutes: { type: 'number', description: 'Only with repeat interval: how many minutes between reminders.' },
+      timeOfDay: { type: 'string', description: 'Only with repeat daily: the 24-hour time, such as 09:30.' },
+    },
+    required: ['title', 'dueAt'],
+  },
+});
+
+/**
+ * An automation runs a prompt on a schedule with nobody watching, which is a standing
+ * commitment rather than a single action. It is therefore gated: offered only in Act and
+ * Autopilot, and always confirmed before it is saved. Note that an unattended run may not
+ * create another automation, because that is not on the read-only allow-list.
+ */
+const CREATE_AUTOMATION_TOOL = Object.freeze({
+  name: 'createAutomation',
+  description:
+    'Create an automation: a prompt Zuri carries out on a schedule by itself, such as checking for new job adverts ' +
+    'every morning. Use it only when they want something to happen repeatedly or unattended. It always asks them ' +
+    'to confirm before it is saved.',
+  parameters: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string', description: 'The instruction Zuri should carry out each time, written in full.' },
+      cadenceType: { type: 'string', enum: ['once', 'interval', 'daily'], description: 'How often it runs: once at a moment, every so many minutes, or daily at a time.' },
+      at: { type: 'string', description: 'With cadenceType once: the date and time it runs, such as 2026-11-02T09:00.' },
+      minutes: { type: 'number', description: 'With cadenceType interval: the gap between runs, in minutes.' },
+      timeOfDay: { type: 'string', description: 'With cadenceType daily: the 24-hour time it runs, such as 09:30.' },
+      mode: { type: 'string', enum: ['ask', 'act', 'autopilot'], description: 'ask only reads and writes things down; act and autopilot may also change things. Use ask when unsure.' },
+    },
+    required: ['prompt', 'cadenceType'],
+  },
+});
+
 const WRITE_TOOL = Object.freeze({
   name: 'writeFile',
   description:
@@ -174,19 +247,29 @@ const FILE_TOOL_NAMES = new Set(FILE_TOOLS.map((tool) => tool.name));
  * Offered in every mode: building new files and reading them change nothing that
  * already exists, so they need no approval.
  */
-const BASE_TOOLS = Object.freeze([DOCUMENT_TOOL, READ_TOOL, SUMMARY_TOOL]);
+// createTask belongs here rather than with the gated tools: writing down a to-do the
+// person just asked for adds one row and changes nothing that already exists, so an
+// approval card would only be in the way. This is what lets Ask mode answer "add a task
+// to send Zuri to Greg" by adding it, instead of replying that it has no way to.
+// createReminder joins them: a reminder the person asked for is a row they can edit or
+// delete, and setting one is the only way Zuri can tell them something later.
+const BASE_TOOLS = Object.freeze([DOCUMENT_TOOL, READ_TOOL, SUMMARY_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL]);
 
 /**
  * Tools that change or open something outside Zuri. They are only offered in Act and
  * Autopilot, and the tool registry refuses each one until it is confirmed.
  */
-const GATED_TOOLS = Object.freeze([EDIT_TOOL, WRITE_TOOL, OPEN_URL_TOOL, OPEN_APP_TOOL]);
+const GATED_TOOLS = Object.freeze([EDIT_TOOL, WRITE_TOOL, OPEN_URL_TOOL, OPEN_APP_TOOL, CREATE_AUTOMATION_TOOL]);
 
 /** Every tool chat can run by name; which are offered on a given message is decided per send. */
 const ALL_CHAT_TOOLS = Object.freeze([...CHAT_TOOLS, ...BASE_TOOLS]);
 
 // Unattended automations in Ask or Autopilot may inspect information but must not
 // create files: nobody is watching, so nothing can be approved at the time.
+// An Ask or Autopilot automation sees only this allow-list, so createTask is not offered
+// there. An Act automation, or a run that declares no mode, keeps every base tool and may
+// add a task: nobody is harmed by that, and a wrong task is a tick or a delete away on the
+// Tasks page, so it is not worth a special case here.
 const READ_ONLY_AUTOMATION_TOOLS = new Set(['webSearch', 'webFetch', 'readFile', 'summarizeDocument']);
 
 /**
@@ -244,6 +327,12 @@ export function describeToolCall(name, args) {
       return `Open ${target(args?.url, 'a link')} in your browser`;
     case 'openApp':
       return `Start ${target(args?.app, 'an app')}`;
+    case 'createTask':
+      return `Add the task "${target(args?.title, 'a task')}" to your Tasks page`;
+    case 'createReminder':
+      return `Set a reminder to "${target(args?.title, 'a reminder')}"`;
+    case 'createAutomation':
+      return `Create an automation that runs ${target(args?.cadenceType, 'on a schedule')}`;
     default:
       return `Run ${name}`;
   }
@@ -1179,6 +1268,10 @@ async function answerToolCalls(
         onStatus(`Reading ${path.basename(String(args.path ?? args.file ?? 'your file')).slice(0, 80)}`);
       } else if (call.name === 'summarizeDocument') {
         onStatus('Summarising your document');
+      } else if (call.name === 'createTask') {
+        // The title is in the line because it is what the person will look for on the
+        // Tasks page; a call with none is refused by the store, so "to your list" covers it.
+        onStatus(`Adding the task ${String(args.title ?? 'to your list').slice(0, 60)}`);
       } else {
         const target = String(args.query ?? args.url ?? '').slice(0, 80);
         onStatus(call.name === 'webFetch' ? `Reading ${target}` : `Searching the web for ${target}`);
@@ -1260,6 +1353,10 @@ export function statusForTool(name, args) {
   }
   if (name === 'openUrl') return 'Opening the page';
   if (name === 'openApp') return app === '' ? 'Opening the app' : `Opening ${app.slice(0, 40)}`;
+  if (name === 'createTask') {
+    const title = typeof args?.title === 'string' ? args.title.trim() : '';
+    return title === '' ? 'Adding the task' : `Adding the task ${title.slice(0, 60)}`;
+  }
   return 'Working on it';
 }
 

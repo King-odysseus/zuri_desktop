@@ -23,6 +23,7 @@ import {
   fetchPictureModels,
   fetchProjects,
   renameConversation,
+  searchWeb,
   setConversationFlags,
   setConversationProject,
   signUpload,
@@ -57,6 +58,29 @@ const CHAT_MODELS = [
  * allowance, so a whole afternoon of history would cost more than the answer.
  */
 const HISTORY_LIMIT = 20;
+
+/*
+ * The one tool the browser chat offers, and the most rounds it may take.
+ *
+ * A round that offers a tool is answered in one JSON body rather than a stream,
+ * so the model's words and the search it wants run arrive together; the round
+ * after that carries the search results back and is streamed as usual. The cap
+ * exists because a model can keep asking for searches for ever, and the person
+ * is waiting on every one of them.
+ */
+const MAX_TOOL_ROUNDS = 3;
+
+const WEB_SEARCH_TOOL = {
+  name: 'webSearch',
+  description: 'Search the web. Use it for anything current or changing (news, prices, jobs, fixtures, opening times, releases) and whenever the person asks you to find, look up or link to pages, because your own knowledge stops at a fixed date.',
+  parameters: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'What to search for.' },
+    },
+    required: ['query'],
+  },
+};
 
 /*
  * The three reply lengths, with the instruction each one adds to the question.
@@ -216,6 +240,85 @@ function chatMessages(messages) {
     }));
 }
 
+/*
+ * What a search call is asking for.
+ *
+ * The arguments arrive from the model as a JSON string, and a model can send
+ * anything, so a string that will not parse, or one carrying no query, becomes a
+ * sentence the model is told rather than an exception that ends the reply.
+ */
+function webSearchQuery(call) {
+  let parsed = call?.arguments;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return { error: 'That search could not run: its arguments were not valid JSON.' };
+    }
+  }
+  const query = typeof parsed?.query === 'string' ? parsed.query.trim() : '';
+  if (query === '') return { error: 'That search could not run: no query was given.' };
+  return { query };
+}
+
+/*
+ * The words the model reads after a search: the numbered results, or one plain
+ * sentence saying there were none. Every word of it is spent against the plan's
+ * input allowance on the next round, so the snippet is kept and nothing is added.
+ */
+function searchResultsText(query, results) {
+  const list = Array.isArray(results) ? results : [];
+  if (list.length === 0) return `No web results were found for "${query}".`;
+  const lines = list.map((entry, index) => {
+    const title = typeof entry?.title === 'string' && entry.title.trim() !== '' ? entry.title.trim() : 'Untitled result';
+    const url = typeof entry?.url === 'string' ? entry.url : '';
+    const snippet = typeof entry?.snippet === 'string' ? entry.snippet.trim() : '';
+    return [`${index + 1}. ${title}`, url, snippet].filter((part) => part !== '').join('\n');
+  });
+  return [`Web results for "${query}":`, ...lines].join('\n\n');
+}
+
+/*
+ * Stop, as the browser reports it, so a loop that is stopped between rounds ends
+ * down the same path as a request aborted mid-answer: what has arrived stays on
+ * screen and no error is announced.
+ */
+function stoppedReply() {
+  const error = new Error('The reply was stopped.');
+  error.name = 'AbortError';
+  return error;
+}
+
+/*
+ * Run one tool call and return the text the model will read for it.
+ *
+ * Almost nothing here throws: a search that fails, a tool this chat does not
+ * offer, and arguments that will not parse all come back as sentences, because a
+ * model that is told what went wrong can still answer, while a thrown error
+ * would end the person's reply. Stop is the one exception, since a stopped reply
+ * must not turn into another request.
+ */
+async function runToolCall(call, signal, onStatus) {
+  const name = typeof call?.name === 'string' ? call.name : '';
+  if (name !== WEB_SEARCH_TOOL.name) return `The tool "${name}" is not available in this chat.`;
+
+  const asked = webSearchQuery(call);
+  if (asked.error) return asked.error;
+
+  onStatus(`Searching the web for "${asked.query}"`);
+  try {
+    const results = await searchWeb(asked.query);
+    if (signal?.aborted) throw stoppedReply();
+    onStatus('Reading the results');
+    return searchResultsText(asked.query, results);
+  } catch (error) {
+    if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
+    // Told to the model rather than swallowed: it can say the search did not run
+    // and answer from what it already knows, so the person still gets a reply.
+    return `The web search failed: ${error?.message || 'the search service did not answer.'}`;
+  }
+}
+
 /** The failure a screen shows: the server's own sentence and status, never a guess. */
 function failureOf(error, fallback) {
   return { message: error?.message || fallback, status: Number(error?.status) || 0 };
@@ -271,6 +374,12 @@ export default function ChatView({
   const modelName = pictureModel?.name || modelNameFor(model);
   const [streaming, setStreaming] = useState(false);
   const [streamReply, setStreamReply] = useState('');
+  /*
+   * What the search round is doing, shown inside the streaming bubble. A tool
+   * round comes back as one body, so it paints nothing until it is over; without
+   * this line the person watches an empty bubble and cannot tell it from a hang.
+   */
+  const [toolStatus, setToolStatus] = useState('');
   const [streamError, setStreamError] = useState(null);
   const [saveWarning, setSaveWarning] = useState('');
   // One file at a time, as the desktop composer allows, so the message stays one turn.
@@ -462,6 +571,7 @@ export default function ChatView({
     setStreamReply('');
     setStreamError(null);
     setSaveWarning('');
+    setToolStatus('');
   }, []);
 
   const openConversation = useCallback(
@@ -724,21 +834,74 @@ export default function ChatView({
         return;
       }
 
-      const result = await streamChat({
-        messages: outgoing,
-        model,
-        // A chat inside a project names it, so the server adds that project's
-        // instructions and files to the prompt before the question is sent.
-        projectId,
-        signal: controller.signal,
-        onDelta: (text) => {
+      /*
+       * A chat model is offered one tool, a web search, and the rounds below are
+       * the desktop app's own shape: ask, run what was asked for, hand the results
+       * back, ask again. Only a chat model gets it, because a picture model reads
+       * words and draws, so a search there would be paid for and thrown away.
+       *
+       * `wire` is the conversation as the server reads it. The person's turns go up
+       * as they always did; each round's own assistant turn and its tool results
+       * are added to that copy alone, because saveExchange keeps only the question
+       * and the final answer.
+       */
+      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL];
+      let wire = outgoing;
+      let answer = '';
+      // One round past the cap, with no tools offered, so a model that keeps
+      // reaching for the search still ends by answering in words.
+      for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
+        // Stop ends the whole loop, which is why the signal is read between rounds
+        // and not only by the request in flight.
+        if (controller.signal.aborted) throw stoppedReply();
+        const offerTools = round < MAX_TOOL_ROUNDS && tools.length > 0;
+        // Each round paints its own words, so a previous round's sentence does not
+        // sit above the search that replaced it.
+        reply = '';
+        setStreamReply('');
+        const result = await streamChat({
+          messages: wire,
+          model,
+          // A chat inside a project names it, so the server adds that project's
+          // instructions and files to the prompt before the question is sent.
+          projectId,
+          tools: offerTools ? tools : [],
+          signal: controller.signal,
+          onDelta: (text) => {
+            if (run !== runRef.current) return;
+            reply += text;
+            setStreamReply(reply);
+            // Words have started arriving, so the search line is no longer the
+            // only thing to say about this round.
+            setToolStatus('');
+          },
+        });
+        if (run !== runRef.current) return;
+
+        const content = result?.content || reply;
+        const calls = Array.isArray(result?.toolCalls) ? result.toolCalls : [];
+        // No calls, or a round that was not allowed to call anything: whatever came
+        // back is the answer, streamed or handed over in one body.
+        if (calls.length === 0 || !offerTools) {
+          answer = content;
+          break;
+        }
+
+        // The model's turn goes back before its results, because that is the only
+        // shape the server reads a tool result against.
+        wire = [...wire, { role: 'assistant', content, toolCalls: calls }];
+        for (const call of calls) {
+          const outcome = await runToolCall(call, controller.signal, setToolStatus);
           if (run !== runRef.current) return;
-          reply += text;
-          setStreamReply(reply);
-        },
-      });
-      if (run !== runRef.current) return;
-      const answer = result?.content || reply;
+          wire = [...wire, {
+            role: 'tool',
+            toolCallId: typeof call?.id === 'string' ? call.id : '',
+            content: outcome,
+          }];
+        }
+      }
+      setToolStatus('');
+
       if (!answer) {
         // On screen but not saved: an empty exchange is not worth a conversation row.
         setStreamError({ message: 'No reply arrived. Send that again when the connection is back.', status: 0 });
@@ -762,11 +925,13 @@ export default function ChatView({
         }));
       }
       setStreamReply('');
+      setToolStatus('');
       if (error?.name !== 'AbortError') setStreamError(failureOf(error, pictureModel ? 'The picture could not be made.' : 'The reply could not be completed.'));
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setStreaming(false);
       setDrawing(false);
+      setToolStatus('');
     }
   }, [draft, streaming, openId, thread.messages, model, resetReply, saveExchange, projectId, pictureModel]);
 
@@ -1402,9 +1567,12 @@ export default function ChatView({
 
           {streaming && (
             <article className="chat-bubble chat-bubble-assistant is-streaming">
+              {/* The search round is the one wait with nothing to read, so it says
+                  what it is doing rather than leaving the bubble empty. */}
               {streamReply
                 ? <div className="chat-answer"><FormattedMessage content={streamReply} /></div>
-                : <p className="chat-text">{drawing ? 'Zuri is drawing your picture...' : 'Zuri is thinking...'}</p>}
+                : <p className="chat-text">{drawing ? 'Zuri is drawing your picture...' : (toolStatus || 'Zuri is thinking...')}</p>}
+              {streamReply !== '' && toolStatus !== '' && <p className="chat-text chat-note">{toolStatus}</p>}
             </article>
           )}
         </div>
