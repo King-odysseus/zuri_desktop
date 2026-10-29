@@ -1211,3 +1211,756 @@ html:has(.zuri-overlay-root) #root {
 .zuri-icon {
   flex: 0 0 auto;
 }
+
+/* ---------------------------------------------------------------------------
+   Account menu and Settings, laid out the way ChatGPT's desktop app does it: a
+   small card at the foot of the rail for who you are, and a settings screen that
+   takes the whole window with its own searchable list of sections.
+   --------------------------------------------------------------------------- */
+
+.zuri-account-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 0.625rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
+  text-align: left;
+  color: var(--foreground);
+}
+
+.zuri-account-trigger:hover,
+.zuri-account-trigger[aria-expanded='true'] {
+  background: var(--selected);
+}
+
+.zuri-avatar {
+  display: inline-flex;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #7c6bff, #4433c4);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.zuri-avatar-lg {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+}
+
+.zuri-account-identity {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.0625rem;
+}
+
+.zuri-account-name {
+  display: block;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zuri-account-plan {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zuri-account-chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  transition: transform 150ms ease;
+}
+
+.zuri-account-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.zuri-account-menu {
+  position: absolute;
+  bottom: calc(100% + 0.375rem);
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 40;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  background: var(--surface);
+  padding: 0.375rem;
+  box-shadow: 0 20px 48px rgb(0 0 0 / 0.22);
+}
+
+.zuri-account-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.5rem 0.625rem;
+}
+
+.zuri-account-group {
+  border-top: 1px solid var(--border);
+  padding: 0.25rem 0;
+}
+
+.zuri-account-row {
+  display: flex;
+  width: 100%;
+  min-height: 2.125rem;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+}
+
+.zuri-account-row:hover {
+  background: var(--selected);
+}
+
+.zuri-account-row.is-active {
+  background: var(--selected);
+  font-weight: 500;
+}
+
+.zuri-account-row-icon {
+  color: var(--muted);
+}
+
+.zuri-account-row-label {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.zuri-account-row-hint {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+
+.zuri-account-count {
+  display: inline-flex;
+  min-width: 1.125rem;
+  height: 1.125rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--selected);
+  padding: 0 0.25rem;
+  color: var(--muted);
+  font-size: 0.625rem;
+  font-weight: 600;
+}
+
+/* A thumb is wider than a mouse pointer, so the rows grow back to 44px when the
+   window is touched rather than clicked. */
+@media (pointer: coarse) {
+  .zuri-account-row,
+  .zuri-settings-nav-item {
+    min-height: 2.75rem;
+  }
+}
+
+.zuri-settings {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.zuri-settings-rail {
+  display: flex;
+  width: 17.5rem;
+  flex: 0 0 auto;
+  flex-direction: column;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  padding: 0.75rem 0.75rem 1rem;
+}
+
+.zuri-settings-rail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.25rem 0.25rem 0.75rem;
+}
+
+.zuri-settings-rail-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.zuri-settings-close,
+.zuri-settings-search-icon {
+  color: var(--muted);
+}
+
+.zuri-settings-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0.25rem 0.875rem;
+  border-radius: 999px;
+  background: var(--selected);
+  padding: 0.4375rem 0.625rem;
+  color: var(--muted);
+}
+
+.zuri-settings-search input {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  outline: none;
+}
+
+.zuri-settings-search input::placeholder {
+  color: var(--muted);
+}
+
+.zuri-settings-nav {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 0.875rem;
+  overflow-y: auto;
+  padding: 0 0.25rem 0.5rem;
+}
+
+.zuri-settings-nav-label {
+  padding: 0 0.5rem 0.25rem;
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.zuri-settings-nav-item {
+  display: flex;
+  width: 100%;
+  min-height: 2rem;
+  align-items: center;
+  gap: 0.625rem;
+  border-radius: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+}
+
+.zuri-settings-nav-item svg {
+  color: var(--muted);
+}
+
+.zuri-settings-nav-item:hover {
+  background: var(--selected);
+}
+
+.zuri-settings-nav-item.is-active {
+  background: var(--selected);
+  font-weight: 500;
+}
+
+.zuri-settings-nav-item.is-active svg {
+  color: var(--foreground);
+}
+
+.zuri-settings-nav-empty {
+  padding: 0 0.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.zuri-settings-body {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+/* The reading column is centred with equal margins, so a 1920px window does not
+   leave the text stuck against the rail. */
+.zuri-settings-page {
+  display: flex;
+  width: 100%;
+  max-width: 46rem;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin: 0 auto;
+  padding: 2.5rem 2rem 4rem;
+}
+
+.zuri-settings-title {
+  font-size: 1.625rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.zuri-settings-sub {
+  margin-top: 0.375rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.zuri-settings-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.zuri-set-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  background: var(--surface);
+}
+
+.zuri-set-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+}
+
+.zuri-set-row + .zuri-set-row {
+  border-top: 1px solid var(--border);
+}
+
+.zuri-set-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.zuri-set-title {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.zuri-set-help {
+  margin-top: 0.125rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.zuri-set-control {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.zuri-set-value {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  text-align: right;
+}
+
+.zuri-set-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.zuri-set-input {
+  min-width: 15rem;
+  font-size: 0.8125rem;
+}
+
+.zuri-set-textarea {
+  width: 100%;
+  min-width: 15rem;
+  font-size: 0.8125rem;
+}
+
+.zuri-set-check-label {
+  font-size: 0.8125rem;
+}
+
+.zuri-choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.zuri-choice-row .zuri-choice {
+  border: 1px solid var(--border);
+  padding: 0.3125rem 0.625rem;
+}
+
+.zuri-choice-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.zuri-choice,
+.zuri-age-choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  border-radius: 0.625rem;
+  cursor: pointer;
+}
+
+.zuri-choice {
+  padding: 0.375rem 0.5rem;
+}
+
+.zuri-choice-stack .zuri-choice,
+.zuri-age-choice {
+  border: 1px solid var(--border);
+  padding: 0.625rem 0.75rem;
+}
+
+.zuri-choice.is-selected,
+.zuri-age-choice.is-selected {
+  border-color: var(--control-border, var(--border));
+  background: var(--selected);
+}
+
+.zuri-radio {
+  width: 1rem;
+  height: 1rem;
+  flex: 0 0 auto;
+  margin-top: 0.125rem;
+  accent-color: var(--accent);
+}
+
+.zuri-choice-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.zuri-choice-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.zuri-choice-help {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+/* The delivery pickers in Notifications: a small pill with its own chevron, so
+   the row reads as one line instead of a form. */
+.zuri-set-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.zuri-set-select select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface);
+  padding: 0.3125rem 1.75rem 0.3125rem 0.625rem;
+  color: var(--foreground);
+  font-size: 0.75rem;
+}
+
+.zuri-set-select-chevron {
+  position: absolute;
+  right: 0.5rem;
+  pointer-events: none;
+  color: var(--muted);
+}
+
+.zuri-settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 0.75rem;
+}
+
+.zuri-settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0 0.25rem;
+}
+
+.zuri-settings-block-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.zuri-settings-block-help {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.zuri-settings-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.zuri-settings-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.zuri-settings-list li + li {
+  border-top: 1px solid var(--border);
+}
+
+.zuri-settings-inline-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.zuri-danger-quiet {
+  color: var(--color-danger);
+}
+
+.zuri-age-card {
+  width: 100%;
+  max-width: 32rem;
+  margin: auto;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+  padding: 2rem;
+}
+
+.zuri-age-kicker {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* A narrow window stacks the two panes: the rail becomes a strip of sections and
+   the page sits underneath it, so nothing has to be scrolled sideways. */
+@media (max-width: 820px) {
+  .zuri-settings {
+    flex-direction: column;
+  }
+
+  .zuri-settings-rail {
+    width: 100%;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+
+  .zuri-settings-nav {
+    flex-direction: row;
+    gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .zuri-settings-nav-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+
+  .zuri-settings-nav-label {
+    display: none;
+  }
+
+  .zuri-settings-page {
+    padding: 1.5rem 1rem 3rem;
+  }
+
+  .zuri-set-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .zuri-set-control {
+    justify-content: flex-start;
+  }
+
+  .zuri-set-value {
+    text-align: left;
+  }
+}
+
+/* An on/off control drawn as a switch: the row already says what it does, so the
+   control only has to read at a glance as "on" or "off". */
+.zuri-switch {
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.zuri-switch-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.zuri-switch-track {
+  position: relative;
+  display: inline-flex;
+  width: 2.25rem;
+  height: 1.375rem;
+  align-items: center;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 150ms ease;
+}
+
+.zuri-switch-thumb {
+  position: absolute;
+  left: 0.1875rem;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
+  transition: transform 150ms ease;
+}
+
+.zuri-switch-input:checked + .zuri-switch-track {
+  background: #1a9e5c;
+}
+
+.zuri-switch-input:checked + .zuri-switch-track .zuri-switch-thumb {
+  transform: translateX(0.875rem);
+}
+
+.zuri-switch-input:focus-visible + .zuri-switch-track {
+  outline: 2px solid var(--foreground);
+  outline-offset: 2px;
+}
+
+/* The buttons inside Settings stay the size of a line of text, as they are in
+   ChatGPT's settings, instead of the chunky default that suits a page action. */
+.zuri-settings .zuri-set-control button,
+.zuri-settings .zuri-settings-actions button,
+.zuri-settings .zuri-settings-inline-form button,
+.zuri-settings .zuri-settings-list button {
+  height: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0 0.6875rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+/* The two lines of the account button need room to breathe or the plan name is
+   shaved by the row's own edge. */
+.zuri-account-name,
+.zuri-account-plan {
+  line-height: 1.35;
+}
+
+/*
+ * The sign-in panel wears the product's two identities at once: a green-white-green
+ * band for Nigeria, a wash of model-blue and violet for the machine doing the
+ * answering, and a warm dusk glow for Lagos in the evening. Drawn in CSS so it
+ * costs no image, and the grid lines take the text colour so they stay visible in
+ * both themes.
+ */
+.zuri-signin {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.zuri-signin::before {
+  content: '';
+  position: absolute;
+  inset: -10% -5%;
+  z-index: -2;
+  background:
+    radial-gradient(52rem 34rem at 6% -14%, rgb(0 168 107 / 0.42), transparent 62%),
+    radial-gradient(46rem 30rem at 98% 0%, rgb(108 92 255 / 0.38), transparent 64%),
+    radial-gradient(34rem 26rem at 82% 108%, rgb(255 176 102 / 0.18), transparent 62%),
+    radial-gradient(40rem 28rem at 34% 112%, rgb(0 135 81 / 0.28), transparent 66%);
+}
+
+.zuri-signin::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(to right, currentColor 1px, transparent 1px),
+    linear-gradient(to bottom, currentColor 1px, transparent 1px);
+  background-size: 34px 34px;
+  opacity: 0.07;
+  -webkit-mask-image: radial-gradient(78% 68% at 50% 40%, #000 42%, transparent 100%);
+  mask-image: radial-gradient(78% 68% at 50% 40%, #000 42%, transparent 100%);
+}
+
+/* The page column paints its own opaque background for the ordinary screens,
+   which would hide the wash behind it. On the sign-in panel it steps aside. */
+.zuri-signin .zuri-page-content {
+  background: transparent;
+}
+
+/* The flag itself, as a thin band across the top of the card: green, white,
+   green. It marks the panel as Zuri's own without turning into a loading bar
+   stretched across the window. */
+.zuri-signin .zuri-age-card,
+.zuri-signin section[aria-labelledby] {
+  position: relative;
+  overflow: hidden;
+}
+
+.zuri-signin .zuri-age-card::before,
+.zuri-signin section[aria-labelledby]::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #00a651 0 33.3%, #ffffff 33.3% 66.6%, #00a651 66.6% 100%);
+}
+
+.zuri-age-card button {
+  height: 2.125rem;
+  min-height: 2.125rem;
+  padding: 0 0.875rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+}

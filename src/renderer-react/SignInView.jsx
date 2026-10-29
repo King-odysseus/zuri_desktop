@@ -93,7 +93,7 @@ export default function SignInView({ onDone }) {
   const creating = authMode === 'create';
 
   return (
-    <main className="flex h-dvh w-full flex-col bg-background text-foreground">
+    <main className="zuri-signin flex h-dvh w-full flex-col bg-background text-foreground">
       {/* my-auto on the card, not justify-center on the scroller: centring an
           overflowing box pushes its top above the scroll range, which cut off the
           logo and heading on the taller create-account form. */}

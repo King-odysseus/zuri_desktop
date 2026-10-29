@@ -16,6 +16,7 @@ import CloudView from './CloudView.jsx';
 import SignInView from './SignInView.jsx';
 import NewProjectView from './NewProjectView.jsx';
 import SkillsView from './SkillsView.jsx';
+import AgeGateView from './AgeGateView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const isOverlay = new URLSearchParams(window.location.search).has('overlay');
@@ -35,6 +36,12 @@ export default function App() {
   // see it at all. The quick-ask window never signs in, so it starts ready.
   const [startup, setStartup] = useState(isOverlay ? 'ready' : 'pending');
   const [needsSignIn, setNeedsSignIn] = useState(false);
+  // Zuri is an 18+ product, so the answer is asked once and kept in settings.
+  // null means "not known yet"; false lets the shell paint without blocking.
+  const [needsAge, setNeedsAge] = useState(false);
+  // Which settings page the account menu asked for. Settings owns the whole
+  // window, so the section has to survive being opened from the sidebar.
+  const [settingsSection, setSettingsSection] = useState('general');
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -57,6 +64,9 @@ export default function App() {
         document.documentElement.dataset.theme = savedTheme;
         setTheme(savedTheme);
       }
+      // A refusal is remembered too, so the gate only shows while the answer is
+      // genuinely missing or was answered "under 18".
+      setNeedsAge(result?.ok === true && result.data?.ageConfirmed !== true);
       // Anything but a loaded account asks for sign-in; being offline is the one
       // failure that is not a missing session, so a signed-in person still gets in.
       setNeedsSignIn(account?.ok !== true && account?.error?.code !== 'CLOUD_UNAVAILABLE');
@@ -97,9 +107,15 @@ export default function App() {
 
   // Opening the New project screen from the sidebar always starts a blank one, even
   // if a project was being edited a moment ago.
-  function navigate(next) {
+  function navigate(next, section) {
     if (next === 'new-project') setEditingProject(null);
+    if (next === 'settings') setSettingsSection(typeof section === 'string' && section !== '' ? section : 'general');
     setRoute(next);
+  }
+
+  async function signOut() {
+    await window.zuri?.cloud?.signOut?.();
+    window.dispatchEvent(new Event('zuri:signed-out'));
   }
 
   function editProject(project) {
@@ -156,16 +172,37 @@ export default function App() {
     return <SignInView onDone={finishSignIn} />;
   }
 
+  // Asked before the shell paints, like the sign-in check: a person who has not
+  // confirmed they are an adult never sees a chat with a saved history behind it.
+  if (needsAge) {
+    return (
+      <AgeGateView
+        onConfirmed={() => setNeedsAge(false)}
+        onSignOut={signOut}
+      />
+    );
+  }
+
   return (
     <div className="flex h-dvh w-full bg-background text-foreground">
-      <Sidebar current={route} onNavigate={navigate} onNewChat={startNewChat} onSelectThread={openThread} onEditProject={editProject} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
+      {/* Settings takes the whole window, ChatGPT-style: its own rail with search
+          stands where the app sidebar would, so the two never show side by side. */}
+      {route !== 'settings' && (
+        <Sidebar current={route} onNavigate={navigate} onNewChat={startNewChat} onSelectThread={openThread} onEditProject={editProject} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
+      )}
       {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} onNewChat={startNewChat} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} openingKind={chatSessionKey % 2 === 0 ? 'greeting' : 'question'} />}
       {route === 'new-project' && <NewProjectView key={editingProject?.id ?? 'new'} project={editingProject} onCreated={() => { setEditingProject(null); refreshChats(); setRoute('chats'); }} />}
       {route === 'skills' && <SkillsView />}
       {route === 'agents' && <AgentsView />}
       {route === 'automations' && <AutomationsView />}
       {route === 'files' && <FilesView />}
-      {route === 'settings' && <SettingsView />}
+      {route === 'settings' && (
+        <SettingsView
+          initialSection={settingsSection}
+          onSectionChange={setSettingsSection}
+          onClose={() => navigate('chats')}
+        />
+      )}
       {route === 'tasks' && <TasksView />}
       {route === 'reminders' && <RemindersView />}
       {route === 'search' && <SearchView onSelectThread={openThread} />}
