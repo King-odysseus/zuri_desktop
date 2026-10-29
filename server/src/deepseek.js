@@ -344,6 +344,10 @@ export function createDeepSeekClient({ apiKey, endpoint, fetchImpl = fetch }) {
     }
 
     let content = '';
+    // A reasoning supplier streams its thinking before the answer. It is gathered
+    // because the tool round will not be accepted without it, but it is never shown:
+    // it is not passed to onDelta, so nothing paints it.
+    let thinking = '';
     let repliedModel = model;
     let usage = null;
     // Tool calls arrive the same way as text: in fragments, each naming its index.
@@ -360,6 +364,8 @@ export function createDeepSeekClient({ apiKey, endpoint, fetchImpl = fetch }) {
         streamFailure.reason = 'stream_error';
         return;
       }
+      const reasoningDelta = payload?.choices?.[0]?.delta?.reasoning_content;
+      if (typeof reasoningDelta === 'string' && reasoningDelta !== '') thinking += reasoningDelta;
       const delta = payload?.choices?.[0]?.delta?.content;
       if (typeof delta === 'string' && delta !== '') {
         content += delta;
@@ -395,6 +401,7 @@ export function createDeepSeekClient({ apiKey, endpoint, fetchImpl = fetch }) {
       model: repliedModel,
       content,
       toolCalls,
+      reasoningContent: thinking,
       usage: {
         inputTokens: Number.isFinite(promptTokens) && promptTokens >= 0
           ? Math.floor(promptTokens)

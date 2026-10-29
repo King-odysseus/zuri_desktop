@@ -455,6 +455,61 @@ assert.equal(openAiRequest.body.messages[1].tool_calls[0].id, 'call_1', 'an assi
 assert.equal(openAiRequest.body.messages[2].tool_call_id, 'call_1', 'a tool result must name the call it answers');
 assert.equal(openAiResult.toolCalls[0].name, 'readFile');
 
+// DeepSeek Flash thinks in the open before it answers, and refuses the next round unless
+// that thinking comes back with the calls. It streams, so the stream must gather it, and
+// it must travel inside the assistant turn, not as words the person reads.
+let echoedRequest;
+const thinkingClient = createDeepSeekClient({
+  apiKey: 'test-key',
+  fetchImpl: async (_url, request) => {
+    const body = JSON.parse(request.body);
+    echoedRequest = body;
+    const call = { id: 'call_9', type: 'function', function: { name: 'readFile', arguments: JSON.stringify({ path: 'a.txt' }) } };
+    // The round that asks for the file is streamed and carries the thinking; the
+    // round that answers it is not streamed, so the same stub has to answer both.
+    if (body.stream !== true) {
+      return new Response(JSON.stringify({
+        id: 'chat_x',
+        model: 'deepseek-flash',
+        choices: [{ message: { role: 'assistant', content: 'Read it.' } }],
+        usage: { prompt_tokens: 3, completion_tokens: 2 },
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    const LF = String.fromCharCode(10);
+    const frames = [
+      { choices: [{ delta: { reasoning_content: 'It needs the file. ' } }] },
+      { choices: [{ delta: { reasoning_content: 'So read a.txt.' } }] },
+      { choices: [{ delta: { tool_calls: [{ index: 0, id: call.id, function: call.function }] } }] },
+      { choices: [], usage: { prompt_tokens: 7, completion_tokens: 3 } },
+    ];
+    const text = frames.map((frame) => 'data: ' + JSON.stringify(frame) + LF + LF).join('') + 'data: [DONE]' + LF + LF;
+    return new Response(text, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+  },
+});
+const painted = [];
+const thinkingResult = await thinkingClient({
+  messages: [{ role: 'user', content: 'Read a.txt' }],
+  model: 'deepseek-flash',
+  maxTokens: 100,
+  tools: [readFileTool],
+  onDelta: (text) => painted.push(text),
+});
+assert.equal(thinkingResult.reasoningContent, 'It needs the file. So read a.txt.', 'the thinking is gathered from a streamed reply');
+assert.equal(painted.length, 0, 'the thinking is never painted as the answer');
+
+// And it goes back on the assistant turn, or the supplier refuses the round.
+await thinkingClient({
+  messages: [
+    { role: 'user', content: 'Read a.txt' },
+    { role: 'assistant', content: '', toolCalls: [{ id: 'call_9', name: 'readFile', arguments: '{"path":"a.txt"}' }], reasoningContent: 'It needs the file. ' },
+    { role: 'tool', toolCallId: 'call_9', content: 'body' },
+  ],
+  model: 'deepseek-flash',
+  maxTokens: 100,
+  tools: [readFileTool],
+});
+assert.equal(echoedRequest.messages[1].reasoning_content, 'It needs the file. ', 'the thinking must come back with the call');
+
 /** @returns {Promise<Error | null>} The refusal, or null when the call succeeded. */
 async function refusalOf(client, input = {}) {
   try {
