@@ -102,7 +102,7 @@ npm run dist
 ```
 
 The installer is written to `release\Zuri-<version>-Setup.exe` (for this version,
-`release\Zuri-0.2.2-Setup.exe`), next to an unpacked copy of the app in
+`release\Zuri-0.2.3-Setup.exe`), next to an unpacked copy of the app in
 `release\win-unpacked`. `release/` is gitignored, so a build never lands in the repository.
 
 `npm run dist` packages whatever `dist-react` already holds and does not rebuild it, so run
