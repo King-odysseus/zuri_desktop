@@ -1715,6 +1715,15 @@ check('Word paragraph writes use portable built-in styles', () => {
   return 'invalid display names cannot cancel the whole Word write';
 });
 
+check('the Office pane shows thinking before the first streamed token', () => {
+  const script = read('src/addin/taskpane.js');
+  const css = read('src/addin/taskpane.css');
+  if (!script.includes("paintAssistant(body, message);")) throw new Error('the empty assistant row is not painted immediately');
+  if (!script.includes("el('div', 'ops-open', 'Thinking...')")) throw new Error('the pane has no thinking state');
+  if (!css.includes('.streaming .bubble::after')) throw new Error('the streaming typing indicator is missing');
+  return 'the pane shows Thinking... immediately and keeps a live cursor while text streams';
+});
+
 check('the admin route is reachable before the server checks the account', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
   const admin = read('web/src/views/AdminView.jsx');

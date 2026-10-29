@@ -1023,6 +1023,9 @@
     pane.empty.classList.add('is-hidden');
     pane.thread.appendChild(node);
     state.streamNode = body;
+    // Paint the waiting state before the first network token arrives. Without this,
+    // a slow provider leaves a blank assistant row even though the request is active.
+    paintAssistant(body, message);
     scrollToEnd(true);
 
     var controller = new AbortController();

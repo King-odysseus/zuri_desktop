@@ -1,3 +1,10 @@
+## 2026-10-29 - Windows (Office add-in shows thinking while replies stream)
+
+- The Office pane now paints a visible "Thinking..." card as soon as a request starts, instead of leaving an empty assistant row until the first token arrives. The existing streaming cursor remains active while reply text is being received.
+- Key files: src/addin/taskpane.js, scripts/selftest.js.
+- Other OS action: run "npm run test". No new dependency and no database change.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (the other tabs are as simple as ChatGPT's)
 
 - Every tab besides chat is now one centred column with a plain title, flat rows separated by a thin line, and one main action, instead of boxed cards inside cards. Desktop: Settings, Zuri Cloud, Features, Agents, Skills, Automations, Tasks, Reminders, Files, History and Search. Web: Overview, Usage and limits, Plans and Billing. Nothing was removed: every setting, number, button and message is still there.
