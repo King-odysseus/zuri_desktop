@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, InlineAlert } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
 import { blobFromBase64, deletePicture, listPictures, savePicture } from '../lib/imageStore.js';
-import { DeleteIcon, DownloadIcon, ImageIcon, RegenerateIcon } from '../components/Icons.jsx';
+import { ChevronDownIcon, DeleteIcon, DownloadIcon, ImageIcon, RegenerateIcon } from '../components/Icons.jsx';
 
 const SHAPES = [['square', 'Square'], ['portrait', 'Portrait'], ['landscape', 'Landscape']];
 const IMPROVE_KEY = 'zuri-improve-image-prompt';
@@ -126,24 +126,42 @@ export default function ImagesView() {
         </div>
       </div>
 
+      {/*
+        * The picture box is built like the chat composer rather than as a form: one
+        * surface holds the description, and the controls sit inside its bottom edge,
+        * so writing a picture reads as the same act as writing a message.
+        */}
       <form className="image-maker" onSubmit={(event) => void make(event)}>
         <textarea
-          className="project-textarea"
-          rows={3}
+          className="image-prompt"
+          rows={2}
           maxLength={2000}
           value={prompt}
           onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            // The composer rule, as in the chat: Enter makes the picture and
+            // Shift+Enter starts a new line. An IME pick arrives as Enter, and that
+            // is text, not a request to draw.
+            if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent?.isComposing) return;
+            event.preventDefault();
+            void make(event);
+          }}
           placeholder="A market in Lagos at sunset, painted in warm watercolours"
           aria-label="Describe the picture"
         />
         <div className="image-options">
-          <select className="project-input" value={modelCode} onChange={(event) => setModelCode(event.target.value)} aria-label="Picture model">
-            {models.map((model) => (
-              <option key={model.code} value={model.code} disabled={!model.available}>
-                {model.name}{model.available ? '' : ` (needs the ${model.minPlan} plan)`}
-              </option>
-            ))}
-          </select>
+          {/* The model is named the way the chat composer names its own: a quiet chip
+              with a chevron, so the tray holds controls rather than form fields. */}
+          <span className="image-model-slot">
+            <select className="image-model" value={modelCode} onChange={(event) => setModelCode(event.target.value)} aria-label="Picture model">
+              {models.map((model) => (
+                <option key={model.code} value={model.code} disabled={!model.available}>
+                  {model.name}{model.available ? '' : ` (needs the ${model.minPlan} plan)`}
+                </option>
+              ))}
+            </select>
+            <ChevronDownIcon size={14} aria-hidden="true" />
+          </span>
           <div role="radiogroup" aria-label="Picture shape" className="image-shapes">
             {SHAPES.map(([value, label]) => (
               <button key={value} type="button" role="radio" aria-checked={shape === value} className={`image-shape${shape === value ? ' is-active' : ''}`} onClick={() => setShape(value)}>
@@ -162,7 +180,7 @@ export default function ImagesView() {
             />
             Improve my description
           </label>
-          <Button type="submit" disabled={busy || prompt.trim() === '' || modelCode === ''}>
+          <Button type="submit" className="image-make" disabled={busy || prompt.trim() === '' || modelCode === ''}>
             <ImageIcon size={16} aria-hidden="true" />
             {busy ? 'Drawing...' : 'Make picture'}
           </Button>

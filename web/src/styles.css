@@ -4438,48 +4438,209 @@ h4,
   gap: 16px;
 }
 
+/*
+ * The picture box is the chat composer with a taller field: one surface, the words
+ * on top, and the controls tucked inside its bottom edge. A bordered textarea with a
+ * row of buttons underneath reads as a form to fill in, which is not how the rest of
+ * Zuri asks for something.
+ */
 .image-maker {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 2px;
+  padding: 10px 12px 10px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-2xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
 }
 
+/* The surface owns the border, so the whole box answers a click and shows the
+   focused state, exactly as the composer does. */
+.image-maker:focus-within {
+  border-color: var(--strong);
+}
+
+/* The field is only the writing area: a second border inside this one would read as
+   two controls stacked rather than one place to type. */
+.image-prompt {
+  width: 100%;
+  min-height: 4.5rem;
+  max-height: 16rem;
+  padding: 8px 2px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: 15px/1.55 "Segoe UI", system-ui, sans-serif;
+  resize: none;
+  overflow-y: auto;
+  /* The scrollbar is kept out of sight until the text really is longer than the
+     box, so a short description never shows a second control down its middle. */
+  scrollbar-width: none;
+}
+
+.image-prompt::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.image-prompt:focus {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-color: transparent;
+}
+
+.image-prompt::placeholder {
+  color: var(--muted);
+}
+
+/* The tray inside the surface. It wraps instead of scrolling sideways, so every
+   control stays reachable when the window is narrow. */
 .image-options {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  padding-top: 4px;
 }
 
-.image-options select {
+/* The model chip, named the way the chat composer names its model: quiet text with a
+   chevron. The select keeps its native menu and keyboard behaviour; only its paint is
+   replaced, which is why the chevron is drawn beside it. */
+.image-model-slot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  max-width: 200px;
+}
+
+.image-model-slot > svg {
+  position: absolute;
+  right: 8px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+.image-model {
+  appearance: none;
+  /* The chip hugs the name it is showing rather than the longest name in the list,
+     so the chevron sits beside the text instead of a hand's width after it. A browser
+     without field-sizing falls back to the list's own width, which is looser, never
+     broken. */
+  field-sizing: content;
   width: auto;
-  min-width: 200px;
+  max-width: 100%;
+  min-height: 34px;
+  padding: 0 26px 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--muted);
+  font: 500 13px/1 "Segoe UI", system-ui, sans-serif;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.image-model:hover {
+  border-color: var(--hairline);
+  background: var(--surface-secondary);
+  color: var(--text);
+}
+
+.image-model option {
+  background: var(--surface);
+  color: var(--text);
 }
 
 .image-shapes {
   display: inline-flex;
-  gap: 4px;
+  flex: 0 0 auto;
+  gap: 2px;
 }
 
 .image-shape {
-  min-height: 44px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
   border-radius: var(--radius-lg);
+  background: transparent;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
+  cursor: pointer;
 }
 
-.image-shape.is-active {
+.image-shape:hover {
   background: var(--surface-secondary);
   color: var(--text);
+}
+
+/* The chosen shape is the app's selected state, not a slightly darker hover, so the
+   one in force stays obvious while the pointer is somewhere else. */
+.image-shape.is-active {
+  background: var(--selected);
+  color: var(--selected-foreground);
+  font-weight: 600;
 }
 
 .image-improve {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 4px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+/* Last in the tray, where a composer puts Send. */
+.image-make {
+  margin-left: auto;
+  min-height: 36px;
+  padding: 0 14px;
+  font-size: 13.5px;
+}
+
+/* A phone taps these rather than clicks them, so the tray keeps the 44px target even
+   though the wide layout is tighter, and the chip takes the width it needs since the
+   names are long ("Zuri Studio (needs the Max plan)"). */
+@media (max-width: 560px) {
+  .image-maker {
+    padding: 8px 10px 10px 12px;
+    border-radius: var(--radius-xl);
+  }
+
+  .image-prompt {
+    /* 16px stops iOS zooming the page when the field takes focus. */
+    font-size: 16px;
+  }
+
+  .image-options {
+    row-gap: 8px;
+  }
+
+  .image-model-slot {
+    /* The chip keeps the width of the name it shows and the shapes follow it on the
+       same line; stretching it would push its chevron away from its own label. */
+    flex: 0 0 auto;
+    max-width: 100%;
+  }
+
+  .image-model,
+  .image-shape,
+  .image-improve,
+  .image-make {
+    min-height: 44px;
+  }
+
+  .image-make {
+    /* Still last in the tray, still its own width. */
+    margin-left: auto;
+  }
 }
 
 .image-search {
