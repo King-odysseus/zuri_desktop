@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
 import { Button, IconButton } from '../components/ui.jsx';
-import { BellIcon, ChartIcon, CardIcon, CloseIcon, FolderIcon, GridIcon, ImageIcon, LogoMark, MenuIcon, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, ReceiptIcon, ShieldIcon, SignOutIcon, SunIcon, TaskIcon } from '../components/Icons.jsx';
+import { AutomationIcon, BellIcon, ChartIcon, CardIcon, CloseIcon, FolderIcon, GridIcon, ImageIcon, LogoMark, MenuIcon, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, ReceiptIcon, ShieldIcon, SignOutIcon, SunIcon, TaskIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
@@ -14,6 +14,7 @@ import ProjectsView from './ProjectsView.jsx';
 import ImagesView from './ImagesView.jsx';
 import TasksView from './TasksView.jsx';
 import RemindersView from './RemindersView.jsx';
+import AutomationsView from './AutomationsView.jsx';
 
 const COLLAPSE_KEY = 'zuri-cloud-nav-collapsed';
 
@@ -32,6 +33,7 @@ export const NAV_ITEMS = [
   { id: 'projects', label: 'Projects', icon: <FolderIcon /> },
   { id: 'tasks', label: 'Tasks', icon: <TaskIcon /> },
   { id: 'reminders', label: 'Reminders', icon: <BellIcon /> },
+  { id: 'automations', label: 'Automations', icon: <AutomationIcon /> },
   { id: 'images', label: 'Images', icon: <ImageIcon /> },
   { id: 'overview', label: 'Overview', icon: <GridIcon /> },
   { id: 'usage', label: 'Usage and limits', icon: <ChartIcon /> },
@@ -211,6 +213,7 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           )}
           {view === 'tasks' && <TasksView />}
           {view === 'reminders' && <RemindersView />}
+          {view === 'automations' && <AutomationsView />}
           {view === 'images' && <ImagesView />}
           {view === 'overview' && (
             <OverviewView me={account.me} usage={account.usage} onViewChange={onViewChange} />

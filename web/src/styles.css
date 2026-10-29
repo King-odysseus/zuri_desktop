@@ -5647,3 +5647,49 @@ h4,
   color: var(--text);
   overflow-wrap: anywhere;
 }
+
+/* An automation's own history, opened inside its row. It takes the whole row width
+   below the words, as the delete question does, so a phone never has to fit an
+   answer beside a title. Everything else on the page is the shared reminder list. */
+.automation-runs {
+  display: flex;
+  flex: 1 1 100%;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0 4px;
+}
+
+.automation-run {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+}
+
+.automation-run-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* The answer is plain text, so the line breaks it was written with are kept here
+   rather than collapsed, and a long URL wraps instead of widening the page. */
+.automation-run-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The instruction is a sentence, not a title, so the field is a textarea and may
+   be dragged taller; the shared input class gives it everything else. */
+.automation-prompt {
+  min-height: 76px;
+  resize: vertical;
+}

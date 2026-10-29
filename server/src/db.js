@@ -75,6 +75,14 @@ export const TASK_NOTES_MAX_LENGTH = 2000;
 export const TASK_DUE_MAX_LENGTH = 40;
 export const REMINDER_LIMIT = 200;
 export const REMINDER_TITLE_MAX_LENGTH = 200;
+// An automation is run by the service on its own, so the cap is far lower than a
+// to-do list's: each row is recurring work this server pays for, not a note.
+export const AUTOMATION_LIMIT = 20;
+// Long enough for "check X and summarise anything new", short enough that the row
+// cannot become a place to keep a document.
+export const AUTOMATION_PROMPT_MAX_LENGTH = 1000;
+// How much of one automation's history a screen reads at once.
+export const AUTOMATION_RUN_LIMIT = 20;
 
 // The only values the Tasks and Reminders screens know how to draw. A value outside
 // these lists would be stored and then shown as nothing, so a route refuses it before
@@ -224,6 +232,59 @@ function publicReminder(row) {
     timeOfDay: row.time_of_day ?? null,
     done: row.done === true,
     createdAt: row.created_at,
+  };
+}
+
+/**
+ * A timestamptz as an ISO string. The driver hands back a Date for a timestamptz and
+ * a string for anything already serialised, and a client reading one of each would
+ * add a timezone of its own to the second.
+ * @param {unknown} value @returns {string}
+ */
+function instant(value) {
+  return value instanceof Date ? value.toISOString() : String(value);
+}
+
+/**
+ * One automation, in the shape every client reads.
+ *
+ * The cadence goes out as one object even though it is stored as three columns: a
+ * screen and the chat card both want "every day at 07:00" as a single thing, and
+ * only the scheduler cares which column held it.
+ * @param {object} row @returns {object}
+ */
+function publicAutomation(row) {
+  const type = String(row.cadence_type ?? 'daily');
+  const minutes = row.interval_minutes === null || row.interval_minutes === undefined ? null : Number(row.interval_minutes);
+  const cadence = { type };
+  if (type === 'interval' && minutes !== null) cadence.minutes = minutes;
+  if (type === 'daily' && row.time_of_day) cadence.timeOfDay = String(row.time_of_day);
+  // A one-off has no rule of its own: when it runs is the whole rule, so the next
+  // run doubles as the cadence's own time.
+  if (type === 'once' && row.next_run_at) cadence.at = instant(row.next_run_at);
+  return {
+    id: row.id,
+    prompt: row.prompt,
+    cadence,
+    enabled: row.enabled === true,
+    deliverEmail: row.deliver_email === true,
+    nextRunAt: row.next_run_at ? instant(row.next_run_at) : null,
+    lastRunAt: row.last_run_at ? instant(row.last_run_at) : null,
+    lastStatus: String(row.last_status ?? ''),
+    createdAt: row.created_at,
+  };
+}
+
+/** One finished or in-flight run of an automation. */
+function publicAutomationRun(row) {
+  return {
+    id: row.id,
+    startedAt: instant(row.started_at),
+    finishedAt: row.finished_at ? instant(row.finished_at) : null,
+    status: String(row.status ?? 'ok'),
+    text: String(row.text ?? ''),
+    error: String(row.error ?? ''),
+    searches: Number(row.searches ?? 0),
   };
 }
 
@@ -1611,6 +1672,210 @@ export function createRepository(pool) {
       if (!isUuid(id)) return 0;
       const result = await pool.query('DELETE FROM reminders WHERE id = $1 AND user_id = $2', [id, userId]);
       return result.rowCount;
+    },
+    /**
+     * The account's automations, newest first.
+     * @param {string} userId
+     * @returns {Promise<object[]>}
+     */
+    /**
+     * Who owns an automation, and on what plan.
+     *
+     * An automation runs with nobody signed in, so there is no session to read the
+     * account from the way every request-driven route does. The scheduler still has
+     * to bill the right subscription and know where to send the result, which is what
+     * this one lookup is for. A lapsed account answers null, so its automations are
+     * skipped rather than run for free.
+     * @param {string} userId
+     * @returns {Promise<{ email: string, displayName: string, subscriptionId: string, planCode: string, status: string } | null>}
+     */
+    async findAutomationOwner(userId) {
+      if (!isUuid(userId)) return null;
+      const result = await pool.query(
+        'SELECT u.email, u.display_name, s.id AS subscription_id, s.plan_code, s.status ' +
+          'FROM users u JOIN subscriptions s ON s.user_id = u.id ' +
+          "WHERE u.id = $1 AND u.status = 'active' AND s.status IN ('active', 'past_due') LIMIT 1",
+        [userId],
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      return {
+        email: String(row.email ?? ''),
+        displayName: String(row.display_name ?? ''),
+        subscriptionId: row.subscription_id,
+        planCode: String(row.plan_code ?? ''),
+        status: String(row.status ?? ''),
+      };
+    },
+    async listAutomations(userId) {
+      const result = await pool.query(
+        'SELECT id, prompt, cadence_type, interval_minutes, time_of_day, enabled, deliver_email, next_run_at, last_run_at, last_status, created_at FROM automations ' +
+          'WHERE user_id = $1 ORDER BY created_at DESC, id LIMIT $2',
+        [userId, AUTOMATION_LIMIT],
+      );
+      return result.rows.map(publicAutomation);
+    },
+    /**
+     * Save one automation.
+     *
+     * The route has already checked the cadence and worked out when it first runs,
+     * because that arithmetic belongs beside the scheduler rather than in SQL. The
+     * cap is decided inside the insert, as a task's and a reminder's are, so two
+     * requests at once cannot both pass a separate count first.
+     * @param {{ userId: string, prompt: string, cadenceType: string, intervalMinutes?: number|null, timeOfDay?: string|null, deliverEmail?: boolean, nextRunAt: string }} automation
+     * @returns {Promise<object>}
+     */
+    async createAutomation({ userId, prompt, cadenceType, intervalMinutes = null, timeOfDay = null, deliverEmail = false, nextRunAt }) {
+      const result = await pool.query(
+        'INSERT INTO automations (user_id, prompt, cadence_type, interval_minutes, time_of_day, deliver_email, next_run_at) ' +
+          'SELECT u.id, $2::text, $3::text, $4::integer, $5::text, $6::boolean, $7::timestamptz FROM users u ' +
+          'WHERE u.id = $1::uuid ' +
+          'AND (SELECT COUNT(*) FROM automations WHERE user_id = $1::uuid) < $8::integer ' +
+          'RETURNING id, prompt, cadence_type, interval_minutes, time_of_day, enabled, deliver_email, next_run_at, last_run_at, last_status, created_at',
+        [userId, prompt, cadenceType, intervalMinutes, timeOfDay, deliverEmail === true, nextRunAt, AUTOMATION_LIMIT],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('This account already holds as many automations as it can run.');
+        error.code = 'AUTOMATION_LIMIT';
+        throw error;
+      }
+      return publicAutomation(row);
+    },
+    /**
+     * Pause or resume one automation.
+     *
+     * Resuming does not move next_run_at forward on its own. A row whose turn passed
+     * while it was paused is therefore due at once, runs a single time and then
+     * advances, which is the same "replay a missed turn once" rule the desktop
+     * scheduler follows. The caller passes nextRunAt only when the row has none left,
+     * which is a one-off that already fired.
+     * @param {{ userId: string, id: string, enabled: boolean, nextRunAt?: string|null }} change
+     * @returns {Promise<object|null>}
+     */
+    async updateAutomation({ userId, id, enabled, nextRunAt = undefined }) {
+      if (!isUuid(id)) return null;
+      const setNext = nextRunAt === undefined ? '' : ', next_run_at = $4::timestamptz';
+      const values = nextRunAt === undefined ? [id, userId, enabled] : [id, userId, enabled, nextRunAt];
+      const result = await pool.query(
+        `UPDATE automations SET enabled = $3::boolean${setNext} WHERE id = $1 AND user_id = $2 ` +
+          'RETURNING id, prompt, cadence_type, interval_minutes, time_of_day, enabled, deliver_email, next_run_at, last_run_at, last_status, created_at',
+        values,
+      );
+      const row = result.rows[0];
+      return row ? publicAutomation(row) : null;
+    },
+    /**
+     * Delete one automation. Its runs go with it, through the cascade on the table.
+     * @param {{ userId: string, id: string }} automation
+     * @returns {Promise<number>}
+     */
+    async deleteAutomation({ userId, id }) {
+      if (!isUuid(id)) return 0;
+      const result = await pool.query('DELETE FROM automations WHERE id = $1 AND user_id = $2', [id, userId]);
+      return result.rowCount;
+    },
+    /**
+     * One automation's recent runs, newest first.
+     *
+     * Scoped on the owner as well as the automation, so a crafted id from one account
+     * cannot read another account's results.
+     * @param {{ userId: string, automationId: string, limit?: number }} query
+     * @returns {Promise<object[]>}
+     */
+    async listAutomationRuns({ userId, automationId, limit = AUTOMATION_RUN_LIMIT }) {
+      if (!isUuid(automationId)) return [];
+      const capped = Math.min(Math.max(Math.trunc(Number(limit) || AUTOMATION_RUN_LIMIT), 1), AUTOMATION_RUN_LIMIT);
+      const result = await pool.query(
+        'SELECT id, started_at, finished_at, status, text, error, searches FROM automation_runs ' +
+          'WHERE automation_id = $1 AND user_id = $2 ORDER BY started_at DESC, id LIMIT $3',
+        [automationId, userId, capped],
+      );
+      return result.rows.map(publicAutomationRun);
+    },
+    /**
+     * Take every automation whose turn has come, and take each one exactly once.
+     *
+     * The claim is the whole point of this query. next_run_at is cleared in the same
+     * statement that selects the row, so a second sweep cannot pick the same row up,
+     * whether that sweep is the next tick arriving while a slow run is still going or
+     * a second instance of this service: the row is no longer due. settleAutomation
+     * puts the next time back when the run ends. SKIP LOCKED means two sweeps racing
+     * take different rows rather than one waiting on the other.
+     *
+     * The cost of that choice is that a crash mid-run leaves a row with no next time,
+     * which is what listStalledAutomations and the boot re-arm repair.
+     * @param {{ now: string, limit?: number }} sweep
+     * @returns {Promise<object[]>} The claimed rows, each carrying its owner.
+     */
+    async claimDueAutomations({ now, limit = 25 }) {
+      const capped = Math.min(Math.max(Math.trunc(Number(limit) || 25), 1), 100);
+      const result = await pool.query(
+        'UPDATE automations SET next_run_at = NULL, last_run_at = $1::timestamptz ' +
+          'WHERE id IN (' +
+          '  SELECT id FROM automations' +
+          '  WHERE enabled = TRUE AND next_run_at IS NOT NULL AND next_run_at <= $1::timestamptz' +
+          '  ORDER BY next_run_at ASC LIMIT $2::integer FOR UPDATE SKIP LOCKED' +
+          ') ' +
+          'RETURNING id, prompt, cadence_type, interval_minutes, time_of_day, enabled, deliver_email, next_run_at, last_run_at, last_status, created_at, user_id',
+        [now, capped],
+      );
+      // user_id is wanted here, which publicAutomation deliberately leaves out: the
+      // scheduler has to know whose account to bill and whom to send the result to.
+      return result.rows.map((row) => ({ ...publicAutomation(row), userId: row.user_id }));
+    },
+    /**
+     * Every enabled automation that is armed for nothing, so the scheduler can give
+     * it a next time again. This is the repair for a process that died mid-run.
+     * @returns {Promise<object[]>}
+     */
+    async listStalledAutomations() {
+      const result = await pool.query(
+        'SELECT id, prompt, cadence_type, interval_minutes, time_of_day, enabled, deliver_email, next_run_at, last_run_at, last_status, created_at FROM automations WHERE enabled = TRUE AND next_run_at IS NULL LIMIT 200',
+      );
+      return result.rows.map(publicAutomation);
+    },
+    /**
+     * Record how a run ended and when the automation next runs.
+     *
+     * A null nextRunAt is how a one-off retires: it has fired, so it is switched off
+     * rather than left armed for a time that will never come round again.
+     * @param {{ id: string, lastStatus: string, nextRunAt: string|null }} outcome
+     * @returns {Promise<void>}
+     */
+    async settleAutomation({ id, lastStatus, nextRunAt }) {
+      if (!isUuid(id)) return;
+      await pool.query(
+        'UPDATE automations SET last_status = $2::text, next_run_at = $3::timestamptz, ' +
+          'enabled = CASE WHEN $3::timestamptz IS NULL THEN FALSE ELSE enabled END ' +
+          'WHERE id = $1',
+        [id, String(lastStatus ?? ''), nextRunAt],
+      );
+    },
+    /**
+     * Open a run row, so an automation that is working is visible before it finishes
+     * and a crash still leaves a record that it started.
+     * @param {{ automationId: string, userId: string }} run
+     * @returns {Promise<string>} The new run's id.
+     */
+    async startAutomationRun({ automationId, userId }) {
+      const result = await pool.query(
+        'INSERT INTO automation_runs (automation_id, user_id) VALUES ($1, $2) RETURNING id',
+        [automationId, userId],
+      );
+      return result.rows[0].id;
+    },
+    /**
+     * Close a run row with what it produced.
+     * @param {{ id: string, status: string, text?: string, error?: string, searches?: number }} run
+     * @returns {Promise<void>}
+     */
+    async finishAutomationRun({ id, status, text = '', error = '', searches = 0 }) {
+      if (!isUuid(id)) return;
+      await pool.query(
+        'UPDATE automation_runs SET finished_at = NOW(), status = $2::text, text = $3::text, error = $4::text, searches = $5::integer WHERE id = $1',
+        [id, String(status ?? 'ok'), String(text ?? ''), String(error ?? ''), Math.max(0, Math.trunc(Number(searches) || 0))],
+      );
     },
     /**
      * Store one picture and hand back its public shape.

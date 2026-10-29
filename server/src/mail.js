@@ -1,6 +1,10 @@
 const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 const MAIL_TIMEOUT_MS = 10_000;
 const RESET_SUBJECT = 'Reset your Zuri Cloud password';
+const AUTOMATION_SUBJECT = 'Zuri has something for you';
+// A subject carrying the person's own words is the one they recognise in a list of
+// mail, so the prompt leads it. Trimmed, because a subject line is not a paragraph.
+const AUTOMATION_SUBJECT_MAX = 60;
 const DEFAULT_FROM_NAME = 'Zuri Cloud';
 
 /** @param {unknown} value @returns {string} */
@@ -35,6 +39,36 @@ export function passwordResetBody(link) {
     '',
     'Zuri Cloud',
   ].join('\n');
+}
+
+/**
+ * What one finished automation says in an email.
+ *
+ * Plain text for the same reason the reset mail is: a result carries links from a
+ * search, and an HTML part would mean escaping every one of them for no gain. The
+ * answer goes in as the model wrote it, markdown and all, which reads perfectly well
+ * as plain text and is what the person sees on the Automations page too.
+ * @param {{ prompt: string, text: string, failure?: string }} run
+ * @returns {string}
+ */
+export function automationResultBody({ prompt, text: answer, failure: why = '' }) {
+  const asked = text(prompt);
+  const lines = ['Hello,', '', `This is the scheduled run of: ${asked}`, ''];
+  if (text(why) !== '') {
+    lines.push(`It did not finish this time: ${text(why)}`, '', 'It will try again at its next scheduled time.');
+  } else {
+    lines.push(text(answer) === '' ? 'It finished but produced no answer this time.' : text(answer));
+  }
+  lines.push('', 'You set this up in Zuri. Open the Automations page in Zuri to pause or remove it.', '', 'Zuri Cloud');
+  return lines.join('\n');
+}
+
+/** The subject for one result, led by the person's own words. */
+export function automationResultSubject(prompt) {
+  const asked = text(prompt);
+  if (asked === '') return AUTOMATION_SUBJECT;
+  const short = asked.length > AUTOMATION_SUBJECT_MAX ? `${asked.slice(0, AUTOMATION_SUBJECT_MAX - 3)}...` : asked;
+  return `Zuri: ${short}`;
 }
 
 /**
@@ -83,6 +117,23 @@ export function createMailer({ apiKey = '', from = '', fromName = '', endpoint =
     async sendPasswordReset({ to, link } = {}) {
       if (!configured) return { sent: false, reason: 'not_configured' };
       return send({ to, subject: RESET_SUBJECT, body: passwordResetBody(text(link)) });
+    },
+    /**
+     * Send what one scheduled automation produced.
+     *
+     * Answers { sent: false } rather than throwing when mail is not configured, as
+     * the reset does: a run that worked must not be recorded as a failure merely
+     * because this deployment has no mail key.
+     * @param {{ to?: string, prompt?: string, text?: string, failure?: string }} [request]
+     */
+    async sendAutomationResult({ to, prompt = '', text: answer = '', failure: why = '' } = {}) {
+      if (!configured) return { sent: false, reason: 'not_configured' };
+      if (text(to) === '') return { sent: false, reason: 'no_recipient' };
+      return send({
+        to,
+        subject: automationResultSubject(prompt),
+        body: automationResultBody({ prompt, text: answer, failure: why }),
+      });
     },
   };
 }

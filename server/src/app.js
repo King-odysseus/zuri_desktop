@@ -6,10 +6,11 @@ import { findPlan, PLANS, publicPlan } from './plans.js';
 import { findTopupPack, publicTopupPack, TOPUP_PACKS } from './topups.js';
 import { usageStatus } from './usage.js';
 import { createRequestLimiter, limitsForPlan, PLAN_LIMITS } from './limits.js';
+import { checkedCadence, firstRunAt } from './automations.js';
 import { DEFAULT_MODELS, canUseModel, findModel, imagePriceKobo, imageSupplierCostMicroUsd, isImageModel, limitsForModel, microUsdToKobo, publicImageModel, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
 import { verifyPaystackSignature } from './paystack.js';
 import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
-import { CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH, REMINDER_REPEATS, REMINDER_TITLE_MAX_LENGTH, STORED_FILE_MAX_BYTES, TASK_DUE_MAX_LENGTH, TASK_NOTES_MAX_LENGTH, TASK_PRIORITIES, TASK_TITLE_MAX_LENGTH } from './db.js';
+import { AUTOMATION_PROMPT_MAX_LENGTH, CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH, REMINDER_REPEATS, REMINDER_TITLE_MAX_LENGTH, STORED_FILE_MAX_BYTES, TASK_DUE_MAX_LENGTH, TASK_NOTES_MAX_LENGTH, TASK_PRIORITIES, TASK_TITLE_MAX_LENGTH } from './db.js';
 import { ALLOWED_UPLOAD_TYPES, checkedAttachment, signUpload } from './uploads.js';
 import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './images.js';
 import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, withResearchRules, answerStyleLength } from './text.js';
@@ -96,6 +97,9 @@ function projectInstructions(value) {
 // project or a chat, and the browser, the phone and the app all read the same shapes.
 const TASKS_PATH = '/api/tasks';
 const REMINDERS_PATH = '/api/reminders';
+// Automations sit beside them for the same reason, and are the one list this service
+// acts on by itself: a row here is run on a schedule by the server, not by a client.
+const AUTOMATIONS_PATH = '/api/automations';
 // Tasks and reminders carry the field names the desktop app already uses in its local
 // files, so a list can move between the two without a translation step.
 // Uploaded pictures live at the top level too: a file belongs to the account, not to
@@ -273,6 +277,25 @@ function checkedReminder(body) {
   }
 
   return checked;
+}
+
+/**
+ * Read and check the body that creates an automation.
+ *
+ * The cadence is checked by the scheduler's own checkedCadence, so the rule the API
+ * accepts and the rule the scheduler can actually run are the same rule rather than
+ * two lists that drift apart.
+ * @param {any} body
+ * @returns {{ ok: true, prompt: string, cadence: object, deliverEmail: boolean } | { ok: false, code: string, message: string }}
+ */
+function checkedAutomation(body) {
+  const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+  if (prompt === '' || prompt.length > AUTOMATION_PROMPT_MAX_LENGTH) {
+    return refusal('AUTOMATION_PROMPT_REQUIRED', `Say what the automation should do, in 1 to ${AUTOMATION_PROMPT_MAX_LENGTH} characters.`);
+  }
+  const cadence = checkedCadence(body?.cadence);
+  if (!cadence.ok) return refusal(cadence.code, cadence.message);
+  return { ok: true, prompt, cadence, deliverEmail: body?.deliverEmail === true };
 }
 
 /**
@@ -1924,6 +1947,88 @@ export function createApp(dependencies = {}) {
         if (error?.code === 'REMINDER_LIMIT') return response(409, { ok: false, error: { code: 'REMINDER_LIMIT_REACHED', message: 'This account already holds as many reminders as it can store. Remove one to add another.' } });
         console.error('[zuri-cloud] reminders', error?.message ?? error);
         return response(500, { ok: false, error: { code: 'REMINDER_FAILED', message: 'That reminder could not be saved.' } });
+      }
+    }
+
+    // Automations: a saved prompt this service runs on a schedule by itself.
+    //
+    // A paid subscription is required to create one, which tasks and reminders are
+    // not: a row here spends model tokens on its own every day, with nobody present
+    // to have agreed to that spend at the time. Reading, pausing and deleting stay
+    // open to any signed-in account, so somebody whose plan lapsed can still see what
+    // is set up and switch it off.
+    if (url.pathname === AUTOMATIONS_PATH || url.pathname.startsWith(`${AUTOMATIONS_PATH}/`)) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (dependencies.repository?.listAutomations === undefined) return response(503, { ok: false, error: { code: 'AUTOMATIONS_NOT_CONFIGURED', message: 'Automations are not configured yet.' } });
+
+      const userId = session.user.id;
+      const [automationId, leaf] = url.pathname.slice(AUTOMATIONS_PATH.length).split('/').filter(Boolean);
+
+      try {
+        if (!automationId) {
+          if (request.method === 'GET') return response(200, { ok: true, data: { automations: await dependencies.repository.listAutomations(userId) } });
+          if (request.method === 'POST') {
+            if (!hasPaidSubscription(session)) {
+              return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to have Zuri run work on a schedule.' } });
+            }
+            const checked = checkedAutomation(await readJson(request));
+            if (!checked.ok) return response(400, { ok: false, error: { code: checked.code, message: checked.message } });
+            const automation = await dependencies.repository.createAutomation({
+              userId,
+              prompt: checked.prompt,
+              cadenceType: checked.cadence.type,
+              intervalMinutes: checked.cadence.intervalMinutes,
+              timeOfDay: checked.cadence.timeOfDay,
+              deliverEmail: checked.deliverEmail,
+              // When it first runs is worked out here rather than in SQL, by the same
+              // function the scheduler uses to advance it afterwards.
+              nextRunAt: firstRunAt(checked.cadence, now()),
+            });
+            return response(200, { ok: true, data: { automation } });
+          }
+          return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST for the automation list.' } });
+        }
+
+        // One automation's history.
+        if (leaf === 'runs') {
+          if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for an automation\'s runs.' } });
+          const runs = await dependencies.repository.listAutomationRuns({ userId, automationId });
+          return response(200, { ok: true, data: { runs } });
+        }
+        if (leaf !== undefined) return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'That address does not exist.' } });
+
+        if (request.method === 'PATCH') {
+          const body = await readJson(request);
+          if (typeof body.enabled !== 'boolean') {
+            return response(400, { ok: false, error: { code: 'AUTOMATION_ENABLED_INVALID', message: 'Send true or false for enabled.' } });
+          }
+          // Resuming a row that has no time left is a one-off that already fired, so
+          // it is given its next turn from now; everything else keeps the time it had,
+          // which is what replays a single missed turn.
+          const existing = (await dependencies.repository.listAutomations(userId)).find((row) => row.id === automationId);
+          if (!existing) return response(404, { ok: false, error: { code: 'AUTOMATION_NOT_FOUND', message: 'That automation does not exist.' } });
+          const rearm = body.enabled === true && existing.nextRunAt === null && existing.cadence.type !== 'once'
+            ? firstRunAt(existing.cadence, now())
+            : undefined;
+          const automation = await dependencies.repository.updateAutomation({ userId, id: automationId, enabled: body.enabled, nextRunAt: rearm });
+          if (!automation) return response(404, { ok: false, error: { code: 'AUTOMATION_NOT_FOUND', message: 'That automation does not exist.' } });
+          return response(200, { ok: true, data: { automation } });
+        }
+
+        if (request.method === 'DELETE') {
+          const removed = await dependencies.repository.deleteAutomation({ userId, id: automationId });
+          if (!removed) return response(404, { ok: false, error: { code: 'AUTOMATION_NOT_FOUND', message: 'That automation does not exist.' } });
+          return response(200, { ok: true, data: { id: automationId } });
+        }
+
+        return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use PATCH or DELETE for one automation.' } });
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'AUTOMATION_LIMIT') return response(409, { ok: false, error: { code: 'AUTOMATION_LIMIT_REACHED', message: 'This account already holds as many automations as it can run. Remove one to add another.' } });
+        console.error('[zuri-cloud] automations', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'AUTOMATION_FAILED', message: 'That automation could not be saved.' } });
       }
     }
 

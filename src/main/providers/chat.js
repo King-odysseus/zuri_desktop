@@ -2018,18 +2018,58 @@ export async function runPrompt(request = {}, options = {}) {
   const config = PROVIDER_CONFIG[provider];
 
   if (typeof options.cloudReply === 'function') {
-    const reply = await options.cloudReply({
-      conversation: {
-        system: chatSystemPrompt({ agentPrompt: agent !== null ? agent.systemPrompt : '', settings }),
-        turns: [{ role: 'user', content: prompt }],
-      },
-      settings,
-      signal: request.signal,
-      emit: (event) => request.onStatus?.(event?.status ?? ''),
-      tools: [],
-    });
-    if (reply?.ok !== true) return reply ?? failure('CHAT_CLOUD_FAILED', 'Zuri could not run that automation.');
-    const text = String(reply.data?.content ?? '').trim();
+    // An unattended run gets exactly one tool: webSearch.
+    //
+    // It used to get none at all, which made every scheduled run answer from memory:
+    // "check for new jobs each morning" could only ever produce a guess, because the
+    // round that would have searched was never offered the tool. Reading the web is
+    // also the one tool that is safe with nobody watching, since it changes nothing;
+    // writing a file, opening an app or creating a record all need a person to agree
+    // at the time, so they stay out.
+    const allowedForRun = Array.isArray(request.allowedTools) ? request.allowedTools : null;
+    const offeredForRun = TOOLS.filter(
+      (tool) => tool.name === 'webSearch' && (allowedForRun === null || allowedForRun.includes(tool.name)),
+    );
+
+    const wire = [{ role: 'user', content: prompt }];
+    const system = chatSystemPrompt({ agentPrompt: agent !== null ? agent.systemPrompt : '', settings });
+    let reply = null;
+
+    for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
+      // The last round offers nothing, so a model that would keep searching has to
+      // write the answer it already has instead of ending the run empty handed.
+      const toolsForRound = round < MAX_TOOL_ROUNDS ? offeredForRun : [];
+      reply = await options.cloudReply({
+        conversation: { system, turns: wire },
+        settings,
+        signal: request.signal,
+        emit: (event) => request.onStatus?.(event?.status ?? ''),
+        tools: toolsForRound,
+      });
+      if (reply?.ok !== true) return reply ?? failure('CHAT_CLOUD_FAILED', 'Zuri could not run that automation.');
+
+      const calls = Array.isArray(reply.data?.toolCalls) ? reply.data.toolCalls.filter((call) => call?.name) : [];
+      if (calls.length === 0) break;
+
+      wire.push({ role: 'assistant', content: reply.data.content || '', toolCalls: calls });
+      for (const call of calls) {
+        const args = parseToolInput(call.arguments);
+        request.onStatus?.(statusForTool(call.name, args));
+        // Only the offered tool may run. A call for anything else is the model
+        // inventing a name, and it is told so rather than silently ignored.
+        const outcome = offeredForRun.some((tool) => tool.name === call.name)
+          ? await runTool(call.name, args, { allowedTools: allowedForRun, confirmed: false })
+          : failure('TOOL_UNKNOWN', `${call.name} is not available in a scheduled run.`);
+        wire.push({
+          role: 'tool',
+          toolCallId: call.id,
+          content: JSON.stringify(outcome).slice(0, TOOL_RESULT_LIMIT),
+        });
+      }
+      request.onStatus?.('');
+    }
+
+    const text = String(reply?.data?.content ?? '').trim();
     if (text === '') return failure('CHAT_EMPTY_REPLY', 'Zuri sent an empty answer for this automation.');
     return { ok: true, data: { text, provider: 'zuri-cloud', model: String(reply.data?.modelCode ?? 'zuri-flash') } };
   }

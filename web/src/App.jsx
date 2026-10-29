@@ -24,7 +24,7 @@ import {
 } from './lib/api.js';
 import { applyTheme, preferredTheme } from './lib/theme.js';
 
-const VIEWS = ['chat', 'projects', 'tasks', 'reminders', 'images', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
+const VIEWS = ['chat', 'projects', 'tasks', 'reminders', 'automations', 'images', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
 const CHAT_PATH = '/chat';
 const LEGAL_PATHS = ['/privacy', '/terms'];
 // The Android app has no marketing page to land on: signed out, it opens on sign-in.

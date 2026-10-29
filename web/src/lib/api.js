@@ -125,6 +125,77 @@ export async function deleteReminder(id) {
   return data ?? { id };
 }
 
+/*
+ * Automations: a saved prompt the server runs on a schedule by itself, with the
+ * web search it needs, and reports back. The browser only ever lists, creates,
+ * pauses and deletes one; the running is the server's own.
+ */
+
+/**
+ * Every automation on the account, paused ones included. The page does the
+ * ordering, so the order the server keeps is not relied on here.
+ * @returns {Promise<Array<{ id: string, prompt: string, cadence: { type: 'once' | 'daily' | 'interval', at?: string, timeOfDay?: string, minutes?: number }, enabled: boolean, deliverEmail: boolean, nextRunAt: string | null, lastRunAt: string | null, lastStatus: 'ok' | 'failed' | '', createdAt: string }>>}
+ */
+export async function listAutomations() {
+  const data = await api('/api/automations');
+  return Array.isArray(data?.automations) ? data.automations : [];
+}
+
+/**
+ * Save one automation. The cadence is passed through as the caller built it,
+ * because only the caller knows which of its three shapes it is; a cadence that
+ * is not an object at all is sent as an empty one so the server's own validation
+ * answers rather than the browser inventing a schedule.
+ * @param {{ prompt: string, cadence: object, deliverEmail?: boolean }} input
+ * @returns {Promise<object>} The stored automation, including the id needed to pause or delete it.
+ */
+export async function createAutomation(input = {}) {
+  const body = {
+    prompt: trimmedText(input.prompt),
+    cadence: input.cadence !== null && typeof input.cadence === 'object' ? input.cadence : {},
+    deliverEmail: Boolean(input.deliverEmail),
+  };
+  const data = await api('/api/automations', { method: 'POST', body: JSON.stringify(body) });
+  return data?.automation ?? {};
+}
+
+/**
+ * Pause an automation, or start it again. Only that one flag is sent: the next
+ * run time is the server's to work out.
+ * @param {string} id
+ * @param {{ enabled: boolean }} patch
+ * @returns {Promise<object>} The automation as the server now holds it.
+ */
+export async function updateAutomation(id, patch = {}) {
+  const data = await api(`/api/automations/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ enabled: Boolean(patch.enabled) }),
+  });
+  return data?.automation ?? {};
+}
+
+/**
+ * Delete one automation.
+ * @param {string} id
+ * @returns {Promise<{ id: string }>}
+ */
+export async function deleteAutomation(id) {
+  const data = await api(`/api/automations/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return data ?? { id };
+}
+
+/**
+ * What one automation has done so far, newest first as the server sends it. This
+ * is asked for per automation rather than with the list, because a history is
+ * only read once somebody opens that row.
+ * @param {string} id
+ * @returns {Promise<Array<{ id: string, startedAt: string, finishedAt: string | null, status: 'ok' | 'failed', text: string, error: string }>>}
+ */
+export async function listAutomationRuns(id) {
+  const data = await api(`/api/automations/${encodeURIComponent(id)}/runs`);
+  return Array.isArray(data?.runs) ? data.runs : [];
+}
+
 const TOKEN_KEY = 'zuri-cloud-token';
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 

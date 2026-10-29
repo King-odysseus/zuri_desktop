@@ -9,6 +9,9 @@ import { createImageClient } from './images.js';
 import { createMailer } from './mail.js';
 import { createPaystackClient } from './paystack.js';
 import { applySchema } from './schema.js';
+import { createAutomationScheduler } from './automations.js';
+import { searchWeb } from './tools.js';
+import { DEFAULT_MODELS } from './models.js';
 
 const config = readConfig();
 const pool = config.databaseUrl ? createDatabase(config.databaseUrl, process.env) : null;
@@ -104,8 +107,42 @@ const app = createApp({
  */
 const serve = createRequestListener({ app, port: config.port });
 
+/**
+ * The automation sweep: the part of this service that acts without being asked.
+ *
+ * It needs a database, so a deployment without one simply has no scheduler and its
+ * automation routes answer "not configured". It is started after the port is open
+ * rather than before, because Railway reads the open port as the service being up
+ * and a slow first sweep should not hold that back.
+ */
+const automations = repository
+  ? createAutomationScheduler({
+    repository,
+    chatProvider,
+    searchWeb,
+    mailer,
+    loadModels: () => (typeof repository.listModels === 'function'
+      ? repository.listModels()
+      : Promise.resolve(DEFAULT_MODELS.map((model) => ({ ...model })))),
+  })
+  : null;
+
 createServer((request, response) => {
   void serve(request, response);
 }).listen(config.port, '0.0.0.0', () => {
   console.log(`[zuri-cloud] listening on ${config.port}`);
+  if (!automations) {
+    console.log('[zuri-cloud] automations are off: there is no database to read them from');
+    return;
+  }
+  // A deploy restarts this process, which can leave an automation that was mid-run
+  // armed for nothing. Re-arming is the repair, and it runs once at boot.
+  automations
+    .rearm()
+    .then((repaired) => {
+      if (repaired > 0) console.log(`[zuri-cloud] re-armed ${repaired} automation(s) left mid-run by a restart`);
+    })
+    .catch((error) => console.error('[zuri-cloud] automation re-arm failed:', error?.message ?? error));
+  automations.start();
+  console.log('[zuri-cloud] automation sweep started');
 });

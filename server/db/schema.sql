@@ -459,3 +459,63 @@ CREATE TABLE IF NOT EXISTS stored_files (
 -- Newest first for one account is the only order this table is ever read in.
 CREATE INDEX IF NOT EXISTS stored_files_user_created_idx
   ON stored_files(user_id, created_at DESC);
+
+-- A saved prompt the server runs by itself on a schedule.
+--
+-- Why this lives on the server rather than in the desktop app's own files: the
+-- desktop scheduler only fires while that computer is awake with Zuri open, so a
+-- 07:00 job check never happened on a laptop that was shut. A row here is run by
+-- the service itself, which is what makes "tell me what you found each morning"
+-- true on a phone as well.
+--
+-- The cadence is three columns rather than one JSON blob because the scheduler
+-- selects on next_run_at in SQL and reads the rule only once a row is due, and
+-- because a malformed blob would be a row that can never be scheduled. Exactly one
+-- of interval_minutes and time_of_day carries the rule, decided by cadence_type;
+-- 'once' needs neither, since next_run_at alone says when.
+CREATE TABLE IF NOT EXISTS automations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  prompt TEXT NOT NULL,
+  cadence_type TEXT NOT NULL DEFAULT 'daily',
+  interval_minutes INTEGER,
+  time_of_day TEXT,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  deliver_email BOOLEAN NOT NULL DEFAULT FALSE,
+  next_run_at TIMESTAMPTZ,
+  last_run_at TIMESTAMPTZ,
+  last_status TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The scheduler's own query: every enabled row anywhere in the service whose turn
+-- has come. It is not scoped to one account, so user_id is deliberately absent and
+-- the index is only what that sweep reads.
+CREATE INDEX IF NOT EXISTS automations_due_idx
+  ON automations(enabled, next_run_at);
+
+-- The Automations screen reads one account's rows, newest first.
+CREATE INDEX IF NOT EXISTS automations_user_created_idx
+  ON automations(user_id, created_at DESC);
+
+-- What one run of an automation produced.
+--
+-- Kept as rows rather than only emailed because the person may read the result on a
+-- phone days later, and because a failed run has to be able to say why rather than
+-- vanish. user_id is repeated from the parent so a read can be scoped to the owner
+-- without a join, which is the guard every other table here uses.
+CREATE TABLE IF NOT EXISTS automation_runs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  automation_id UUID NOT NULL REFERENCES automations(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  finished_at TIMESTAMPTZ,
+  status TEXT NOT NULL DEFAULT 'ok',
+  text TEXT NOT NULL DEFAULT '',
+  error TEXT NOT NULL DEFAULT '',
+  searches INTEGER NOT NULL DEFAULT 0
+);
+
+-- One automation's history, newest first, which is how the screen opens it.
+CREATE INDEX IF NOT EXISTS automation_runs_automation_started_idx
+  ON automation_runs(automation_id, started_at DESC);

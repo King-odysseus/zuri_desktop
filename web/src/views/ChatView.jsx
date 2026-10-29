@@ -19,6 +19,7 @@ import {
   DEFAULT_CHAT_MODEL,
   api,
   appendMessage,
+  createAutomation,
   createConversation,
   createReminder,
   createTask,
@@ -110,6 +111,36 @@ const CREATE_REMINDER_TOOL = {
       timeOfDay: { type: 'string', description: 'Only with repeat daily: the 24-hour time, such as 09:30.' },
     },
     required: ['title', 'dueAt'],
+  },
+};
+
+/*
+ * An automation is the one tool here whose work happens with nobody watching: the
+ * server runs the saved instruction on its own schedule. This chat has no approval
+ * step for any tool, so it is created straight away like the other two, and the
+ * card says plainly that it was created and when it next runs.
+ */
+const CREATE_AUTOMATION_TOOL = {
+  name: 'createAutomation',
+  description: 'Save an instruction for the server to carry out on a schedule by itself, searching the web if it needs to, and report back. Use it when the person asks for something to happen again and again without them asking each time, such as "every morning check for new project manager jobs in Scotland and summarise them". Put the whole instruction in prompt, as a sentence you would be happy to read back later with no other context.',
+  parameters: {
+    type: 'object',
+    properties: {
+      prompt: { type: 'string', description: 'The instruction to carry out each time, in full.' },
+      cadence: {
+        type: 'object',
+        description: 'When it runs. Use type daily with timeOfDay, type interval with minutes, or type once with at.',
+        properties: {
+          type: { type: 'string', enum: ['once', 'daily', 'interval'], description: 'daily, interval or once.' },
+          timeOfDay: { type: 'string', description: 'Only with type daily: the 24-hour time, such as 07:00.' },
+          minutes: { type: 'number', description: 'Only with type interval: minutes between runs.' },
+          at: { type: 'string', description: 'Only with type once: the date and time, like 2026-11-03T09:00.' },
+        },
+        required: ['type'],
+      },
+      deliverEmail: { type: 'boolean', description: 'True only if they asked to be emailed the result.' },
+    },
+    required: ['prompt', 'cadence'],
   },
 };
 
@@ -405,6 +436,50 @@ function toolArguments(call) {
   }
 }
 
+/**
+ * The cadence an automation call is asking for, in the shape the API takes.
+ *
+ * A model can send anything, and a schedule that is nearly right is worse than
+ * none: an automation with an unreadable interval would either never run or run
+ * for ever. So each of the three shapes is checked and only its own field is
+ * passed on, and anything else comes back as a sentence the model can act on.
+ * @param {unknown} value The cadence object the model sent.
+ * @returns {{ value: object } | { error: string }}
+ */
+function automationCadence(value) {
+  const shape = value !== null && typeof value === 'object' ? value : {};
+  const type = typeof shape.type === 'string' ? shape.type.trim().toLowerCase() : '';
+
+  if (type === 'daily') {
+    const time = typeof shape.timeOfDay === 'string' ? shape.timeOfDay.trim() : '';
+    const parts = /^(\d{1,2}):(\d{2})$/.exec(time);
+    if (!parts) return { error: 'A daily automation needs the time of day, written as 07:00, and none was readable. Ask what time it should run.' };
+    // The API stores HH:MM, so a model that wrote 7:00 is padded rather than refused.
+    return { value: { type: 'daily', timeOfDay: `${parts[1].padStart(2, '0')}:${parts[2]}` } };
+  }
+
+  if (type === 'interval') {
+    const minutes = Math.round(Number(shape.minutes));
+    if (!Number.isFinite(minutes) || minutes <= 0) return { error: 'A repeating automation needs the minutes between runs, and none was readable. Ask how often it should run.' };
+    return { value: { type: 'interval', minutes } };
+  }
+
+  if (type === 'once') {
+    const at = new Date(String(shape.at ?? ''));
+    if (Number.isNaN(at.getTime())) return { error: 'A one-off automation needs the moment to run, and none was readable. Ask when it should run.' };
+    return { value: { type: 'once', at: at.toISOString() } };
+  }
+
+  return { error: 'That automation was not saved: its schedule has to be daily, interval or once. Ask which one they want.' };
+}
+
+/** The schedule in the card's own words, lowercased to sit mid-sentence. */
+function automationScheduleWords(automation) {
+  const card = describeNotable('automation', automation);
+  const line = card?.lines?.find((entry) => entry.label === 'Runs');
+  return typeof line?.value === 'string' ? line.value.toLowerCase() : '';
+}
+
 async function runToolCall(call, signal, onStatus, onNotable) {
   const name = typeof call?.name === 'string' ? call.name : '';
   const args = toolArguments(call);
@@ -451,6 +526,30 @@ async function runToolCall(call, signal, onStatus, onNotable) {
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
       return `The reminder was not set: ${error?.message || 'the account refused it.'}`;
+    }
+  }
+
+  if (name === CREATE_AUTOMATION_TOOL.name) {
+    const prompt = typeof args.prompt === 'string' ? args.prompt.trim() : '';
+    if (prompt === '') return 'An automation needs the instruction it should carry out, so nothing was saved. Ask what it should do each time.';
+    const cadence = automationCadence(args.cadence);
+    if (cadence.error) return cadence.error;
+    onStatus('Setting up the automation');
+    try {
+      const automation = await createAutomation({
+        prompt,
+        cadence: cadence.value,
+        // Email is opt-in: only a person who asked for it gets one, so anything
+        // other than a plain true is read as no.
+        deliverEmail: args.deliverEmail === true,
+      });
+      if (signal?.aborted) throw stoppedReply();
+      if (typeof onNotable === 'function') onNotable('automation', automation);
+      const schedule = automationScheduleWords(automation);
+      return `Saved an automation on their Automations page: "${automation?.prompt ?? prompt}"${schedule === '' ? '' : `, running ${schedule}`}. Zuri runs it on the server, so it happens whether or not they are here.`;
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
+      return `The automation was not saved: ${error?.message || 'the account refused it.'}`;
     }
   }
 
@@ -1006,7 +1105,7 @@ export default function ChatView({
        * are added to that copy alone, because saveExchange keeps only the question
        * and the final answer.
        */
-      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL];
+      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL];
       let wire = outgoing;
       let answer = '';
       // One round past the cap, with no tools offered, so a model that keeps
