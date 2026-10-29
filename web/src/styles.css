@@ -3370,6 +3370,45 @@ a.download-card:hover {
   color: var(--text);
 }
 
+/*
+ * The desktop's rewrite row ("Shorter", "More detail", "Explain simply", "As a
+ * table"), carried under the newest reply here. Its 28px height and 0.75rem label
+ * keep it on one line with the 32px round icon buttons it shares the row with: a
+ * full control height would make one worn row look like two stacked ones. nowrap
+ * protects "Explain simply"; the row wraps the whole chip instead, so on a narrow
+ * phone the extra rewrites drop to a second line rather than splitting a label.
+ * A transparent border is kept so the ghost button is the same box as its
+ * neighbours and picks up no browser default.
+ */
+.chat-quick-adjust {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.75rem;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+/* The same wash the icon buttons beside it take, so one row reacts as one row. */
+.chat-quick-adjust:hover {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+
+/* The keyboard gets that wash too: the shared outline alone was easy to miss
+   among four chips of the same size. */
+.chat-quick-adjust:focus-visible {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text);
+}
+
 @media (hover: hover) {
   .chat-turn-user .chat-bubble-actions {
     opacity: 0;

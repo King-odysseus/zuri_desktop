@@ -1652,6 +1652,56 @@ check('web chat prompts can be edited and the latest reply regenerated', () => {
   return 'prompt edit and latest-reply regeneration controls are wired';
 });
 
+// The browser chat shipped for weeks without the row of one-press rewrites the
+// desktop shows, because the four labels lived inside ChatPanel.jsx where the web
+// view could not see them. Asserting the imports is what keeps the list shared;
+// asserting the map call is what keeps the row on the page.
+check('both chats draw the one-press rewrites from the one shared list', () => {
+  const chat = read('web/src/views/ChatView.jsx');
+  const panel = read('src/renderer-react/ChatPanel.jsx');
+  const shared = read('src/renderer-react/answerAdjustments.js');
+
+  const imports = /import\s*\{\s*QUICK_ADJUSTMENTS\s*\}\s*from\s*['"][^'"]*answerAdjustments\.js['"]/;
+  if (!imports.test(chat)) throw new Error('the web chat does not import QUICK_ADJUSTMENTS from answerAdjustments.js');
+  if (!imports.test(panel)) throw new Error('the desktop panel does not import QUICK_ADJUSTMENTS from answerAdjustments.js');
+
+  // A second copy of the labels is the drift this check exists to catch: whichever
+  // surface keeps its own array can lose a rewrite without the other noticing.
+  for (const [name, source] of [['ChatView.jsx', chat], ['ChatPanel.jsx', panel]]) {
+    if (/const\s+QUICK_ADJUSTMENTS\s*=/.test(source)) throw new Error(name + ' still declares its own QUICK_ADJUSTMENTS');
+  }
+
+  // The shared module is the only place the four rewrites are named.
+  if (!/export\s+const\s+QUICK_ADJUSTMENTS\s*=/.test(shared)) {
+    throw new Error('answerAdjustments.js does not export QUICK_ADJUSTMENTS');
+  }
+  for (const label of ['Shorter', 'More detail', 'Explain simply', 'As a table']) {
+    if (!new RegExp("label:\\s*['\"]" + label + "['\"]").test(shared)) {
+      throw new Error('the shared list has no ' + label + ' rewrite');
+    }
+  }
+
+  // The web row is drawn from that list, and a press sends the rewrite as a prompt
+  // rather than editing the reply, so the earlier answer stays to compare against.
+  if (!/QUICK_ADJUSTMENTS\s*\.\s*map\s*\(/.test(chat)) throw new Error('the web chat does not draw the rewrites from the shared list');
+  if (!/className=\{?['"]chat-quick-adjust['"]/.test(chat)) throw new Error('the web chat draws the rewrites without the chat-quick-adjust class');
+  if (!/send\(\s*adjustment\.text\s*,\s*\{\s*rewrite:\s*true\s*\}\s*\)/.test(chat)) throw new Error('pressing a rewrite does not send its own text');
+  if (!/QUICK_ADJUSTMENTS\s*\.\s*map\s*\(/.test(panel)) throw new Error('the desktop panel no longer draws the rewrites');
+
+  // Newest reply only, and not while one is being written: a rewrite offered
+  // mid-stream would send a second request over the first.
+  const rowAt = chat.search(/QUICK_ADJUSTMENTS\s*\.\s*map\s*\(/);
+  const condition = chat.slice(Math.max(0, rowAt - 240), rowAt);
+  if (!/index\s*===\s*lastAnswerIndex/.test(condition)) {
+    throw new Error('the web chat offers the rewrites under an older reply too');
+  }
+  if (!/!\s*streaming/.test(condition)) throw new Error('the web chat offers a rewrite while a reply is still streaming');
+
+  return 'four rewrites from one shared list, newest reply only, on both surfaces';
+
+
+});
+
 check('Android chat drafts persist locally and clear on send', () => {
   const view = read('web/src/views/ChatView.jsx');
   const drafts = read('web/src/lib/drafts.js');
@@ -1721,10 +1771,10 @@ check('the web chat is built from Flowbite components and one icon family', () =
   if (!ui.includes('aria-label={label}')) throw new Error('the icon button is unnamed for screen readers');
   for (const [name, source] of [['chat', chat], ['shell', dashboard]]) {
     const raw = (source.match(/<button[\s>]/g) ?? []).length;
-    // The chat keeps two plain buttons: a conversation row is a list row with two
-    // controls beside it, and the model chip is a text trigger for its list.
-    // Everything else must be a component.
-    const allowed = 2;
+    // The chat keeps three plain buttons: a conversation row is a list row with two
+    // controls beside it, the model chip is a text trigger for its list, and the
+    // rewrite row is a set of text chips. The shell keeps two. The rest are components.
+    const allowed = name === 'chat' ? 3 : 2;
     if (raw > allowed) throw new Error(`${name} still draws ${raw} raw buttons`);
   }
 

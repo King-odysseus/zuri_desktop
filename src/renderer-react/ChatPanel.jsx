@@ -3,6 +3,9 @@ import { Button, ComposerTextarea } from './ui.jsx';
 // The same catalogue Settings offers, so the chip and the Settings picker can never
 // disagree about which supplier id sits behind a Zuri name.
 import { ZURI_MODELS, zuriModelFor, zuriModelName } from './zuriModels.js';
+// The rewrite row under the newest reply. Shared with the web chat, so the two
+// surfaces cannot offer different choices.
+import { QUICK_ADJUSTMENTS } from './answerAdjustments.js';
 import {
   ArrowUpIcon,
   CheckIcon,
@@ -152,15 +155,6 @@ function saveWebSearchPreference(enabled) {
     console.warn('[zuri:chat] web search preference', error?.message ?? error);
   }
 }
-
-// Under the newest reply: one-press rewrites. Each sends a short follow-up in the
-// same thread, so the earlier answer stays on screen to compare against.
-const QUICK_ADJUSTMENTS = [
-  { label: 'Shorter', text: 'Rewrite the same answer, shorter.', field: 'answerLength', value: 'concise' },
-  { label: 'More detail', text: 'Rewrite the same answer with more detail.', field: 'answerLength', value: 'detailed' },
-  { label: 'Explain simply', text: 'Rewrite the same answer in simpler words.', field: 'answerDetail', value: 'simple' },
-  { label: 'As a table', text: 'Show the same answer as a table.', field: 'answerLayout', value: 'structured' },
-];
 
 const STYLE_HINT_STORAGE_KEY = 'zuri.styleHints';
 /** Uses of one rewrite before Zuri offers to make it the saved default. */

@@ -1140,3 +1140,14 @@
 - Key files: scripts/build-android-icons.py, android/app/src/main/res/**, updates.md, scripts/selftest.js.
 - Other OS action: run "npm run test". No dependency changes. Rebuild the APK with the normal Android build so the new icons and splash are packaged.
 - Done on: Windows
+
+## 2026-10-29 - Windows (the rewrite row reaches the browser chat)
+
+- The web chat now draws the four one-press rewrites the desktop has shown under its newest reply since 24 October: Shorter, More detail, Explain simply and As a table. The cloud chat had only copy, share and regenerate, which is why the same conversation offered them in the app and not in the browser.
+- The four labels moved out of src/renderer-react/ChatPanel.jsx into a shared src/renderer-react/answerAdjustments.js that both surfaces import, so a rewrite cannot go missing from one of them again.
+- Pressing one sends the rewrite as a follow-up turn in the same chat, so the earlier answer stays on screen to compare against. It no longer clears a half-typed composer message or a file waiting to go, and it no longer appends the composer's answer-length rule, which used to send the model two opposite lengths at once.
+- The row is hidden while a reply is still arriving, under any reply but the newest, and under a picture reply or with a picture model chosen, because a rewrite there would swap the picture for words.
+- scripts/selftest.js now checks that both surfaces import the one shared list, that the web row is drawn from it, and that it stays limited to the newest reply.
+- Key files: src/renderer-react/answerAdjustments.js, src/renderer-react/ChatPanel.jsx, web/src/views/ChatView.jsx, web/src/styles.css, scripts/selftest.js, server/public/index.html, server/public/assets.
+- Other OS action: run "npm run test". No dependency changes. The cloud server must redeploy for the browser chat to carry the change.
+- Done on: Windows

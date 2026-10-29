@@ -7,6 +7,9 @@ import ConversationSearch from '../components/ConversationSearch.jsx';
 // imported rather than copied: an answer is then drawn by one set of markdown rules
 // on both surfaces, and the code block's own copy button behaves the same way.
 import FormattedMessage from '../../../src/renderer-react/FormattedMessage.jsx';
+// The desktop's rewrite row, imported rather than copied: the browser chat had no
+// rewrite buttons at all while the list lived inside the desktop panel.
+import { QUICK_ADJUSTMENTS } from '../../../src/renderer-react/answerAdjustments.js';
 import { copyText } from '../../../src/renderer-react/clipboard.js';
 import { shareText } from '../lib/share.js';
 import {
@@ -603,7 +606,7 @@ export default function ChatView({
     [loadConversations, model, projectId],
   );
 
-  const send = useCallback(async (questionOverride = null) => {
+  const send = useCallback(async (questionOverride = null, { rewrite = false } = {}) => {
     const question = (typeof questionOverride === 'string' ? questionOverride : draft).trim();
     // Regenerating re-asks an earlier question, so only a fresh send carries the file.
     const attached = questionOverride === null ? attachment : null;
@@ -629,7 +632,11 @@ export default function ChatView({
     const withQuestion = attached && question !== '' ? `${question}\n\n${withFile}` : withFile;
     // The length the person picked rides with the question, the way the attachment
     // does. It is sent but not saved, so the transcript keeps only the words said.
-    const prompt = withQuestion === '' ? question : `${withQuestion}\n\n${ANSWER_LENGTH_RULES[answerLength]}`;
+    // A rewrite already names its own length ("Shorter"), so the picker's rule is left
+    // out rather than sent beside it as a contradicting second instruction.
+    const prompt = withQuestion === '' || rewrite
+      ? withQuestion
+      : `${withQuestion}\n\n${ANSWER_LENGTH_RULES[answerLength]}`;
     // What the bubble and the saved chat keep: the words, plus a line naming the
     // file. A link, where there is one, is stored beside the turn rather than
     // inside the words, so the thread draws a thumbnail instead of a long address.
@@ -652,10 +659,15 @@ export default function ChatView({
     // The question the model answers is the last turn, so it carries the file.
     outgoing[outgoing.length - 1] = { role: 'user', content: prompt };
 
-    setDraft('');
-    setAttachment(null);
-    setAttachNote('');
-    clearChatDraft();
+    // A rewrite is about the answer above, not about what the composer holds, so the
+    // desktop's behaviour is kept: a half-typed message and any file waiting to go
+    // stay where they are. A fresh send takes them, as it always did.
+    if (!rewrite) {
+      setDraft('');
+      setAttachment(null);
+      setAttachNote('');
+      clearChatDraft();
+    }
     resetReply();
     setStreaming(true);
     setThread((previous) => ({
@@ -1331,6 +1343,30 @@ export default function ChatView({
                   >
                     {copiedIndex === index ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
                   </IconButton>
+                  {/*
+                    * The same four rewrites the desktop shows under its newest reply, in
+                    * the desktop's order: the icon actions first, the words after them.
+                    * Each sends a short follow-up in this chat instead of editing the
+                    * answer, so the earlier version stays on screen to compare against,
+                    * and the request reads as something the person said.
+                    *
+                    * A picture reply is drawn by an image model, not written by the chat
+                    * model, so rewriting it would swap the picture for words. A picture
+                    * model in the composer is left out for the same reason: its turn
+                    * would draw a new image instead of rewriting the words above.
+                    */}
+                  {message.role === 'assistant' && index === lastAnswerIndex && !streaming && !pictureModel && !message.picture && QUICK_ADJUSTMENTS.map((adjustment) => (
+                    <button
+                      key={adjustment.label}
+                      type="button"
+                      className="chat-quick-adjust"
+                      title={`Rewrite: ${adjustment.label}`}
+                      aria-label={`Rewrite: ${adjustment.label}`}
+                      onClick={() => void send(adjustment.text, { rewrite: true })}
+                    >
+                      {adjustment.label}
+                    </button>
+                  ))}
                   <IconButton
                     size="sm"
                     className="chat-share"
