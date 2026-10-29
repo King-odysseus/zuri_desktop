@@ -925,13 +925,17 @@ a {
   color: var(--faint);
 }
 
-/* One card per picture model: a single column on a phone, three across once the
-   window has room. The list is the grid, so the models are announced as one
-   group instead of three unrelated cards. */
+/* One card per picture model. The columns are sized by how much room a card
+   needs, not by a viewport breakpoint: three across once the row is wide enough,
+   two while it is tight, one on a phone. A fixed three-column rule squeezed a
+   card to 216px on a narrow laptop, and to 178px on the signed-in Plans page,
+   where the sidebar takes its share of the window, which wrapped every price and
+   plan count onto three lines. min() keeps the single column full width inside a
+   phone's padding instead of overflowing it. */
 .image-grid {
   display: grid;
   gap: 16px;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
 }
 
 .image-card {
@@ -980,12 +984,6 @@ a {
 .image-plan-count {
   min-width: 0;
   color: var(--muted);
-}
-
-@media (min-width: 760px) {
-  .image-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 /* Signed-in application shell */
