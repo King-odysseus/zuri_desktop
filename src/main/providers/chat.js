@@ -288,6 +288,16 @@ const MAX_TOOL_ROUNDS = 4;
 const TOOL_RESULT_LIMIT = 8_000;
 
 /**
+ * Asked of the model when a whole turn came back with no words in it.
+ *
+ * A model sometimes writes its tool request as text for a tool this turn never
+ * offered. That markup is stripped, so nothing is left to show, and the turn ends
+ * with no reply at all. One more round with no tools offered turns that into the
+ * answer the person was waiting for instead of an error.
+ */
+const NO_TOOLS_NUDGE = 'The person is still waiting for an answer to their last message. Reply now in plain words, using what you already know or any results above. Do not call or describe any tool.';
+
+/**
  * Channel main pushes token events on. It is a one-way push, not an `invoke`
  * channel, so it stays out of the CHANNELS list in preload.js.
  */
@@ -1747,6 +1757,54 @@ export async function sendChatMessage(threadId, options = {}) {
       rounds += 1;
     }
 
+    // A turn can end with nothing the person can read. The commonest cause is a
+    // tool request written into the text for a tool this turn never offered: the
+    // markup is stripped as markup, so the words around it are all that is left, and
+    // often there are none. Asking once more with no tools offered is the difference
+    // between a reply and a failure.
+    const wordless = (value) => typeof value !== 'string' || value.trim() === '';
+    if (reached.ok && wordless(reached.data?.content) && wordless(textSoFar)) {
+      let askedAgain = '';
+      let shownSoFar = 0;
+      const retry = await options.cloudReply({
+        // The nudge rides in the system instruction so a pretend turn from the person
+        // is never added to the conversation the model reads.
+        conversation: { system: `${conversation.system}\n\n${NO_TOOLS_NUDGE}`, turns: wire },
+        settings: modelSettings,
+        tools: [],
+        signal: options.signal,
+        emit: (event) => {
+          if (typeof event.delta !== 'string') {
+            emit({ threadId, ...event });
+            return;
+          }
+          askedAgain += event.delta;
+          // No tools are offered this round, so nothing but a half-arrived "<" is held back.
+          const limit = visiblePrefixLength(askedAgain);
+          if (limit > shownSoFar) {
+            emit({ threadId, delta: askedAgain.slice(shownSoFar, limit) });
+            shownSoFar = limit;
+          }
+        },
+      });
+      if (retry.ok) {
+        const last = splitToolCalls(
+          typeof retry.data?.content === 'string' && retry.data.content !== '' ? retry.data.content : askedAgain,
+        );
+        // A reply that arrived whole rather than as deltas was never painted above,
+        // so the rest of it goes out now. Without this the answer would be saved and
+        // the window would still look empty.
+        if (last.visible.length > shownSoFar) {
+          emit({ threadId, delta: last.visible.slice(shownSoFar) });
+          shownSoFar = last.visible.length;
+        }
+        if (!retry.data) retry.data = {};
+        retry.data.content = last.visible;
+        reached = retry;
+        textSoFar += last.visible;
+      }
+    }
+
     // The per-round tool files are already in builtFiles; the shared code below
     // saves one message from reached.data.content, so it is told the whole text.
     if (reached.ok) reached.data.content = textSoFar !== '' ? textSoFar : reached.data.content;
@@ -1761,6 +1819,12 @@ export async function sendChatMessage(threadId, options = {}) {
   // The stream stopped early or the server reported a failure; say so plainly.
   if (options.signal?.aborted) return failure('CHAT_STOPPED', 'That reply was stopped before it arrived.');
   if (!reached.ok) return reached;
+  // Nothing was written even after the second attempt. The store refuses an empty
+  // message with "a message needs non-empty content", which says nothing to the
+  // person waiting for an answer, so the real reason is given here instead.
+  if (typeof reached.data?.content !== 'string' || reached.data.content.trim() === '') {
+    return failure('CHAT_EMPTY_REPLY', 'Zuri did not write an answer that time. Send the message again.');
+  }
   const saved = await appendMessage(threadId, {
     role: 'assistant',
     content: reached.data.content,

@@ -1413,6 +1413,76 @@ check('a call written into the reply text is run, not printed', async () => {
   }
 });
 
+// The screenshot behind this: four questions, no replies, and the store's own
+// sentence ("a message needs non-empty content") where an answer should be. A model
+// that writes a tool request as text for a tool this turn never offered leaves no
+// words behind once the markup is stripped, so the turn now asks once more with no
+// tools. If even that comes back silent, the person is told plainly rather than
+// shown an internal message.
+check('a wordless turn is asked again, not answered with an internal error', async () => {
+  const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const { sendChatMessage } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+  const previousRoot = store.getStoreRoot();
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-empty-reply-'));
+  try {
+    store.setStoreRoot(scratch);
+    const thread = (await store.createThread({ title: 'Ukraine' })).data;
+    await store.appendMessage(thread.id, { role: 'user', content: 'what is going on with the war in ukraine' });
+
+    // webSearch is never offered in Ask mode, so this call cannot run and its markup
+    // is the whole of the reply, exactly as the screenshot showed.
+    const markup = '<tool_call>{"name": "webSearch", "arguments": {"query": "war in ukraine"}}</tool_call>';
+    const answer = 'Zuri cannot see live news, so here is the shape of the war.';
+    const script = [{ content: markup }, { content: answer }];
+    const requests = [];
+    const deltas = [];
+    const result = await sendChatMessage(thread.id, {
+      mode: 'ask',
+      emit: (event) => {
+        if (typeof event.delta === 'string') deltas.push(event.delta);
+      },
+      cloudReply: async (request) => {
+        requests.push({
+          tools: (request.tools ?? []).map((tool) => tool.name),
+          system: request.conversation.system,
+        });
+        const round = script[Math.min(requests.length - 1, script.length - 1)];
+        return { ok: true, data: { ...round, modelCode: 'zuri-flash' } };
+      },
+    });
+
+    if (!result.ok) throw new Error(`the turn failed: ${result.error?.code} ${result.error?.message}`);
+    if (requests.length !== 2) throw new Error(`the model was asked ${requests.length} times, expected one more round`);
+    if (requests[1].tools.length !== 0) throw new Error('the second round still offered tools');
+    if (!requests[1].system.includes('plain words')) throw new Error('the second round did not ask for a plain answer');
+    const saved = result.data.thread.messages.at(-1).content;
+    if (saved !== answer) throw new Error(`the saved reply was "${saved}"`);
+    if (deltas.join('') !== answer) throw new Error(`the chat showed "${deltas.join('')}" but saved "${saved}"`);
+
+    // A model that stays silent even when asked plainly must not put the store's own
+    // wording in front of the person.
+    const quiet = await sendChatMessage(thread.id, {
+      mode: 'ask',
+      cloudReply: async () => ({ ok: true, data: { content: markup, modelCode: 'zuri-flash' } }),
+    });
+    if (quiet.ok) throw new Error('a silent model was reported as an answer');
+    if (quiet.error?.code !== 'CHAT_EMPTY_REPLY') throw new Error(`the failure was ${quiet.error?.code}`);
+    if (/non-empty content/.test(quiet.error?.message ?? '')) throw new Error('the store internal message reached the person');
+    const after = await store.readStore('chats');
+    const kept = after.data.find((entry) => entry.id === thread.id).messages;
+    if (kept.length !== result.data.thread.messages.length) throw new Error('an empty reply was saved to the chat');
+    return 'one more round with no tools, and a plain message when even that is silent';
+  } finally {
+    store.setStoreRoot(previousRoot);
+    // Windows keeps a handle on the store file, so this scratch folder can survive the
+    // scrub. It is under %TEMP% and leaving it is safe, but a failed scrub must not
+    // stand in for the assertion this check is making.
+    try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (error) {
+      if (error?.code !== 'ENOTEMPTY' && error?.code !== 'EBUSY' && error?.code !== 'EPERM') throw error;
+    }
+  }
+});
+
 // The chip has to sit in the message row and offer the one catalogue, or a person
 // has to leave the chat to change model, which is what this change removes.
 check('the composer offers the model chip and sends the choice with the message', async () => {
