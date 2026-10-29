@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        The app theme's own colours. styles.xml has always asked for these names, but
+        the file defining them was missing, so Android fell back to the stock colours
+        in the Capacitor library: indigo #3F51B5 with a pink #FF4081 accent. Those are
+        not Zuri's colours. Defining them here makes the Android chrome wear the same
+        navy the logo, the web site and the desktop app use.
+
+        Both values come from the app's own palette: the accent token in app.css and
+        the dark theme's background token. Nothing is invented here.
+    -->
+    <color name="colorPrimary">#0D1B3A</color>
+    <color name="colorPrimaryDark">#040130</color>
+    <color name="colorAccent">#0D1B3A</color>
+</resources>

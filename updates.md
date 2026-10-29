@@ -1130,3 +1130,13 @@
 - Other OS action: run `npm run test` after syncing. No dependency changes.
 - Done on: Windows
 
+## 2026-10-29 - Windows (one Zuri mark on the phone too)
+
+- The Android app was the last surface still wearing the stock Capacitor artwork: a grey cross on a white plate for the launcher and a blue cross on the splash. It now uses the same navy plate and white speech bubble as the Windows app, the web site, the Office add-in and the favicon.
+- Launcher, round launcher, the Android 8+ adaptive foreground and all eleven splash sizes are now generated from src/main/assets/zuri-icon.png by scripts/build-android-icons.py, so the phone cannot drift from the desktop again.
+- The adaptive icon plate is brand navy #0D1B3A instead of white, and the Android theme colours are defined in res/values/colors.xml for the first time. Without that file Android fell back to the Capacitor library's stock indigo #3F51B5 and pink #FF4081 accent.
+- Two unused Capacitor template vectors were deleted (drawable/ic_launcher_background.xml with #26A69A teal, drawable-v24/ic_launcher_foreground.xml with the white cross). Nothing referenced either; the adaptive icon is defined by mipmap-anydpi-v26 plus the mipmap PNGs.
+- scripts/selftest.js now asserts the Android launcher, adaptive and splash art exist, that the plate and theme are the brand navy, and that the Capacitor teal has not come back.
+- Key files: scripts/build-android-icons.py, android/app/src/main/res/**, updates.md, scripts/selftest.js.
+- Other OS action: run "npm run test". No dependency changes. Rebuild the APK with the normal Android build so the new icons and splash are packaged.
+- Done on: Windows

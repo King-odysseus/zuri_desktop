@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- The adaptive icon's plate. It is the brand navy the finished mark uses, so the
+         launcher and the in-app logo cannot show two different colours: the system
+         draws this plate and centres ic_launcher_foreground.png, the white bubble,
+         on top of it. -->
+    <color name="ic_launcher_background">#0D1B3A</color>
 </resources>
