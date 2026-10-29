@@ -213,13 +213,25 @@
             ? '"setFormulas" needs a rectangular grid of formulas starting with "=".'
             : '"setValues" needs a rectangular grid of values.');
         }
-        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, grid: grid } };
+        var expectedRows = range.end.row - range.start.row + 1;
+        var expectedColumns = range.end.column - range.start.column + 1;
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, grid: grid, rangeRows: expectedRows, rangeColumns: expectedColumns } };
       }
 
       if (name === 'setNumberFormat') {
         var format = text(raw.format, 60).trim();
         if (format === '') return fail('"setNumberFormat" needs a format code such as "0.0%".');
-        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, format: format } };
+        return {
+          ok: true,
+          operation: {
+            op: name,
+            sheet: sheet,
+            range: range.text,
+            format: format,
+            rangeRows: range.end.row - range.start.row + 1,
+            rangeColumns: range.end.column - range.start.column + 1,
+          },
+        };
       }
 
       if (name === 'format') {

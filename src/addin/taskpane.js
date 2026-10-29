@@ -979,12 +979,20 @@
         var range = sheet.getRange(operation.range);
 
         if (operation.op === 'setValues' || operation.op === 'setFormulas') {
-          var anchor = sheet.getRange(operation.range.split(':')[0]);
-          var target = anchor.getResizedRange(operation.grid.length - 1, operation.grid[0].length - 1);
+          // Write to the exact range when the reviewed matrix matches it. Older
+          // plans use the range as an anchor for a shorter generated grid, so keep
+          // the resized fallback for that explicitly supported shape.
+          var exactShape = operation.grid.length === operation.rangeRows && operation.grid[0].length === operation.rangeColumns;
+          var target = exactShape ? range : sheet.getRange(operation.range.split(':')[0]).getResizedRange(operation.grid.length - 1, operation.grid[0].length - 1);
           if (operation.op === 'setFormulas') target.formulas = operation.grid;
           else target.values = operation.grid;
         } else if (operation.op === 'setNumberFormat') {
-          range.numberFormat = operation.format;
+          // Office.js expects numberFormat to be a matrix matching the range shape.
+          var formatRows = operation.rangeRows || 1;
+          var formatColumns = operation.rangeColumns || 1;
+          range.numberFormat = Array.from({ length: formatRows }, function () {
+            return Array.from({ length: formatColumns }, function () { return operation.format; });
+          });
         } else if (operation.op === 'format') {
           if (operation.bold !== undefined) range.format.font.bold = operation.bold;
           if (operation.italic !== undefined) range.format.font.italic = operation.italic;
@@ -992,7 +1000,10 @@
           if (operation.color !== undefined) range.format.font.color = operation.color;
           if (operation.size !== undefined) range.format.font.size = operation.size;
           if (operation.wrapText !== undefined) range.format.wrapText = operation.wrapText;
-          if (operation.align !== undefined) range.format.horizontalAlignment = operation.align;
+          if (operation.align !== undefined) {
+            var alignments = { left: 'Left', center: 'Center', right: 'Right', general: 'General' };
+            range.format.horizontalAlignment = alignments[operation.align] || 'General';
+          }
         } else if (operation.op === 'columnWidth') {
           // Set on the range itself: this is the documented way to size the columns a
           // range touches, and it skips getEntireColumn(), one more host call that can

@@ -2251,6 +2251,9 @@ check('a change block is checked before it can reach a file', async () => {
   const padded = ops.parseBlock('{"operations":[{"op":"setValues","range":"A1:B2","values":[[1],[2,3]]}]}');
   if (padded.ok !== true || padded.operations[0].grid[0].length !== 2) throw new Error('a short row was not padded');
 
+  const exact = ops.parseBlock('{"operations":[{"op":"setValues","range":"A1:B2","values":[[1,2],[3,4]]}]}');
+  if (exact.ok !== true || exact.operations[0].rangeRows !== 2 || exact.operations[0].rangeColumns !== 2) throw new Error('a valid grid did not retain the range shape');
+
   return `${Object.keys(ops.OPERATIONS).length} operations, bad input refused with a reason`;
 });
 
