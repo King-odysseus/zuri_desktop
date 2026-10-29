@@ -308,7 +308,6 @@ function modelLabelPositions(messages) {
     return show;
   });
 }
-
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar, openingKind = 'question' }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [draft, setDraft] = useState(() => {
@@ -1236,8 +1235,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Add to message" aria-haspopup="menu" aria-expanded={menuView !== ''} title="Add files, photos or a command" onPress={() => setMenuView((current) => (current === '' ? 'main' : ''))}>
                 <PlusIcon />
               </Button>
+              {/* The list opens upward out of the composer, so on a short window its first
+                  row would sit above the top edge. The viewport cap lets it scroll
+                  instead, so no row becomes unreachable. */}
               {menuView !== '' && (
-                <div role="menu" aria-label="Add to message" className="absolute bottom-full left-0 z-20 mb-2 w-64 rounded-2xl border border-border bg-surface p-1 shadow-lg">
+                <div role="menu" aria-label="Add to message" className="absolute bottom-full left-0 z-20 mb-2 max-h-[min(60vh,26rem)] w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg">
                   {menuView === 'main' ? (
                     <>
                       <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseAttachment())}>
@@ -1368,7 +1370,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                 aria-label={`Chat model: ${chatModelLabel}`}
                 title={`${chatModelLabel}${chatModel !== null ? `. ${chatModel.note}` : ''} Change the model for this chat.`}
                 className="zuri-chat-model-trigger flex h-10 max-w-32 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted outline-none hover:text-foreground focus:ring-2 focus:ring-accent/30"
-                onClick={() => setModelMenu((open) => !open)}
+                onClick={() => {
+                  // The picture names are fetched the first time the list opens, so a chat
+                  // that never draws a picture never asks the app for them.
+                  if (!modelMenu) void loadImageModels();
+                  setModelMenu((open) => !open);
+                }}
               >
                 <span className="zuri-chat-model-label-full truncate">{chatModelLabel}</span>
                 <span className="zuri-chat-model-label-short truncate" aria-hidden="true">
@@ -1376,8 +1383,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                 </span>
                 <ChevronDownIcon size={12} />
               </button>
+              {/* Chat models first, then picture models, so the same popup can also draw.
+                  It opens upward too, so it carries the same viewport cap and scrolls. */}
               {modelMenu && (
-                <div role="menu" aria-label="Chat model" className="absolute bottom-full right-0 z-20 mb-2 w-64 rounded-2xl border border-border bg-surface p-1 shadow-lg">
+                <div role="menu" aria-label="Chat model" className="absolute bottom-full right-0 z-20 mb-2 max-h-[min(60vh,26rem)] w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg">
                   <p className="px-3 pb-1 pt-2 text-xs text-muted">Zuri answers this chat with:</p>
                   {ZURI_MODELS.map((entry) => (
                     <button
@@ -1395,6 +1404,31 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                       <span className="text-xs text-muted">{entry.note}</span>
                     </button>
                   ))}
+                  {/* A picture row does not answer with text: it draws what the message box
+                      says, through the same handler the + menu's image list uses. */}
+                  {imageModels.length > 0 && (
+                    <>
+                      <p className="px-3 pb-1 pt-2 text-xs text-muted">Draw a picture</p>
+                      {imageModels.map((model) => (
+                        <button
+                          key={model.code}
+                          type="button"
+                          role="menuitem"
+                          disabled={!model.available || imageBusy !== ''}
+                          title={`${model.hint}. About NGN ${model.nairaPerImage} an image.`}
+                          className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary disabled:opacity-40"
+                          onClick={() => { setModelMenu(false); void createImage(model); }}
+                        >
+                          <span className="flex w-full items-center gap-2">
+                            <ImageIcon size={15} />
+                            <span className="truncate">{model.name}</span>
+                            <span className="ml-auto shrink-0 text-xs text-muted">NGN {model.nairaPerImage}</span>
+                          </span>
+                          <span className="text-xs text-muted">{model.hint}</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
                   <p className="px-3 pb-1 pt-2 text-xs text-muted">Billed to your Zuri plan, like every other reply.</p>
                 </div>
               )}
