@@ -1177,3 +1177,14 @@
 - Key files: src/renderer-react/answerAdjustments.js, src/renderer-react/ChatPanel.jsx, web/src/views/ChatView.jsx, web/src/styles.css, scripts/selftest.js, server/public/index.html, server/public/assets.
 - Other OS action: run "npm run test". No dependency changes. The cloud server must redeploy for the browser chat to carry the change.
 - Done on: Windows
+
+## 2026-10-29 - Windows (0.2.3 is published for Windows, macOS and Android)
+
+- The download page had been offering nothing at all: the ZURI_RELEASE_REPO variable on Railway held the placeholder text "<only to point downloads at a different releases repo>" instead of a repository name. downloads.js read it as a configured repo, every GitHub call 404ed, the failure was swallowed by the cache fallback, and the page rendered no cards. The variable now names King-odysseus/zuri-releases.
+- GITHUB_TOKEN on Railway was empty, so the release list was fetched anonymously from a shared container IP under the 60-requests-an-hour limit. A failed refresh silently kept the old cached list, which is why the page stayed on 0.2.2 after 0.2.3 was uploaded. The variable now carries a token, which lifts the limit to 5000 an hour. It is the account OAuth token; replace it with a fine-grained read-only token for this one repository when convenient.
+- Version is 0.2.3 (Android versionCode 4) because the 0.2.2 files predate the colour, sync and composer work and nobody holding that download could tell the new files apart.
+- The Windows installer and the Android APK were built on this machine (release/Zuri-0.2.3-Setup.exe, release/Zuri-0.2.3.apk) and published with npm run release:publish. The macOS dmg cannot be built on Windows, so the existing Build macOS installer workflow produced and published it: release/Zuri-0.2.3.dmg, 263 MB.
+- The v0.2.3 release was created empty before any build ran, so the three publishers could not race each other into "release already exists". Stale 0.2.2 installers were removed from release/ first, because release:publish uploads every installer it finds there and the site takes the first match per platform.
+- Key files: package.json, package-lock.json, android/app/build.gradle, README.md, updates.md.
+- Other OS action: run "npm run test". No dependency changes.
+- Done on: Windows
