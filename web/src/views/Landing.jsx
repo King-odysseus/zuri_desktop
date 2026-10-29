@@ -162,7 +162,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
               <button
                 type="button"
                 onClick={() => onNavigate('/signup')}
-                className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
+                className={`inline-flex min-h-[var(--button-height)] items-center justify-center gap-2 rounded-[var(--button-radius)] bg-accent px-[var(--button-padding-x)] text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
               >
                 Start with Zuri
                 <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -170,7 +170,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
               <button
                 type="button"
                 onClick={() => onNavigate('/#how')}
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-hairline bg-surface px-5 text-[14px] font-semibold text-body transition-colors hover:bg-surface-secondary"
+                className="inline-flex min-h-[var(--button-height)] items-center justify-center rounded-[var(--button-radius)] border border-hairline bg-surface px-[var(--button-padding-x)] text-[14px] font-semibold text-body transition-colors hover:bg-surface-secondary"
               >
                 See the app
               </button>
@@ -243,7 +243,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate('/signup')}
-              className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
+              className={`inline-flex min-h-[var(--button-height)] items-center justify-center gap-2 rounded-[var(--button-radius)] bg-accent px-[var(--button-padding-x)] text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
             >
               Create an account
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
@@ -328,7 +328,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
                       type="button"
                       onClick={() => onChoose(plan.code)}
                       disabled={working}
-                      className={`mt-auto inline-flex min-h-11 w-full items-center justify-center rounded-full px-4 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`mt-auto inline-flex min-h-[var(--button-height)] w-full items-center justify-center rounded-[var(--button-radius)] px-[var(--button-padding-x)] text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
                         featured
                           ? `bg-accent hover:bg-accent-hover ${ON_ACCENT}`
                           : 'border border-hairline bg-surface-secondary text-body hover:bg-surface-tertiary'
@@ -393,7 +393,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             <button
               type="button"
               onClick={() => onNavigate('/signup')}
-              className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-white px-6 text-[14px] font-semibold text-[#0d1b3a] transition-colors hover:bg-white/90 lg:w-auto lg:shrink-0"
+              className="inline-flex min-h-[var(--button-height)] w-full items-center justify-center rounded-[var(--button-radius)] bg-white px-[var(--button-padding-x)] text-[14px] font-semibold text-[#0d1b3a] transition-colors hover:bg-white/90 lg:w-auto lg:shrink-0"
             >
               Start free
             </button>

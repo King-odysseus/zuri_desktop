@@ -25,9 +25,21 @@ function fieldId(label, id, fallback) {
 
 export function Button({ variant = 'default', size, isIconOnly = false, fullWidth = false, isDisabled = false, onPress, className = '', children, ...props }) {
   const color = BUTTON_COLORS[variant] ?? 'gray';
+  // Flowbite builds a button from its `size` prop (40px tall at the default, with
+  // 20px of side padding), and the page rule in app.css lifts that to 44px, so every
+  // desktop button read oversized. Buttons now take the style guide's compact scale:
+  // 36px tall, 16px of side padding, and square when icon-only. A caller that sets its
+  // own height or width keeps it, which is why the chat row actions at h-7 and the
+  // composer's send button are untouched. The trailing `!` is needed because the page
+  // rule in app.css is more specific than a utility class.
+  const sizedByCaller = /(?:h|min-h|w|min-w|size)-/.test(className);
+  const compact = sizedByCaller ? '' : 'h-9 min-h-9!';
+  const compactSquare = isIconOnly && !sizedByCaller ? 'w-9 min-w-9!' : '';
   const classes = [
     'zuri-button rounded-xl',
-    isIconOnly ? 'is-icon-only p-2' : '',
+    isIconOnly ? 'is-icon-only p-2' : 'px-4',
+    compact,
+    compactSquare,
     fullWidth ? 'w-full' : '',
     variant === 'primary' ? 'zuri-button-primary' : '',
     variant === 'danger' ? 'zuri-button-danger' : '',
