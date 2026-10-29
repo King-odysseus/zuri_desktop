@@ -54,12 +54,12 @@ body {
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* The mark is drawn in greys: a monochrome interface carries identity in the shape,
-   not in a hue, and the mark was the last colour left in the window. Vite renames
-   the file as it bundles it, so this matches the element rather than the URL. */
+/* The mark keeps the app icon's own colours: a navy plate behind a white bubble.
+   A grayscale filter used to sit here and turned that plate into a dark grey block,
+   which is heavier than anything else in the window. */
 img.zuri-chat-mark,
 img[alt='Zuri'] {
-  filter: grayscale(1);
+  border-radius: 0.9rem;
 }
 
 h1,
@@ -1319,5 +1319,11 @@ html:has(.zuri-overlay-root) #root {
 }
 
 .zuri-overlay-composer .zuri-button {
+  flex: 0 0 auto;
+}
+
+/* Shared icon rule, matching the web app: the family draws on a 24 grid with a 2
+   unit stroke, and a glyph never shrinks inside a flex row. */
+.zuri-icon {
   flex: 0 0 auto;
 }

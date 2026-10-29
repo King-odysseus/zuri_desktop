@@ -1,15 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  ArrowRight,
-  Bot,
-  Check,
-  FileText,
-  Gauge,
-  ListChecks,
-  MessageSquare,
-  Sparkles,
-  Zap,
-} from 'lucide-react';
+import { AgentIcon, ArrowRightIcon, BoltIcon, CheckIcon, FileIcon, GaugeIcon, MessageIcon, SparkIcon, TaskIcon } from '../../../src/renderer-react/Icons.jsx';
 import Footer from '../components/Footer.jsx';
 import DownloadList from '../components/DownloadList.jsx';
 import ImagePrices from '../components/ImagePrices.jsx';
@@ -39,32 +29,32 @@ const HERO_POINTS = [
 
 const FEATURES = [
   {
-    Icon: MessageSquare,
+    Icon: MessageIcon,
     title: 'Chat that keeps context',
     body: 'Ask once and follow up later. Zuri holds the thread and your notes together.',
   },
   {
-    Icon: ListChecks,
+    Icon: TaskIcon,
     title: 'Tasks and reminders',
     body: 'Write it the way you say it. Zuri turns it into a task with a time attached.',
   },
   {
-    Icon: Zap,
+    Icon: BoltIcon,
     title: 'Automations',
     body: 'Put the repeating work on a schedule: weekly reports, tidy ups, standing reminders.',
   },
   {
-    Icon: FileText,
+    Icon: FileIcon,
     title: 'Files in, documents out',
     body: 'Drop a brief, a spreadsheet or a PDF and get a clean draft back in minutes.',
   },
   {
-    Icon: Bot,
+    Icon: AgentIcon,
     title: 'Agents',
     body: 'Small helpers that watch a project and report back when something moves.',
   },
   {
-    Icon: Gauge,
+    Icon: GaugeIcon,
     title: 'Usage you can see',
     body: 'A live counter of tokens and credits, so a limit never arrives as a surprise.',
   },
@@ -155,7 +145,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
         <div className="grid items-center gap-12 lg:grid-cols-[46fr_54fr] lg:gap-14">
           <div className="flex min-w-0 flex-col items-start gap-5">
             <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              <Sparkles className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+              <SparkIcon className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
               Your AI workspace
             </span>
 
@@ -175,7 +165,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
                 className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
               >
                 Start with Zuri
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -189,7 +179,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             <ul className="flex flex-col gap-2 text-[13.5px] text-muted">
               {HERO_POINTS.map((point) => (
                 <li key={point} className="flex items-start gap-2">
-                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-body" aria-hidden="true" />
+                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-body" aria-hidden="true" />
                   <span>{point}</span>
                 </li>
               ))}
@@ -256,7 +246,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
               className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
             >
               Create an account
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
             </button>
 
           </div>

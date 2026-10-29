@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, CreditCard, Gauge, MessageSquare, Plus, Sparkles, Wallet } from 'lucide-react';
+import { AlertIcon, CardIcon, GaugeIcon, MessageIcon, PlusIcon, SparkIcon, WalletIcon } from '../../../src/renderer-react/Icons.jsx';
 import { fetchConversations } from '../lib/api.js';
 import { formatDate, formatNaira, formatRelativeTime, formatTokens, greetingFor } from '../lib/format.js';
 
@@ -7,10 +7,10 @@ import { formatDate, formatNaira, formatRelativeTime, formatTokens, greetingFor 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const QUICK_ACTIONS = [
-  { view: 'chat', title: 'Ask Zuri', subtitle: 'Start a chat', Icon: Sparkles },
-  { view: 'usage', title: 'Usage and limits', subtitle: 'Tokens and requests', Icon: Gauge },
-  { view: 'plans', title: 'Plans', subtitle: 'Change your plan', Icon: CreditCard },
-  { view: 'billing', title: 'Billing', subtitle: 'Payments and receipts', Icon: Wallet },
+  { view: 'chat', title: 'Ask Zuri', subtitle: 'Start a chat', Icon: SparkIcon },
+  { view: 'usage', title: 'Usage and limits', subtitle: 'Tokens and requests', Icon: GaugeIcon },
+  { view: 'plans', title: 'Plans', subtitle: 'Change your plan', Icon: CardIcon },
+  { view: 'billing', title: 'Billing', subtitle: 'Payments and receipts', Icon: WalletIcon },
 ];
 
 // One tone per state: the icon and the action take the colour, the sentence stays
@@ -265,7 +265,7 @@ export default function OverviewView({ me, usage, onViewChange }) {
           onClick={() => onViewChange?.('chat')}
           className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[13px] font-semibold text-[color:var(--accent-foreground)] transition-colors hover:bg-accent-hover sm:min-h-10 sm:w-auto"
         >
-          <Plus className="size-4" aria-hidden="true" />
+          <PlusIcon className="size-4" aria-hidden="true" />
           New chat
         </button>
       </header>
@@ -275,7 +275,7 @@ export default function OverviewView({ me, usage, onViewChange }) {
           role="status"
           className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-hairline bg-surface px-3.5 py-2.5"
         >
-          <AlertTriangle className={`size-4 shrink-0 ${toneClass}`} aria-hidden="true" />
+          <AlertIcon className={`size-4 shrink-0 ${toneClass}`} aria-hidden="true" />
           <p className="min-w-0 flex-1 text-[12.5px] leading-snug text-body">{banner.message}</p>
           <button
             type="button"
@@ -455,7 +455,7 @@ export default function OverviewView({ me, usage, onViewChange }) {
               {recentChats.map((conversation) => (
                 <div key={conversation.id} className="flex min-w-0 items-center gap-2.5">
                   <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
-                    <MessageSquare className="size-4" aria-hidden="true" />
+                    <MessageIcon className="size-4" aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1 truncate text-[12.5px] leading-snug text-body">
                     {conversation.title || 'New chat'}

@@ -68,10 +68,11 @@ let conversations = [
     title: 'Draft a launch email for the starter plan',
     model: 'zuri-pro',
     origin: 'web',
+    projectId: 'p1',
     createdAt: '2026-10-24T09:12:00.000Z',
     updatedAt: '2026-10-24T09:40:00.000Z',
     messages: [
-      { id: 'm1', role: 'user', content: 'Write a short launch email for the Starter plan.', createdAt: '2026-10-24T09:12:00.000Z' },
+      { id: 'm1', role: 'user', content: 'What is wrong with this leaf?', createdAt: '2026-10-24T09:12:00.000Z', attachment: { url: '/zuri-logo.png', name: 'leaf.png', kind: 'image/png', bytes: 2048 } },
       { id: 'm2', role: 'assistant', content: 'Subject: Zuri Starter is here\n\nHi there,\n\nStarter gives you 2 million tokens a month, enough for everyday work, and it costs N2,500.\n\nReply if you would like a walkthrough.', createdAt: '2026-10-24T09:40:00.000Z' },
     ],
   },
@@ -80,6 +81,8 @@ let conversations = [
     title: 'Why is my reply slow on Power?',
     model: 'zuri-flash',
     origin: 'desktop',
+    // Filed nowhere, so the chat history list still shows a thread with no project.
+    projectId: null,
     createdAt: '2026-10-23T16:02:00.000Z',
     updatedAt: '2026-10-23T16:05:00.000Z',
     messages: [
@@ -92,9 +95,58 @@ let conversations = [
     title: 'New chat',
     model: 'zuri-flash',
     origin: 'web',
+    projectId: null,
     createdAt: '2026-10-22T11:00:00.000Z',
     updatedAt: '2026-10-22T11:00:00.000Z',
     messages: [],
+  },
+];
+
+// Sample projects, so the project screen can be reviewed without a database. As with
+// chats, each row keeps its files beside it and a summary helper is what keeps them
+// off the wire. In memory only: this server is a look, not a store.
+let projects = [
+  {
+    id: 'p1',
+    name: 'Launch plan',
+    instructions:
+      'Write for a Nigerian small business owner who wants fewer tools, not more. Keep the tone plain and warm, quote prices in naira, and never promise a feature that is not on the pricing page.',
+    createdAt: '2026-10-20T09:00:00.000Z',
+    updatedAt: '2026-10-24T09:40:00.000Z',
+    files: [
+      {
+        id: 'f1',
+        name: 'positioning.md',
+        kind: 'text/plain',
+        // A text file travels as words rather than bytes, so its size is the length
+        // of what it holds and the server reports that instead.
+        bytes: 0,
+        url: null,
+        content:
+          'Positioning note\n\nZuri is a Nigerian AI assistant sold monthly in naira.\nThe audience is a small business owner who wants fewer tools, not more.\nLead with the hours saved, then the price.',
+        createdAt: '2026-10-20T09:05:00.000Z',
+      },
+      {
+        id: 'f2',
+        name: 'launch-hero.png',
+        kind: 'image/png',
+        bytes: 184_320,
+        // A picture's bytes live on the CDN, so only its link is kept here.
+        url: '/zuri-logo.png',
+        content: '',
+        createdAt: '2026-10-21T14:20:00.000Z',
+      },
+    ],
+  },
+  // A second project with nothing in it, so the empty instructions, empty file list
+  // and empty chat list can all be seen without deleting anything.
+  {
+    id: 'p2',
+    name: 'Thesis notes',
+    instructions: '',
+    createdAt: '2026-10-18T07:30:00.000Z',
+    updatedAt: '2026-10-18T07:30:00.000Z',
+    files: [],
   },
 ];
 
@@ -102,6 +154,41 @@ let conversations = [
 function conversationSummary(row) {
   const { messages, ...rest } = row;
   return { ...rest, messageCount: messages.length };
+}
+
+/**
+ * A project row as the client reads it: the files and the chat count are worked out
+ * here rather than stored, so the two counts can never drift from the arrays behind
+ * them while the preview is being clicked through.
+ * @param {object} row @returns {object}
+ */
+function projectSummary(row) {
+  const { files, ...rest } = row;
+  const stored = Array.isArray(files) ? files : [];
+  return {
+    ...rest,
+    fileCount: stored.length,
+    conversationCount: conversations.filter((conversation) => conversation.projectId === row.id).length,
+  };
+}
+
+/**
+ * One project file, without its text.
+ *
+ * The real server sends only the length of a text file, because a list of files has
+ * to stay small and the words are read by the chat route rather than every screen.
+ * @param {object} row @returns {object}
+ */
+function projectFileSummary(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind ?? '',
+    bytes: Math.max(0, Math.floor(Number(row.bytes) || 0)),
+    url: row.url ?? null,
+    contentLength: typeof row.content === 'string' ? row.content.length : 0,
+    createdAt: row.createdAt,
+  };
 }
 
 /**
@@ -115,8 +202,28 @@ async function conversationRoute(request, response, url) {
   const [, id, action] = match;
   const found = conversations.find((row) => row.id === id);
 
+  // The signing route, answered without Cloudinary so the chat can be looked at
+  // with attachments switched off in this preview.
+  if (id === 'uploads' && action === 'sign') {
+    json(response, {
+      cloudName: '',
+      apiKey: '',
+      folder: 'zuri/u/preview',
+      timestamp: Math.floor(Date.now() / 1000),
+      signature: '',
+      maxBytes: 10 * 1024 * 1024,
+      allowedTypes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'application/pdf'],
+    });
+    return true;
+  }
+
   if (!id && request.method === 'GET') {
+    // A project screen asks for one project's chats; without the filter the whole
+    // history is listed, which is what the chat list draws. An empty value counts as
+    // no filter, the way an unset box on a form does.
+    const wanted = (url.searchParams.get('projectId') ?? '').trim();
     const summary = [...conversations]
+      .filter((row) => wanted === '' || row.projectId === wanted)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .map(conversationSummary);
     json(response, { conversations: summary });
@@ -131,6 +238,9 @@ async function conversationRoute(request, response, url) {
       title: body.title || 'New chat',
       model: body.model || 'zuri-flash',
       origin: 'web',
+      // A chat started from inside a project is filed into it at birth; one started
+      // anywhere else belongs to no project, which is null rather than a missing key.
+      projectId: typeof body.projectId === 'string' && body.projectId !== '' ? body.projectId : null,
       createdAt: now,
       updatedAt: now,
       messages: [],
@@ -153,7 +263,7 @@ async function conversationRoute(request, response, url) {
 
   if (request.method === 'POST' && action === 'messages') {
     const body = JSON.parse(await readBody(request));
-    const message = { id: `m${Math.floor(Math.random() * 1e6)}`, role: body.role, content: body.content, createdAt: new Date().toISOString() };
+    const message = { id: `m${Math.floor(Math.random() * 1e6)}`, role: body.role, content: body.content, attachment: body.attachment ?? null, createdAt: new Date().toISOString() };
     found.messages.push(message);
     found.updatedAt = message.createdAt;
     if (found.title === 'New chat' && body.role === 'user') found.title = body.content.slice(0, 60);
@@ -163,7 +273,17 @@ async function conversationRoute(request, response, url) {
 
   if (request.method === 'PATCH') {
     const body = JSON.parse(await readBody(request));
-    found.title = String(body.title || '').trim().slice(0, 60) || found.title;
+    // The row menu sends whichever field changed, so a title is only replaced when
+    // one arrived and the flags keep their value otherwise.
+    if (body.pinned !== undefined) found.pinned = body.pinned === true;
+    if (body.archived !== undefined) found.archived = body.archived === true;
+    if (body.pinned === true && body.archived === undefined) found.archived = false;
+    if (body.title !== undefined) found.title = String(body.title || '').trim().slice(0, 60) || found.title;
+    // Filing a chat into a project, or taking it out with null, is read by the key
+    // being present rather than by its value: null is a real answer here.
+    if (body.projectId !== undefined) {
+      found.projectId = typeof body.projectId === 'string' && body.projectId !== '' ? body.projectId : null;
+    }
     json(response, { conversation: conversationSummary(found) });
     return true;
   }
@@ -175,6 +295,166 @@ async function conversationRoute(request, response, url) {
   }
 
   return false;
+}
+
+// The same caps the real server applies, so a form that is refused here would be
+// refused there too rather than saving something production would reject.
+const PROJECT_NAME_MAX_LENGTH = 60;
+const PROJECT_INSTRUCTIONS_MAX_LENGTH = 4000;
+const PROJECT_FILE_TEXT_MAX_LENGTH = 20_000;
+
+/** A trimmed name, or the empty string the caller refuses. @param {unknown} value @returns {string} */
+function projectName(value) {
+  return String(value ?? '').trim().slice(0, PROJECT_NAME_MAX_LENGTH);
+}
+
+/** The instructions as stored: trimmed of trailing space but otherwise kept. @param {unknown} value @returns {string} */
+function projectInstructions(value) {
+  return String(value ?? '').trim().slice(0, PROJECT_INSTRUCTIONS_MAX_LENGTH);
+}
+
+/**
+ * The project endpoints, shaped as the real server serves them.
+ *
+ * A project keeps one set of instructions, a few reference files and the chats filed
+ * into it, so opening one is a single answer rather than a request per section. The
+ * file text never travels back: only its length does, as production does it.
+ * @returns {Promise<boolean>} whether the request was handled here
+ */
+async function projectRoute(request, response, url) {
+  const match = url.pathname.match(/^\/api\/me\/projects(?:\/([^/]+))?(?:\/(files)(?:\/([^/]+))?)?$/);
+  if (!match) return false;
+  const [, rawId, section, rawFileId] = match;
+  const id = rawId ? decodeURIComponent(rawId) : '';
+  const fileId = rawFileId ? decodeURIComponent(rawFileId) : '';
+  const found = projects.find((row) => row.id === id);
+  const isFilesPath = section === 'files' && fileId === '';
+  const isOneFilePath = section === 'files' && fileId !== '';
+
+  if (id === '') {
+    if (request.method === 'GET') {
+      const summary = [...projects]
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .map(projectSummary);
+      json(response, { projects: summary });
+      return true;
+    }
+    if (request.method === 'POST') {
+      const body = JSON.parse(await readBody(request));
+      const name = projectName(body.name);
+      if (name === '') {
+        fail(response, 400, 'INVALID_MESSAGE', `Give the project a name of 1 to ${PROJECT_NAME_MAX_LENGTH} characters.`);
+        return true;
+      }
+      const now = new Date().toISOString();
+      // Counted ids would collide once a project had been deleted, and the screen
+      // would then open the wrong one, so the id is taken from the clock instead.
+      const created = {
+        id: `p${Date.now().toString(36)}`,
+        name,
+        instructions: projectInstructions(body.instructions),
+        createdAt: now,
+        updatedAt: now,
+        files: [],
+      };
+      projects.push(created);
+      json(response, { project: projectSummary(created) });
+      return true;
+    }
+    fail(response, 405, 'METHOD_NOT_ALLOWED', 'Use GET or POST for the project list.');
+    return true;
+  }
+
+  if (!found) {
+    fail(response, 404, 'PROJECT_NOT_FOUND', 'That project does not exist.');
+    return true;
+  }
+
+  if (!section && request.method === 'GET') {
+    // Only this project's chats travel with it, newest first, so the open project
+    // draws its whole screen from one answer.
+    const inProject = [...conversations]
+      .filter((conversation) => conversation.projectId === found.id)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .map(conversationSummary);
+    json(response, { project: projectSummary(found), files: found.files.map(projectFileSummary), conversations: inProject });
+    return true;
+  }
+
+  if (!section && request.method === 'PATCH') {
+    const body = JSON.parse(await readBody(request));
+    // Only the fields that arrived change, so a rename cannot blank instructions a
+    // dialog never showed.
+    if (body.name !== undefined) {
+      const name = projectName(body.name);
+      // A name that was sent but is blank is a refused form, not a rename to nothing.
+      if (name === '') {
+        fail(response, 400, 'INVALID_MESSAGE', `Give the project a name of 1 to ${PROJECT_NAME_MAX_LENGTH} characters.`);
+        return true;
+      }
+      found.name = name;
+    }
+    if (body.instructions !== undefined) found.instructions = projectInstructions(body.instructions);
+    // The list is ordered by this, and the project somebody just edited is the one
+    // they are working in, so it moves to the top.
+    found.updatedAt = new Date().toISOString();
+    json(response, { project: projectSummary(found) });
+    return true;
+  }
+
+  if (!section && request.method === 'DELETE') {
+    // Its files go with it. Its chats do not vanish: the real server sets their
+    // project_id to null, so the work written inside a project returns to the plain
+    // history. That is repeated here so the chat list matches what was just deleted.
+    projects = projects.filter((row) => row.id !== id);
+    for (const conversation of conversations) {
+      if (conversation.projectId === id) conversation.projectId = null;
+    }
+    json(response, { deleted: true });
+    return true;
+  }
+
+  if (isFilesPath && request.method === 'POST') {
+    const body = JSON.parse(await readBody(request));
+    const name = String(body.name ?? '').trim().slice(0, 120);
+    if (name === '') {
+      fail(response, 400, 'INVALID_FILE', 'Give the file a name.');
+      return true;
+    }
+    const bytes = Number(body.bytes);
+    const file = {
+      id: `f${Math.floor(Math.random() * 1e6)}`,
+      name,
+      kind: String(body.kind ?? '').slice(0, 120),
+      // A text file arrives as words and keeps no byte count, which is why the client
+      // falls back to the character count when this is zero.
+      bytes: Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes) : 0,
+      url: typeof body.url === 'string' && body.url !== '' ? body.url : null,
+      content: typeof body.content === 'string' ? body.content.slice(0, PROJECT_FILE_TEXT_MAX_LENGTH) : '',
+      createdAt: new Date().toISOString(),
+    };
+    found.files.push(file);
+    found.updatedAt = file.createdAt;
+    json(response, { file: projectFileSummary(file) });
+    return true;
+  }
+
+  if (isOneFilePath && request.method === 'DELETE') {
+    const before = found.files.length;
+    found.files = found.files.filter((file) => file.id !== fileId);
+    // A file that was already gone answers like a file that never existed, as the
+    // real server does, so a double press is not an error the screen has to explain.
+    if (found.files.length === before) {
+      fail(response, 404, 'PROJECT_NOT_FOUND', 'That project or file does not exist.');
+      return true;
+    }
+    found.updatedAt = new Date().toISOString();
+    json(response, { deleted: true });
+    return true;
+  }
+
+  fail(response, 405, 'METHOD_NOT_ALLOWED', 'That method is not used for a project or its files.');
+  return true;
 }
 
 /**
@@ -206,6 +486,15 @@ async function readBody(request) {
 function json(response, data) {
   response.writeHead(200, { 'content-type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify({ ok: true, data }));
+}
+
+/**
+ * Refuse a project request in the envelope the client already unwraps, so a screen
+ * shows the server's own sentence instead of a status code it cannot explain.
+ */
+function fail(response, status, code, message) {
+  response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' });
+  response.end(JSON.stringify({ ok: false, error: { code, message } }));
 }
 
 createServer(async (request, response) => {
@@ -257,6 +546,7 @@ createServer(async (request, response) => {
 
   if (url.pathname === '/api/chat' && request.method === 'POST') { streamChatRoute(response); return; }
   if (await conversationRoute(request, response, url)) return;
+  if (await projectRoute(request, response, url)) return;
 
   // An extensionless path is an app address such as /chat, which the real server
   // answers with the shell; without this the preview 404s on a shared chat link.

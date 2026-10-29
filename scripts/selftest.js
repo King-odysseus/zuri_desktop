@@ -1568,15 +1568,21 @@ check('the navigation drawer closes on Escape and locks the page behind it', () 
   return 'Escape closes, the page behind is locked, and the lock is restored';
 });
 
-check('the web chat is built from Flowbite components and lucide icons', () => {
+check('the web chat is built from Flowbite components and one icon family', () => {
   const chat = read('web/src/views/ChatView.jsx');
   const dashboard = read('web/src/views/Dashboard.jsx');
   const ui = read('web/src/components/ui.jsx');
 
-  // Icons come from lucide, either through the shared set or straight from the package.
-  if (!chat.includes("from 'lucide-react'")) throw new Error('the chat does not draw lucide icons');
+  // Icons come from one family, defined once and re-exported by the web module, so
+  // the desktop window and the browser cannot drift apart. Lucide is only the
+  // drawing engine inside that family and must not be imported anywhere else.
+  const family = read('src/renderer-react/Icons.jsx');
+  if (!family.includes("from 'lucide-react'")) throw new Error('the icon family is not drawn on the shared grid');
   const shared = read('web/src/components/Icons.jsx');
-  if (!shared.includes("from 'lucide-react'")) throw new Error('the shared icon set is not lucide');
+  if (!shared.includes('renderer-react/Icons.jsx')) throw new Error('the web icon module does not re-export the family');
+  for (const page of ['web/src/views/ChatView.jsx', 'web/src/views/OverviewView.jsx', 'web/src/views/Landing.jsx', 'web/src/components/ConversationSearch.jsx']) {
+    if (read(page).includes("from 'lucide-react'")) throw new Error(page + ' draws icons from the package directly');
+  }
 
   // Every icon control goes through the one wrapper, so a raw button with an icon
   // cannot creep back in beside the components.
@@ -1595,7 +1601,214 @@ check('the web chat is built from Flowbite components and lucide icons', () => {
   if (!chat.includes('Textarea')) throw new Error('the composer is not a Flowbite textarea');
   if (!chat.includes('chat-model-menu')) throw new Error('the model menu is not anchored to its chip');
 
-  return 'Flowbite controls, lucide icons, one copy path';
+  return 'Flowbite controls, one icon family, one copy path';
+});
+
+check('the reply house style is the same in the server and the app', async () => {
+  // The rule is written twice because Railway uploads server/ on its own, so a
+  // shared module would never reach it. The corpus below is the contract: both
+  // copies must answer identically, or a reply reads one way in the account and
+  // another way on the device.
+  const server = await import(pathToFileURL(path.join(root, 'server/src/text.js')).href);
+  const app = await import(pathToFileURL(path.join(root, 'src/renderer-react/formatting.js')).href);
+
+  const em = String.fromCharCode(0x2014);
+  const en = String.fromCharCode(0x2013);
+  const corpus = [
+    `a ${em} b`,
+    `a${em}b`,
+    `2024${en}2026`,
+    `10 ${em} 20`,
+    `before \`code ${em} here\` after ${em} word`,
+    '```\nconst s = "a ' + em + ' b";\n```\nplain ' + en + ' text',
+    'no dashes here',
+    '',
+    `- list item ${em} with a dash`,
+    `| a | b |\n| --- | --- |\n| 1 ${en} 2 | 3 |`,
+  ];
+  for (const sample of corpus) {
+    if (server.plainDashes(sample) !== app.plainDashes(sample)) {
+      throw new Error(`the two copies disagree about: ${JSON.stringify(sample)}`);
+    }
+  }
+
+  // And the rule itself must hold: a typographic dash may survive only inside
+  // code, where it is the program's own text.
+  const prose = server.plainDashes(`one ${em} two and 4 ${en} 5`);
+  if (/[\u2013\u2014]/.test(prose)) throw new Error('a dash survived the rewrite');
+  if (!prose.includes('4-5')) throw new Error('a numeric range lost its shape');
+
+  // Every conversation carries the instruction exactly once.
+  const ruled = server.withFormattingRules([{ role: 'user', content: 'hi' }]);
+  if (ruled.length !== 2 || ruled[0].role !== 'system') throw new Error('the house style is not sent');
+  if (server.withFormattingRules(ruled).length !== 2) throw new Error('the house style is sent twice');
+
+  // Both sides must actually use it, or the rule only holds in the test.
+  if (!read('src/renderer-react/FormattedMessage.jsx').includes('plainDashes(')) {
+    throw new Error('the reply renderer does not apply the house style');
+  }
+  const route = read('server/src/app.js');
+  if (!route.includes('withFormattingRules(')) throw new Error('the chat route does not send the house style');
+  if (!route.includes('plainDashes(')) throw new Error('the chat route does not rewrite the reply');
+
+  return 'one rule, two copies that agree, applied on both sides';
+});
+
+check('the Office pane is a composer, not a form', () => {
+  const pane = read('src/addin/taskpane.html');
+  for (const required of ['id="prompt"', 'id="thread"', 'id="send"', 'id="stop"', 'id="context-text"', 'ops.js']) {
+    if (!pane.includes(required)) throw new Error(`the pane has no ${required}`);
+  }
+  // The old screen was three boxes and one button: an answer was copied by hand and
+  // the conversation was lost the moment the pane closed.
+  for (const gone of ['id="answer"', 'id="context"', 'id="ask"']) {
+    if (pane.includes(gone)) throw new Error(`the pane still has the old ${gone} control`);
+  }
+
+  const script = read('src/addin/taskpane.js');
+  for (const required of ["fetch('/api/chat'", 'state.messages.push', 'AbortController', 'applyOperations', 'readExcel', 'readWord', 'readPowerPoint']) {
+    if (!script.includes(required)) throw new Error(`the pane script never uses ${required}`);
+  }
+  // A change must be reviewable: nothing reaches the file without an Apply press.
+  if (!script.includes('Nothing changes until you press Apply')) throw new Error('a change is applied without asking');
+  if (!script.includes("localStorage")) throw new Error('the conversation is not kept across a pane reload');
+  return 'composer, streaming, review, and a kept conversation';
+});
+
+check('a change block is checked before it can reach a file', async () => {
+  const vm = await import('node:vm');
+  const sandbox = { module: { exports: {} } };
+  vm.createContext(sandbox);
+  vm.runInContext(read('src/addin/ops.js'), sandbox);
+  const ops = sandbox.ZuriOps;
+
+  const good = [
+    'I will do two things.',
+    '',
+    '\u0060\u0060\u0060zuri',
+    JSON.stringify({
+      summary: 'Fill the Remaining column',
+      operations: [
+        { op: 'setFormulas', range: 'e3:e4', formulas: [['=C3-D3']] },
+        { op: 'setNumberFormat', range: 'E3:E4', format: '0.00' },
+      ],
+    }),
+    '\u0060\u0060\u0060',
+    '',
+    'Then the format.',
+  ].join('\n');
+
+  const segments = ops.splitReply(good);
+  if (segments.map((part) => part.type).join(',') !== 'text,ops,text') {
+    throw new Error('the reply was not split into prose, change and prose: ' + segments.map((part) => part.type).join(','));
+  }
+  const plan = segments[1].result;
+  if (plan.ok !== true || plan.operations.length !== 2) throw new Error('a good change block was refused');
+  if (plan.operations[0].range !== 'E3:E4') throw new Error('the range was not normalised');
+  if (!ops.describeOperation(plan.operations[0]).includes('E3:E4')) throw new Error('a change cannot be described');
+
+  const refused = [
+    ['an invented operation', '{"operations":[{"op":"deleteSheet","range":"A1"}]}'],
+    ['a backwards range', '{"operations":[{"op":"setValues","range":"F9:A1","values":[[1]]}]}'],
+    ['a formula with no equals sign', '{"operations":[{"op":"setFormulas","range":"A1:A2","formulas":[["C1-D1"]]}]}'],
+    ['broken JSON', '{"operations":[{"op":"clear"'],
+    ['an empty plan', '{"operations":[]}'],
+    ['an unknown style of grid', '{"operations":[{"op":"setValues","range":"A1:A2","values":"nope"}]}'],
+  ];
+  for (const [label, raw] of refused) {
+    const outcome = ops.parseBlock(raw);
+    if (outcome.ok !== false) throw new Error(`${label} was accepted`);
+    if (typeof outcome.error !== 'string' || outcome.error === '') throw new Error(`${label} gave no reason`);
+  }
+
+  // A block still being written must never be shown as ready to apply.
+  const streaming = ops.splitReply('Working on it\n\n\u0060\u0060\u0060zuri\n{"summary":"x"');
+  if (streaming[streaming.length - 1].type !== 'ops-open') throw new Error('a half-written change looks finished');
+
+  // A sample JSON object in an answer is code, not a change.
+  const sample = ops.splitReply('\u0060\u0060\u0060json\n{"hello":"world"}\n\u0060\u0060\u0060');
+  if (sample.some((part) => part.type === 'ops')) throw new Error('an ordinary JSON snippet became a change');
+
+  // Short rows are padded, so Office is never handed a ragged grid.
+  const padded = ops.parseBlock('{"operations":[{"op":"setValues","range":"A1:B2","values":[[1],[2,3]]}]}');
+  if (padded.ok !== true || padded.operations[0].grid[0].length !== 2) throw new Error('a short row was not padded');
+
+  return `${Object.keys(ops.OPERATIONS).length} operations, bad input refused with a reason`;
+});
+
+check('every operation Zuri can be asked for has a handler', async () => {
+  const vm = await import('node:vm');
+  const sandbox = { module: { exports: {} } };
+  vm.createContext(sandbox);
+  vm.runInContext(read('src/addin/ops.js'), sandbox);
+  const names = Object.keys(sandbox.ZuriOps.OPERATIONS);
+
+  const chat = read('src/main/providers/chat.js');
+  const pane = read('src/addin/taskpane.js');
+
+  for (const name of names) {
+    if (!chat.includes('"op":"' + name + '"')) throw new Error(`the model is never told about ${name}`);
+    if (!pane.includes("'" + name + "'")) throw new Error(`the pane cannot carry out ${name}`);
+  }
+  if (!chat.includes('export async function chatForAddin')) throw new Error('the add-in has no chat route');
+  if (chat.includes('askForAddin')) throw new Error('the one-shot add-in route is still here');
+  if (!chat.includes('C3-D3')) throw new Error('the contract has no worked formula example');
+
+  const addin = read('src/main/addin.js');
+  if (!addin.includes("route === '/api/chat'")) throw new Error('the pane has nothing to post to');
+  if (addin.includes("'/api/ask'")) throw new Error('the one-shot route is still served');
+  if (!addin.includes('text/event-stream')) throw new Error('the reply is not streamed');
+  if (!addin.includes("'/ops.js'")) throw new Error("the pane has no parser to serve");
+
+  return `${names.length} operations, each with a handler and a line in the contract`;
+});
+
+check('the installer carries the Office pane', () => {
+  if (!packageJson.build?.files?.includes('src/addin/**/*')) {
+    throw new Error('electron-builder does not package src/addin');
+  }
+  for (const name of ['taskpane.html', 'taskpane.js', 'taskpane.css', 'ops.js']) {
+    if (!exists('src/addin/' + name)) throw new Error('src/addin/' + name + ' is missing');
+  }
+  return 'src/addin is packaged';
+});
+
+check('a chat can be filed into a project from its row menu', () => {
+  const chat = read('web/src/views/ChatView.jsx');
+  for (const required of [
+    'setConversationProject',
+    'fetchProjects',
+    'projectPickerFor',
+    'Move to project',
+    'Take out of its project',
+  ]) {
+    if (!chat.includes(required)) throw new Error(`the row menu never offers ${required}`);
+  }
+
+  // The project list is a second view inside the same menu, so the menu must keep the
+  // row it belongs to rather than opening a dialog over the conversation.
+  if (!chat.includes('chat-row-menu-projects')) throw new Error('the project list is not drawn inside the row menu');
+  if (!chat.includes('menuitemradio')) throw new Error('the current project cannot be shown as chosen');
+
+  // Inside a project the list is that project's own, so a chat filed elsewhere has to
+  // leave it; filed from the whole history the row simply records where it belongs.
+  if (!chat.includes('nowInThisProject')) throw new Error('a chat moved to another project would stay on this screen');
+
+  const css = read('web/src/styles.css');
+  for (const selector of ['.chat-row-menu-projects', '.chat-menu-note', '.chat-menu-label']) {
+    if (!css.includes(selector)) throw new Error(`${selector} has no style`);
+  }
+  if (!/\.chat-row-menu-projects\s*\{[^}]*max-height/s.test(css)) {
+    throw new Error('a long project list would run off the screen');
+  }
+
+  // The screen a chat is filed into has to exist, with instructions, files and chats.
+  const project = read('web/src/views/ProjectsView.jsx');
+  for (const required of ['Instructions', 'Add a file', 'Chats in this project', 'New chat in this project', 'Delete project']) {
+    if (!project.includes(required)) throw new Error(`the project screen has no ${required}`);
+  }
+
+  return 'row menu files a chat, project screen holds instructions, files and chats';
 });
 
 await Promise.all(pendingChecks);

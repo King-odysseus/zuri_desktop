@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { copyText } from './clipboard.js';
+import { plainDashes } from './formatting.js';
 
 // Inline markers are matched in this order so a URL that happens to contain an
 // asterisk is still read as a link rather than half-italic text.
@@ -115,7 +116,9 @@ function startsTable(lines, index) {
 }
 
 export default function FormattedMessage({ content, onOpenCode }) {
-  const lines = String(content ?? '').replace(/\r\n?/g, '\n').split('\n');
+  // Every reply is drawn through the house style, so a dash that predates the
+  // rule, or came from a local model, still reads as a plain hyphen.
+  const lines = plainDashes(String(content ?? '')).replace(/\r\n?/g, '\n').split('\n');
   const blocks = [];
   let paragraph = [];
   let list = null;
