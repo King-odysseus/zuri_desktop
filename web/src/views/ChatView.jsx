@@ -880,6 +880,7 @@ export default function ChatView({
 
         const content = result?.content || reply;
         const calls = Array.isArray(result?.toolCalls) ? result.toolCalls : [];
+        const reasoningContent = typeof result?.reasoningContent === 'string' ? result.reasoningContent : '';
         // No calls, or a round that was not allowed to call anything: whatever came
         // back is the answer, streamed or handed over in one body.
         if (calls.length === 0 || !offerTools) {
@@ -889,7 +890,15 @@ export default function ChatView({
 
         // The model's turn goes back before its results, because that is the only
         // shape the server reads a tool result against.
-        wire = [...wire, { role: 'assistant', content, toolCalls: calls }];
+        // reasoningContent goes back too: without it a reasoning model refuses the
+        // round that carries the results, with "the reasoning_content in the thinking
+        // mode must be passed back".
+        wire = [...wire, {
+          role: 'assistant',
+          content,
+          toolCalls: calls,
+          ...(reasoningContent === '' ? {} : { reasoningContent }),
+        }];
         for (const call of calls) {
           const outcome = await runToolCall(call, controller.signal, setToolStatus);
           if (run !== runRef.current) return;

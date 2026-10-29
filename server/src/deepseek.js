@@ -226,6 +226,13 @@ function openAiMessages(messages) {
       return {
         role: 'assistant',
         content: message.content ?? '',
+        // A reasoning supplier refuses a tool round unless the thinking that produced
+        // the calls comes back with them: DeepSeek answers "the reasoning_content in
+        // the thinking mode must be passed back". It is not shown to anyone, only
+        // echoed, so the second round is accepted.
+        ...(typeof message.reasoningContent === 'string' && message.reasoningContent !== ''
+          ? { reasoning_content: message.reasoningContent }
+          : {}),
         tool_calls: message.toolCalls.map((call, index) => ({
           id: call.id || `call_${index}`,
           type: 'function',
@@ -321,10 +328,13 @@ export function createDeepSeekClient({ apiKey, endpoint, fetchImpl = fetch }) {
       }
       const inputTokens = Number(payload?.usage?.prompt_tokens);
       const outputTokens = Number(payload?.usage?.completion_tokens);
+      const reasoning = rawMessage?.reasoning_content;
       return {
         id: typeof payload?.id === 'string' ? payload.id : '',
         model: typeof payload?.model === 'string' ? payload.model : model,
         content: typeof message === 'string' ? message : '',
+        // Handed back so the caller can return it with the calls on the next round.
+        reasoningContent: typeof reasoning === 'string' ? reasoning : '',
         toolCalls,
         usage: {
           inputTokens: Number.isFinite(inputTokens) && inputTokens >= 0 ? Math.floor(inputTokens) : 0,

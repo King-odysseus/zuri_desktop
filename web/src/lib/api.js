@@ -642,6 +642,10 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, project
     return {
       content: typeof data.content === 'string' ? data.content : '',
       toolCalls: Array.isArray(data.toolCalls) ? data.toolCalls : [],
+      // A reasoning supplier will not accept the tool round unless the thinking that
+      // produced the calls travels with them, so it is carried to the caller and
+      // echoed on the next request. Nobody sees it.
+      reasoningContent: typeof data.reasoningContent === 'string' ? data.reasoningContent : '',
       ...(data.model === undefined ? {} : { model: data.model }),
       ...(data.modelName === undefined ? {} : { modelName: data.modelName }),
     };

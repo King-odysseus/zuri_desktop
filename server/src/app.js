@@ -426,7 +426,16 @@ function validateMessages(messages) {
           arguments: typeof call.arguments === 'string' ? call.arguments.slice(0, 20_000) : '{}',
         });
       }
-      normalized.push({ role: 'assistant', content: entry.content, toolCalls: calls });
+      // The thinking that produced the calls comes back with them, because a
+      // reasoning supplier will not accept the second round without it. Bounded like
+      // the rest, and never stored: it exists only for this one request.
+      const reasoning = typeof entry.reasoningContent === 'string' ? entry.reasoningContent.slice(0, 20_000) : '';
+      normalized.push({
+        role: 'assistant',
+        content: entry.content,
+        toolCalls: calls,
+        ...(reasoning === '' ? {} : { reasoningContent: reasoning }),
+      });
     } else {
       // An empty assistant turn that made no calls carries nothing to send.
       if (entry.content.trim() === '') continue;
@@ -903,6 +912,10 @@ export function createApp(dependencies = {}) {
                 modelName: zuriModel.name,
                 content: plainDashes(result.content),
                 toolCalls: Array.isArray(result.toolCalls) ? result.toolCalls : [],
+                // A reasoning supplier (DeepSeek Flash) refuses a tool round unless the
+                // thinking that produced the calls comes back with them. It is passed to
+                // the caller and echoed on the next request; nobody is shown it.
+                reasoningContent: typeof result.reasoningContent === 'string' ? result.reasoningContent : '',
                 usage: result.usage,
               },
             });

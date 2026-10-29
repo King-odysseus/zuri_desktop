@@ -938,6 +938,8 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
         model: request.model,
         content: '',
         toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{"path":"notes.txt"}' }],
+        // A reasoning supplier sends the thinking that produced the call.
+        reasoningContent: 'It wants the notes, so read notes.txt.',
         usage: { inputTokens: 20, outputTokens: 5 },
       };
     },
@@ -957,6 +959,10 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
   assert.equal(round.toolCalls.length, 1);
   assert.equal(round.toolCalls[0].name, 'readFile');
   assert.equal(seen[0].tools.length, 1, 'the definition reached the supplier');
+  // DeepSeek refuses the next round with "the reasoning_content in the thinking
+  // mode must be passed back", so the thinking has to travel to the caller even
+  // though nobody is shown it.
+  assert.equal(round.reasoningContent, 'It wants the notes, so read notes.txt.');
 
   // The round is charged: its tokens were spent whether or not it produced text.
   assert.equal(charged.length, 1);
@@ -973,7 +979,12 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
       stream: true,
       messages: [
         { role: 'user', content: 'Read my notes' },
-        { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{"path":"notes.txt"}' }] },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{"path":"notes.txt"}' }],
+          reasoningContent: 'It wants the notes, so read notes.txt.',
+        },
         { role: 'tool', toolCallId: 'call_1', content: '{"ok":true,"data":{"text":"hello"}}' },
       ],
     }),
@@ -984,6 +995,11 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
   assert.equal(relayed.at(-2).toolCalls[0].name, 'readFile', 'the call travelled back');
   assert.equal(relayed.at(-1).role, 'tool');
   assert.equal(relayed.at(-1).toolCallId, 'call_1', 'the result names the call it answers');
+  assert.equal(
+    relayed.at(-2).reasoningContent,
+    'It wants the notes, so read notes.txt.',
+    'the thinking came back with the call, or a reasoning supplier would refuse the round',
+  );
 
   // A malformed tool or message is refused rather than forwarded.
   const badTool = await toolApp(new Request('https://cloud.example.com/api/chat', {
