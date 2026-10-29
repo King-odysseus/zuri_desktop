@@ -354,7 +354,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           >
             <EditIcon size={16} />
             New chat
-            <kbd className="ml-auto text-xs text-muted" aria-hidden="true">{NEW_CHAT_HINT}</kbd>
+            <kbd className="ml-auto text-xs opacity-70 text-accent-foreground" aria-hidden="true">{NEW_CHAT_HINT}</kbd>
           </Button>
         </div>
 

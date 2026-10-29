@@ -270,13 +270,22 @@ button,
   }
 }
 
-/* Preserve wheel and keyboard scrolling without showing a second visual rail. */
-.zuri-scrollbar-hidden {
+/* No scrollbar is painted anywhere, in any engine, so the window reads like a
+   native app rather than a page: a rail down a dark panel looks like a seam.
+   The wildcard is deliberate, so a panel added later cannot quietly bring one
+   back, and the two legacy properties sit beside the modern one for Firefox and
+   for the old Edge engine. Only the painting goes here: overflow is untouched,
+   so a container that scrolls today still scrolls and a clipped one stays
+   clipped. Every scroll site in the app is covered by this one rule as a
+   result: the document, the shell, the sidebar and its lists, the chat thread,
+   the composer's textarea, the modal and sheet bodies, the scrolling tables and
+   code blocks, and the model and add menus that scroll sideways when narrow. */
+* {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 
-.zuri-scrollbar-hidden::-webkit-scrollbar {
+*::-webkit-scrollbar {
   display: none;
 }
 
@@ -383,12 +392,14 @@ button,
     --brand-blue-hover: #2560d8;
     --brand-blue-soft: #e8effc;
     --brand-blue-ink: #1b47b8;
-    /* The panel beside the thread is the brand navy, so the colour the logo is
-       drawn in is also a surface in the app rather than only a button outline. */
-    --nav-surface: var(--brand-navy);
-    --nav-foreground: #eef2ff;
-    --nav-muted: #a7b4d6;
-    --nav-active: #20356b;
+    /* The panel beside the thread stays a white surface carrying navy ink. The navy
+       is for the logo and the filled primary control, not for the background; the
+       row you are on takes the light blue so the panel still shows the brand. */
+    --nav-surface: var(--surface-secondary);
+    --nav-foreground: #0d1b3a;
+    --nav-muted: #5a6480;
+    --nav-active: var(--brand-blue-soft);
+    --nav-accent: var(--brand-blue-ink);
     /* Status is recognised before it is read: green confirmation, amber allowance,
        red refusal, light blue news. Each has a soft fill, an ink that still clears
        4.5:1 on it, and a line for the stripe down the side of a notice. */
@@ -441,6 +452,7 @@ button,
     --nav-foreground: #e9ebf7;
     --nav-muted: #b0b4dd;
     --nav-active: #16224d;
+    --nav-accent: #a9c1ff;
     --success: #6fce9a;
     --success-soft: #16301f;
     --success-line: #2f6b4a;
@@ -510,22 +522,22 @@ button,
   background: var(--nav-active) !important;
 }
 
-/* New chat is the light blue on the navy panel, in both themes: it is the one
-   control that must stand off the panel it sits on. */
+/* New chat is the navy primary control on the light panel and a white one in the
+   dark theme, the pair the rest of the dashboard uses. */
 .zuri-sidebar-panel .zuri-new-chat {
-  background: var(--brand-blue) !important;
-  color: #ffffff !important;
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
 }
 
 .zuri-sidebar-panel .zuri-new-chat:hover,
 .zuri-sidebar-panel .zuri-new-chat:focus-visible {
-  background: var(--brand-blue-hover) !important;
-  color: #ffffff !important;
+  background: color-mix(in srgb, var(--accent) 86%, var(--foreground)) !important;
+  color: var(--accent-foreground) !important;
 }
 
 .zuri-sidebar-panel .zuri-selected-pill {
   background: var(--nav-active) !important;
-  color: var(--nav-foreground) !important;
+  color: var(--nav-accent) !important;
 }
 
 /* Chat controls that float over the conversation: the sidebar toggle keeps the

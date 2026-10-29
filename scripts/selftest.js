@@ -2166,11 +2166,30 @@ check('brand palette keeps navy and the light blue', () => {
     throw new Error(`web/src/styles.css paints --brand-navy and --brand-blue the same colour (${navy}); the navy has to stay dark and the light blue light`);
   }
 
-  // The panel beside the page follows the brand by reference. A literal near-white
-  // here is exactly how the sidebar went grey before.
+  // The panel beside the page is a light surface carrying navy ink. The navy is
+  // spent on the logo and the primary control, so a navy panel is the opposite
+  // mistake: it doubles the brand colour into the background and the page reads as
+  // one dark slab. A literal white or the surface token is fine; what must not
+  // happen is the panel taking the brand navy.
   const navSurface = valueOf(web.light, '--nav-surface');
-  if (!/^var\(\s*--brand-navy\s*\)$/i.test(navSurface)) {
-    throw new Error(`web/src/styles.css sets --nav-surface to ${navSurface || 'nothing'}; it must be var(--brand-navy) so the panel beside the page stays navy instead of going back to a near-white grey`);
+  if (!navSurface) {
+    throw new Error('web/src/styles.css no longer sets --nav-surface, so the panel beside the page has no surface colour of its own');
+  }
+  if (/var\(\s*--brand-navy\s*\)/i.test(navSurface)) {
+    throw new Error(`web/src/styles.css sets --nav-surface to ${navSurface}; the panel beside the page must stay a light surface with navy ink on it, not the brand navy itself`);
+  }
+  // And it has to actually be light, so a future edit cannot trade one dark panel
+  // for another without the check noticing.
+  const navSurfaceColour = colourOf(web.light, '--nav-surface').toLowerCase();
+  if (navSurfaceColour === navy.toLowerCase()) {
+    throw new Error(`web/src/styles.css paints --nav-surface the same navy as --brand-navy (${navSurfaceColour}); the panel must stay light`);
+  }
+  if (/^#[0-9a-f]{6}$/i.test(navSurfaceColour)) {
+    const channels = [1, 3, 5].map((at) => parseInt(navSurfaceColour.slice(at, at + 2), 16));
+    const luminance = (channels[0] * 299 + channels[1] * 587 + channels[2] * 114) / 1000;
+    if (luminance < 200) {
+      throw new Error(`web/src/styles.css sets --nav-surface to ${navSurfaceColour}, which is too dark for the panel beside the page; it should read as white with navy ink on it`);
+    }
   }
 
 

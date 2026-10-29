@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Textarea } from 'flowbite-react';
-import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, FileIcon, FolderIcon, ICON_SIZE, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
+import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, FileIcon, FolderIcon, ICON_SIZE, ImageIcon, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
 import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
 import ConversationSearch from '../components/ConversationSearch.jsx';
 // The reply renderer and the clipboard fallback are the desktop app's own modules,
@@ -20,6 +20,7 @@ import {
   deleteConversation,
   fetchConversation,
   fetchConversations,
+  fetchPictureModels,
   fetchProjects,
   renameConversation,
   setConversationFlags,
@@ -275,8 +276,8 @@ export default function ChatView({
   // One file at a time, as the desktop composer allows, so the message stays one turn.
   const [attachment, setAttachment] = useState(null);
   const [attachNote, setAttachNote] = useState('');
-  // '' keeps the add menu closed. The desktop composer's own three views, minus
-  // the image list, which needs a route the cloud API does not have.
+  // '' keeps the add menu closed. The desktop composer's own four views: the main
+  // list, a reply length, the picture models and the starter sentences.
   const [menuView, setMenuView] = useState('');
   const [answerLength, setAnswerLength] = useState('balanced');
   // The model list is its own popup, anchored to its own chip. It is not a
@@ -1002,22 +1003,41 @@ export default function ChatView({
   }, [draft, showThread]);
 
   /*
-   * One picker for everything Zuri can make, so the picture models are read from
-   * the same catalogue the Images page uses. A model the plan leaves out stays in
-   * the list, greyed with the plan it needs: hiding it would let the picker look
-   * like the whole story. The catalogue itself needs a paid plan, so a refusal
-   * here just leaves the chat models in place.
+   * One picker for everything Zuri can make, so the picture models come from the
+   * catalogue the Images page uses. A model the plan leaves out stays in the list,
+   * greyed with the plan it needs: hiding it would let the picker look like the
+   * whole story.
+   *
+   * /api/models is asked first because it answers with this account's own
+   * availability, but it refuses anyone who is not on a paid plan, which left the
+   * picture list empty for most people. The public price list carries no such
+   * check, so it answers when the first route lists nothing, and an empty list is
+   * what is left when both of them fail.
    */
   useEffect(() => {
     let active = true;
     void (async () => {
+      let pictures = [];
       try {
         const listed = await api('/api/models');
-        if (!active || !Array.isArray(listed)) return;
-        setPictureModels(listed.filter((entry) => entry.kind === 'image'));
+        pictures = Array.isArray(listed) ? listed.filter((entry) => entry.kind === 'image') : [];
       } catch {
-        if (active) setPictureModels([]);
+        // A refusal is the expected answer for an account on no paid plan, and it
+        // is not the end of the list: the fallback below still knows every model.
+        pictures = [];
       }
+      if (pictures.length === 0) {
+        // This view is not handed the account's plan, so the helper is asked
+        // without one: it then marks every model available, and the server still
+        // refuses a model the plan leaves out when a picture is actually asked for.
+        try {
+          const catalogue = await fetchPictureModels('');
+          pictures = Array.isArray(catalogue) ? catalogue : [];
+        } catch {
+          pictures = [];
+        }
+      }
+      if (active) setPictureModels(pictures);
     })();
     return () => { active = false; };
   }, []);
@@ -1433,12 +1453,9 @@ export default function ChatView({
               void send();
             }}
           >
-            {/* The desktop composer leads with an add control, so the web one does too.
-                It carries only what a browser and this server can actually do: a file
-                a page can read, a reply length, and the starter sentences. Adding a
-                folder, searching the web and drawing a picture are desktop only
-                because they need the desktop app or a route the cloud API does not
-                have, and a menu item that cannot work is worse than no item. */}
+            {/* The desktop composer leads with an add control, so the web one does too:
+                a file, a picture, a reply length or a starter sentence, each acted on
+                here rather than sent to another screen. */}
             <div ref={menuRef} className="relative">
               <IconButton
                 className="chat-attach"
@@ -1461,6 +1478,15 @@ export default function ChatView({
                       <MenuItem onSelect={() => pickMenuItem(() => fileRef.current?.click())}>
                         <PaperclipIcon size={16} aria-hidden="true" />
                         <span>Attach a file</span>
+                      </MenuItem>
+                      {/* The same entry the desktop add menu carries, so a picture is
+                          started from the composer rather than from another screen. */}
+                      <MenuItem onSelect={() => setMenuView('picture')}>
+                        <ImageIcon size={16} aria-hidden="true" />
+                        <span className="flex-1">Draw a picture</span>
+                        {pictureModel && (
+                          <span className="text-xs text-[var(--muted)]">{pictureModel.name}</span>
+                        )}
                       </MenuItem>
                       <MenuItem onSelect={() => setMenuView('length')}>
                         <AlignLeftIcon size={16} aria-hidden="true" />
@@ -1487,6 +1513,32 @@ export default function ChatView({
                           {answerLength === value && <CheckIcon size={16} aria-hidden="true" />}
                         </MenuItem>
                       ))}
+                    </>
+                  ) : menuView === 'picture' ? (
+                    <>
+                      <MenuBack onBack={() => setMenuView('main')}>Draw a picture</MenuBack>
+                      {pictureModels.length === 0 ? (
+                        <p className="chat-menu-note">The picture models could not be loaded.</p>
+                      ) : (
+                        pictureModels.map((entry) => (
+                          <MenuItem
+                            key={entry.code}
+                            role="menuitemradio"
+                            checked={model === entry.code}
+                            disabled={!entry.available}
+                            title={entry.available ? `Draws a picture with ${entry.name}` : `${entry.name} needs the ${entry.minPlan} plan`}
+                            onSelect={() => {
+                              setModel(entry.code);
+                              setMenuView('');
+                            }}
+                          >
+                            <span className="flex-1">{entry.name}</span>
+                            {entry.available
+                              ? (model === entry.code && <CheckIcon size={16} aria-hidden="true" />)
+                              : <span className="chat-model-plan">{entry.minPlan}</span>}
+                          </MenuItem>
+                        ))
+                      )}
                     </>
                   ) : (
                     <>

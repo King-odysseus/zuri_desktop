@@ -99,21 +99,18 @@
   --accent-text: var(--brand-blue-ink);
   --selected: var(--brand-blue-soft);
   --selected-foreground: #12306f;
-  /* The panel beside the page is the brand navy, so the colour the logo is drawn
-     in is also a surface in the app rather than only the outline of a button.
-     Its rows are the same navy a step lighter, and the row you are on takes the
-     light blue so the current place is the thing that glows. */
-  --nav-surface: var(--brand-navy);
-  --nav-foreground: #eef2ff;
-  --nav-muted: #a7b4d6;
+  /* The panel beside the page stays a white surface with navy ink on it: the navy
+     belongs to the logo and the filled primary control, not to the background. The
+     row you are on carries the light blue, so the panel still shows the brand
+     without turning into a second page colour. */
+  --nav-surface: #ffffff;
+  --nav-foreground: #0d1b3a;
+  --nav-muted: #5a6480;
   --nav-border: transparent;
-  --nav-hover: #17274f;
-  --nav-active: #20356b;
-  --nav-field: #16244a;
-  /* The light blue as it appears ON the navy panel. The page's own --brand-blue-ink
-     is chosen to read on white, so it would vanish here; this is the same colour
-     lifted until it reads against navy. */
-  --nav-accent: #a9c8ff;
+  --nav-hover: #f0f3fa;
+  --nav-active: var(--brand-blue-soft);
+  --nav-field: #ffffff;
+  --nav-accent: var(--brand-blue-ink);
   /* Status has to be recognised before it is read: green for a confirmation,
      amber for an allowance running out, red for a refusal, the light blue for
      news. Each carries a soft fill, an ink that still clears 4.5:1 on that fill,
@@ -224,6 +221,58 @@
 
 * {
   box-sizing: border-box;
+}
+
+/*
+ * No scrollbar is painted anywhere in the app.
+ *
+ * Every scroller keeps working exactly as it did: the wheel, a finger, the arrow
+ * keys and the saved scroll position are all untouched, because this stops the bar
+ * being drawn and does nothing else. It is not a way of clipping a box, so no
+ * `overflow` value changes along with it: a container that scrolls today still
+ * scrolls and one that is clipped today stays clipped. Nothing is hidden by this
+ * rule except the rail beside the content.
+ *
+ * One rule over every element, rather than a list of the panels that scroll today,
+ * so a panel added later cannot quietly bring the rail back. That covers the page,
+ * the shell, the sidebar and its lists, the chat thread and the conversation list,
+ * the composer, every table, every code block, the body of any dialog, and
+ * everything that scrolls sideways: the add menu, the model menu, the plan rows and
+ * the image price rows included. On Windows the rail is a 15px light strip with
+ * arrow buttons: over the navy panel it read as a separate surface laid on top of
+ * it, and in the conversation list it took a tenth of a 296px column. The three
+ * ways out between them cover the three families, so no browser is left with its
+ * own bar: `scrollbar-width` for Firefox and current Chromium, `-ms-overflow-style`
+ * for old Edge and Internet Explorer, and the WebKit pseudo-elements for everything
+ * that came before them.
+ *
+ * The `!important` is deliberate, for the same reason the `[hidden]` rule further
+ * down carries it: a rule naming one panel is more specific than this wildcard, and
+ * one such rule is all it takes for a bar to appear again. It also wins over a
+ * utility class, since this stylesheet is unlayered and Tailwind's utilities are
+ * not.
+ */
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+/* The pseudo-elements sit in a rule of their own rather than in the list above. A
+   browser that does not know `::-webkit-scrollbar` throws away the whole selector
+   list it appears in, and Firefox is one of them, which would cost it the
+   `scrollbar-width` it does understand. The track, the thumb, the corner and the
+   button are named too: a bar given no size only at the root can still paint the
+   parts it was given sizes for. */
+*::-webkit-scrollbar,
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-thumb,
+*::-webkit-scrollbar-corner,
+*::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 svg {
@@ -1109,24 +1158,6 @@ a:hover {
   box-shadow: var(--shadow-glass);
 }
 
-/*
- * Every scroller in the signed-in app hides its bar, as the desktop app's panels
- * and transcript do. On Windows the platform bar is a 15px light rail with arrow
- * buttons: over the navy panel it read as a separate surface laid on top of it, and
- * in the conversation list it took a tenth of a 296px column. Wheel, touch, keyboard
- * and the scroll position all still work; only the rail is gone.
- */
-:is(.sidebar, .chat-recents-list, .chat-transcript) {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-:is(.sidebar, .chat-recents-list, .chat-transcript)::-webkit-scrollbar {
-  display: none;
-  width: 0;
-  height: 0;
-}
-
 /* The shell names itself here, as the desktop app's panel does, using the same
    brand mark the public bar uses. */
 .sidebar-brand {
@@ -1420,34 +1451,16 @@ body:has(.app) .app {
 
    It is a column as well as a scroller, so the page can grow into the window and
    the footer can be carried to the bottom edge of a short page instead of sitting
-   halfway up it. */
+   halfway up it.
+
+   This column used to paint a thin tinted bar of its own, and that rule was more
+   specific than the app-wide one at the top of this file, so it would have kept a
+   rail here after every other panel lost one. It paints nothing now. */
 .app-main:not(.is-chat) {
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--nav-muted) 30%, transparent) transparent;
-}
-
-/* A slim, tinted bar rather than the system's heavy rail: it sits beside the
-   navigation, so a bright grey slab there breaks the panel in two. */
-.app-main:not(.is-chat)::-webkit-scrollbar {
-  width: 10px;
-}
-
-.app-main:not(.is-chat)::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.app-main:not(.is-chat)::-webkit-scrollbar-thumb {
-  border: 0;
-  border-radius: 9999px;
-  background: color-mix(in srgb, var(--nav-muted) 30%, transparent);
-}
-
-.app-main:not(.is-chat)::-webkit-scrollbar-thumb:hover {
-  background: color-mix(in srgb, var(--nav-muted) 55%, transparent);
 }
 
 .app-content {
@@ -1766,7 +1779,6 @@ body:has(.app) .app {
   color: var(--nav-accent);
   font-weight: 600;
 }
-
 .nav-item.is-active svg {
   stroke: currentColor;
 }
@@ -3759,15 +3771,9 @@ a.download-card:hover {
   font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
   resize: none;
   /* A one-line box that scrolls draws a scrollbar down its own middle, which reads
-     as a second control. It grows in height instead, and keeps the scrollbar out
-     of sight until the text really is longer than the box. */
+     as a second control. It grows in height instead, up to the cap above, and the
+     app-wide rule keeps the bar out of sight once the text runs past that. */
   overflow-y: auto;
-  scrollbar-width: none;
-}
-
-.chat-composer .chat-input::-webkit-scrollbar {
-  width: 0;
-  height: 0;
 }
 
 .chat-composer .chat-input:focus {
@@ -4664,14 +4670,8 @@ h4,
   font: 15px/1.55 "Segoe UI", system-ui, sans-serif;
   resize: none;
   overflow-y: auto;
-  /* The scrollbar is kept out of sight until the text really is longer than the
-     box, so a short description never shows a second control down its middle. */
-  scrollbar-width: none;
-}
-
-.image-prompt::-webkit-scrollbar {
-  width: 0;
-  height: 0;
+  /* The bar is kept out of sight until the text really is longer than the box, so a
+     short description never shows a second control down its middle. */
 }
 
 .image-prompt:focus {

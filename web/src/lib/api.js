@@ -48,6 +48,142 @@ export async function api(path, options = {}) {
   return body.data;
 }
 
+/*
+ * Which plans may use which picture model, cheapest first. format.js keeps the
+ * same ladder for the plan tiles but does not export it, and this module carries
+ * no imports of its own, so the four codes are named once here. The list only
+ * decides what a menu greys out; it never decides whether a picture is drawn.
+ */
+const PICTURE_PLANS = ['starter', 'pro', 'power', 'max'];
+
+/** @param {unknown} code @returns {number} Position on the ladder, or -1 when it is not on it. */
+function picturePlanRank(code) {
+  return PICTURE_PLANS.indexOf(String(code ?? '').toLowerCase());
+}
+
+/** @param {string} value */
+function capitalised(value) {
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
+}
+
+/**
+ * "zuri-sketch" into "Zuri Sketch", so a catalogue entry that arrives without a
+ * name still reads as a model rather than as a bare code.
+ * @param {string} code
+ */
+function nameFromCode(code) {
+  return String(code)
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map(capitalised)
+    .join(' ');
+}
+
+/**
+ * Whole Naira for one picture on the caller's plan. A plan the catalogue does not
+ * price falls back to its highest price, which is the "from" figure a menu can show
+ * honestly, and nothing readable at all becomes 0 rather than an invented number.
+ * @param {{ plans?: Array<{ code?: string, priceKobo?: number }> }} model
+ * @param {string} planCode Lower case, or '' when the plan is unknown.
+ * @returns {number}
+ */
+function nairaForPicture(model, planCode) {
+  const plans = Array.isArray(model?.plans) ? model.plans : [];
+  // Kobo to Naira, rounded: 5998 reads as NGN 60 rather than NGN 59.98.
+  const nairaOf = (entry) => {
+    const naira = Math.round(Number(entry?.priceKobo) / 100);
+    return Number.isFinite(naira) && naira > 0 ? naira : 0;
+  };
+
+  const own = plans.find((entry) => String(entry?.code ?? '').toLowerCase() === planCode);
+  const ownNaira = own ? nairaOf(own) : 0;
+  if (ownNaira > 0) return ownNaira;
+
+  // No entry for this plan, or one whose price is unreadable: the dearest picture
+  // is the one a menu can honestly promise as a starting price.
+  const amounts = plans.map(nairaOf).filter((naira) => naira > 0);
+  return amounts.length > 0 ? Math.max(...amounts) : 0;
+}
+
+/**
+ * The one line the composer's menu shows beside a model: its price, or the plan
+ * that unlocks a model this account cannot use yet, because "locked" on its own
+ * tells nobody what to do about it.
+ * @param {{ name: string, nairaPerImage: number, available: boolean, minPlan: string }} entry
+ */
+function hintForPicture({ name, nairaPerImage, available, minPlan }) {
+  if (!available && minPlan !== '') return `${name}, needs the ${capitalised(minPlan)} plan`;
+  if (nairaPerImage > 0) return `${name}, about NGN ${nairaPerImage} an image`;
+  return `${name}, price not listed`;
+}
+
+/**
+ * The picture models the composer may offer, read from the public image catalogue.
+ *
+ * Not from /api/models: that route answers a signed-in account on a paid plan and
+ * refuses everyone else, so a menu built from it stayed empty for most people and
+ * there was no way to ask for a picture at all. /api/image-prices is public and
+ * carries the same catalogue, so the menu fills in for whoever the composer is
+ * shown to.
+ *
+ * `available` only decides what reads as locked in the menu; it never decides
+ * whether a picture can be drawn. The server checks the account's plan again when
+ * the picture is asked for, which is why an unknown plan on either side, ours or
+ * the model's, is left open instead of greying out a menu that may well be right.
+ *
+ * Like the other catalogue readers this never throws. A menu with no picture
+ * models is a far smaller problem than a chat screen that will not load, so a 404,
+ * an outage or a malformed answer all leave an empty list.
+ * @param {string} [planCode] This account's plan, such as 'pro'. Omit it when unknown.
+ * @returns {Promise<Array<{ code: string, name: string, kind: 'image', minPlan: string, hint: string, nairaPerImage: number, available: boolean }>>}
+ */
+export async function fetchPictureModels(planCode = '') {
+  try {
+    const data = await api('/api/image-prices');
+    const catalogue = Array.isArray(data) ? data : [];
+    const plan = String(planCode ?? '').trim().toLowerCase();
+    const accountRank = picturePlanRank(plan);
+
+    const models = [];
+    for (const entry of catalogue) {
+      if (!entry || typeof entry !== 'object') continue;
+      const code = typeof entry.code === 'string' ? entry.code.trim() : '';
+      // A model with no code is one the composer could never ask for.
+      if (code === '') continue;
+
+      const minPlan = typeof entry.minPlan === 'string' ? entry.minPlan.trim() : '';
+      const floor = picturePlanRank(minPlan);
+      const available = plan === '' || accountRank === -1 || floor === -1 || floor <= accountRank;
+      const nairaPerImage = nairaForPicture(entry, plan);
+      const statedName = typeof entry.name === 'string' ? entry.name.trim() : '';
+      const name = statedName !== '' ? statedName : nameFromCode(code);
+
+      models.push({
+        code,
+        name,
+        kind: 'image',
+        minPlan,
+        hint: hintForPicture({ name, nairaPerImage, available, minPlan }),
+        nairaPerImage,
+        available,
+      });
+    }
+
+    // Cheapest entry point first: the lowest plan that can use a model, then its
+    // price. A model whose floor is off the ladder cannot be placed, so it goes
+    // last rather than ahead of Starter.
+    const floorOf = (model) => {
+      const rank = picturePlanRank(model.minPlan);
+      return rank === -1 ? PICTURE_PLANS.length : rank;
+    };
+    return models.sort((a, b) => floorOf(a) - floorOf(b) || a.nairaPerImage - b.nairaPerImage);
+  } catch {
+    // Deliberately silent: the composer renders no picture models when this is
+    // empty, and an error about pictures would bury the chat it sits in.
+    return [];
+  }
+}
+
 /** @returns {Promise<Array<{ code: string, name: string, currency: string, amountKobo: number, monthlyTokens: number }>>} */
 export async function fetchPlans() {
   const data = await api('/api/plans');
