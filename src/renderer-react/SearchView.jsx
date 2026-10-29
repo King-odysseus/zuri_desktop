@@ -92,12 +92,12 @@ export default function SearchView({ onSelectThread }) {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header>
-          <h1>Search</h1>
-          <p>Find any word in your saved conversations, including the replies.</p>
-        </header>
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+          <header>
+            <h1 className="text-2xl font-medium tracking-tight">Search</h1>
+            <p className="mt-1 text-sm text-muted">Find any word in your saved conversations, including the replies.</p>
+          </header>
 
-        <section className="rounded-xl border border-border bg-surface p-5">
           <div className="zuri-search-field">
             <span aria-hidden="true" className="zuri-search-icon"><SearchIcon size={18} /></span>
             <Input
@@ -112,39 +112,39 @@ export default function SearchView({ onSelectThread }) {
           </div>
 
           {status === 'unavailable' && (
-            <p className="mt-4 text-sm text-muted">Search works inside the Zuri app, not in this preview.</p>
+            <p className="text-sm text-muted">Search works inside the Zuri app, not in this preview.</p>
           )}
           {status === 'error' && (
-            <p role="alert" className="mt-4 text-sm text-danger">Your conversations could not be read.</p>
+            <p role="alert" className="text-sm text-danger">Your conversations could not be read.</p>
           )}
 
           {status === 'ready' && needle === '' && (
-            <div className="zuri-empty-state mt-4">
+            <div className="zuri-empty-state">
               <strong>Search every conversation</strong>
               <p>Type a word or person above. Matches show the reply they came from.</p>
             </div>
           )}
 
           {status === 'ready' && needle !== '' && results.length === 0 && (
-            <div className="zuri-empty-state mt-4">
+            <div className="zuri-empty-state">
               <strong>No matches for "{query.trim()}"</strong>
               <p>Try a shorter word, or search the other way round.</p>
             </div>
           )}
 
           {results.length > 0 && (
-            <>
-              <p className="mt-4 text-xs uppercase tracking-wide text-muted">
+            <div>
+              <p className="mb-1 text-xs uppercase tracking-wide text-muted">
                 {results.length} {results.length === 1 ? 'conversation' : 'conversations'}
               </p>
-              <ul className="mt-2 flex flex-col gap-2">
+              <ul className="flex flex-col divide-y divide-border border-t border-border">
                 {results.map(({ thread, titleMatches, matches, snippet }) => (
                   <li key={thread.id}>
                     <Button
                       type="button"
                       variant="ghost"
                       fullWidth
-                      className="h-auto items-start justify-start rounded-xl px-3 py-3 text-left"
+                      className="h-auto items-start justify-start rounded-lg px-2 py-3 text-left"
                       onPress={() => onSelectThread?.(thread.id)}
                     >
                       <span className="flex min-w-0 w-full flex-col gap-1">
@@ -163,9 +163,9 @@ export default function SearchView({ onSelectThread }) {
                   </li>
                 ))}
               </ul>
-            </>
+            </div>
           )}
-        </section>
+        </div>
       </div>
     </main>
   );

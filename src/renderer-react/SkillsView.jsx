@@ -24,6 +24,8 @@ export default function SkillsView() {
   const [problem, setProblem] = useState('');
   // The skill whose text is in the form; '' means the form is adding a new one.
   const [editingId, setEditingId] = useState('');
+  // The form is hidden until someone adds or edits, so the page opens as a plain list.
+  const [formOpen, setFormOpen] = useState(false);
 
   const zuriSkills = typeof window !== 'undefined' ? window.zuri?.skills : undefined;
 
@@ -48,6 +50,7 @@ export default function SkillsView() {
   }, []);
 
   function resetForm() {
+    setFormOpen(false);
     setEditingId('');
     setName('');
     setInstructions('');
@@ -56,6 +59,7 @@ export default function SkillsView() {
   /** Put a saved skill's text in the form so it can be corrected and saved again. */
   function startEditing(skill) {
     setProblem('');
+    setFormOpen(true);
     setEditingId(skill.id);
     setName(skill.name);
     setInstructions(skill.instructions);
@@ -97,79 +101,90 @@ export default function SkillsView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-6">
-          <h1 className="text-3xl font-medium tracking-tight">Skills</h1>
-          <p className="mt-2 text-sm text-muted">
-            Saved instructions Zuri follows while they are on. Up to {MAX_ENABLED} can be on at once, because each one is added to every message you send.
-          </p>
-        </header>
-
-        {status === 'error' && <p role="alert" className="mb-4 text-sm text-danger">Skills need the Zuri desktop app.</p>}
-        {problem !== '' && <p role="alert" className="mb-4 text-sm text-danger">{problem}</p>}
-
-        <section className="rounded-xl border border-border bg-surface p-5">
-          <h2 className="text-base font-semibold">{editingId === '' ? 'Add a skill' : 'Edit skill'}</h2>
-          <form onSubmit={saveSkill} className="mt-3 flex flex-col gap-3">
-            <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} maxLength={40} placeholder="For example, Plain English" fullWidth />
-            <Textarea
-              label="What should Zuri do?"
-              value={instructions}
-              onChange={(event) => setInstructions(event.target.value)}
-              maxLength={1500}
-              rows={4}
-              placeholder="Describe how to write, what to include, or what to avoid."
-            />
-            <div className="flex flex-wrap items-center gap-2">
-              <Button type="submit" variant="primary" className="min-h-11" isDisabled={status !== 'ready' || name.trim() === '' || instructions.trim() === ''}>
-                {editingId === '' ? 'Save skill' : 'Save changes'}
-              </Button>
-              {editingId !== '' && (
-                <Button type="button" variant="ghost" className="min-h-11" onPress={resetForm}>Cancel</Button>
-              )}
-              {editingId === '' && STARTER_IDEAS.map((idea) => (
-                <Button
-                  key={idea.name}
-                  type="button"
-                  variant="ghost"
-                  className="min-h-11 text-xs"
-                  onPress={() => {
-                    setName(idea.name);
-                    setInstructions(idea.instructions);
-                  }}
-                >
-                  Try: {idea.name}
-                </Button>
-              ))}
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1 className="text-3xl font-medium tracking-tight">Skills</h1>
+              <p className="mt-2 text-sm text-muted">
+                Saved instructions Zuri follows while they are on. Up to {MAX_ENABLED} can be on at once, because each one is added to every message you send.
+              </p>
             </div>
-          </form>
-        </section>
+            {!formOpen && (
+              <Button variant="primary" className="shrink-0" isDisabled={status !== 'ready'} onPress={() => { setProblem(''); setFormOpen(true); }}>
+                New skill
+              </Button>
+            )}
+          </header>
 
-        <section className="mt-6 flex flex-col gap-3" aria-label="Your skills">
-          {status === 'ready' && skills.length === 0 && <p className="text-sm text-muted">No skills yet. Save one above and switch it on.</p>}
-          {skills.map((skill) => (
-            <article key={skill.id} className="flex flex-wrap items-start gap-3 rounded-xl border border-border bg-surface p-4">
-              <div className="min-w-0 flex-1">
-                <h3 className="font-medium">{skill.name}</h3>
-                <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted">{skill.instructions}</p>
-              </div>
-              <Checkbox
-                isSelected={skill.enabled === true}
-                isDisabled={skill.enabled !== true && enabledCount >= MAX_ENABLED}
-                onChange={(checked) => void toggle(skill, checked)}
-                className="min-h-11"
-                aria-label={`Switch ${skill.name} on`}
-              >
-                On
-              </Checkbox>
-              <Button isIconOnly size="sm" variant="ghost" className="min-h-11 min-w-11 text-muted" aria-label={`Edit skill ${skill.name}`} title="Edit skill" onPress={() => startEditing(skill)}>
-                <EditIcon size={16} />
-              </Button>
-              <Button isIconOnly size="sm" variant="ghost" className="min-h-11 min-w-11 text-muted" aria-label={`Delete skill ${skill.name}`} title="Delete skill" onPress={() => void remove(skill)}>
-                <DeleteIcon size={16} />
-              </Button>
-            </article>
-          ))}
-        </section>
+          {status === 'error' && <p role="alert" className="text-sm text-danger">Skills need the Zuri desktop app.</p>}
+          {problem !== '' && <p role="alert" className="text-sm text-danger">{problem}</p>}
+
+          {formOpen && (
+            <section className="border-b border-border pb-6">
+              <h2 className="text-base font-semibold">{editingId === '' ? 'Add a skill' : 'Edit skill'}</h2>
+              <form onSubmit={saveSkill} className="mt-3 flex flex-col gap-3">
+                <Input label="Name" value={name} onChange={(event) => setName(event.target.value)} maxLength={40} placeholder="For example, Plain English" fullWidth />
+                <Textarea
+                  label="What should Zuri do?"
+                  value={instructions}
+                  onChange={(event) => setInstructions(event.target.value)}
+                  maxLength={1500}
+                  rows={4}
+                  placeholder="Describe how to write, what to include, or what to avoid."
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button type="submit" variant="primary" className="min-h-11" isDisabled={status !== 'ready' || name.trim() === '' || instructions.trim() === ''}>
+                    {editingId === '' ? 'Save skill' : 'Save changes'}
+                  </Button>
+                  <Button type="button" variant="ghost" className="min-h-11" onPress={resetForm}>Cancel</Button>
+                  {editingId === '' && STARTER_IDEAS.map((idea) => (
+                    <Button
+                      key={idea.name}
+                      type="button"
+                      variant="ghost"
+                      className="min-h-11 text-xs text-muted"
+                      onPress={() => {
+                        setName(idea.name);
+                        setInstructions(idea.instructions);
+                      }}
+                    >
+                      Try: {idea.name}
+                    </Button>
+                  ))}
+                </div>
+              </form>
+            </section>
+          )}
+
+          <section aria-label="Your skills">
+            {status === 'ready' && skills.length === 0 && <p className="text-sm text-muted">No skills yet. Choose New skill and switch it on.</p>}
+            <ul className="flex flex-col divide-y divide-border">
+              {skills.map((skill) => (
+                <li key={skill.id} className="flex flex-wrap items-start gap-3 py-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-medium">{skill.name}</h3>
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted">{skill.instructions}</p>
+                  </div>
+                  <Checkbox
+                    isSelected={skill.enabled === true}
+                    isDisabled={skill.enabled !== true && enabledCount >= MAX_ENABLED}
+                    onChange={(checked) => void toggle(skill, checked)}
+                    className="min-h-11"
+                    aria-label={`Switch ${skill.name} on`}
+                  >
+                    On
+                  </Checkbox>
+                  <Button isIconOnly size="sm" variant="ghost" className="min-h-11 min-w-11 text-muted" aria-label={`Edit skill ${skill.name}`} title="Edit skill" onPress={() => startEditing(skill)}>
+                    <EditIcon size={16} />
+                  </Button>
+                  <Button isIconOnly size="sm" variant="ghost" className="min-h-11 min-w-11 text-muted" aria-label={`Delete skill ${skill.name}`} title="Delete skill" onPress={() => void remove(skill)}>
+                    <DeleteIcon size={16} />
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
       </div>
     </main>
   );

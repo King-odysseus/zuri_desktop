@@ -27,6 +27,7 @@ export default function SettingsView() {
   const [addin, setAddin] = useState({ supported: false, installed: false, running: false });
   const [addinBusy, setAddinBusy] = useState(false);
   const [user, setUser] = useState(null);
+  const [displayName, setDisplayName] = useState('');
 
   async function load() {
     if (typeof api?.settings?.get !== 'function') {
@@ -47,7 +48,11 @@ export default function SettingsView() {
       setStatus('ready');
       await refreshAddinStatus();
       const account = await api.cloud?.account?.();
-      if (account?.ok) setUser(account.data?.user ?? null);
+      if (account?.ok) {
+        const accountUser = account.data?.user ?? null;
+        setUser(accountUser);
+        setDisplayName(accountUser?.displayName ?? '');
+      }
     } catch (error) {
       setStatus('error');
       setMessage(error?.message ?? 'Settings could not be read.');
@@ -107,6 +112,29 @@ export default function SettingsView() {
     window.dispatchEvent(new Event('zuri:signed-out'));
   }
 
+  async function saveAccountName(event) {
+    event.preventDefault();
+    const nextName = displayName.trim();
+    if (nextName.length > 60) {
+      setMessage('Use 60 characters or fewer for your name.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await api?.cloud?.updateAccount?.({ displayName: nextName });
+      if (!result?.ok) {
+        setMessage(result?.error?.message ?? 'The name could not be saved.');
+        return;
+      }
+      setUser((current) => ({ ...(current ?? {}), ...(result.data?.user ?? {}), displayName: nextName }));
+      setMessage('Name saved.');
+    } catch (error) {
+      setMessage(error?.message ?? 'The name could not be saved.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function savePatch(patch, successMessage) {
     if (typeof api?.settings?.save !== 'function') {
       setMessage('Settings can only be saved inside Zuri.');
@@ -164,102 +192,111 @@ export default function SettingsView() {
     ...(zuriModel === null && savedModel !== '' ? [{ value: savedModel, label: `${savedModel} (current)` }] : []),
   ];
 
+  // One centred column of hairline-separated rows, like a plain account page.
+  const row = 'flex flex-wrap items-center justify-between gap-3 border-t border-border py-5';
+  const heading = 'text-base font-medium';
+  const helper = 'mt-1 text-sm text-muted';
+
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header>
-          <h1 className="text-3xl font-medium tracking-tight">Settings</h1>
-          <p className="mt-2 text-sm text-muted">Your account, how Zuri looks, and the Office add-in.</p>
-        </header>
+        <div className="max-w-2xl pb-8">
+          <header className="pb-6">
+            <h1 className="text-2xl font-medium tracking-tight">Settings</h1>
+            <p className="mt-1 text-sm text-muted">Your account, how Zuri looks, and the Office add-in.</p>
+          </header>
 
-        {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
-        {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
-        {status === 'ready' && message !== '' && <p role="status" className="text-sm text-muted">{message}</p>}
+          {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
+          {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+          {status === 'ready' && message !== '' && <p role="status" className="pb-4 text-sm text-muted">{message}</p>}
 
-        {status === 'ready' && <div className="grid gap-5 lg:grid-cols-2">
-          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          {status === 'ready' && <div>
+            <section className={row}>
               <div>
-                <h2 className="text-lg font-medium">Account</h2>
-                <p className="mt-1 text-sm text-muted">{user ? `Signed in as ${user.displayName || user.email}` : 'Signed in to Zuri Cloud.'}</p>
+                <h2 className={heading}>Account</h2>
+                <p className={helper}>{user ? `Signed in as ${user.displayName || user.email}` : 'Signed in to Zuri Cloud.'}</p>
+                <form className="mt-3 flex flex-wrap items-end gap-3" onSubmit={saveAccountName}>
+                  <Input label="Your name" value={displayName} maxLength={60} onChange={(event) => setDisplayName(event.target.value)} placeholder="What should Zuri call you?" />
+                  <Button type="submit" variant="secondary" isDisabled={busy}>{busy ? 'Saving...' : 'Save name'}</Button>
+                </form>
               </div>
               <Button variant="ghost" onPress={() => void signOut()} isDisabled={busy}>Sign out</Button>
-            </div>
-          </section>
+            </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="text-lg font-medium">Appearance</h2>
-            <p className="mt-1 text-sm text-muted">Pick how Zuri looks. Applied straight away.</p>
-            <div className="mt-4">
-              <SelectField label="Theme" value={current.theme === 'light' ? 'light' : 'dark'} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} onChange={(value) => void savePatch({ theme: value }, `Theme is now ${value}.`)} />
-            </div>
-          </section>
+            <section className="border-t border-border py-5">
+              <h2 className={heading}>Appearance</h2>
+              <p className={helper}>Pick how Zuri looks. Applied straight away.</p>
+              <div className="mt-3">
+                <SelectField label="Theme" value={current.theme === 'light' ? 'light' : 'dark'} options={[{ value: 'light', label: 'Light' }, { value: 'dark', label: 'Dark' }]} onChange={(value) => void savePatch({ theme: value }, `Theme is now ${value}.`)} />
+              </div>
+            </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <h2 className="text-lg font-medium">Model</h2>
-            <p className="mt-1 text-sm text-muted">The Zuri model that answers your chats. It is billed to your Zuri plan.</p>
-            <div className="mt-4">
-              <SelectField
-                label="Model"
-                value={zuriModel?.model ?? savedModel}
-                options={modelOptions}
-                onChange={(value) => {
-                  const picked = ZURI_MODELS.find((entry) => entry.model === value);
-                  // Saved together: a supplier id is only valid on its own API,
-                  // so the model and the key that pays for it never drift apart.
-                  if (picked === undefined) void savePatch({ model: value }, `Model set to ${value}.`);
-                  else void savePatch({ provider: picked.provider, model: picked.model }, `Model set to ${picked.name}.`);
-                }}
+            <section className="border-t border-border py-5">
+              <h2 className={heading}>Model</h2>
+              <p className={helper}>The Zuri model that answers your chats. It is billed to your Zuri plan.</p>
+              <div className="mt-3">
+                <SelectField
+                  label="Model"
+                  value={zuriModel?.model ?? savedModel}
+                  options={modelOptions}
+                  onChange={(value) => {
+                    const picked = ZURI_MODELS.find((entry) => entry.model === value);
+                    // Saved together: a supplier id is only valid on its own API,
+                    // so the model and the key that pays for it never drift apart.
+                    if (picked === undefined) void savePatch({ model: value }, `Model set to ${value}.`);
+                    else void savePatch({ provider: picked.provider, model: picked.model }, `Model set to ${picked.name}.`);
+                  }}
+                />
+              </div>
+              <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
+            </section>
+
+            <section className="border-t border-border py-5">
+              <h2 className={heading}>Standing instructions</h2>
+              <Textarea
+                className="mt-3"
+                label="Added to every request (optional)"
+                rows={3}
+                maxLength={CUSTOM_INSTRUCTIONS_MAX_LENGTH}
+                value={current.customInstructions ?? ''}
+                onChange={(event) => setSettings((value) => ({ ...(value ?? {}), customInstructions: event.target.value }))}
+                onBlur={() => void savePatch({ customInstructions: String(current.customInstructions ?? '') }, 'Standing instructions saved.')}
+                placeholder="For example: answer in British English, and always show the cost in naira."
               />
-            </div>
-            <Checkbox className="mt-4" isSelected={current.overlayEnabled === true} isDisabled={busy} onChange={(checked) => void savePatch({ overlayEnabled: checked }, checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.')}>Assistant overlay</Checkbox>
-          </section>
+            </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <h2 className="text-lg font-medium">Standing instructions</h2>
-            <Textarea
-              className="mt-3"
-              label="Added to every request (optional)"
-              rows={3}
-              maxLength={CUSTOM_INSTRUCTIONS_MAX_LENGTH}
-              value={current.customInstructions ?? ''}
-              onChange={(event) => setSettings((value) => ({ ...(value ?? {}), customInstructions: event.target.value }))}
-              onBlur={() => void savePatch({ customInstructions: String(current.customInstructions ?? '') }, 'Standing instructions saved.')}
-              placeholder="For example: answer in British English, and always show the cost in naira."
-            />
-          </section>
+            <section className="border-t border-border py-5">
+              <h2 className={heading}>Office add-in</h2>
+              <p className={helper}>Adds Zuri to Word, PowerPoint and Excel for this Windows user. It needs Zuri running to answer requests.</p>
+              {!addin.supported && <p className="mt-3 text-sm text-muted">The Office add-in is available on Windows only.</p>}
+              {addin.supported && <div className="mt-3 flex flex-wrap items-center gap-3">
+                <Chip color={addin.installed ? 'primary' : 'default'}>{addin.installed ? 'Installed' : 'Not installed'}</Chip>
+                <Button variant="secondary" onPress={() => void installOfficeAddin()} isDisabled={addinBusy || addin.installed}>Install for Word, PowerPoint and Excel</Button>
+                <Button variant="ghost" className="zuri-danger-quiet" onPress={() => void removeOfficeAddin()} isDisabled={addinBusy || !addin.installed}>Remove add-in</Button>
+              </div>}
+            </section>
 
-          <section className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <h2 className="text-lg font-medium">Office add-in</h2>
-            <p className="mt-1 text-sm text-muted">Adds Zuri to Word, PowerPoint and Excel for this Windows user. It needs Zuri running to answer requests.</p>
-            {!addin.supported && <p className="mt-3 text-sm text-muted">The Office add-in is available on Windows only.</p>}
-            {addin.supported && <div className="mt-4 flex flex-wrap items-center gap-3">
-              <Chip color={addin.installed ? 'primary' : 'default'}>{addin.installed ? 'Installed' : 'Not installed'}</Chip>
-              <Button variant="secondary" onPress={() => void installOfficeAddin()} isDisabled={addinBusy || addin.installed}>Install for Word, PowerPoint and Excel</Button>
-              <Button variant="ghost" className="zuri-danger-quiet" onPress={() => void removeOfficeAddin()} isDisabled={addinBusy || !addin.installed}>Remove add-in</Button>
-            </div>}
-          </section>
-
-          <details className="rounded-xl border border-border bg-surface p-5 lg:col-span-2">
-            <summary className="cursor-pointer text-lg font-medium">Advanced: apps and sites Act mode may open</summary>
-            <p className="mt-2 text-sm text-muted">Act mode can only open apps and sites listed here. Empty lists block everything.</p>
-            <form onSubmit={addAllowed} className="mt-4 flex flex-wrap items-end gap-2">
-              <SelectField label="Type" value={allowKind} options={[{ value: 'apps', label: 'App' }, { value: 'urls', label: 'Site' }]} onChange={setAllowKind} className="min-w-32" />
-              <Input label="App or site" value={allowValue} onChange={(event) => setAllowValue(event.target.value)} placeholder={allowKind === 'apps' ? 'notepad.exe' : 'https://example.com'} className="min-w-64 flex-1" />
-              <Button type="submit" variant="secondary">Add</Button>
-            </form>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="mb-2 text-sm font-medium">Apps</p>
-                {listFor('apps').length === 0 ? <p className="text-sm text-muted">No apps added yet.</p> : <ul className="flex flex-col gap-2">{listFor('apps').map((value) => <li key={value} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeAllowed('apps', value)}>Remove</Button></li>)}</ul>}
+            <details className="border-t border-border py-5">
+              <summary className={`cursor-pointer ${heading}`}>Advanced: apps and sites Act mode may open</summary>
+              <p className={helper}>Act mode can only open apps and sites listed here. Empty lists block everything.</p>
+              <form onSubmit={addAllowed} className="mt-4 flex flex-wrap items-end gap-2">
+                <SelectField label="Type" value={allowKind} options={[{ value: 'apps', label: 'App' }, { value: 'urls', label: 'Site' }]} onChange={setAllowKind} className="min-w-32" />
+                <Input label="App or site" value={allowValue} onChange={(event) => setAllowValue(event.target.value)} placeholder={allowKind === 'apps' ? 'notepad.exe' : 'https://example.com'} className="min-w-48 flex-1" />
+                <Button type="submit" variant="secondary">Add</Button>
+              </form>
+              <div className="mt-4 flex flex-col gap-4">
+                <div>
+                  <p className="mb-2 text-sm font-medium">Apps</p>
+                  {listFor('apps').length === 0 ? <p className="text-sm text-muted">No apps added yet.</p> : <ul className="flex flex-col gap-2">{listFor('apps').map((value) => <li key={value} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeAllowed('apps', value)}>Remove</Button></li>)}</ul>}
+                </div>
+                <div>
+                  <p className="mb-2 text-sm font-medium">Sites</p>
+                  {listFor('urls').length === 0 ? <p className="text-sm text-muted">No sites added yet.</p> : <ul className="flex flex-col gap-2">{listFor('urls').map((value) => <li key={value} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeAllowed('urls', value)}>Remove</Button></li>)}</ul>}
+                </div>
               </div>
-              <div>
-                <p className="mb-2 text-sm font-medium">Sites</p>
-                {listFor('urls').length === 0 ? <p className="text-sm text-muted">No sites added yet.</p> : <ul className="flex flex-col gap-2">{listFor('urls').map((value) => <li key={value} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{value}</span><Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void removeAllowed('urls', value)}>Remove</Button></li>)}</ul>}
-              </div>
-            </div>
-          </details>
-        </div>}
+            </details>
+          </div>}
+        </div>
       </div>
     </main>
   );

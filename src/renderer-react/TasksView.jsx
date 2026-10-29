@@ -78,13 +78,13 @@ export default function TasksView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-6">
-          <h1 className="text-3xl font-medium tracking-tight">Tasks</h1>
-          <p className="mt-2 text-sm text-muted">Everything you need to get done, in one list.</p>
-        </header>
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+          <header>
+            <h1 className="text-2xl font-medium tracking-tight">Tasks</h1>
+            <p className="mt-1 text-sm text-muted">Everything you need to get done, in one list.</p>
+          </header>
 
-        <section className="rounded-xl border border-border bg-surface p-5">
-          <form onSubmit={addTask} className="zuri-task-form flex flex-col gap-2 sm:flex-row">
+          <form onSubmit={addTask} className="zuri-task-form flex items-center gap-2">
             <Input
               value={newTitle}
               onChange={(event) => setNewTitle(event.target.value)}
@@ -92,22 +92,13 @@ export default function TasksView() {
               aria-label="New task title"
               fullWidth
             />
-            <Button
-              type="submit"
-              variant="primary"
-              className="w-full sm:w-auto"
-              isDisabled={newTitle.trim() === ''}
-            >
+            <Button type="submit" variant="primary" isDisabled={newTitle.trim() === ''}>
               Add
             </Button>
           </form>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div
-              role="group"
-              aria-label="Task filter"
-              className="inline-flex rounded-full border border-border bg-surface-secondary p-1"
-            >
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div role="group" aria-label="Task filter" className="inline-flex gap-1">
               {FILTERS.map((name) => (
                 <Button
                   key={name}
@@ -124,28 +115,25 @@ export default function TasksView() {
             {status === 'ready' && <span className="text-sm text-muted">{openCount} open</span>}
           </div>
 
-          {status === 'loading' && <p className="mt-4 text-sm text-muted">Loading tasks...</p>}
+          {status === 'loading' && <p className="text-sm text-muted">Loading tasks...</p>}
 
           {status === 'error' && (
-            <p className="mt-4 text-sm text-muted">
+            <p className="text-sm text-muted">
               Your tasks only appear in the Zuri app, not in this preview.
             </p>
           )}
 
           {status === 'ready' && visible.length === 0 && (
-            <div className="zuri-empty-state mt-4">
+            <div className="zuri-empty-state">
               <strong>{empty.title}</strong>
               <p>{empty.hint}</p>
             </div>
           )}
 
           {status === 'ready' && visible.length > 0 && (
-            <ul className="zuri-task-list mt-4 flex flex-col gap-2">
+            <ul className="zuri-task-list flex flex-col divide-y divide-border border-t border-border">
               {visible.map((task) => (
-                <li
-                  key={task.id}
-                  className="flex items-center gap-3 rounded-xl border border-border px-4 py-3"
-                >
+                <li key={task.id} className="flex items-center gap-3 py-3">
                   <Checkbox isSelected={task.done} onChange={() => toggleDone(task)} />
                   <span className={`flex-1 text-sm ${task.done ? 'text-muted line-through' : ''}`}>
                     {task.title}
@@ -167,7 +155,7 @@ export default function TasksView() {
               ))}
             </ul>
           )}
-        </section>
+        </div>
       </div>
     </main>
   );

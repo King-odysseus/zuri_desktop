@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "migrate": "node src/migrate.js",
-    "test": "node test/server.test.js && node test/models.test.js && node test/db.test.js && node test/admin.test.js && node test/admin-users.test.js && node test/conversations.test.js && node test/projects.test.js && node test/text.test.js"
+    "test": "node test/server.test.js && node test/models.test.js && node test/db.test.js && node test/admin.test.js && node test/admin-users.test.js && node test/conversations.test.js && node test/projects.test.js && node test/text.test.js && node test/images.test.js"
   },
   "engines": {
     "node": ">=20"

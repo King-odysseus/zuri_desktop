@@ -81,3 +81,92 @@ export function withFormattingRules(messages) {
   if (already) return messages;
   return [{ role: 'system', content: FORMATTING_RULES }, ...messages];
 }
+
+/**
+ * Who the assistant is. Without it a model answers "I am DeepSeek" or "I am Claude"
+ * in the browser and the phone app, because nothing told it otherwise. The desktop
+ * app sends its own, longer version, which carries the same marker and is respected.
+ */
+export const ZURI_IDENTITY = 'You are Zuri, an AI assistant made by Tijha. Describe yourself as Zuri whenever you are asked who you are or who made you, and never name another AI company as your maker.';
+
+/** The marker that shows the identity is already present, so it is never sent twice. */
+export const IDENTITY_MARKER = 'You are Zuri';
+
+/**
+ * Put the identity first in a conversation that does not already carry it.
+ * @param {Array<{ role: string, content: string }>} messages
+ * @returns {Array<{ role: string, content: string }>}
+ */
+export function withZuriIdentity(messages) {
+  const already = messages.some(
+    (message) => message.role === 'system' && typeof message.content === 'string' && message.content.includes(IDENTITY_MARKER),
+  );
+  if (already) return messages;
+  return [{ role: 'system', content: ZURI_IDENTITY }, ...messages];
+}
+
+/**
+ * How a good answer is shaped, the same for every model. The desktop app builds a
+ * longer version from the person's saved style choices; the browser and phone app
+ * have no such settings yet, so they get these defaults. Kept short because it is
+ * charged as input on every turn.
+ */
+export const ANSWER_RULES = [
+  'How to answer:',
+  'Start with the answer itself, never a restatement of the question or a preamble such as "Great question".',
+  'Match the length to the question: a greeting or simple fact gets a sentence or two, a hard problem gets the reasoning, steps and any caveat that changes what the person should do.',
+  'Markdown is rendered. Use bullets for separate facts, numbered steps for a procedure, a table only to compare the same attributes across two or more things, and a fenced code block with a language tag for code. Never wrap a whole answer in a code fence and never use emoji.',
+  'If the request is ambiguous in a way that changes the answer, state your assumption or ask one short question.',
+  'Never invent facts, names, links or quotes, and say plainly when you do not know.',
+  'When web search results are given, say which source each claim comes from and put its link next to it; if the results do not answer the question, say so instead of guessing.',
+].join(' ');
+
+/** The marker that shows the answer rules are already present. */
+export const ANSWER_MARKER = 'How to answer:';
+
+/** The opening line of the desktop app's own, longer style block. */
+const DESKTOP_STYLE_MARKER = 'How to write this reply:';
+
+/**
+ * Short per-supplier corrections for habits each family of models is known for.
+ * Keyed by the supplier the catalogue names, so a new Zuri model on an existing
+ * supplier inherits the note without a code change.
+ */
+export const MODEL_NOTES = Object.freeze({
+  deepseek: 'Do not show your reasoning or any <think> text; give only the final answer. Reply in the language the person wrote in, not Chinese by default.',
+  moonshot: 'Do not pad with caveats or a closing summary of what you just said. Reply in the language the person wrote in.',
+  zai: 'Do not show your reasoning. Prefer short paragraphs over long nested lists, and reply in the language the person wrote in.',
+  openai: 'Do not end with an offer such as "Let me know if you want more"; stop when the answer is complete.',
+  anthropic: 'Do not open with an apology or an acknowledgement of the request, and do not add a closing summary of what you just said.',
+});
+
+/**
+ * Put the answer rules, plus the note for the model's supplier, ahead of the
+ * conversation. A client that already sent the rules is respected, as with the
+ * house style and identity.
+ * @param {Array<{ role: string, content: string }>} messages
+ * @param {string} supplier The catalogue's supplier for the chosen Zuri model.
+ * @returns {Array<{ role: string, content: string }>}
+ */
+export function withAnswerStyle(messages, supplier) {
+  const carries = (marker) => messages.some(
+    (message) => message.role === 'system' && typeof message.content === 'string' && message.content.includes(marker),
+  );
+  if (carries(ANSWER_MARKER)) return messages;
+  const note = Object.hasOwn(MODEL_NOTES, supplier) ? MODEL_NOTES[supplier] : '';
+  // The desktop app sends its own longer style block, built from the person's saved
+  // choices. It keeps that block and gets only the supplier note, so the two never
+  // contradict each other.
+  const rules = carries(DESKTOP_STYLE_MARKER) ? '' : ANSWER_RULES;
+  const content = [rules, note].filter((part) => part !== '').join(' ');
+  if (content === '') return messages;
+  // A project's own context stays first, since it is the person's standing wish for
+  // this work and the rest of the system turns are the app's.
+  const lead = messages[0]?.role === 'system' && String(messages[0].content).startsWith('You are answering inside the project') ? 1 : 0;
+  return [...messages.slice(0, lead), { role: 'system', content }, ...messages.slice(lead)];
+}
+
+/** Characters withAnswerStyle adds for a supplier, so the allowance counts them. */
+export function answerStyleLength(supplier) {
+  return ANSWER_RULES.length + (Object.hasOwn(MODEL_NOTES, supplier) ? MODEL_NOTES[supplier].length + 1 : 0);
+}

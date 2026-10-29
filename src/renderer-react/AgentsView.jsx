@@ -68,6 +68,8 @@ export default function AgentsView() {
   const [tools, setTools] = useState(PREVIEW_TOOLS);
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
+  // The form shows only while adding or editing; the page is otherwise a plain list.
+  const [editorOpen, setEditorOpen] = useState(false);
 
   const selected = useMemo(
     () => agents.find((agent) => agent.id === selectedId) ?? null,
@@ -128,6 +130,7 @@ export default function AgentsView() {
     const agent = { id: newAgentId(), name: 'New agent', systemPrompt: '', allowedTools: [], provider: '' };
     setAgents((current) => [...current, agent]);
     setSelectedId(agent.id);
+    setEditorOpen(true);
     setMessage('Unsaved changes');
   }
 
@@ -136,6 +139,7 @@ export default function AgentsView() {
     const remaining = agents.filter((agent) => agent.id !== selected.id);
     setAgents(remaining);
     setSelectedId(remaining[0]?.id ?? '');
+    setEditorOpen(false);
     if (activeAgentId === selected.id) setActiveAgentId('');
     setMessage('Unsaved changes');
   }
@@ -159,60 +163,57 @@ export default function AgentsView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1>AI agents</h1>
-            <p>Give a chat a name, a way of writing, and the tools it may use.</p>
-          </div>
-          <Button variant="primary" className="ml-auto" onPress={addAgent}>New agent</Button>
-        </header>
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <h1>AI agents</h1>
+              <p>Give a chat a name, a way of writing, and the tools it may use.</p>
+            </div>
+            <Button variant="primary" className="shrink-0" onPress={addAgent}>New agent</Button>
+          </header>
 
-        {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
-        {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
-        {status === 'ready' && (
-          <div className="zuri-agents-layout grid min-h-0 gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
-            <section className="rounded-xl border border-border bg-surface-secondary p-3" aria-label="Agents">
-              <div className="mb-2 flex items-center justify-between px-2">
-                <span className="text-sm font-medium">Agents</span>
-                <Chip size="sm">{agents.length}</Chip>
-              </div>
-              <div className="flex flex-col gap-1">
-                {agents.map((agent) => {
-                  const isSelected = agent.id === selectedId;
-                  return (
-                    <Button
-                      key={agent.id}
-                      variant={isSelected ? 'secondary' : 'ghost'}
-                      aria-pressed={isSelected}
-                      className={`relative h-auto w-full justify-start rounded-lg px-3 py-2 text-left ${isSelected ? 'font-semibold' : ''}`}
-                      onPress={() => setSelectedId(agent.id)}
-                    >
-                      {isSelected && <span aria-hidden="true" className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent" />}
-                      <span className="flex min-w-0 flex-1 flex-col items-start">
-                        <span className="w-full truncate text-sm">{agent.name || 'Untitled agent'}</span>
-                        <span className="text-xs text-muted">
-                          {providerLabel(agent.provider)} - {agent.allowedTools.length} {agent.allowedTools.length === 1 ? 'tool' : 'tools'}
-                        </span>
-                      </span>
-                    </Button>
-                  );
-                })}
-                {agents.length === 0 && <p className="px-2 py-4 text-xs text-muted">No agents yet.</p>}
-              </div>
-            </section>
+          {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
+          {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+          {status === 'ready' && (
+            <>
+              <section aria-label="Agents">
+                {agents.length === 0 ? (
+                  <div className="zuri-empty-state">
+                    <strong>No agents yet</strong>
+                    <p>Create an agent to give a chat a name and a set of tools.</p>
+                  </div>
+                ) : (
+                  <ul className="flex flex-col divide-y divide-border">
+                    {agents.map((agent) => {
+                      const isSelected = editorOpen && agent.id === selectedId;
+                      return (
+                        <li key={agent.id}>
+                          <button
+                            type="button"
+                            aria-pressed={isSelected}
+                            className="flex min-h-11 w-full items-center gap-3 py-3 text-left hover:bg-surface-secondary/60"
+                            onClick={() => { setSelectedId(agent.id); setEditorOpen(true); }}
+                          >
+                            <span className="flex min-w-0 flex-1 flex-col">
+                              <span className={`truncate text-sm ${isSelected ? 'font-semibold' : 'font-medium'}`}>{agent.name || 'Untitled agent'}</span>
+                              <span className="text-xs text-muted">
+                                {providerLabel(agent.provider)} - {agent.allowedTools.length} {agent.allowedTools.length === 1 ? 'tool' : 'tools'}
+                              </span>
+                            </span>
+                            {agent.id === activeAgentId && <Chip size="sm" color="primary">Active for chat</Chip>}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
 
-            <section className="zuri-agents-editor rounded-xl border border-border bg-surface p-5">
-              {!selected ? (
-                <div className="zuri-empty-state">
-                  <strong>No agent selected</strong>
-                  <p>Create an agent to give a chat a name and a set of tools.</p>
-                  <Button variant="secondary" onPress={addAgent}>New agent</Button>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-5">
+              {editorOpen && selected && (
+                <section className="zuri-agents-editor flex flex-col gap-5 border-t border-border pt-6">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-xl font-medium">{selected.name || 'Untitled agent'}</h2>
-                    {selected.id === activeAgentId && <Chip color="primary">Active for chat</Chip>}
+                    <h2 className="text-lg font-medium">{selected.name || 'Untitled agent'}</h2>
+                    <Button variant="ghost" onPress={() => setEditorOpen(false)}>Close</Button>
                   </div>
 
                   <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
@@ -242,7 +243,7 @@ export default function AgentsView() {
                       <p className="text-sm font-medium">Allowed tools</p>
                       <span className="text-xs text-muted">{selected.allowedTools.length} of {tools.length} tools allowed</span>
                     </div>
-                    <div className="grid gap-2 rounded-xl border border-border bg-surface-secondary p-4 lg:grid-cols-2">
+                    <div className="grid gap-2 lg:grid-cols-2">
                       {tools.map((tool) => (
                         <Checkbox
                           key={tool.name}
@@ -255,19 +256,19 @@ export default function AgentsView() {
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
                     <Button variant="ghost" className="zuri-danger-quiet" onPress={removeSelected}>Delete agent</Button>
-                    {message !== '' && <span role="status" className="min-w-0 flex-1 text-sm text-muted">{message}</span>}
                     <div className="ml-auto flex items-center gap-2">
                       <Button variant="ghost" onPress={() => void load()}>Revert</Button>
                       <Button variant="primary" onPress={() => void save()}>Save agent</Button>
                     </div>
                   </div>
-                </div>
+                </section>
               )}
-            </section>
-          </div>
-        )}
+              {message !== '' && <p role="status" className="text-xs text-muted">{message}</p>}
+            </>
+          )}
+        </div>
       </div>
     </main>
   );

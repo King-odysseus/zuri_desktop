@@ -37,7 +37,11 @@ export default function NewProjectView({ project = null, onCreated }) {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <form onSubmit={saveProject} className="mx-auto flex max-w-md flex-1 flex-col items-center justify-center gap-6 text-center">
+        {/* The form sits in a plain wrapper on purpose: the shared page style gives a form that is a
+            direct child of the page a card border and right-aligned content, which pushed this
+            screen's heading and icons to one side of a boxed column. */}
+        <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center">
+        <form onSubmit={saveProject} className="flex flex-col items-center gap-6 text-center">
           <header>
             <h1 className="text-3xl font-medium tracking-tight">{editing ? 'Edit project' : 'New project'}</h1>
             <p className="mt-2 text-sm text-muted">Keep one topic in one place</p>
@@ -87,6 +91,7 @@ export default function NewProjectView({ project = null, onCreated }) {
             {editing ? 'Save project' : 'Create project'}
           </Button>
         </form>
+        </div>
       </div>
     </main>
   );

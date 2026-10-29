@@ -429,11 +429,6 @@ button,
 
 /* The panel is a shade off the page with no rule between them, the way ChatGPT's
    sidebar sits beside its thread. Nothing here carries a hue. */
-.zuri-sidebar-rail {
-  background: var(--surface-secondary) !important;
-  border-color: var(--border) !important;
-}
-
 .zuri-sidebar-panel {
   background: var(--surface-secondary) !important;
   color: var(--surface-secondary-foreground) !important;
@@ -466,117 +461,6 @@ button,
 .zuri-sidebar-panel .zuri-selected-pill {
   background: var(--selected) !important;
   color: var(--selected-foreground) !important;
-}
-
-/* Where you are is a soft grey row, the same marker the web panel uses. */
-.zuri-sidebar-rail .zuri-rail-active {
-  background: var(--selected) !important;
-  color: var(--surface-secondary-foreground) !important;
-  border-radius: 0.5rem !important;
-}
-
-.zuri-sidebar-rail .zuri-rail-active:hover,
-.zuri-sidebar-rail .zuri-rail-active:focus-visible {
-  background: color-mix(in srgb, var(--selected) 80%, var(--foreground)) !important;
-}
-
-/* Empty-chat overview: real counts from tasks, reminders and automations (see
-   WorkspaceOverview.jsx). It disappears as soon as a conversation begins. */
-.zuri-opening-dashboard {
-  display: grid;
-  width: 100%;
-  gap: 0.75rem;
-  margin: 1.5rem 0 1rem;
-}
-
-.zuri-opening-activity,
-.zuri-opening-dashboard-grid {
-  display: grid;
-  gap: 0.75rem;
-}
-
-.zuri-opening-activity {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.zuri-opening-dashboard-grid {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-}
-
-.zuri-opening-card {
-  min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  background: var(--surface);
-  padding: 0.9rem;
-}
-
-.zuri-opening-activity .zuri-opening-card {
-  min-height: 5rem;
-}
-
-.zuri-opening-card strong,
-.zuri-opening-card span,
-.zuri-opening-card small {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.zuri-opening-card strong {
-  color: var(--foreground);
-  font-family: inherit;
-  font-size: 0.76rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.zuri-opening-card span,
-.zuri-opening-card small {
-  color: var(--muted);
-  font-size: 0.72rem;
-  line-height: 1.45;
-}
-
-.zuri-opening-label {
-  color: var(--muted) !important;
-  font-size: 0.68rem !important;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.zuri-opening-calendar-list {
-  display: grid;
-  gap: 0.6rem;
-  margin-top: 0.9rem;
-}
-
-.zuri-opening-calendar-item {
-  display: grid;
-  grid-template-columns: 2rem minmax(0, 1fr);
-  align-items: center;
-  gap: 0.55rem;
-}
-
-.zuri-opening-calendar-item b {
-  display: grid;
-  place-items: center;
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.65rem;
-  background: var(--selected);
-  color: var(--selected-foreground);
-  font-family: 'Montserrat', 'Roboto', 'Segoe UI', sans-serif;
-  font-size: 0.72rem;
-}
-
-@media (max-width: 700px) {
-  .zuri-opening-activity,
-  .zuri-opening-dashboard-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 /* Chat controls that float over the conversation: the sidebar toggle keeps the

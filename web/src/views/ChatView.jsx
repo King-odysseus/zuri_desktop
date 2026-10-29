@@ -3,7 +3,6 @@ import { Textarea } from 'flowbite-react';
 import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, FileIcon, FolderIcon, ICON_SIZE, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
 import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
 import ConversationSearch from '../components/ConversationSearch.jsx';
-import { LogoMark } from '../components/Icons.jsx';
 // The reply renderer and the clipboard fallback are the desktop app's own modules,
 // imported rather than copied: an answer is then drawn by one set of markdown rules
 // on both surfaces, and the code block's own copy button behaves the same way.
@@ -25,6 +24,7 @@ import {
   streamChat,
   uploadAttachment,
 } from '../lib/api.js';
+import { LogoMark } from '../components/Icons.jsx';
 import { formatRelativeTime, greetingFor } from '../lib/format.js';
 import { clearChatDraft, readChatDraft, saveChatDraft } from '../lib/drafts.js';
 
@@ -1165,11 +1165,8 @@ export default function ChatView({
         <div ref={messagesRef} onScroll={onMessagesScroll} className="chat-transcript">
           {!showThread && (
             <div className="chat-opening">
-              <span className="chat-opening-mark" aria-hidden="true">
-                <LogoMark size={30} />
-              </span>
+              <span className="chat-opening-mark"><LogoMark size={52} /></span>
               <h2>{greetingFor(userName)}</h2>
-              <p>Ask anything below to begin. A reply can carry code, a table or a list of links, and the chat is saved to your account.</p>
             </div>
           )}
 
@@ -1177,15 +1174,8 @@ export default function ChatView({
 
           {showThread && threadStatus !== 'loading' && thread.messages.length === 0 && !streaming && (
             <div className="chat-opening">
-              <span className="chat-opening-mark" aria-hidden="true">
-                <LogoMark size={30} />
-              </span>
+              <span className="chat-opening-mark"><LogoMark size={52} /></span>
               <h2>{greetingFor(userName)}</h2>
-              <p>
-                {openId
-                  ? 'This chat has no messages yet. Ask something below and the exchange is saved here.'
-                  : 'Ask anything below. This chat is saved to your account once you send, so it opens on any device.'}
-              </p>
             </div>
           )}
 
@@ -1195,6 +1185,7 @@ export default function ChatView({
               {message.role === 'assistant' && index === lastAnswerIndex && (
                 <span className="chat-bubble-role">{modelName}</span>
               )}
+              <div className={`chat-turn chat-turn-${message.role}`}>
               <article className={`chat-bubble chat-bubble-${message.role}`}>
                 {/* A prompt is shown exactly as typed. A reply goes through the desktop's
                     own renderer, so code, lists, tables and links read the same on both. */}
@@ -1219,6 +1210,7 @@ export default function ChatView({
                 {message.role === 'assistant'
                   ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
                   : <p className="chat-text">{message.content}</p>}
+              </article>
                 <div className="chat-bubble-actions">
                   {message.role === 'user' && (
                     <IconButton
@@ -1257,7 +1249,7 @@ export default function ChatView({
                     <ShareIcon size={14} aria-hidden="true" />
                   </IconButton>
                 </div>
-              </article>
+              </div>
             </Fragment>
           ))}
 

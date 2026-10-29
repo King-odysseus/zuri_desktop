@@ -23,7 +23,7 @@ export default function PlansView({ plans, currentPlan, busy, onChoose, onSignIn
   }, []);
 
   return (
-    <section className="view">
+    <section className="view calm calm-wide">
       <div className="view-head">
         <div>
           <h1>Plans</h1>
@@ -60,7 +60,7 @@ export default function PlansView({ plans, currentPlan, busy, onChoose, onSignIn
         </div>
       )}
       {imagePrices.length > 0 && (
-        <section className="plan-images-section" id="images">
+        <section className="plan-images-section" id="images" style={{ marginTop: 22 }}>
           <h2>Pictures, priced in Naira</h2>
           <p>
             Images are paid for out of the same monthly allowance as your messages, so a picture

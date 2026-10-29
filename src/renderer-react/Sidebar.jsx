@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui.jsx';
 import {
   AgentIcon,
@@ -11,6 +11,7 @@ import {
   HistoryIcon,
   FolderIcon,
   FolderPlusIcon,
+  ImageIcon,
   DeleteIcon,
   ChevronRightIcon,
   PanelLeftCloseIcon,
@@ -40,15 +41,16 @@ export const NAV_ITEMS = [
   { key: 'tasks', label: 'Tasks', Icon: TaskIcon },
   { key: 'reminders', label: 'Reminders', Icon: BellIcon },
   { key: 'automations', label: 'Automations', Icon: AutomationIcon },
+  { key: 'images', label: 'Images', Icon: ImageIcon },
   { key: 'files', label: 'Files', Icon: FolderIcon },
   { key: 'features', label: 'Features', Icon: FeaturesIcon },
   { key: 'cloud', label: 'Zuri Cloud', Icon: CloudIcon },
   { key: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
-// The reference app pairs a narrow icon rail (where you are) with a list panel
-// (what you have). The rail carries the destinations; the panel is the
-// conversation list, which routing in App.jsx keeps in step with the rail.
+// One list, the way ChatGPT's sidebar is: New chat, Projects with their chats,
+// Recents, and a Menu at the bottom that holds every other destination.
+const MENU_ITEMS = NAV_ITEMS.filter(({ key }) => key !== 'chats');
 export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -57,6 +59,24 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   const [movingThreadId, setMovingThreadId] = useState('');
   // Reminders whose time has come and that are still open: what the bell counts.
   const [dueReminders, setDueReminders] = useState(0);
+  // The bottom menu holds every destination that is not chat, so the list above it stays calm.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    const close = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'mousedown' && menuRef.current?.contains(event.target)) return;
+      setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', close);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     let active = true;
@@ -173,41 +193,15 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   }
   return (
     <div className="flex h-full shrink-0">
-      <nav
-        className="zuri-sidebar-rail flex w-14 flex-col items-center gap-2 border-r border-border py-4"
-        aria-label="Destinations"
-      >
-        {/* The chat view carries this control as a floating button over the
-            conversation, so the rail only repeats it where that one is absent. */}
-        {collapsed && current !== 'chats' && (
-          <Button
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            className="text-muted"
-            aria-label="Expand sidebar"
-            title="Expand sidebar"
-            onPress={() => onToggleCollapsed(false)}
-          >
+      {/* No icon strip: the sidebar is one list, the way ChatGPT's is. When it is folded
+          away on a screen that has no floating toggle, one small button brings it back. */}
+      {collapsed && current !== 'chats' && (
+        <div className="zuri-sidebar-panel flex w-12 flex-col items-center py-4">
+          <Button isIconOnly size="sm" variant="ghost" aria-label="Expand sidebar" title="Expand sidebar" onPress={() => onToggleCollapsed(false)}>
             <PanelLeftOpenIcon />
           </Button>
-        )}
-        {NAV_ITEMS.map(({ key, label, Icon }) => (
-          <Button
-            key={key}
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            className={current === key || (key === 'chats' && current === 'history') ? 'zuri-rail-active' : 'text-muted'}
-            aria-label={label}
-            title={label}
-            aria-current={current === key ? 'page' : undefined}
-            onPress={() => onNavigate(key)}
-          >
-            <Icon />
-          </Button>
-        ))}
-      </nav>
+        </div>
+      )}
 
       <aside
         className={`zuri-sidebar-panel flex flex-col transition-[width] duration-200 ${collapsed ? 'w-0 overflow-hidden' : 'w-72'}`}
@@ -217,59 +211,16 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         <div className="flex items-center justify-between px-5 pb-3 pt-5">
           <span className="px-2 text-lg font-semibold tracking-tight">Zuri</span>
           <div className="flex items-center gap-1 text-muted">
+            <Button isIconOnly size="sm" variant="ghost" aria-label="Search conversations" title="Search conversations" onPress={() => onNavigate('search')}>
+              <SearchIcon size={16} />
+            </Button>
             {/* On the chat view the same control floats over the conversation, so
                 keeping a second copy here would give the person two toggles. */}
             {current !== 'chats' && (
-              <Button
-                isIconOnly
-                size="sm"
-                variant="ghost"
-                aria-label="Collapse sidebar"
-                title="Collapse sidebar"
-                onPress={() => onToggleCollapsed(true)}
-              >
+              <Button isIconOnly size="sm" variant="ghost" aria-label="Collapse sidebar" title="Collapse sidebar" onPress={() => onToggleCollapsed(true)}>
                 <PanelLeftCloseIcon size={17} />
               </Button>
             )}
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              aria-label="Open quick ask overlay"
-              title="Quick ask overlay"
-              onPress={() => void window.zuri?.overlay?.open?.()}
-            >
-              <OverlayIcon size={16} />
-            </Button>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              className="relative"
-              aria-label={dueReminders > 0 ? `Reminders, ${dueReminders} due` : 'Reminders'}
-              title={dueReminders > 0 ? `${dueReminders} reminder${dueReminders === 1 ? '' : 's'} due` : 'Reminders'}
-              onPress={() => onNavigate('reminders')}
-            >
-              <BellIcon size={16} />
-              {dueReminders > 0 && (
-                <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 min-w-4 rounded-full bg-accent px-1 text-[10px] font-semibold leading-4 text-accent-foreground">
-                  {dueReminders > 9 ? '9+' : dueReminders}
-                </span>
-              )}
-            </Button>
-            <Button isIconOnly size="sm" variant="ghost" aria-label="Search conversations" onPress={() => onNavigate('search')}>
-              <SearchIcon size={16} />
-            </Button>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              onPress={onToggleTheme}
-            >
-              {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
-            </Button>
           </div>
         </div>
 
@@ -372,6 +323,51 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         <div className="zuri-scrollbar-hidden flex-1 overflow-y-auto px-3 text-sm text-muted">
           {threads.length === 0 && <p className="px-2">No conversations yet. Your threads will appear here, newest first.</p>}
           {looseThreads.map(renderThread)}
+        </div>
+
+        <div className="relative border-t border-border px-3 py-3" ref={menuRef}>
+          {menuOpen && (
+            <div role="menu" aria-label="More of Zuri" className="zuri-sidebar-menu absolute bottom-full left-3 right-3 mb-2 flex max-h-96 flex-col gap-0.5 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-lg">
+              {MENU_ITEMS.map(({ key, label, Icon }) => (
+                <Button
+                  key={key}
+                  type="button"
+                  variant="ghost"
+                  role="menuitem"
+                  className={`min-h-11 justify-start gap-3 rounded-lg px-3 font-normal ${current === key ? 'zuri-selected-pill' : ''}`}
+                  aria-current={current === key ? 'page' : undefined}
+                  onPress={() => { setMenuOpen(false); onNavigate(key); }}
+                >
+                  <Icon size={16} />
+                  {label}
+                  {key === 'reminders' && dueReminders > 0 && (
+                    <span className="ml-auto min-w-5 rounded-full bg-accent px-1.5 text-center text-[11px] font-semibold leading-5 text-accent-foreground">{dueReminders > 9 ? '9+' : dueReminders}</span>
+                  )}
+                </Button>
+              ))}
+              <Button type="button" variant="ghost" role="menuitem" className="min-h-11 justify-start gap-3 rounded-lg px-3 font-normal" onPress={() => { setMenuOpen(false); void window.zuri?.overlay?.open?.(); }}>
+                <OverlayIcon size={16} />
+                Quick ask
+              </Button>
+              <Button type="button" variant="ghost" role="menuitem" className="min-h-11 justify-start gap-3 rounded-lg px-3 font-normal" onPress={() => { setMenuOpen(false); onToggleTheme(); }}>
+                {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
+                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+              </Button>
+            </div>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            fullWidth
+            className="min-h-11 justify-start gap-3 rounded-xl px-3 font-normal"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            onPress={() => setMenuOpen((open) => !open)}
+          >
+            <SettingsIcon size={16} />
+            Menu
+            {dueReminders > 0 && <span aria-label={`${dueReminders} reminders due`} className="ml-auto size-2 rounded-full bg-accent" />}
+          </Button>
         </div>
       </aside>
     </div>

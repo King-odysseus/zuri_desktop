@@ -439,7 +439,11 @@ export const ZURI_IDENTITY_PROMPT = [
  * and the app's own style block.
  * The mode note (what Act or Autopilot may do) comes after the style block and still
  * before the language rule, which stays last.
- * @param {{ agentPrompt?: string, projectPrompt?: string, skillsPrompt?: string, threadPrompt?: string, modePrompt?: string, settings?: object, now?: Date }} [parts]
+ * `webTools` is whether the web search and page reading tools are being offered on
+ * this message. It decides what the prompt says about the web, because a model told
+ * flatly that it cannot see websites refuses a question it could have answered with
+ * the search tool it was just given.
+ * @param {{ agentPrompt?: string, projectPrompt?: string, skillsPrompt?: string, threadPrompt?: string, modePrompt?: string, settings?: object, webTools?: boolean, now?: Date }} [parts]
  * @returns {string}
  */
 export function chatSystemPrompt(parts = {}) {
@@ -449,7 +453,7 @@ export function chatSystemPrompt(parts = {}) {
     parts.projectPrompt,
     parts.skillsPrompt,
     parts.threadPrompt,
-    currentTimeContext(parts.now instanceof Date ? parts.now : new Date()),
+    currentTimeContext(parts.now instanceof Date ? parts.now : new Date(), parts.webTools === true),
     answerStylePolicy(parts.settings ?? {}),
     parts.modePrompt,
     RESPONSE_LANGUAGE_POLICY,
@@ -491,10 +495,15 @@ const MAX_ERROR_DETAIL = 240;
  * These models have no clock of their own, so without this they refuse questions
  * like "what day is it" even though the desktop knows. The date is read per
  * request rather than at module load so a long-running window stays correct.
+ *
+ * The last line has to match the tools actually offered. Without web tools the model
+ * is told it cannot see the web, which is true. With them, the same sentence makes it
+ * deny a capability the person switched on and waste the search it never ran.
  * @param {Date} [now]
+ * @param {boolean} [webTools] Whether webSearch and webFetch are offered this message.
  * @returns {string}
  */
-function currentTimeContext(now = new Date()) {
+function currentTimeContext(now = new Date(), webTools = false) {
   const date = now.toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -502,7 +511,11 @@ function currentTimeContext(now = new Date()) {
     year: 'numeric',
   });
   const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
-  return `Current local date and time where the user is: ${date}, ${time} (${Intl.DateTimeFormat().resolvedOptions().timeZone}). Use this whenever the user asks about today, the date, the day or the time. You still cannot see live websites or page contents unless a tool gives them to you.`;
+  const clock = `Current local date and time where the user is: ${date}, ${time} (${Intl.DateTimeFormat().resolvedOptions().timeZone}). Use this whenever the user asks about today, the date, the day or the time.`;
+  const web = webTools
+    ? 'You have a web search tool and a page reading tool on this message. Run webSearch for anything current, recent, or after your training data, and webFetch to read a result before you rely on it. Never say you cannot look things up. If a search returns nothing useful, say that plainly instead of guessing.'
+    : 'You still cannot see live websites or page contents unless a tool gives them to you.';
+  return `${clock} ${web}`;
 }
 
 /**
@@ -1321,12 +1334,15 @@ function addinOperationList(host) {
       '{"op":"addWorksheet","name":"Summary","activate":true}',
       '{"op":"clear","range":"G1:G30"}                                              clears the contents only',
       '{"op":"createTable","range":"A1:F30","name":"BudgetTable","hasHeaders":true}',
+      '{"op":"addChart","range":"A1:B13","chartType":"column","title":"Spend by month","at":"D2"}   draws a chart beside the data',
       '',
       'Excel notes',
       '- Any range operation also takes "sheet":"Budget" to work on a sheet other than the active one.',
       '- Formulas use Excel syntax with a leading "=" and comma separators. Escape a double quote inside a formula: "=SUMIF($B$3:$B$26,\\\"Expense\\",$D$3:$D$26)".',
       '- Use $ for a reference that must not move when it is filled down, such as $C$3.',
       '- A percentage, a date or money is a number format, not text: write the number and set the format.',
+      '- chartType is one of column, bar, line, pie, area or scatter. Label the columns the chart is drawn from, or the chart has no names.',
+      '- Leave "at" out and the chart lands two columns right of the data. Give one cell such as "H2" to put it somewhere else.',
       '- The sheet map you are given starts each line with its row number and uses tabs between cells, so count nothing by eye.',
     ].join('\n');
   }
@@ -1567,6 +1583,9 @@ export async function sendChatMessage(threadId, options = {}) {
     threadPrompt: conversation.system,
     modePrompt: MODE_PROMPTS[mode],
     settings: modelSettings,
+    // The same flag decides whether the tools below are offered, so the prompt and
+    // the tool list can never disagree about whether Zuri can search today.
+    webTools: options.webSearch === true,
   });
 
   // Desktop chat must always use the signed-in account route. Keeping a direct
@@ -1724,19 +1743,24 @@ export async function runPrompt(request = {}, options = {}) {
     return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri Cloud so automations can run.');
   }
 
-  const conversation = {
-    system: chatSystemPrompt({
-      agentPrompt: agent !== null ? agent.systemPrompt : '',
-      settings,
-    }),
-    turns: [{ role: 'user', content: prompt }],
-  };
-
   // Confirmation-gated tools (writeFile, openUrl, openApp) are left out on purpose:
   // a run happens with nobody watching, and starting an app or opening a link then
   // is not something the person can agree to at the time.
   const allowed = Array.isArray(request.allowedTools) ? request.allowedTools : null;
   const mode = request.mode === 'act' || request.mode === 'autopilot' ? request.mode : request.mode === 'ask' ? 'ask' : null;
+  // Read before the prompt is built, because the prompt has to say the same thing
+  // about the web as the tool list actually offers.
+  const offersWebSearch = allowed === null || allowed.includes('webSearch');
+
+  const conversation = {
+    system: chatSystemPrompt({
+      agentPrompt: agent !== null ? agent.systemPrompt : '',
+      settings,
+      webTools: offersWebSearch,
+    }),
+    turns: [{ role: 'user', content: prompt }],
+  };
+
   const tools = ALL_CHAT_TOOLS.filter((tool) => {
     if (allowed !== null && !allowed.includes(tool.name)) return false;
     if ((mode === 'ask' || mode === 'autopilot') && !READ_ONLY_AUTOMATION_TOOLS.has(tool.name)) return false;

@@ -8,6 +8,7 @@ import SettingsView from './SettingsView.jsx';
 import TasksView from './TasksView.jsx';
 import RemindersView from './RemindersView.jsx';
 import SearchView from './SearchView.jsx';
+import ImageLibraryView from './ImageLibraryView.jsx';
 import HistoryView from './HistoryView.jsx';
 import FeaturesView from './FeaturesView.jsx';
 import SignUpView from './SignUpView.jsx';
@@ -168,6 +169,7 @@ export default function App() {
       {route === 'tasks' && <TasksView />}
       {route === 'reminders' && <RemindersView />}
       {route === 'search' && <SearchView onSelectThread={openThread} />}
+      {route === 'images' && <ImageLibraryView onNavigate={setRoute} />}
       {route === 'features' && <FeaturesView onNavigate={setRoute} />}
       {route === 'cloud' && <CloudView onNavigate={setRoute} />}
       {route === 'signup' && <SignUpView onNavigate={setRoute} />}

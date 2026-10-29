@@ -6,7 +6,17 @@
     <meta name="zuri-token" content="__ZURI_TOKEN__" />
     <title>Zuri</title>
     <link rel="stylesheet" href="taskpane.css" />
-    <script src="https://appsforoffice.officeapps.live.com/lib/1/hosted/office.js"></script>
+    <!--
+      Office.js is how the pane learns which app it is inside. The officeapps.live.com
+      address stopped resolving on some machines, and without office.js the pane cannot
+      tell Excel from Word, so the canonical address loads first and the other is a fallback.
+    -->
+    <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <script>
+      if (typeof Office === 'undefined') {
+        document.write('<script src="https://appsforoffice.officeapps.live.com/lib/1/hosted/office.js"><\/script>');
+      }
+    </script>
   </head>
   <body>
     <!--

@@ -31,7 +31,7 @@ export default function UsageView({ usage, limits, topups = [], busyTopup = '', 
   const resetsAt = clockTime(rolling.resetsAt);
 
   return (
-    <section className="view">
+    <section className="view calm">
       <div className="view-head">
         <div>
           <h1>Usage and limits</h1>
@@ -46,69 +46,59 @@ export default function UsageView({ usage, limits, topups = [], busyTopup = '', 
       )}
       {!usage.overQuota && usage.nearLimit && <Alert>Nearly at the limit for this period.</Alert>}
 
-      <article className="card">
-        <p className="stat-label">Tokens used</p>
-        <p className="stat-value">
+      <div className="calm-section">
+        <h2>Tokens used</h2>
+        <p className="calm-help" style={{ color: 'var(--text)', fontSize: 14 }}>
           {formatTokens(usage.usedTokens)} of {formatTokens(usage.monthlyTokens)} tokens
         </p>
         <ProgressBar percent={usage.percentUsed} warn={usage.nearLimit || usage.overQuota} />
-        <p className="stat-meta">{usage.percentUsed}% of this period's allowance used.</p>
-      </article>
+        <p className="calm-help">{usage.percentUsed}% of this period's allowance used.</p>
+        <div className="calm-lines">
+          <DataRow label="Remaining tokens">{formatTokens(usage.remainingTokens)}</DataRow>
+          <DataRow label="Percent used">{usage.percentUsed}%</DataRow>
+          {extraTokens > 0 && <DataRow label="Extra tokens purchased">{formatTokens(extraTokens)}</DataRow>}
+        </div>
+        <p className="calm-help">
+          Remaining tokens reset when the billing period renews. Percent used is calculated from the
+          tokens on your plan.
+          {extraTokens > 0
+            ? ' Extra tokens are counted in the period allowance above, so they spend like plan tokens until they expire.'
+            : ''}
+        </p>
+      </div>
 
-      <article className="card">
-        <p className="stat-label">Last 5 hours</p>
-        <p className="stat-value">
+      <div className="calm-section">
+        <h2>Last 5 hours</h2>
+        <p className="calm-help" style={{ color: 'var(--text)', fontSize: 14 }}>
           {Number(rolling.tokens) > 0
             ? `${formatTokens(rolling.usedTokens)} of ${formatTokens(rolling.tokens)} tokens`
             : `${formatTokens(rolling.usedTokens)} tokens in the last 5 hours`}
         </p>
         <ProgressBar percent={rollingPercent} warn={Boolean(rolling.overWindow)} />
-        <p className="stat-meta">
+        <p className="calm-help">
           {rollingPercent}% of the 5-hour allowance used.{' '}
           {resetsAt ? `Usage frees up again from ${resetsAt}.` : 'Nothing has been used in this window yet.'}
         </p>
         {windowExtra > 0 && (
-          <p className="stat-meta">
+          <p className="calm-help">
             Your purchased tokens raise this window too, so a pack can be spent straight away instead of
             waiting for older usage to age out.
           </p>
         )}
-        <p className="stat-meta">
+        <p className="calm-help">
           This rolling window protects the service from sudden bursts of traffic, and it refills on its
           own as older requests age out of the 5 hours.
         </p>
-      </article>
-
-      <div className="stat-grid">
-        <article className="card">
-          <p className="stat-label">Remaining tokens</p>
-          <p className="stat-value">{formatTokens(usage.remainingTokens)}</p>
-          <p className="stat-meta">Resets when the billing period renews.</p>
-        </article>
-        <article className="card">
-          <p className="stat-label">Percent used</p>
-          <p className="stat-value">{usage.percentUsed}%</p>
-          <p className="stat-meta">Calculated from the tokens on your plan.</p>
-        </article>
-        {extraTokens > 0 && (
-          <article className="card">
-            <p className="stat-label">Extra tokens purchased</p>
-            <p className="stat-value">{formatTokens(extraTokens)}</p>
-            <p className="stat-meta">
-              Counted in the period allowance above, so they spend like plan tokens until they expire.
-            </p>
-          </article>
-        )}
       </div>
 
       {packs.length > 0 && (
-        <article className="card">
-          <p className="stat-label">Buy extra usage</p>
-          <p className="stat-meta" style={{ marginTop: 4 }}>
+        <div className="calm-section">
+          <h2>Buy extra usage</h2>
+          <p className="calm-help">
             Tokens you buy are added to the current period's allowance. Each pack stays valid for the
             number of days shown on it.
           </p>
-          <div className="row-list" style={{ marginTop: 8 }}>
+          <div className="calm-lines">
             {packs.map((pack) => {
               const busy = busyTopup === pack.code;
               const validDays = Math.max(0, Math.floor(Number(pack.validDays) || 0));
@@ -117,15 +107,15 @@ export default function UsageView({ usage, limits, topups = [], busyTopup = '', 
                 ? `, valid for ${validDays} ${validDays === 1 ? 'day' : 'days'}`
                 : '';
               return (
-                <div className="row" key={pack.code}>
-                  <div>
-                    <div>{pack.name}</div>
-                    <div className="row-meta">
+                <div className="calm-line" key={pack.code} style={{ alignItems: 'center' }}>
+                  <span>
+                    {pack.name}
+                    <span className="calm-sub">
                       {formatTokens(pack.tokens)} tokens{validity}
-                    </div>
-                  </div>
-                  <div className="row-meta" style={{ textAlign: 'right' }}>
-                    <div>{formatNaira(pack.amountKobo)}</div>
+                    </span>
+                  </span>
+                  <span className="calm-value" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    {formatNaira(pack.amountKobo)}
                     <Button
                       variant="secondary"
                       disabled={busy}
@@ -134,32 +124,32 @@ export default function UsageView({ usage, limits, topups = [], busyTopup = '', 
                     >
                       {busy ? 'Opening checkout...' : 'Buy'}
                     </Button>
-                  </div>
+                  </span>
                 </div>
               );
             })}
           </div>
-        </article>
+        </div>
       )}
 
-      <article className="card">
-        <p className="stat-label">Request limits for your plan</p>
-        <div className="row-list" style={{ marginTop: 8 }}>
+      <div className="calm-section">
+        <h2>Request limits for your plan</h2>
+        <div className="calm-lines">
           <DataRow label="Requests per minute">{formatTokens(planLimits.requestsPerMinute)}</DataRow>
           <DataRow label="Requests at the same time">{formatTokens(planLimits.maxConcurrent)}</DataRow>
           <DataRow label="Largest input">{formatTokens(planLimits.maxInputTokens)} tokens</DataRow>
           <DataRow label="Largest reply">{formatTokens(planLimits.maxOutputTokens)} tokens</DataRow>
         </div>
-      </article>
+      </div>
 
-      <article className="card">
-        <p className="stat-label">How your allowance is counted</p>
-        <p className="stat-meta">
+      <div className="calm-section">
+        <h2>How your allowance is counted</h2>
+        <p className="calm-help">
           Each request counts input tokens plus output tokens. More expensive Zuri models have a higher
           weight, so they use more of the monthly allowance. Your subscription price is charged in Naira
           through Paystack; messages do not create a separate per-request charge.
         </p>
-      </article>
+      </div>
     </section>
   );
 }

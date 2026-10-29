@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { FORMATTING_RULES, plainDashes, withFormattingRules } from '../src/text.js';
+import { ANSWER_RULES, FORMATTING_RULES, MODEL_NOTES, ZURI_IDENTITY, answerStyleLength, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity } from '../src/text.js';
 
 const EM = String.fromCharCode(0x2014);
 const EN = String.fromCharCode(0x2013);
@@ -38,5 +38,31 @@ assert.equal(withFormattingRules(ruled), ruled, 'a conversation that already car
 // A client that already sent its own copy is respected rather than duplicated.
 const ownCopy = [{ role: 'system', content: 'Never use em dashes. Be brief.' }, { role: 'user', content: 'Hi' }];
 assert.equal(withFormattingRules(ownCopy), ownCopy, 'an existing rule is not duplicated');
+
+// Web and phone chats are told they are Zuri, once; the desktop's own longer line is respected.
+const named = withZuriIdentity([{ role: 'user', content: 'Who are you?' }]);
+assert.equal(named.length, 2, 'the identity adds one turn');
+assert.equal(named[0].content, ZURI_IDENTITY);
+assert.equal(withZuriIdentity(named), named, 'a conversation that already carries the identity is not given a second copy');
+const desktopOwn = [{ role: 'system', content: 'You are Zuri, an AI assistant made by Tijha. More rules.' }, { role: 'user', content: 'Hi' }];
+assert.equal(withZuriIdentity(desktopOwn), desktopOwn, 'the desktop identity is not duplicated');
+
+// Every model gets the answer rules; each supplier adds its own short note, once.
+for (const supplier of ['deepseek', 'moonshot', 'zai', 'openai', 'anthropic']) {
+  const styled = withAnswerStyle([{ role: 'user', content: 'Hi' }], supplier);
+  assert.equal(styled.length, 2, supplier + ' gets one extra turn');
+  assert.ok(styled[0].content.startsWith(ANSWER_RULES), supplier + ' carries the shared rules');
+  assert.ok(styled[0].content.endsWith(MODEL_NOTES[supplier]), supplier + ' carries its own note');
+  assert.equal(styled[0].content.length, answerStyleLength(supplier), supplier + ' is counted exactly');
+  assert.equal(withAnswerStyle(styled, supplier), styled, supplier + ' is not given a second copy');
+}
+// The desktop's own style block is kept; only the supplier note is added to it.
+const fromDesktop = withAnswerStyle([{ role: 'system', content: 'How to write this reply: short.' }, { role: 'user', content: 'Hi' }], 'deepseek');
+assert.equal(fromDesktop.length, 3);
+assert.equal(fromDesktop[0].content, MODEL_NOTES.deepseek, 'the desktop gets the note without a second set of rules');
+const unknownSupplier = withAnswerStyle([{ role: 'user', content: 'Hi' }], 'someone-new');
+assert.equal(unknownSupplier[0].content, ANSWER_RULES, 'an unlisted supplier gets the shared rules only');
+assert.equal(answerStyleLength('someone-new'), ANSWER_RULES.length);
+assert.ok(!/[‒-―]/.test(ANSWER_RULES + Object.values(MODEL_NOTES).join('')), 'the rules follow their own no-dash style');
 
 console.log('PASS reply house style rewrites dashes and leaves code alone');

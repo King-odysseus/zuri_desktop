@@ -30,24 +30,28 @@ export default function FeaturesView({ onNavigate }) {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-8">
-          <h1 className="text-3xl font-medium tracking-tight">What Zuri can do</h1>
-          <p className="mt-2 text-sm text-muted">Everything in one place. Open any feature to start using it.</p>
-        </header>
-        <section className="zuri-features-grid" aria-label="Features">
-          {FEATURES.map(({ route, label, description, Icon }) => (
-            <Button key={label} className="zuri-tool-card text-left" onPress={() => onNavigate?.(route)}>
-              <span className="zuri-tool-icon">
-                <Icon size={16} />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col items-start">
-                <span className="text-sm font-medium leading-tight text-foreground">{label}</span>
-                <span className="w-full whitespace-normal text-xs font-normal text-muted">{description}</span>
-              </span>
-              <ChevronRightIcon size={16} className="shrink-0 self-center text-muted" />
-            </Button>
-          ))}
-        </section>
+        <div className="max-w-2xl pb-8">
+          <header className="pb-6">
+            <h1 className="text-2xl font-medium tracking-tight">What Zuri can do</h1>
+            <p className="mt-1 text-sm text-muted">Everything in one place. Open any feature to start using it.</p>
+          </header>
+          {/* A single hairline list: each row is a whole-width button, so the
+              target stays large without a box around every feature. */}
+          <section aria-label="Features" className="divide-y divide-border border-y border-border">
+            {FEATURES.map(({ route, label, description, Icon }) => (
+              <Button key={label} variant="ghost" className="h-auto w-full justify-start gap-3 rounded-none px-1 py-3 text-left" onPress={() => onNavigate?.(route)}>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-secondary text-muted">
+                  <Icon size={16} />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col items-start">
+                  <span className="text-sm font-medium leading-tight text-foreground">{label}</span>
+                  <span className="w-full whitespace-normal text-xs font-normal text-muted">{description}</span>
+                </span>
+                <ChevronRightIcon size={16} className="shrink-0 self-center text-muted" />
+              </Button>
+            ))}
+          </section>
+        </div>
       </div>
     </main>
   );

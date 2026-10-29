@@ -240,13 +240,14 @@ export default function AutomationsView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="flex flex-wrap items-start justify-between gap-4">
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
+        <header className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-medium tracking-tight">Automations</h1>
             <p className="mt-2 text-sm text-muted">Runs Zuri does on a schedule while the app is open.</p>
           </div>
           {/* Hidden while the editor is open so the page keeps one primary action. */}
-          {!showEditor && <Button variant="primary" onPress={openCreate}>New automation</Button>}
+          {!showEditor && <Button variant="primary" className="shrink-0" onPress={openCreate}>New automation</Button>}
         </header>
 
         {status === 'loading' && <p className="text-sm text-muted">Loading automations...</p>}
@@ -257,7 +258,7 @@ export default function AutomationsView() {
         {/* The editor sits above the list: the person just pressed a button in
             the header, so the form must open where their eye already is. */}
         {showEditor && (
-          <section className="rounded-xl border border-border bg-surface p-5">
+          <section className="border-b border-border pb-6">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-medium">{editing ? 'Edit automation' : 'New automation'}</h2>
               <Button variant="ghost" onPress={closeEditor}>Cancel</Button>
@@ -284,22 +285,22 @@ export default function AutomationsView() {
               {cadenceType === 'daily' && <Input type="time" label="Time of day" value={timeOfDay} onChange={(event) => setTimeOfDay(event.target.value)} />}
               <SelectField label="Agent" value={agentId} options={[{ value: '', label: 'Whoever is active' }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={setAgentId} />
             </div>
-            <div className="mt-4 rounded-lg border border-border bg-surface-secondary p-3">
+            <div className="mt-4">
               <Checkbox isSelected={dryRun} onChange={setDryRun}>
                 Preview only (do not change files)
               </Checkbox>
               <p className="mt-1 text-xs text-muted">The run will show the planned steps and save no output file.</p>
             </div>
             {tools.length > 0 && <div className="mt-4"><p className="mb-2 text-sm font-medium">Tools it may use</p><div className="grid gap-2 sm:grid-cols-2">{tools.map((tool) => <Checkbox key={tool.name} isSelected={allowedTools.includes(tool.name)} onChange={(checked) => setAllowedTools((current) => checked ? [...new Set([...current, tool.name])] : current.filter((name) => name !== tool.name))}>{tool.label}</Checkbox>)}</div></div>}
-            <div className="mt-5 flex justify-end border-t border-border pt-4">
+            <div className="mt-5 flex justify-end">
               <Button variant="primary" onPress={() => void save()}>{editing ? 'Save changes' : 'Add automation'}</Button>
             </div>
           </section>
         )}
 
         {status === 'ready' && (
-          <section className="rounded-xl border border-border bg-surface p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+          <section>
+            <div className="mb-2 flex items-center justify-between gap-3">
               <h2 className="text-lg font-medium">Scheduled</h2>
               <Chip size="sm">{automations.length}</Chip>
             </div>
@@ -309,9 +310,9 @@ export default function AutomationsView() {
                 <p>Choose New automation to have Zuri run a prompt on a schedule.</p>
               </div>
             ) : (
-              <ul className="flex flex-col gap-2">
+              <ul className="flex flex-col divide-y divide-border">
                 {automations.map((automation) => (
-                  <li key={automation.id} className="flex flex-wrap items-center gap-3">
+                  <li key={automation.id} className="flex flex-wrap items-center gap-3 py-3">
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{automation.prompt}</p>
                       <p className="mt-1 text-xs text-muted">{describeCadence(automation.cadence)} - {describeNextRun(automation.nextRunAt)}</p>
@@ -327,7 +328,8 @@ export default function AutomationsView() {
           </section>
         )}
 
-        {status === 'ready' && runs.length > 0 && <section className="rounded-xl border border-border bg-surface p-5"><h2 className="mb-3 text-lg font-medium">Recent runs</h2><ul className="flex flex-col gap-2">{runs.slice(0, 5).map((run) => <li key={run.id} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm"><span className="truncate">{run.prompt ?? run.automationId ?? 'Automation run'}</span><Chip size="sm" color={run.status === 'failed' ? 'danger' : 'default'}>{run.status ?? 'unknown'}</Chip></li>)}</ul></section>}
+        {status === 'ready' && runs.length > 0 && <section><h2 className="mb-2 text-lg font-medium">Recent runs</h2><ul className="flex flex-col divide-y divide-border">{runs.slice(0, 5).map((run) => <li key={run.id} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="truncate">{run.prompt ?? run.automationId ?? 'Automation run'}</span><Chip size="sm" color={run.status === 'failed' ? 'danger' : 'default'}>{run.status ?? 'unknown'}</Chip></li>)}</ul></section>}
+        </div>
       </div>
     </main>
   );

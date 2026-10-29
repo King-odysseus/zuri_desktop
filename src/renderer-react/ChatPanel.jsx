@@ -30,12 +30,12 @@ import {
 import FormattedMessage from './FormattedMessage.jsx';
 import { ApprovalCard, ModeMenu, readChatMode, saveChatMode } from './ActControls.jsx';
 import ResultPanel from './ResultPanel.jsx';
-import WorkspaceOverview from './WorkspaceOverview.jsx';
 import { copyText } from './clipboard.js';
+import zuriMarkUrl from './assets/zuri-logo.png';
+import { PENDING_IMAGE_PROMPT_KEY } from './ImageLibraryView.jsx';
 // The app mark that sits above the opening line. Importing it lets the bundler
 // fingerprint the file and rewrite the URL relative to the built index.html,
 // which is what keeps it loading over file:// in the packaged app.
-import zuriMarkUrl from './assets/zuri-logo.png';
 
 const OPENING_QUESTION = "What's on the agenda today?";
 
@@ -98,18 +98,6 @@ function greetingHeading(name, now = new Date()) {
   return `${part}, ${trimmed.split(/\s+/)[0]}`;
 }
 
-const CAPABILITY_HINTS = [
-  'Ask me to summarise your files.',
-  'I can turn a rough thought into a task.',
-  'Ask me to remind you about something tomorrow.',
-  'I can draft a reply for you to edit.',
-  'Ask what needs your attention this week.',
-  'I can set up a recurring research automation.',
-  'Ask me to explain a document in plain words.',
-  'I can search past conversations for you.',
-  'Ask me to compare two options and pick one.',
-  'Paste a table and I will help you check it.',
-];
 // Each command only fills the composer with a starter sentence; the person finishes
 // it and sends as usual, so nothing runs until they press Send.
 const SLASH_COMMANDS = [
@@ -123,6 +111,28 @@ const IMAGE_EXTENSIONS =['png', 'jpg', 'jpeg', 'webp', 'gif'];
 const ATTACHMENT_EXTENSIONS = ['pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv', 'md', 'json', ...IMAGE_EXTENSIONS];
 
 const WEB_SEARCH_STORAGE_KEY = 'zuri.webSearch';
+// Picture choices are remembered on this computer: the shape asked for, and whether
+// Zuri may rewrite the description for the picture maker (on unless switched off).
+const IMAGE_SHAPE_STORAGE_KEY = 'zuri.imageShape';
+const IMAGE_IMPROVE_STORAGE_KEY = 'zuri.improveImagePrompt';
+const IMAGE_SHAPES = [['square', 'Square'], ['portrait', 'Portrait'], ['landscape', 'Landscape']];
+
+function readLocal(key, fallback) {
+  try {
+    return window.localStorage.getItem(key) ?? fallback;
+  } catch (error) {
+    console.warn('[zuri:chat] stored choice', error?.message ?? error);
+    return fallback;
+  }
+}
+
+function writeLocal(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch (error) {
+    console.warn('[zuri:chat] stored choice', error?.message ?? error);
+  }
+}
 
 function readWebSearchPreference() {
   try {
@@ -301,7 +311,19 @@ function modelLabelPositions(messages) {
 
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar, openingKind = 'question' }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState(() => {
+    // "Make another" in the image library leaves the picture's words here for one read.
+    try {
+      const pending = window.sessionStorage.getItem(PENDING_IMAGE_PROMPT_KEY);
+      if (pending) {
+        window.sessionStorage.removeItem(PENDING_IMAGE_PROMPT_KEY);
+        return pending;
+      }
+    } catch (error) {
+      console.warn('[zuri:chat] pending image prompt', error?.message ?? error);
+    }
+    return '';
+  });
   const [threadId, setThreadId] = useState(initialThreadId);
   const [messages, setMessages] = useState([]);
   const [streamingText, setStreamingText] = useState('');
@@ -329,6 +351,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [imageModels, setImageModels] = useState([]);
   const [imagePreviews, setImagePreviews] = useState({});
   const [imageBusy, setImageBusy] = useState('');
+  const [imageShape, setImageShape] = useState(() => {
+    const saved = readLocal(IMAGE_SHAPE_STORAGE_KEY, 'square');
+    return IMAGE_SHAPES.some(([value]) => value === saved) ? saved : 'square';
+  });
+  const [improveImagePrompt, setImproveImagePrompt] = useState(() => readLocal(IMAGE_IMPROVE_STORAGE_KEY, 'on') !== 'off');
   const [answerLength, setAnswerLength] = useState('balanced');
   // On by default for current answers, then remembered when the person changes it.
   const [webSearch, setWebSearch] = useState(readWebSearchPreference);
@@ -346,10 +373,6 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const stickToBottomRef = useRef(true);
   const recognitionRef = useRef(null);
   const voiceDraftRef = useRef('');
-  const capabilityHint = useMemo(
-    () => CAPABILITY_HINTS[Math.floor(Math.random() * CAPABILITY_HINTS.length)],
-    [],
-  );
   // The shell alternates this per chat session, so the first screen is a
   // greeting one time and the agenda question the next. It is a prop rather
   // than a value this view picks itself: a mount counter would be read twice
@@ -617,7 +640,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setError('');
     setImageBusy(model.name);
     try {
-      const made = await api.images.generate({ prompt, modelCode: model.code });
+      const made = await api.images.generate({ prompt, modelCode: model.code, shape: imageShape, improve: improveImagePrompt });
       if (made?.ok !== true) {
         setError(made?.error?.message ?? 'Zuri could not make that picture. Try again.');
         return;
@@ -1077,21 +1100,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       )}
       <div className={`flex min-h-0 flex-1 flex-col items-center px-4 sm:px-6 ${panelItem !== null ? 'lg:pr-[28.5rem]' : ''} ${compact ? 'zuri-overlay-content justify-end p-3' : hasConversation ? 'justify-end pb-4 pt-4 sm:pb-6 sm:pt-6' : 'justify-center pb-10 sm:pb-24'}`}>
         {!compact && !hasConversation && (
-          <div className={`mb-6 flex w-full ${contentWidth} flex-col items-center`}>
-            {/* The mark sits above the line rather than beside it: the heading is
-                the thing to read, and a logo beside it would pull the eye first. */}
-            <img
-              src={zuriMarkUrl}
-              alt=""
-              aria-hidden="true"
-              width={52}
-              height={52}
-              className="zuri-chat-mark"
-              decoding="async"
-            />
-            <h1 className="mt-5 text-center text-3xl font-medium tracking-tight">{openingHeading}</h1>
-            <p className="mt-3 text-center text-base text-muted">{capabilityHint}</p>
-            <WorkspaceOverview />
+          // One line and the composer below it, the way ChatGPT opens: nothing competes with the box.
+          <div className={`mb-8 flex w-full ${contentWidth} flex-col items-center`}>
+            <img src={zuriMarkUrl} alt="" width={52} height={52} className="zuri-chat-mark mb-5" decoding="async" aria-hidden="true" />
+          <h1 className="text-center text-3xl font-normal tracking-tight sm:text-4xl">{openingHeading}</h1>
           </div>
         )}
 
@@ -1257,6 +1269,28 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                     </>
                   ) : menuView === 'image' ? (
                     <div className="flex flex-col gap-1">
+                      <div role="radiogroup" aria-label="Picture shape" className="flex gap-1 px-2 pb-1">
+                        {IMAGE_SHAPES.map(([value, label]) => (
+                          <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={imageShape === value}
+                            className={`min-h-9 flex-1 rounded-lg px-2 text-xs ${imageShape === value ? 'zuri-selected-pill' : 'text-muted hover:bg-surface-secondary'}`}
+                            onClick={() => { setImageShape(value); writeLocal(IMAGE_SHAPE_STORAGE_KEY, value); }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                      <label className="flex items-center gap-2 px-3 pb-1 text-xs text-muted" title="Zuri rewrites your description into a better prompt for the picture maker. The picture library shows both.">
+                        <input
+                          type="checkbox"
+                          checked={improveImagePrompt}
+                          onChange={(event) => { setImproveImagePrompt(event.target.checked); writeLocal(IMAGE_IMPROVE_STORAGE_KEY, event.target.checked ? 'on' : 'off'); }}
+                        />
+                        Improve my description
+                      </label>
                       {imageModels.length === 0 && <p className="px-3 py-2 text-xs text-muted">Checking which picture models you can use...</p>}
                       {imageModels.map((model) => (
                         <button
@@ -1264,7 +1298,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                           type="button"
                           role="menuitem"
                           disabled={!model.available || imageBusy !== ''}
-                          title={model.available ? `${model.hint}. About NGN ${model.nairaPerImage} an image.` : 'Add a key for this provider in Settings first.'}
+                          title={`${model.hint}. About NGN ${model.nairaPerImage} an image.`}
                           className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary disabled:opacity-40"
                           onClick={() => void createImage(model)}
                         >
@@ -1273,7 +1307,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                             {model.name}
                             <span className="ml-auto text-xs text-muted">NGN {model.nairaPerImage}</span>
                           </span>
-                          <span className="text-xs text-muted">{model.available ? model.hint : 'Needs a key in Settings'}</span>
+                          <span className="text-xs text-muted">{model.hint}</span>
                         </button>
                       ))}
                     </div>

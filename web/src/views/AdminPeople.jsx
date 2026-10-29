@@ -156,47 +156,50 @@ export default function AdminPeople({ days, plans }) {
   }
 
   return (
-    <>
+    <div className="admin-people">
       {error && <Alert tone="danger">{error}</Alert>}
 
       {stats && (
         <>
-          <div className="stat-grid">
-            <article className="card">
+          <section className="admin-section">
+            <div className="admin-section-heading"><div><h2>People and service health</h2><p>Recent activity, account health and the server behind the dashboard.</p></div></div>
+          <div className="admin-stat-lines">
+            <article>
               <p className="stat-label">People</p>
               <p className="stat-value">{stats.accounts.active}</p>
               <p className="stat-meta">{stats.accounts.seenToday} seen today, {stats.accounts.joined} joined, {stats.accounts.suspended} suspended.</p>
             </article>
-            <article className="card">
+            <article>
               <p className="stat-label">Requests today</p>
               <p className="stat-value">{formatTokens(stats.usage.requestsToday)}</p>
               <p className="stat-meta">{formatTokens(stats.usage.tokensToday)} tokens today; {formatTokens(stats.usage.requests)} requests from {stats.usage.people} people this period.</p>
             </article>
-            <article className="card">
+            <article>
               <p className="stat-label">Paying plans</p>
               <p className="stat-value">{stats.subscriptions.paying}</p>
               <p className="stat-meta">{formatNaira(stats.subscriptions.monthlyKobo)} a month. Payments: {stats.payments.paid} paid, {stats.payments.failed} failed.</p>
             </article>
-            <article className="card">
+            <article>
               <p className="stat-label">Server</p>
               <p className="stat-value">{stats.server.databaseMs} ms</p>
               <p className="stat-meta">Database answer time. Up {uptime(stats.server.uptimeSeconds)}, {stats.server.environment}, Node {stats.server.nodeVersion}.</p>
             </article>
           </div>
-          <article className="card">
+          <div className="admin-section-subsection">
             <p className="stat-label">Requests per day</p>
             <DailyBars daily={stats.daily} />
             {stats.topUsers.length > 0 && (
               <p className="stat-meta">Busiest: {stats.topUsers.map((top) => `${top.displayName || top.email} (${formatTokens(top.requests)})`).join(', ')}.</p>
             )}
-          </article>
+          </div>
+          </section>
         </>
       )}
 
       {notice && <PasswordNotice notice={notice} onDismiss={() => setNotice(null)} />}
 
-      <form className="card form-stack admin-form" onSubmit={addUser}>
-        <p className="stat-label">Add a person</p>
+      <form className="form-stack admin-form" onSubmit={addUser}>
+        <div className="admin-section-heading"><div><h2>Add a person</h2><p>Create an account and assign its plan immediately.</p></div></div>
         <div className="admin-fields">
           <label className="field"><span>Name</span>
             <input value={form.displayName} maxLength={60} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
@@ -219,9 +222,9 @@ export default function AdminPeople({ days, plans }) {
         <p className="stat-meta">The plan is active straight away with no payment step. A temporary password is generated for you to pass on.</p>
       </form>
 
-      <article className="card">
+      <section className="admin-section">
         <div className="admin-head">
-          <p className="stat-label">Accounts</p>
+          <div><h2>Accounts</h2><p className="admin-help">Search, re-plan, reset or suspend an account.</p></div>
           <label className="field admin-window">
             <span className="sr-only">Search accounts</span>
             <input type="search" placeholder="Search name or email" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -231,7 +234,7 @@ export default function AdminPeople({ days, plans }) {
             wider than a phone and scrolls sideways, and a form in there would open
             out of sight. */}
         {planEditor && (
-          <form className="card admin-plan-form" onSubmit={savePlan}>
+          <form className="admin-plan-form" onSubmit={savePlan}>
             <p className="stat-label">Plan for {planEditor.name}</p>
             <div className="admin-fields">
               <label className="field"><span>Plan</span>
@@ -257,7 +260,7 @@ export default function AdminPeople({ days, plans }) {
           </form>
         )}
         <div className="admin-scroll">
-          <table className="admin-table">
+          <table className="admin-table admin-people-table">
             <thead>
               <tr>
                 <th>Person</th>
@@ -307,7 +310,7 @@ export default function AdminPeople({ days, plans }) {
             </tbody>
           </table>
         </div>
-      </article>
-    </>
+      </section>
+    </div>
   );
 }

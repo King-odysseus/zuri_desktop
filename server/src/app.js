@@ -11,7 +11,8 @@ import { verifyPaystackSignature } from './paystack.js';
 import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
 import { CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from './db.js';
 import { checkedAttachment, signUpload } from './uploads.js';
-import { FORMATTING_RULES, plainDashes, withFormattingRules } from './text.js';
+import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './images.js';
+import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, answerStyleLength } from './text.js';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const ASSETS_DIR = `${PUBLIC_DIR}${path.sep}assets`;
@@ -31,7 +32,7 @@ const STATIC_TYPES = new Map([
   ['.woff2', 'font/woff2'],
 ]);
 const DASHBOARD_SECURITY_HEADERS = Object.freeze({
-  'content-security-policy': "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; frame-src https://accounts.google.com; connect-src 'self' https://accounts.google.com; img-src 'self' data: https:",
+  'content-security-policy': "default-src 'self'; script-src 'self' https://accounts.google.com; style-src 'self' 'unsafe-inline'; frame-src https://accounts.google.com; connect-src 'self' https://accounts.google.com; img-src 'self' data: blob: https:",
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'no-referrer',
 });
@@ -747,8 +748,8 @@ export function createApp(dependencies = {}) {
         // House style, applied before the allowance is measured so the rule's own
         // cost is charged like any other input.
         if (messages.ok) {
-          messages.data = withFormattingRules(messages.data);
-          messages.inputTokens += Math.ceil(FORMATTING_RULES.length / 4);
+          messages.data = withZuriIdentity(withFormattingRules(messages.data));
+          messages.inputTokens += Math.ceil((FORMATTING_RULES.length + ZURI_IDENTITY.length) / 4);
           // A chat that lives in a project is answered with that project's standing
           // instructions and reference files, so the person does not repeat them in
           // every thread. The extra input is counted before the allowance is checked,
@@ -773,6 +774,10 @@ export function createApp(dependencies = {}) {
         if (!canUseModel(zuriModel, session.subscription.planCode)) {
           return response(403, { ok: false, error: { code: 'PLAN_UPGRADE_REQUIRED', message: `${zuriModel.name} needs a higher plan. Upgrade to use it.` } });
         }
+        // The answer rules and the note for this model's supplier, counted as input
+        // like the other system turns so the allowance check stays honest.
+        messages.data = withAnswerStyle(messages.data, zuriModel.supplier);
+        messages.inputTokens += Math.ceil(answerStyleLength(zuriModel.supplier) / 4);
         const limits = limitsForModel(limitsForPlan(session.subscription.planCode), zuriModel);
         if (messages.inputTokens > limits.maxInputTokens) {
           return response(413, { ok: false, error: { code: 'INPUT_TOO_LARGE', message: `Keep the conversation below ${limits.maxInputTokens} input tokens.` } });
@@ -976,6 +981,92 @@ export function createApp(dependencies = {}) {
       } catch (error) {
         if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
         throw error;
+      }
+    }
+
+    // Draw one picture. The picture comes back once, in this reply, and is not kept:
+    // the person's own device is the only library. It is billed per picture from the
+    // plan's allowance, reserved before the supplier is called and released if the
+    // supplier fails, so a failed picture costs nothing.
+    if (request.method === 'POST' && url.pathname === '/api/images') {
+      if (!dependencies.auth || !dependencies.repository?.reserveUsage || !dependencies.repository?.commitUsage || !dependencies.repository?.releaseUsage || typeof dependencies.imageProvider !== 'function') {
+        return response(503, { ok: false, error: { code: 'IMAGES_NOT_CONFIGURED', message: 'Picture making is not switched on yet.' } });
+      }
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to make pictures.' } });
+      let body;
+      try {
+        body = await readJson(request);
+      } catch (error) {
+        return response(400, { ok: false, error: { code: error.code ?? 'INVALID_JSON', message: error.message } });
+      }
+      const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+      if (prompt === '') return response(400, { ok: false, error: { code: 'INVALID_PROMPT', message: 'Describe the picture you want first.' } });
+      if (prompt.length > MAX_IMAGE_PROMPT_LENGTH) return response(400, { ok: false, error: { code: 'INVALID_PROMPT', message: `Keep the description under ${MAX_IMAGE_PROMPT_LENGTH} characters.` } });
+      const shape = body.shape === undefined ? 'square' : body.shape;
+      if (typeof shape !== 'string' || !Object.hasOwn(IMAGE_SHAPES, shape)) return response(400, { ok: false, error: { code: 'INVALID_SHAPE', message: 'Choose square, portrait or landscape.' } });
+
+      const imageModel = findModel(await loadModels(dependencies), body.model);
+      if (!imageModel || !isImageModel(imageModel)) return response(400, { ok: false, error: { code: 'UNKNOWN_MODEL', message: 'Choose one of the picture models.' } });
+      if (!canUseModel(imageModel, session.subscription.planCode)) {
+        return response(403, { ok: false, error: { code: 'PLAN_UPGRADE_REQUIRED', message: `${imageModel.name} needs a higher plan. Upgrade to use it.` } });
+      }
+
+      const limits = limitsForModel(limitsForPlan(session.subscription.planCode), imageModel);
+      const lease = limiter.acquire(`${session.user.id}:${imageModel.code}`, limits);
+      if (!lease.allowed) {
+        return response(429, { ok: false, error: { code: lease.reason === 'concurrency_limit' ? 'CONCURRENCY_LIMIT' : 'RATE_LIMITED', message: 'This account has reached its request limit. Try again shortly.' } }, { 'retry-after': String(lease.retryAfterSeconds) });
+      }
+      let reservation;
+      try {
+        reservation = await dependencies.repository.reserveUsage({
+          userId: session.user.id,
+          subscriptionId: session.subscription.id,
+          requestedTokens: imageModel.quotaTokensPerImage,
+          expiresAt: new Date(now().getTime() + RESERVATION_TTL_MS),
+        });
+        // On by default; the app sends improve:false when the person switched it off.
+        const finalPrompt = body.improve === false
+          ? prompt
+          : await improveImagePrompt({ chatProvider: dependencies.chatProvider, prompt, supplier: imageModel.supplier });
+        const picture = await dependencies.imageProvider({
+          supplier: imageModel.supplier,
+          supplierModel: imageModel.supplierModel,
+          quality: imageModel.imageQuality,
+          shape,
+          prompt: finalPrompt,
+          signal: AbortSignal.timeout(180_000),
+        });
+        const requestId = randomUUID();
+        await dependencies.repository.commitUsage({
+          reservationId: reservation.id,
+          userId: session.user.id,
+          model: imageModel.supplierModel,
+          modelCode: imageModel.code,
+          supplier: imageModel.supplier,
+          quotaTokens: imageModel.quotaTokensPerImage,
+          costMicroUsd: imageSupplierCostMicroUsd(imageModel),
+          inputTokens: 0,
+          outputTokens: 0,
+          requestId,
+        });
+        return response(200, {
+          ok: true,
+          data: { requestId, model: imageModel.code, modelName: imageModel.name, mime: picture.mime, imageBase64: picture.base64, prompt: plainDashes(finalPrompt), shape },
+        });
+      } catch (error) {
+        if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
+        if (error?.code === 'QUOTA_EXCEEDED') return response(429, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'WINDOW_EXCEEDED') {
+          const seconds = Math.max(60, Math.floor(Number(error.retryAfterSeconds) || 300));
+          return response(429, { ok: false, error: { code: error.code, message: error.message, retryAfterSeconds: seconds } }, { 'retry-after': String(seconds) });
+        }
+        if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'PROVIDER_RESPONSE_INVALID') return response(502, { ok: false, error: { code: error.code, message: error.message } });
+        console.error('[zuri-cloud] image', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'IMAGE_FAILED', message: 'The picture could not be made.' } });
+      } finally {
+        lease.release();
       }
     }
 
@@ -1279,6 +1370,21 @@ export function createApp(dependencies = {}) {
           if (handled) return handled;
           console.error('[zuri-cloud] set password', error?.message ?? error);
           return response(500, { ok: false, error: { code: 'PASSWORD_SAVE_FAILED', message: 'The password could not be saved.' } });
+        }
+      }
+      if (request.method === 'PATCH' && url.pathname === '/api/me') {
+        try {
+          const body = await readJson(request);
+          const displayName = typeof body.displayName === 'string' ? body.displayName.trim() : '';
+          if (displayName.length > 60) return response(400, { ok: false, error: { code: 'NAME_TOO_LONG', message: 'Use 60 characters or fewer for your name.' } });
+          if (!dependencies.repository?.updateDisplayName) return response(503, { ok: false, error: { code: 'ACCOUNT_UPDATE_NOT_CONFIGURED', message: 'Account details cannot be changed yet.' } });
+          const user = await dependencies.repository.updateDisplayName(session.user.id, displayName);
+          return response(200, { ok: true, data: { ...session, user } });
+        } catch (error) {
+          const handled = authErrorResponse(error);
+          if (handled) return handled;
+          console.error('[zuri-cloud] update account name', error?.message ?? error);
+          return response(500, { ok: false, error: { code: 'ACCOUNT_UPDATE_FAILED', message: 'The account details could not be saved.' } });
         }
       }
       if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET for this account endpoint.' } });

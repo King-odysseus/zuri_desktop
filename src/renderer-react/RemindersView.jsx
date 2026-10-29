@@ -177,22 +177,22 @@ export default function RemindersView() {
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
       <div className="zuri-page-content zuri-scrollbar-hidden">
-        <header className="mb-6">
-          <h1 className="text-3xl font-medium tracking-tight">Reminders</h1>
-          <p className="mt-2 text-sm text-muted">Follow-ups that come back when they are due.</p>
-        </header>
+        <div className="mx-auto flex w-full max-w-3xl flex-col gap-5">
+          <header>
+            <h1 className="text-2xl font-medium tracking-tight">Reminders</h1>
+            <p className="mt-1 text-sm text-muted">Follow-ups that come back when they are due.</p>
+          </header>
 
-        <section className="rounded-xl border border-border bg-surface p-5">
           <form
             onSubmit={addReminder}
-            className="zuri-reminders-form grid w-full items-end gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1.5fr)_minmax(12rem,1fr)_minmax(10rem,0.9fr)_minmax(11rem,1fr)_auto]"
+            className="zuri-reminders-form grid w-full items-end gap-3 sm:grid-cols-2"
           >
             <Input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Call the bank"
               aria-label="What is it for"
-              className="min-w-0"
+              className="min-w-0 sm:col-span-2"
             />
             <DateField
               label="Date"
@@ -230,64 +230,61 @@ export default function RemindersView() {
           </form>
 
           {message !== '' && (
-            <p role="status" className="mt-3 text-sm text-muted">
+            <p role="status" className="text-sm text-muted">
               {message}
             </p>
           )}
-        </section>
 
-        {status === 'loading' && <p className="text-sm text-muted">Loading reminders...</p>}
+          {status === 'loading' && <p className="text-sm text-muted">Loading reminders...</p>}
 
-        {status === 'error' && (
-          <p className="text-sm text-muted">
-            Your reminders only appear in the Zuri app, not in this preview.
-          </p>
-        )}
+          {status === 'error' && (
+            <p className="text-sm text-muted">
+              Your reminders only appear in the Zuri app, not in this preview.
+            </p>
+          )}
 
-        {status === 'ready' && groups.length === 0 && (
-          <div className="zuri-empty-state">
-            <strong>Nothing coming up</strong>
-            <p>Add a reminder above and Zuri will bring it back when it is due.</p>
-          </div>
-        )}
+          {status === 'ready' && groups.length === 0 && (
+            <div className="zuri-empty-state">
+              <strong>Nothing coming up</strong>
+              <p>Add a reminder above and Zuri will bring it back when it is due.</p>
+            </div>
+          )}
 
-        {status === 'ready' &&
-          groups.map((group) => (
-            <section key={group.key} className="rounded-xl border border-border bg-surface p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <h2 className="text-lg font-medium">{group.label}</h2>
-                <Chip size="sm">{group.items.length}</Chip>
-              </div>
-              <ul className="zuri-reminder-list flex flex-col gap-2">
-                {group.items.map((reminder) => (
-                  <li
-                    key={reminder.id}
-                    className="flex items-center gap-3 rounded-xl border border-border px-4 py-3"
-                  >
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span className="truncate text-sm">{reminder.title}</span>
-                      <span className="text-xs text-muted">
-                        {describeRowDue(reminder.dueAt, group.key)} - {describeRepeat(reminder)}
-                      </span>
-                    </div>
-                    {group.key === 'overdue' && (
-                      <Chip size="sm" color="danger">
-                        Overdue
-                      </Chip>
-                    )}
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      aria-label={`Mark ${reminder.title} done`}
-                      onPress={() => complete(reminder)}
-                    >
-                      Done
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
+          {status === 'ready' &&
+            groups.map((group) => (
+              <section key={group.key}>
+                <div className="mb-1 flex items-center gap-2">
+                  <h2 className="text-sm font-medium text-muted">{group.label}</h2>
+                  <Chip size="sm">{group.items.length}</Chip>
+                </div>
+                <ul className="zuri-reminder-list flex flex-col divide-y divide-border border-t border-border">
+                  {group.items.map((reminder) => (
+                    <li key={reminder.id} className="flex items-center gap-3 py-3">
+                      <div className="flex min-w-0 flex-1 flex-col">
+                        <span className="truncate text-sm">{reminder.title}</span>
+                        <span className="text-xs text-muted">
+                          {describeRowDue(reminder.dueAt, group.key)} - {describeRepeat(reminder)}
+                        </span>
+                      </div>
+                      {group.key === 'overdue' && (
+                        <Chip size="sm" color="danger">
+                          Overdue
+                        </Chip>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Mark ${reminder.title} done`}
+                        onPress={() => complete(reminder)}
+                      >
+                        Done
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+        </div>
       </div>
     </main>
   );

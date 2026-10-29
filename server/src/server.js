@@ -5,6 +5,7 @@ import { createRequestListener } from './serve.js';
 import { createAuthService, createGoogleVerifier, provisionAdminAccount } from './auth.js';
 import { createDatabase, createRepository } from './db.js';
 import { createAnthropicClient, createDeepSeekClient } from './deepseek.js';
+import { createImageClient } from './images.js';
 import { createMailer } from './mail.js';
 import { createPaystackClient } from './paystack.js';
 import { applySchema } from './schema.js';

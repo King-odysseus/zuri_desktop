@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertIcon, CardIcon, GaugeIcon, MessageIcon, PlusIcon, SparkIcon, WalletIcon } from '../../../src/renderer-react/Icons.jsx';
+import { PlusIcon } from '../../../src/renderer-react/Icons.jsx';
 import { fetchConversations } from '../lib/api.js';
 import { formatDate, formatNaira, formatRelativeTime, formatTokens, greetingFor } from '../lib/format.js';
 
@@ -7,22 +7,11 @@ import { formatDate, formatNaira, formatRelativeTime, formatTokens, greetingFor 
 const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 const QUICK_ACTIONS = [
-  { view: 'chat', title: 'Ask Zuri', subtitle: 'Start a chat', Icon: SparkIcon },
-  { view: 'usage', title: 'Usage and limits', subtitle: 'Tokens and requests', Icon: GaugeIcon },
-  { view: 'plans', title: 'Plans', subtitle: 'Change your plan', Icon: CardIcon },
-  { view: 'billing', title: 'Billing', subtitle: 'Payments and receipts', Icon: WalletIcon },
+  { view: 'chat', title: 'Ask Zuri', subtitle: 'Start a chat' },
+  { view: 'usage', title: 'Usage and limits', subtitle: 'Tokens and requests' },
+  { view: 'plans', title: 'Plans', subtitle: 'Change your plan' },
+  { view: 'billing', title: 'Billing', subtitle: 'Payments and receipts' },
 ];
-
-// One tone per state: the icon and the action take the colour, the sentence stays
-// in the body colour so it is readable in both themes.
-const BANNER_TONES = {
-  danger: 'text-danger',
-  warning: 'text-warning',
-  accent: 'text-accent',
-};
-
-// The card shell every panel shares: white on the canvas, hairline border, 16px.
-const CARD = 'flex min-w-0 flex-col gap-3 rounded-xl border border-hairline bg-surface p-4';
 
 /** A usable Date for a value the server may have left out, or null. */
 function dateFor(value) {
@@ -88,14 +77,6 @@ function newestFirst(conversations) {
   const stampOf = (conversation) =>
     dateFor(conversation?.updatedAt ?? conversation?.createdAt)?.getTime() ?? 0;
   return [...conversations].sort((left, right) => stampOf(right) - stampOf(left));
-}
-
-/** The small date tile in a "Coming up" row. */
-function badgeFor(date) {
-  return {
-    day: String(date.getDate()),
-    month: date.toLocaleDateString('en-NG', { month: 'short' }).toUpperCase(),
-  };
 }
 
 /**
@@ -249,260 +230,165 @@ export default function OverviewView({ me, usage, onViewChange }) {
   const recentChats = newestFirst(chats).slice(0, 4);
   const chatsFailed = chatState === 'error';
   const chatsLoading = chatState === 'loading';
-  const toneClass = banner ? BANNER_TONES[banner.tone] : '';
 
   return (
-    <section className="flex w-full min-w-0 flex-col gap-5">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <h1 className="break-words text-[25px] font-bold leading-tight tracking-tight text-body">
-            {greeting}
-          </h1>
-          <p className="break-words text-[13px] leading-snug text-muted">{subline}</p>
+    <section className="view calm">
+      <div className="view-head">
+        <div className="min-w-0 overview-greeting">
+          <h1 className="break-words">{greeting}</h1>
+          <p className="break-words">{subline}</p>
         </div>
-        <button
-          type="button"
-          onClick={() => onViewChange?.('chat')}
-          className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-full bg-accent px-5 text-[13px] font-semibold text-[color:var(--accent-foreground)] transition-colors hover:bg-accent-hover sm:min-h-10 sm:w-auto"
-        >
-          <PlusIcon className="size-4" aria-hidden="true" />
-          New chat
-        </button>
-      </header>
+      </div>
 
       {banner && (
-        <div
-          role="status"
-          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-hairline bg-surface px-3.5 py-2.5"
-        >
-          <AlertIcon className={`size-4 shrink-0 ${toneClass}`} aria-hidden="true" />
-          <p className="min-w-0 flex-1 text-[12.5px] leading-snug text-body">{banner.message}</p>
-          <button
-            type="button"
-            onClick={() => onViewChange?.('plans')}
-            className={`shrink-0 text-[12px] font-semibold hover:underline ${toneClass}`}
-          >
+        <div role="status" className="calm-note">
+          {banner.message}{' '}
+          <button type="button" onClick={() => onViewChange?.('plans')} className="calm-link">
             {banner.action}
           </button>
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {QUICK_ACTIONS.map(({ view, title, subtitle, Icon }) => (
-          <button
-            key={view}
-            type="button"
-            onClick={() => onViewChange?.(view)}
-            className="flex min-h-11 min-w-0 flex-col items-start gap-2 rounded-xl border border-hairline bg-surface p-3.5 text-left transition-colors hover:bg-surface-secondary lg:flex-row lg:items-center lg:gap-3"
-          >
-            <span className="grid size-10 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
-              <Icon className="size-[18px]" aria-hidden="true" />
-            </span>
-            <span className="flex min-w-0 flex-col">
-              <span className="break-words text-[13px] font-semibold leading-snug text-body">{title}</span>
-              <span className="break-words text-[11.5px] leading-snug text-muted">{subtitle}</span>
-            </span>
+      <div className="calm-actions" style={{ paddingBottom: 22 }}>
+        <button type="button" onClick={() => onViewChange?.('chat')} className="calm-primary">
+          <PlusIcon className="size-4" aria-hidden="true" />
+          New chat
+        </button>
+      </div>
+
+      <div className="calm-section">
+        <div className="calm-section-head">
+          <h2>Your allowance</h2>
+          <button type="button" onClick={() => onViewChange?.('plans')} className="calm-link">
+            Manage plan
           </button>
-        ))}
-      </div>
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {stats.map((stat) => (
+        </div>
+        <div
+          role="progressbar"
+          aria-valuenow={percentUsed}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Share of this period's token allowance used"
+          className="calm-bar"
+        >
           <div
-            key={stat.label}
-            className="flex min-w-0 flex-col gap-1 rounded-xl border border-hairline bg-surface p-3.5"
-          >
-            <p className="break-words text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted">
-              {stat.label}
-            </p>
-            <p className="break-words text-[22px] font-bold leading-tight tracking-tight text-body">
-              {stat.value}
-            </p>
-            <p className="break-words text-[11px] leading-snug text-faint">{stat.note}</p>
-          </div>
-        ))}
+            className={quota.overQuota ? 'is-danger' : quota.nearLimit ? 'is-warn' : ''}
+            style={{ width: `${percentUsed}%` }}
+          />
+        </div>
+        <p className="calm-help">
+          {`${formatTokens(usedTokens)} of ${formatTokens(monthlyTokens)} tokens used (${percentUsed}%)`}
+        </p>
+        <div className="calm-lines">
+          {stats.map((stat) => (
+            <div key={stat.label} className="calm-line">
+              <span>{stat.label}</span>
+              <span className="calm-value">
+                {stat.value}
+                <span className="calm-sub">{stat.note}</span>
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className={CARD}>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[13px] font-semibold text-body">Chats this week</h2>
-            <span className="shrink-0 rounded-full bg-accent-soft px-2.5 py-1 text-[11px] font-semibold text-accent-text">
-              {planName ? `${planName} plan` : 'No plan yet'}
+      <div className="calm-section">
+        <h2>Chats this week</h2>
+        {chatsFailed ? (
+          <p className="calm-help">Chats could not be loaded.</p>
+        ) : chatsLoading ? (
+          <p className="calm-help">Loading chats.</p>
+        ) : (
+          <div role="img" aria-label={barsLabel} className="calm-week">
+            {bars.map((bar) => (
+              <div key={bar.key} className="calm-week-col">
+                <div className="calm-week-track">
+                  <div
+                    className={`calm-week-bar${bar.isToday ? ' is-today' : ''}`}
+                    style={{ height: `${barHeight(bar.count)}%` }}
+                  />
+                </div>
+                <span className="calm-week-label">{bar.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="calm-section">
+        <div className="calm-section-head">
+          <h2>Recent chats</h2>
+          <button type="button" onClick={() => onViewChange?.('chat')} className="calm-link">
+            See all
+          </button>
+        </div>
+        {chatsFailed ? (
+          <p className="calm-help">Chats could not be loaded.</p>
+        ) : chatsLoading ? (
+          <p className="calm-help">Loading chats.</p>
+        ) : recentChats.length === 0 ? (
+          <p className="calm-help">No saved chats yet. Ask Zuri a question to start one.</p>
+        ) : (
+          <div className="calm-lines">
+            {recentChats.map((conversation) => (
+              <div key={conversation.id} className="calm-line">
+                <span className="min-w-0 flex-1 truncate">{conversation.title || 'New chat'}</span>
+                <span className="calm-help shrink-0">
+                  {formatRelativeTime(conversation.updatedAt ?? conversation.createdAt)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="calm-section">
+        <div className="calm-section-head">
+          <h2>Billing period</h2>
+          <button type="button" onClick={() => onViewChange?.('billing')} className="calm-link">
+            Open billing
+          </button>
+        </div>
+        <div className="calm-lines">
+          <div className="calm-line">
+            <span>Plan</span>
+            <span className="calm-value">{planText}</span>
+          </div>
+          <div className="calm-line">
+            <span>Amount each month</span>
+            <span className="calm-value">
+              {monthlyPrice === undefined ? 'Not set' : formatNaira(monthlyPrice)}
             </span>
           </div>
-
-          {chatsFailed ? (
-            <p className="text-[11.5px] leading-snug text-faint">Chats could not be loaded.</p>
-          ) : chatsLoading ? (
-            <p className="text-[11.5px] leading-snug text-faint">Loading chats.</p>
-          ) : (
-            <div role="img" aria-label={barsLabel} className="flex items-end justify-between gap-1.5 sm:gap-2">
-              {bars.map((bar) => (
-                <div key={bar.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
-                  <div className="flex h-20 w-full items-end">
-                    <div
-                      className={`mx-auto w-full max-w-11 rounded-t-[6px] ${bar.isToday ? 'bg-accent' : 'bg-faint'}`}
-                      style={{ height: `${barHeight(bar.count)}%` }}
-                    />
-                  </div>
-                  <span
-                    className={`text-[10px] leading-none ${
-                      bar.isToday ? 'font-semibold text-body' : 'text-faint'
-                    }`}
-                  >
-                    {bar.label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex flex-col gap-2">
-            <div
-              role="progressbar"
-              aria-valuenow={percentUsed}
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-label="Share of this period's token allowance used"
-              className="h-2 w-full overflow-hidden rounded-full bg-surface-secondary"
-            >
-              <div
-                className={`h-full rounded-full ${
-                  quota.overQuota ? 'bg-danger' : quota.nearLimit ? 'bg-warning' : 'bg-accent'
-                }`}
-                style={{ width: `${percentUsed}%` }}
-              />
-            </div>
-            <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-              <p className="text-[11px] leading-snug text-muted">
-                {`${formatTokens(usedTokens)} of ${formatTokens(monthlyTokens)} tokens used (${percentUsed}%)`}
-              </p>
-              <button
-                type="button"
-                onClick={() => onViewChange?.('plans')}
-                className="text-[11px] font-semibold text-accent hover:underline"
-              >
-                Manage plan
-              </button>
-            </div>
+          <div className="calm-line">
+            <span>Period ends</span>
+            <span className="calm-value">{periodEnd ? formatDate(periodEnd) : 'Not set'}</span>
           </div>
-        </div>
-
-        <div className={CARD}>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[13px] font-semibold text-body">Coming up</h2>
-            <button
-              type="button"
-              onClick={() => onViewChange?.('usage')}
-              className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
-            >
-              See all
-            </button>
-          </div>
-
-          {upcoming.length === 0 ? (
-            <p className="text-[11.5px] leading-snug text-faint">Your plan has no dates to show yet.</p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {upcoming.map((row) => {
-                const badge = badgeFor(row.date);
-                return (
-                  <div key={row.key} className="flex min-w-0 items-center gap-3">
-                    <span className="flex size-[34px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-[10px] bg-accent-soft text-accent-text">
-                      <span className="text-[13px] font-bold leading-none">{badge.day}</span>
-                      <span className="text-[8px] font-semibold uppercase leading-none tracking-[0.06em]">
-                        {badge.month}
-                      </span>
-                    </span>
-                    <span className="flex min-w-0 flex-col">
-                      <span className="truncate text-[12.5px] font-medium leading-snug text-body">
-                        {row.label}
-                      </span>
-                      <span className="truncate text-[11px] leading-snug text-muted">{row.meta}</span>
-                    </span>
-                  </div>
-                );
-              })}
+          {upcoming.map((row) => (
+            <div key={row.key} className="calm-line">
+              <span>{row.label}</span>
+              <span className="calm-value">{row.meta}</span>
             </div>
-          )}
+          ))}
         </div>
+        <p className="calm-help">Receipts and past payments are in Billing.</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className={CARD}>
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-[13px] font-semibold text-body">Recent chats</h2>
+      <div className="calm-section">
+        <h2>Go to</h2>
+        <div className="calm-lines">
+          {QUICK_ACTIONS.map(({ view, title, subtitle }) => (
             <button
+              key={view}
               type="button"
-              onClick={() => onViewChange?.('chat')}
-              className="shrink-0 text-[11px] font-semibold text-accent hover:underline"
+              onClick={() => onViewChange?.(view)}
+              className="calm-line"
+              style={{ background: 'none', borderLeft: 0, borderRight: 0, borderBottom: 0, textAlign: 'left', cursor: 'pointer', width: '100%' }}
             >
-              See all
+              <span>{title}</span>
+              <span className="calm-help">{subtitle}</span>
             </button>
-          </div>
-
-          {chatsFailed ? (
-            <p className="text-[11.5px] leading-snug text-faint">Chats could not be loaded.</p>
-          ) : chatsLoading ? (
-            <p className="text-[11.5px] leading-snug text-faint">Loading chats.</p>
-          ) : recentChats.length === 0 ? (
-            <p className="text-[11.5px] leading-snug text-faint">
-              No saved chats yet. Ask Zuri a question to start one.
-            </p>
-          ) : (
-            <div className="flex flex-col gap-2.5">
-              {recentChats.map((conversation) => (
-                <div key={conversation.id} className="flex min-w-0 items-center gap-2.5">
-                  <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent-soft text-accent">
-                    <MessageIcon className="size-4" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-[12.5px] leading-snug text-body">
-                    {conversation.title || 'New chat'}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-faint">
-                    {formatRelativeTime(conversation.updatedAt ?? conversation.createdAt)}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className={CARD}>
-          <h2 className="text-[13px] font-semibold text-body">Billing period</h2>
-
-          <div className="flex flex-col divide-y divide-hairline">
-            <div className="flex items-baseline justify-between gap-3 pb-2">
-              <span className="shrink-0 text-[11px] text-muted">Plan</span>
-              <span className="min-w-0 break-words text-right text-[12.5px] font-medium text-body">
-                {planText}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between gap-3 py-2">
-              <span className="shrink-0 text-[11px] text-muted">Amount each month</span>
-              <span className="min-w-0 break-words text-right text-[12.5px] font-medium text-body">
-                {monthlyPrice === undefined ? 'Not set' : formatNaira(monthlyPrice)}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between gap-3 pt-2">
-              <span className="shrink-0 text-[11px] text-muted">Period ends</span>
-              <span className="min-w-0 break-words text-right text-[12.5px] font-medium text-body">
-                {periodEnd ? formatDate(periodEnd) : 'Not set'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <p className="text-[11px] leading-snug text-faint">Receipts and past payments are in Billing.</p>
-            <button
-              type="button"
-              onClick={() => onViewChange?.('billing')}
-              className="text-[11px] font-semibold text-accent hover:underline"
-            >
-              Open billing
-            </button>
-          </div>
+          ))}
         </div>
       </div>
     </section>

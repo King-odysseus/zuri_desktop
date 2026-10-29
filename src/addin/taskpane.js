@@ -51,6 +51,79 @@
   };
 
   var previewHost = (new URLSearchParams(window.location.search).get('preview') || '').toLowerCase();
+  var wired = false;
+
+  /* Which Office app is this? ---------------------------------------------- */
+
+  /** "excel" in, "Excel" out, and "" for anything else. */
+  function normaliseHostName(value) {
+    var name = String(value === undefined || value === null ? '' : value).trim().toLowerCase();
+    if (name === 'excel') return 'Excel';
+    if (name === 'powerpoint') return 'PowerPoint';
+    if (name === 'word') return 'Word';
+    return '';
+  }
+
+  /**
+   * Which app the pane is running in, or '' when Office has not said yet.
+   *
+   * Office writes the answer in three different places and they do not all arrive at
+   * once: the desktop clients put it in the pane's own address as _host_Info, office.js
+   * exposes Office.context.host, and onReady hands it over as info.host. The pane used to
+   * assume Word whenever the first of those was late, which put a Word screen inside
+   * Excel and then ran Word's API against a workbook, so the pane sat on "Reading the
+   * file..." for ever. Reading every source, and waiting rather than guessing, is the fix.
+   */
+  function detectHost(info) {
+    return hostFromInfo(info) || hostFromAddress() || hostFromOffice() || hostFromGlobals();
+  }
+
+  function hostFromInfo(info) {
+    return info && typeof info.host === 'string' ? normaliseHostName(info.host) : '';
+  }
+
+  /** Word, Excel and PowerPoint all append ?_host_Info=Excel$Win32$... to the pane URL. */
+  function hostFromAddress() {
+    try {
+      var raw = new URLSearchParams(window.location.search).get('_host_Info') || '';
+      return normaliseHostName(raw.split('$')[0]);
+    } catch (error) {
+      return '';
+    }
+  }
+
+  function hostFromOffice() {
+    try {
+      if (typeof Office === 'undefined' || !Office.context) return '';
+      var diagnosed = Office.context.diagnostics ? Office.context.diagnostics.host : '';
+      return normaliseHostName(Office.context.host) || normaliseHostName(diagnosed);
+    } catch (error) {
+      return '';
+    }
+  }
+
+  /** office.js installs only the running app's namespace, so this settles the last case. */
+  function hostFromGlobals() {
+    try {
+      if (typeof Excel !== 'undefined' && Excel && typeof Excel.run === 'function') return 'Excel';
+      if (typeof PowerPoint !== 'undefined' && PowerPoint && typeof PowerPoint.run === 'function') return 'PowerPoint';
+      if (typeof Word !== 'undefined' && Word && typeof Word.run === 'function') return 'Word';
+    } catch (error) {
+      return '';
+    }
+    return '';
+  }
+
+  /** The app's own API object, or null while office.js has not loaded it. */
+  function officeApiFor(host) {
+    if (host === '') return null;
+    try {
+      var api = window[host];
+      return api && typeof api.run === 'function' ? api : null;
+    } catch (error) {
+      return null;
+    }
+  }
 
   /* Small helpers ---------------------------------------------------------- */
 
@@ -81,14 +154,47 @@
   function describeTarget() {
     if (state.host === 'Excel') return 'this sheet';
     if (state.host === 'PowerPoint') return 'this slide';
-    return 'this document';
+    if (state.host === 'Word') return 'this document';
+    return 'the file';
   }
 
+  /**
+   * Read the open file, or say plainly why it cannot be read.
+   *
+   * A read never starts for an app the pane has not identified, and never starts the wrong
+   * app's API either: a Word read inside Excel does not fail, it waits for ever.
+   */
   function readContext() {
     if (previewHost !== '') return Promise.resolve(previewContext());
-    if (state.host === 'Excel') return readExcel();
-    if (state.host === 'PowerPoint') return readPowerPoint();
-    return readWord();
+    if (state.host === '') {
+      return Promise.reject(new Error('Zuri is still waiting for Office to say which app this is.'));
+    }
+    if (officeApiFor(state.host) === null) {
+      return Promise.reject(new Error(state.host + ' has not finished loading. Close this pane and open it again from the ribbon.'));
+    }
+
+    var reading;
+    try {
+      reading = state.host === 'Excel' ? readExcel() : state.host === 'PowerPoint' ? readPowerPoint() : readWord();
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    // Nothing should leave the chip on "Reading the file..." for ever, so a read that never
+    // settles gives up and says so instead.
+    return withDeadline(reading, 20000, 'Office did not answer in time. Press Refresh to try again.');
+  }
+
+  function withDeadline(promise, milliseconds, message) {
+    return new Promise(function (resolve, reject) {
+      var timer = window.setTimeout(function () { reject(new Error(message)); }, milliseconds);
+      Promise.resolve(promise).then(function (value) {
+        window.clearTimeout(timer);
+        resolve(value);
+      }, function (error) {
+        window.clearTimeout(timer);
+        reject(error);
+      });
+    });
   }
 
   /** A1:F30 plus the grid, written out cell by cell so nothing has to be counted. */
@@ -606,6 +712,16 @@
     return ZuriOps.OPERATIONS[operation.op];
   }
 
+  /** The chart names Excel's own API expects, for the short names a plan uses. */
+  var CHART_KINDS = {
+    column: 'ColumnClustered',
+    bar: 'BarClustered',
+    line: 'Line',
+    pie: 'Pie',
+    area: 'Area',
+    scatter: 'XYScatter',
+  };
+
   function applyExcel(operations) {
     return Excel.run(function (context) {
       var applied = [];
@@ -653,6 +769,11 @@
         } else if (operation.op === 'createTable') {
           var table = context.workbook.tables.add(range, operation.hasHeaders !== false);
           if (operation.name) table.name = operation.name;
+        } else if (operation.op === 'addChart') {
+          var chart = sheet.charts.add(CHART_KINDS[operation.chartType] || 'ColumnClustered', range, 'Auto');
+          if (operation.title) chart.title.text = operation.title;
+          // Office places the chart where it is told, which is beside the data by default.
+          chart.setPosition(operation.at);
         }
         applied.push(operation);
       }
@@ -830,6 +951,12 @@
   function sendMessage() {
     var text = pane.prompt.value.trim();
     if (text === '' || state.streaming) return;
+    // Without a host there is no file to work on, and a request sent anyway would be
+    // answered as if it were about a Word document.
+    if (state.host === '') {
+      setStatus('Zuri is not connected to Office yet. Press Try again above.', true);
+      return;
+    }
 
     pane.prompt.value = '';
     autosize();
@@ -1015,6 +1142,7 @@
         'Total each type on a new Summary sheet',
         'Check my formulas for mistakes and fix them',
         'Make this table easier to read: headers, number formats, widths',
+        'Draw a column chart of the main numbers',
       ],
     },
     Word: {
@@ -1039,11 +1167,38 @@
     },
   };
 
+  /** Shown when Office has not named the app: no host, so no promise is made about one. */
+  var UNKNOWN_COPY = {
+    title: 'Zuri cannot tell which Office app this is',
+    line: 'Office has not said whether this is Word, Excel or PowerPoint, so Zuri will not touch the file. Try again, or close this pane and open it from the Zuri button on the ribbon.',
+    suggestions: [],
+  };
+
+  /** The pane opened before Office answered; ask again without closing it. */
+  function retryHost() {
+    var host = detectHost(null);
+    if (host === '') {
+      setStatus('Office still has not said which app this is. Close the pane and open it again from the ribbon.', true);
+      return;
+    }
+    setStatus('');
+    startPane();
+  }
+
   function paintHostCopy() {
-    var copy = COPY[state.host] || COPY.Word;
+    var copy = COPY[state.host] || UNKNOWN_COPY;
     pane.emptyTitle.textContent = copy.title;
     pane.emptyLine.textContent = copy.line;
     pane.suggestions.textContent = '';
+
+    if (state.host === '') {
+      var again = el('button', 'suggestion', 'Try again');
+      again.type = 'button';
+      again.addEventListener('click', retryHost);
+      pane.suggestions.appendChild(again);
+      return;
+    }
+
     copy.suggestions.forEach(function (suggestion) {
       var button = el('button', 'suggestion', suggestion);
       button.type = 'button';
@@ -1087,6 +1242,11 @@
   }
 
   function refreshContext() {
+    if (state.host === '') {
+      pane.contextText.textContent = 'Waiting for Office';
+      pane.refreshContext.disabled = false;
+      return;
+    }
     pane.refreshContext.disabled = true;
     pane.contextText.textContent = 'Reading the file...';
     readContext()
@@ -1120,13 +1280,23 @@
   }
 
   function startPane() {
-    pane.hostLabel.textContent = previewHost !== '' ? 'Preview (' + state.host + ')' : state.host;
+    pane.hostLabel.textContent = previewHost !== '' ? 'Preview (' + state.host + ')'
+      : state.host === '' ? 'Waiting for Office'
+        : state.host;
     pane.prompt.placeholder = state.host === 'Excel' ? 'Ask Zuri to change this sheet'
       : state.host === 'PowerPoint' ? 'Ask Zuri to change this slide'
-        : 'Ask Zuri to change this document';
+        : state.host === 'Word' ? 'Ask Zuri to change this document'
+          : 'Ask Zuri to change this file';
     paintHostCopy();
     restore();
     renderThread();
+
+    // A retry after a slow start reuses the screen, so the listeners are wired only once.
+    if (wired === true) {
+      refreshContext();
+      return;
+    }
+    wired = true;
 
     pane.send.addEventListener('click', sendMessage);
     pane.stop.addEventListener('click', function () {
@@ -1152,33 +1322,40 @@
 
   function boot() {
     if (previewHost !== '') {
-      state.host = previewHost === 'excel' ? 'Excel' : previewHost === 'powerpoint' ? 'PowerPoint' : 'Word';
+      state.host = normaliseHostName(previewHost) || 'Word';
       startPane();
       return;
     }
 
-    var settled = false;
-    function begin(info) {
-      if (settled) return;
-      settled = true;
-      state.host = info && info.host === Office.HostType.Excel ? 'Excel'
-        : info && info.host === Office.HostType.PowerPoint ? 'PowerPoint'
-          : 'Word';
+    var opened = false;
+    var poll = 0;
+    var deadline = 0;
+
+    function open(info) {
+      if (opened) return;
+      var host = detectHost(info);
+      if (host === '') return;
+      opened = true;
+      window.clearInterval(poll);
+      window.clearTimeout(deadline);
+      state.host = host;
       startPane();
     }
 
     if (typeof Office !== 'undefined' && typeof Office.onReady === 'function') {
-      Office.onReady(begin);
+      Office.onReady(open);
     }
-    // Office.js normally answers in well under a second. If it does not, the pane
-    // still opens so the person can see why rather than staring at an empty box.
-    window.setTimeout(function () {
-      if (settled) return;
-      settled = true;
-      state.host = 'Word';
+    // office.js comes from Microsoft's servers, so onReady can be late or never arrive at
+    // all. The other sources are polled meanwhile rather than guessed at.
+    poll = window.setInterval(function () { open(null); }, 250);
+    deadline = window.setTimeout(function () {
+      if (opened) return;
+      opened = true;
+      window.clearInterval(poll);
+      state.host = '';
       startPane();
-      setStatus('Zuri could not reach Office. Close this pane and open it again from the ribbon.', true);
-    }, 8000);
+      setStatus('Office has not said which app this is. Close this pane and open it again from the Zuri button.', true);
+    }, 15000);
   }
 
   boot();

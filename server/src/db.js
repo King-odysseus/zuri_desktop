@@ -323,6 +323,16 @@ export function createRepository(pool) {
         throw error;
       }
     },
+    async updateDisplayName(userId, displayName) {
+      const result = await pool.query('UPDATE users SET display_name = $2 WHERE id = $1 AND status <> \'deleted\' RETURNING *', [userId, displayName]);
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('That account no longer exists.');
+        error.code = 'USER_NOT_FOUND';
+        throw error;
+      }
+      return publicUser(row);
+    },
     /**
      * Create the administrator account, or promote the one that already exists.
      *

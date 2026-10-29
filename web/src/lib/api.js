@@ -112,6 +112,14 @@ export async function fetchAccount() {
   return { me, usage, limits, billing };
 }
 
+/** @param {string} displayName */
+export function updateAccountName(displayName) {
+  return api('/api/me', {
+    method: 'PATCH',
+    body: JSON.stringify({ displayName }),
+  });
+}
+
 /** @returns {Promise<string>} */
 export function loadGoogleScript() {
   return new Promise((resolve, reject) => {

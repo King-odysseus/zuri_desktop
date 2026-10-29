@@ -38,6 +38,7 @@ function fakeRepository() {
       if (!state.userExists) throw Object.assign(new Error('That account no longer exists.'), { code: 'USER_NOT_FOUND' });
     },
     async updatePasswordHash(userId, hash) { calls.push({ passwordFor: userId }); state.hashes.set(userId, hash); },
+    async updateDisplayName(userId, displayName) { calls.push({ displayName: { userId, displayName } }); return { id: userId, email: 'boss@example.com', displayName, status: 'active', isAdmin: true }; },
     async revokeUserSessions(userId) { calls.push({ revoked: userId }); },
     async adminStats(days) {
       return { days, accounts: { active: 3, suspended: 1, joined: 2, seenToday: 1 }, usage: { requestsToday: 4, tokensToday: 400, requests: 9, tokens: 900, people: 2 }, daily: [], subscriptions: { paying: 2, monthlyKobo: 500000 }, topUsers: [], payments: { paid: 2, failed: 0 } };
@@ -67,6 +68,14 @@ assert.equal(customerRepo.calls.length, 0, 'a refused call never reaches the rep
 
 const repo = fakeRepository();
 const admin = appFor(true, repo);
+
+const renamed = await call(admin, '/api/me', { method: 'PATCH', body: JSON.stringify({ displayName: 'Boss Zuri' }) });
+assert.equal(renamed.status, 200);
+assert.equal((await renamed.json()).data.user.displayName, 'Boss Zuri');
+assert.deepEqual(repo.calls.at(-1), { displayName: { userId: 'admin-1', displayName: 'Boss Zuri' } });
+
+const tooLong = await call(admin, '/api/me', { method: 'PATCH', body: JSON.stringify({ displayName: 'x'.repeat(61) }) });
+assert.equal(tooLong.status, 400);
 
 // The list passes the search through and returns what the repository found.
 const listed = await (await call(admin, '/api/admin/users?search=Ada')).json();

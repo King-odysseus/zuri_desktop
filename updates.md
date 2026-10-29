@@ -1,3 +1,41 @@
+## 2026-10-29 - Windows (the other tabs are as simple as ChatGPT's)
+
+- Every tab besides chat is now one centred column with a plain title, flat rows separated by a thin line, and one main action, instead of boxed cards inside cards. Desktop: Settings, Zuri Cloud, Features, Agents, Skills, Automations, Tasks, Reminders, Files, History and Search. Web: Overview, Usage and limits, Plans and Billing. Nothing was removed: every setting, number, button and message is still there.
+- Agents and Skills now show a list first and open the editor or form only when you pick a row or press the new-item button. Tasks adds with one inline field.
+- Key files: the matching src/renderer-react/*View.jsx files, web/src/views/{Overview,Usage,Plans,Billing}View.jsx, web/src/styles.css (a new section at the end).
+- Other OS action: run "npm run test && npm run web:build". Railway must redeploy to serve the rebuilt web bundle. No new dependency and no database change.
+- Done on: Windows
+
+## 2026-10-29 - Windows (ChatGPT-style look, better replies, pictures that stay on your device)
+
+- Web chat: the copy, edit, regenerate and share icons now sit in a row under each bubble instead of inside it, so the grey bubble can no longer hide the copy button. The coloured Zuri logo is back above the greeting on the web, Android and desktop start screens.
+- Replies: the server now adds one shared set of answer rules to every web, Android and desktop chat (answer first, length that fits the question, one clarifying question, no invented facts, cite sources when web results are given) plus a short note for each supplier's known habits (DeepSeek, Kimi, GLM, OpenAI, Claude). The desktop keeps its own longer style block and only gets the supplier note. A project's own instructions still come first.
+- Desktop sidebar: the thin icon strip is gone. One list now holds search, New chat, Projects with their chats nested, and Recents, with a Menu at the bottom for every other screen, Quick ask and the light or dark switch.
+- Pictures: a new POST /api/images route draws one picture for a signed-in person whose plan includes the model. It reserves the model's share of the allowance, calls OpenAI or Z.ai, charges by the picture and refunds if the supplier fails. The description is rewritten for the chosen supplier by a small chat call (on by default, off with improve:false). The picture is returned once as base64 and the server keeps nothing.
+- Local-only storage: the desktop saves each picture to the images folder in its workspace with its prompt, and a new Images screen (Menu) lists them with search, a large view, Save as, Copy, Delete and Make another. The web and Android app keep pictures in the browser's own storage (IndexedDB) and offer Download. The chat's + menu has Square, Portrait and Landscape and an Improve my description switch.
+- Key files: server/src/images.js, server/src/app.js, server/src/text.js, server/src/server.js, server/test/images.test.js, server/test/text.test.js, src/main/main.js, src/main/preload.js, src/renderer-react/ImageLibraryView.jsx, src/renderer-react/Sidebar.jsx, src/renderer-react/ChatPanel.jsx, web/src/views/ImagesView.jsx, web/src/lib/imageStore.js, web/src/views/ChatView.jsx, web/src/styles.css, scripts/selftest.js.
+- Other OS action: run "npm run test && npm run web:build". Railway must redeploy for the picture route, the new reply rules and the rebuilt web bundle, and OPENAI_API_KEY and ZAI_API_KEY must be set there for pictures to work. Rebuild the Android app with "npm run android:build" and the Windows installer. No new dependency and no database change.
+- Done on: Windows
+
+## 2026-10-29 - Windows (the Office pane knows which app it is in, and can draw a chart)
+
+- The pane in Excel said "Word" and offered Word's suggestions. Office.js, the script that tells the pane which app it is inside, was being loaded from appsforoffice.officeapps.live.com, which does not resolve on this machine at all. With no script there was no host, and the pane had one line of fallback: assume Word. In Excel that meant it showed a Word screen, then ran Word's file-reading code against a workbook, which never answers, so the chip sat on "Reading the file..." for ever. The address is now the canonical appsforoffice.microsoft.com one, with the old address kept as a fallback.
+- The host is no longer guessed at. The pane reads it from four places (onReady, Office.context.host, the _host_Info the desktop clients put in the pane URL, and the app namespace office.js installs) and waits up to fifteen seconds for one of them instead of picking Word after eight. If none of them answers it says so plainly, shows Try again, refuses to read the file and refuses to send a message, so a broken office.js can no longer look like a Word pane.
+- A file read now has a twenty second deadline and is only attempted when the app's own namespace is loaded. A read that never settles says "Office did not answer in time" instead of leaving the chip reading the file.
+- Excel can draw a chart: the new addChart operation takes a range, one of column, bar, line, pie, area or scatter, an optional title and an optional cell to sit at, and lands two columns right of the data when no cell is given. The model is told about it in the Excel contract, and it is offered as a suggestion on the pane's opening screen.
+- Key files: src/addin/taskpane.html (office.js address and fallback), src/addin/taskpane.js (detectHost, readContext deadline, unnamed-host screen, chart applier), src/addin/ops.js (addChart), src/main/providers/chat.js (chart in the Excel contract), scripts/selftest.js (two checks, and the operation count is now 21).
+- Other OS action: run "npm run test". No new dependency and no database change. Rebuild the installer and reinstall Zuri before looking for it in Office: the running app serves the pane from the installed folder.
+- Done on: Windows
+
+## 2026-10-28 - Windows (Zuri no longer denies the web search it has)
+
+- Asked "can you browse the web?", the desktop app answered that it could not see live websites, even though web search was switched on and it had been handed the search and page-reading tools for that very message. The cause was one sentence in Zuri's own prompt: the date line ended "You still cannot see live websites or page contents unless a tool gives them to you", and that line was written the same way whether or not the tools were offered. The model read the rule, obeyed it, and never ran the search.
+- The prompt now follows the tools. When web search is on for a message, Zuri is told it has webSearch and webFetch, to use them for anything current or after its training data, never to say it cannot look something up, and to say plainly when a search returns nothing useful instead of guessing. When web search is off, the old sentence stays, so a reply with no tools still claims no ability to browse. The same rule is applied to a scheduled run, which only claims the web when its own tool list contains the search.
+- The flag that decides whether the tools are offered is the same flag that decides what the prompt says, so the two can never disagree again. This is a wording fix, not a new feature: search itself was already there, on by default in the composer's menu.
+- Key files: src/main/providers/chat.js (chatSystemPrompt takes webTools, currentTimeContext writes one of two lines), scripts/selftest.js (one check proving both versions of the prompt).
+- Other OS action: run "npm run test". No new dependency, no database change and no rebuild needed for the web bundle, which has no web search and says so.
+- Done on: Windows
+
 ## 2026-10-28 - Windows (projects: file a chat into one, and prove the instructions travel)
 
 - A chat can now be filed into a project from the web chat list. The row's actions menu gained "Move to project" (or "Move to another project" when it is already filed), which opens the project list inside the same menu rather than a dialog over the conversation: the current project is ticked, and "Take out of its project" returns the chat to the whole history. One press sends a single PATCH and the row records where it belongs, so the change survives a reload.
@@ -1017,5 +1055,27 @@
 - The desktop composer no longer shows native textarea scroll arrows in narrow windows, and its model picker uses the shorter model name below 700px so the message field keeps more room.
 - Key files: `src/renderer-react/ChatPanel.jsx`, `src/renderer-react/app.css`, `scripts/selftest.js`.
 - Other OS action: run `npm run react:build` and `npm run selftest` after syncing.
+
+## 2026-10-29 - Windows
+
+- Reworked the web Admin dashboard into calm, focused sections for business stats, people and service health, models and prices, and plans and limits. AdminView now coordinates separate AdminStats, AdminPeople, AdminModels, and AdminPlans files. Existing account and model actions are unchanged.
+- Key files: `web/src/views/AdminView.jsx`, `web/src/views/AdminPeople.jsx`, `web/src/views/AdminStats.jsx`, `web/src/views/AdminModels.jsx`, `web/src/views/AdminPlans.jsx`, `web/src/styles.css`.
+- Other OS action: run `npm run test` and `npm run web:build` after syncing.
+- Done on: Windows
+
+## 2026-10-29 - Windows
+
+- Fixed the Admin layout so the page uses the full available workspace instead of the shared 1200px content cap. Added consistent vertical section spacing and readable minimum widths for People, Models and Plans tables; narrow screens scroll each table inside its own region instead of squeezing columns.
+- Key files: `web/src/views/AdminView.jsx`, `web/src/views/AdminPeople.jsx`, `web/src/views/AdminModels.jsx`, `web/src/views/AdminPlans.jsx`, `web/src/styles.css`.
+- Other OS action: run `npm run test` and `npm run web:build` after syncing.
+- Done on: Windows
+- Done on: Windows
+
+## 2026-10-29 - Windows (account names and calmer greeting)
+
+- Signed-in people can now change the name Zuri uses from the web Account page or desktop Settings. The update is owner-scoped, trimmed and capped at 60 characters.
+- The web overview greeting has more space above it so it does not sit against the page header.
+- Key files: server/src/app.js, server/src/db.js, server/test/admin-users.test.js, web/src/lib/api.js, web/src/views/AccountView.jsx, web/src/views/OverviewView.jsx, web/src/styles.css, src/main/main.js, src/main/preload.js, src/renderer-react/SettingsView.jsx.
+- Other OS action: run "npm run test". Railway must redeploy for the account update route and rebuilt web bundle. Rebuild the Windows installer with "npm run dist".
 - Done on: Windows
 

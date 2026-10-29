@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { DataRow } from '../components/DataRow.jsx';
 import { Button } from '../components/ui.jsx';
-import { setPassword } from '../lib/api.js';
+import { setPassword, updateAccountName } from '../lib/api.js';
 import { formatDate } from '../lib/format.js';
 
 /** @param {unknown} value Turns "past_due" into "Past due" for a reading eye. */
@@ -30,6 +30,9 @@ export default function AccountView({ me, onSignOut }) {
   const user = me?.user ?? {};
   const subscription = me?.subscription ?? {};
   const name = user.displayName || user.email || 'Zuri user';
+  const [displayName, setDisplayName] = useState(user.displayName ?? '');
+  const [nameBusy, setNameBusy] = useState(false);
+  const [nameMessage, setNameMessage] = useState('');
   const [passwordAdded, setPasswordAdded] = useState(false);
   const canSetPassword = user.hasPassword === false && !passwordAdded;
   const hasPassword = user.hasPassword === true || passwordAdded;
@@ -47,6 +50,27 @@ export default function AccountView({ me, onSignOut }) {
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+
+  const saveName = async (event) => {
+    event.preventDefault();
+    if (nameBusy) return;
+    const nextName = displayName.trim();
+    if (nextName.length > 60) {
+      setNameMessage('Use 60 characters or fewer for your name.');
+      return;
+    }
+    setNameBusy(true);
+    setNameMessage('');
+    try {
+      await updateAccountName(nextName);
+      setNameMessage('Name saved.');
+      window.dispatchEvent(new CustomEvent('zuri:account-updated', { detail: { displayName: nextName } }));
+    } catch (failure) {
+      setNameMessage(failure?.message ?? 'The name could not be saved.');
+    } finally {
+      setNameBusy(false);
+    }
+  };
 
   const save = async (event) => {
     event.preventDefault();
@@ -85,6 +109,14 @@ export default function AccountView({ me, onSignOut }) {
 
       <article className="card">
         <p className="stat-label">Your details</p>
+        <form className="form-stack" onSubmit={saveName} style={{ marginTop: 12 }} noValidate>
+          <label className="field">
+            <span>Your name</span>
+            <input value={displayName} maxLength={60} onChange={(event) => setDisplayName(event.target.value)} placeholder="What should Zuri call you?" />
+          </label>
+          {nameMessage && <p className="form-error" role="status">{nameMessage}</p>}
+          <div className="card-actions"><Button type="submit" disabled={nameBusy}>{nameBusy ? 'Saving...' : 'Save name'}</Button></div>
+        </form>
         <div className="row-list" style={{ marginTop: 8 }}>
           <DataRow label="Name">{name}</DataRow>
           <DataRow label="Email">{user.email ?? 'Not set'}</DataRow>

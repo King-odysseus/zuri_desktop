@@ -1356,6 +1356,12 @@ body:has(.app) .app {
   margin: 0 auto;
 }
 
+/* Reports and tables need the whole workspace. Other pages keep the readable
+   1200px column, while Admin gets enough room for its operational data. */
+.app-content:has(.admin-view) {
+  max-width: none;
+}
+
 /* Views keep the desktop page rhythm: a header, then sections that share one
    width, one gap and one card treatment. */
 .view {
@@ -1387,6 +1393,10 @@ body:has(.app) .app {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.55;
+}
+
+.overview-greeting {
+  padding-top: 16px;
 }
 
 /* The picture models below the plan grid in the signed-in picker: the same card
@@ -2649,12 +2659,27 @@ a.download-card:hover {
 .admin-scroll {
   overflow-x: auto;
   margin: 8px 0;
+  max-width: 100%;
+  overscroll-behavior-inline: contain;
 }
 
 .admin-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+.admin-models-table {
+  min-width: 1120px;
+}
+
+.admin-people-table {
+  min-width: 920px;
+}
+
+.admin-plans-table {
+  min-width: 820px;
 }
 
 .admin-table th,
@@ -3116,11 +3141,33 @@ a.download-card:hover {
 }
 
 /* ---------------------------------------------------------------- transcript */
+/* One turn is the bubble plus its icons underneath, so the icons sit outside the
+   grey box and never crowd or hide behind it. */
+.chat-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 85%;
+  min-width: 0;
+}
+
+.chat-turn-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-turn-assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 100%;
+}
+
 .chat-bubble {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-width: 85%;
+  max-width: 100%;
   min-width: 0;
   margin: 0;
   padding: 14px 18px;
@@ -3133,14 +3180,12 @@ a.download-card:hover {
    That is the pair ChatGPT draws, and it means only the person's own words ever
    sit in a filled box. */
 .chat-bubble-user {
-  align-self: flex-end;
   align-items: flex-end;
   background: var(--surface-secondary);
   color: var(--text);
 }
 
 .chat-bubble-assistant {
-  align-self: flex-start;
   align-items: flex-start;
   border: 0;
   padding-inline: 0;
@@ -3234,21 +3279,41 @@ a.download-card:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 2px;
-  margin-top: 2px;
+  padding-inline: 4px;
 }
 
-/* The copy control inside a prompt is a quiet glyph on the grey bubble. */
-.chat-bubble-user .chat-copy {
+/* Quiet glyphs under the bubble; a prompt's stay hidden until the pointer is near. */
+.chat-turn .chat-bubble-actions button {
   color: var(--muted);
 }
 
-.chat-bubble-user .chat-copy:hover {
+.chat-turn .chat-bubble-actions button:hover {
   background: color-mix(in srgb, var(--text) 10%, transparent);
   color: var(--text);
 }
 
-/* The opening screen, matching the desktop chat: the app mark, a greeting and one
-   line of what Zuri can be asked for. */
+@media (hover: hover) {
+  .chat-turn-user .chat-bubble-actions {
+    opacity: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .chat-turn-user:hover .chat-bubble-actions,
+  .chat-turn-user:focus-within .chat-bubble-actions {
+    opacity: 1;
+  }
+}
+
+.chat-opening-mark {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.chat-opening-mark .zuri-logo {
+  border-radius: 14px;
+}
+
+/* The opening screen, matching the desktop chat: one greeting above the composer. */
 .chat-opening {
   display: flex;
   flex-direction: column;
@@ -3259,31 +3324,12 @@ a.download-card:hover {
   text-align: center;
 }
 
-.chat-opening-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 0.9rem;
-  background: transparent;
-  color: var(--text);
-}
-
 .chat-opening h2 {
   margin: 4px 0 0;
   color: var(--text);
   font-size: 30px;
   font-weight: 500;
   letter-spacing: -0.02em;
-}
-
-.chat-opening p {
-  margin: 0;
-  max-width: 32rem;
-  color: var(--muted);
-  font-size: 16px;
-  line-height: 1.55;
 }
 
 .chat-empty {
@@ -4278,5 +4324,484 @@ h4,
 
   .project-file-actions {
     margin-left: auto;
+  }
+}
+
+/* ------------------------------------------------------------------- images */
+.image-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.image-maker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.image-options select {
+  width: auto;
+  min-width: 200px;
+}
+
+.image-shapes {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.image-shape {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: var(--radius-lg);
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.image-shape.is-active {
+  background: var(--surface-secondary);
+  color: var(--text);
+}
+
+.image-improve {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.image-search {
+  max-width: 360px;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.image-tile {
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--radius-xl);
+  background: var(--surface-secondary);
+}
+
+.image-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 56px 16px calc(24px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  background: var(--canvas);
+}
+
+.image-viewer > img {
+  max-width: min(100%, 900px);
+  max-height: 65dvh;
+  border-radius: var(--radius-xl);
+  object-fit: contain;
+}
+
+.image-viewer-close {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--text);
+}
+
+.image-viewer-info {
+  width: min(100%, 900px);
+}
+
+/* ------------------------------------------------------- calmer project screens
+   Sections sit on the page and are told apart by one hairline, the way ChatGPT's
+   project page reads, instead of a box inside a page. Only a card that is
+   something to open keeps an outline, and only on hover. */
+.project-view .card.project-section {
+  padding: 20px 0;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0;
+  background: transparent;
+}
+
+.project-view .project-card {
+  border-color: transparent;
+  background: var(--surface-secondary);
+}
+
+.project-view .project-card:hover {
+  border-color: var(--hairline);
+  background: var(--surface-tertiary);
+}
+
+.project-view .project-form {
+  border: 0;
+  background: var(--surface-secondary);
+}
+
+.project-view .project-empty,
+.project-view .project-loading {
+  border: 0;
+  background: var(--surface-secondary);
+}
+
+/* ==========================================================================
+   Calm account pages: Overview, Usage and limits, Plans, Billing.
+   One centred column, plain lines, hairlines between sections, few borders.
+   Everything is scoped under .calm so no other screen is affected.
+   ========================================================================== */
+.calm {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  gap: 0;
+  padding-bottom: 24px;
+}
+
+.calm.calm-wide {
+  max-width: 1040px;
+}
+
+.calm .view-head {
+  padding: 4px 0 20px;
+}
+
+.calm .view-head h1 {
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.calm .view-head p {
+  font-size: 13px;
+}
+
+.calm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 22px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.calm-section > h2,
+.calm-section-head h2 {
+  margin: 0;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.calm-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+
+.calm-help {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.calm-lines {
+  display: flex;
+  flex-direction: column;
+}
+
+.calm-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  min-height: 44px;
+  padding: 10px 0;
+  border-top: 1px solid var(--hairline);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.calm-line:first-child {
+  border-top: 0;
+}
+
+.calm-line > :first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.calm-line .calm-value {
+  min-width: 0;
+  color: var(--text);
+  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.calm-line .calm-sub {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+}
+
+.calm-bar {
+  width: 100%;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-secondary);
+}
+
+.calm-bar > div {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent, var(--text));
+}
+
+.calm-bar > div.is-warn {
+  background: var(--warning, #b7791f);
+}
+
+.calm-bar > div.is-danger {
+  background: var(--danger, #c0392b);
+}
+
+.calm-note {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-xl);
+  background: var(--surface-secondary);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.calm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.calm-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent, var(--text));
+  color: var(--accent-foreground, #fff);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calm-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text, var(--accent, var(--text)));
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.calm-link:hover {
+  text-decoration: underline;
+}
+
+.calm-week {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.calm-week-col {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.calm-week-track {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 64px;
+}
+
+.calm-week-bar {
+  width: 100%;
+  max-width: 28px;
+  margin: 0 auto;
+  border-radius: 4px 4px 0 0;
+  background: var(--hairline);
+}
+
+.calm-week-bar.is-today {
+  background: var(--accent, var(--text));
+}
+
+.calm-week-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.calm .plan-grid {
+  margin-top: 4px;
+}
+
+/* Admin is a control room, not a collection of dashboard cards. Each concern
+   gets one quiet section so the period selector and the primary actions remain
+   easy to find on a narrow screen. */
+.admin-view {
+  width: 100%;
+  max-width: none;
+  gap: 0;
+  padding-bottom: 40px;
+}
+
+.admin-view > .view-head {
+  padding-bottom: 24px;
+}
+
+.admin-view > .notice,
+.admin-view > .alert {
+  margin-bottom: 4px;
+}
+
+.admin-section,
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 0;
+  border-top: 1px solid var(--hairline);
+}
+
+.admin-view .admin-form,
+.admin-view .admin-plan-form {
+  margin: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.admin-section-subsection {
+  padding-top: 18px;
+  border-top: 1px solid var(--hairline);
+}
+
+.admin-section-subsection .stat-meta {
+  margin: 12px 0 0;
+}
+
+.admin-view .admin-head {
+  align-items: flex-start;
+}
+
+.admin-view .admin-head h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.admin-section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-section-heading h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.admin-section-heading p,
+.admin-help {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.admin-stat-lines {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-top: 1px solid var(--hairline);
+}
+
+.admin-stat-lines > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px 14px 0;
+  border-right: 1px solid var(--hairline);
+}
+
+.admin-stat-lines > div:not(:first-child) { padding-left: 16px; }
+.admin-stat-lines > div:last-child { border-right: 0; }
+.admin-stat-lines span { color: var(--muted); font-size: 13px; }
+.admin-stat-lines strong { font-size: 20px; font-weight: 600; }
+.admin-stat-lines small { color: var(--muted); font-size: 12px; }
+
+.admin-view .admin-fields { margin-top: 0; }
+
+@media (max-width: 700px) {
+  .admin-stat-lines { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .admin-stat-lines > div:nth-child(2) { border-right: 0; }
+  .admin-stat-lines > div:nth-child(3) { padding-left: 0; border-top: 1px solid var(--hairline); }
+  .admin-stat-lines > div:nth-child(4) { border-top: 1px solid var(--hairline); }
+}
+
+@media (max-width: 767px) {
+  .calm .view-head h1 {
+    font-size: 22px;
+  }
+  .calm-primary {
+    width: 100%;
   }
 }

@@ -30,6 +30,7 @@
   var TABLE_NAME = /^[A-Za-z_][A-Za-z0-9_]{0,254}$/;
   var SHEET_NAME = /^[^\[\]:*?/\\]{1,31}$/;
   var ALIGNMENTS = ['left', 'center', 'right', 'general'];
+  var CHART_TYPES = ['column', 'bar', 'line', 'pie', 'area', 'scatter'];
 
   /** Every operation the pane can carry out, and the host it belongs to. */
   var OPERATIONS = {
@@ -42,6 +43,7 @@
     addWorksheet: 'excel',
     clear: 'excel',
     createTable: 'excel',
+    addChart: 'excel',
     replaceSelection: 'word',
     insertAfterSelection: 'word',
     insertParagraphs: 'word',
@@ -273,6 +275,21 @@
         return { ok: true, operation: { op: name, sheet: sheet, range: range.text, name: tableName, hasHeaders: raw.hasHeaders !== false } };
       }
 
+      if (name === 'addChart') {
+        var chartType = text(raw.chartType, 20).trim().toLowerCase() || 'column';
+        if (CHART_TYPES.indexOf(chartType) === -1) return fail('"chartType" must be one of ' + CHART_TYPES.join(', ') + '.');
+        var chartTitle = text(raw.title, 200).trim();
+        var anchor = '';
+        if (raw.at !== undefined && raw.at !== null && raw.at !== '') {
+          var at = normaliseRange(raw.at);
+          if (at === null || at.text.indexOf(':') !== -1) return fail('"at" must be one cell such as "H2", where the chart goes.');
+          anchor = at.text;
+        }
+        // Two columns clear of the data, so the default never draws over the numbers.
+        if (anchor === '') anchor = columnName(Math.min(range.end.column + 2, 16384)) + range.start.row;
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, chartType: chartType, title: chartTitle, at: anchor } };
+      }
+
       // autofit and clear
       return { ok: true, operation: { op: name, sheet: sheet, range: range.text } };
     }
@@ -400,6 +417,18 @@
     return { row: Number(match[2]), column: column };
   }
 
+  /** 3 in, "C" out, so a computed cell can be written the way a person reads it. */
+  function columnName(column) {
+    var name = '';
+    var left = Math.max(1, Math.min(column, 16384));
+    while (left > 0) {
+      var remainder = (left - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      left = Math.floor((left - 1) / 26);
+    }
+    return name;
+  }
+
   /**
    * A rectangular grid, with short rows padded so every row has the same width.
    * @param {any} value
@@ -478,6 +507,10 @@
         return 'Clear the contents of ' + where;
       case 'createTable':
         return 'Turn ' + where + ' into a table' + (operation.name ? ' called ' + operation.name : '');
+      case 'addChart':
+        return 'Draw a ' + operation.chartType + ' chart of ' + where
+          + (operation.title ? ' titled "' + operation.title + '"' : '')
+          + ' at ' + operation.at;
       case 'replaceSelection':
         return 'Replace the selected text with ' + plural(operation.text.length, 'character', 'characters');
       case 'insertAfterSelection':

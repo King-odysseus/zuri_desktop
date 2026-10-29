@@ -26,7 +26,7 @@ export default function BillingView({ me, billing, usage }) {
   const periodEnd = subscription.currentPeriodEnd ?? billing?.subscription?.current_period_end;
 
   return (
-    <section className="view">
+    <section className="view calm">
       <div className="view-head">
         <div>
           <h1>Billing</h1>
@@ -34,9 +34,9 @@ export default function BillingView({ me, billing, usage }) {
         </div>
       </div>
 
-      <article className="card">
-        <p className="stat-label">Subscription</p>
-        <div className="row-list" style={{ marginTop: 8 }}>
+      <div className="calm-section">
+        <h2>Subscription</h2>
+        <div className="calm-lines">
           <DataRow label="Plan">{subscription.status === 'pending' ? 'No active plan' : subscription.planName ?? billing?.subscription?.plan_name ?? 'Starter'}</DataRow>
           <DataRow label="Status">{statusChip(billing?.subscription?.status ?? subscription.status ?? 'active')}</DataRow>
           <DataRow label="Current period">
@@ -53,18 +53,18 @@ export default function BillingView({ me, billing, usage }) {
             </DataRow>
           )}
         </div>
-      </article>
+      </div>
 
-      <article className="card">
-        <p className="stat-label">Payments</p>
+      <div className="calm-section">
+        <h2>Payments</h2>
         {payments.length === 0 ? (
-          <p className="empty" style={{ marginTop: 8 }}>
+          <p className="calm-help">
             {isAdmin
               ? 'Nothing to pay: plans are put on an account from the Admin tab.'
               : 'No payments yet. Paid plans appear here after checkout.'}
           </p>
         ) : (
-          <div className="row-list" style={{ marginTop: 8 }}>
+          <div className="calm-lines">
             {payments.map((payment) => (
               <div className="row" key={payment.reference ?? payment.created_at}>
                 <div>
@@ -90,7 +90,7 @@ export default function BillingView({ me, billing, usage }) {
             ))}
           </div>
         )}
-      </article>
+      </div>
     </section>
   );
 }

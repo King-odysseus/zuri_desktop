@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeTheme,
 import { existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { APPROVAL_TIMEOUT_MS, CHAT_STREAM_CHANNEL, chatForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
@@ -350,6 +350,7 @@ const HANDLERS = new Map([
   ['zuri:cloud:reset-password', handleCloudResetPassword],
   ['zuri:cloud:set-password', handleCloudSetPassword],
   ['zuri:cloud:account', handleCloudAccount],
+  ['zuri:cloud:update-account', handleCloudUpdateAccount],
   ['zuri:cloud:plans', handleCloudPlans],
   ['zuri:cloud:topups', handleCloudTopups],
   ['zuri:cloud:topup', handleCloudTopup],
@@ -375,6 +376,9 @@ const HANDLERS = new Map([
   ['zuri:files:summarize', handleFilesSummarize],
   ['zuri:images:generate', handleImagesGenerate],
   ['zuri:images:models', handleImagesModels],
+  ['zuri:images:library', handleImagesLibrary],
+  ['zuri:images:read', handleImagesRead],
+  ['zuri:images:remove', handleImagesRemove],
   ['zuri:tools:list', handleToolsList],
   ['zuri:tools:run', handleToolsRun],
   ['zuri:tools:cancel', handleToolsCancel],
@@ -1246,6 +1250,14 @@ async function handleCloudAccount() {
   return { ok: true, data: { user: account.data?.user, subscription: account.data?.subscription, usage: limits.data?.usage, limits: limits.data?.limits, billing: billing.data } };
 }
 
+async function handleCloudUpdateAccount(payload) {
+  const displayName = textOf(payload?.displayName);
+  if (displayName.length > 60) return { ok: false, error: { code: 'CLOUD_NAME_TOO_LONG', message: 'Use 60 characters or fewer for your name.' } };
+  const result = await cloudFetch('/api/me', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ displayName }) }, true);
+  if (!result.ok) return result;
+  return { ok: true, data: { user: result.data?.user } };
+}
+
 async function handleCloudPlans() {
   return cloudFetch('/api/plans');
 }
@@ -1732,7 +1744,7 @@ function imageFileName(modelCode, extension) {
  * @param {string} modelCode
  * @returns {Promise<object>}
  */
-async function saveGeneratedImage(bytes, extension, modelCode) {
+async function saveGeneratedImage(bytes, extension, modelCode, details = {}) {
   try {
     const relative = `${IMAGES_DIR_NAME}/${imageFileName(modelCode, extension)}`;
     const target = resolveWorkspacePath(relative);
@@ -1740,12 +1752,132 @@ async function saveGeneratedImage(bytes, extension, modelCode) {
     // part of saving rather than a separate onboarding step.
     await mkdir(path.dirname(target), { recursive: true });
     await writeFile(target, bytes);
+    await rememberImage(path.basename(target), { model: modelCode, ...details });
     return { ok: true, data: { name: path.basename(target), path: target, relative, bytes: bytes.length } };
   } catch (error) {
     // A workspace refusal carries a TOOL_ code and is an answer for the view; a real
     // write error is worth a log line for whoever reads this next.
     if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:images] save', error);
     return { ok: false, error: { code: 'IMAGE_SAVE_FAILED', message: String(error?.message ?? error) } };
+  }
+}
+
+/**
+ * The image library lives only on this computer: the pictures are files in the
+ * workspace images folder, and the prompt behind each one sits in a small index
+ * beside them. Zuri Cloud never receives a picture back, so deleting a file here
+ * deletes the picture for good.
+ */
+const IMAGE_INDEX_NAME = '.library.json';
+const IMAGE_FILE_PATTERN = /^zuri-[a-z0-9-]+-\d{8}-\d{6}\.(png|jpg|webp)$/;
+const IMAGE_MIME = { png: 'image/png', jpg: 'image/jpeg', webp: 'image/webp' };
+
+function imagesFolder() {
+  return resolveWorkspacePath(IMAGES_DIR_NAME);
+}
+
+async function readImageIndex() {
+  try {
+    const parsed = JSON.parse(await readFile(path.join(imagesFolder(), IMAGE_INDEX_NAME), 'utf8'));
+    return parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+  } catch (error) {
+    // No index yet is normal on a fresh install; a damaged one only loses prompts.
+    if (error?.code !== 'ENOENT') console.error('[zuri:images] index', error);
+    return {};
+  }
+}
+
+async function rememberImage(name, details) {
+  try {
+    const index = await readImageIndex();
+    index[name] = { ...details, createdAt: new Date().toISOString() };
+    await writeFile(path.join(imagesFolder(), IMAGE_INDEX_NAME), JSON.stringify(index), 'utf8');
+  } catch (error) {
+    // The picture is already saved; losing its note must not fail the draw.
+    console.error('[zuri:images] remember', error);
+  }
+}
+
+/** A name from the renderer is only ever trusted if it matches what this app writes. */
+function libraryImagePath(name) {
+  if (typeof name !== 'string' || !IMAGE_FILE_PATTERN.test(name)) return null;
+  return path.join(imagesFolder(), name);
+}
+
+/**
+ * Every picture made on this computer, newest first, with its prompt.
+ * @returns {Promise<object>}
+ */
+async function handleImagesLibrary() {
+  try {
+    const folder = imagesFolder();
+    let names = [];
+    try {
+      names = await readdir(folder);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+    const index = await readImageIndex();
+    const items = [];
+    for (const name of names.filter((entry) => IMAGE_FILE_PATTERN.test(entry))) {
+      const info = await stat(path.join(folder, name));
+      items.push({
+        name,
+        path: path.join(folder, name),
+        bytes: info.size,
+        createdAt: index[name]?.createdAt ?? info.mtime.toISOString(),
+        prompt: index[name]?.prompt ?? '',
+        usedPrompt: index[name]?.usedPrompt ?? '',
+        model: index[name]?.model ?? '',
+        shape: index[name]?.shape ?? 'square',
+      });
+    }
+    items.sort((left, right) => (left.createdAt < right.createdAt ? 1 : -1));
+    return { ok: true, data: items };
+  } catch (error) {
+    console.error('[zuri:images] library', error);
+    return { ok: false, error: { code: 'IMAGE_LIBRARY_FAILED', message: 'The image library could not be read.' } };
+  }
+}
+
+/**
+ * One picture as a data URL, read on demand so a long library does not load every
+ * file at once.
+ * @param {{ name?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleImagesRead(payload) {
+  const target = libraryImagePath(payload?.name);
+  if (!target) return { ok: false, error: { code: 'IMAGE_NAME_INVALID', message: 'That is not a Zuri picture.' } };
+  try {
+    const bytes = await readFile(target);
+    const extension = path.extname(target).slice(1);
+    return { ok: true, data: { name: payload.name, url: `data:${IMAGE_MIME[extension]};base64,${bytes.toString('base64')}` } };
+  } catch (error) {
+    if (error?.code !== 'ENOENT') console.error('[zuri:images] read', error);
+    return { ok: false, error: { code: 'IMAGE_READ_FAILED', message: 'That picture could not be opened. It may have been moved.' } };
+  }
+}
+
+/**
+ * Delete one picture from this computer, and forget its prompt.
+ * @param {{ name?: string }} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleImagesRemove(payload) {
+  const target = libraryImagePath(payload?.name);
+  if (!target) return { ok: false, error: { code: 'IMAGE_NAME_INVALID', message: 'That is not a Zuri picture.' } };
+  try {
+    await unlink(target);
+    const index = await readImageIndex();
+    if (index[payload.name] !== undefined) {
+      delete index[payload.name];
+      await writeFile(path.join(imagesFolder(), IMAGE_INDEX_NAME), JSON.stringify(index), 'utf8');
+    }
+    return { ok: true, data: { name: payload.name } };
+  } catch (error) {
+    if (error?.code !== 'ENOENT') console.error('[zuri:images] remove', error);
+    return { ok: false, error: { code: 'IMAGE_REMOVE_FAILED', message: 'That picture could not be deleted.' } };
   }
 }
 
@@ -1765,12 +1897,39 @@ async function handleImagesGenerate(payload, event) {
   if (prompt === '') {
     return { ok: false, error: { code: 'IMAGE_PROMPT_REQUIRED', message: 'Describe the picture you want first.' } };
   }
+  const model = IMAGE_MODELS.find((entry) => entry.code === payload?.modelCode);
+  if (!model) {
+    return { ok: false, error: { code: 'IMAGE_MODEL_UNKNOWN', message: 'Choose one of the Zuri picture models.' } };
+  }
 
+  // The account makes the picture and answers once. The cloud keeps nothing, so the
+  // file written below is the only copy: the library lives on this computer.
+  const shape = ['square', 'portrait', 'landscape'].includes(payload?.shape) ? payload.shape : 'square';
+  const made = await cloudFetch('/api/images', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ prompt, model: model.code, shape, improve: payload?.improve !== false }),
+  }, true);
+  if (made.ok !== true) return { ok: false, error: made.error ?? { code: 'CLOUD_REQUEST_FAILED', message: 'Zuri Cloud could not make that picture.' } };
+
+  const base64 = typeof made.data?.imageBase64 === 'string' ? made.data.imageBase64 : '';
+  const mime = ['image/png', 'image/jpeg', 'image/webp'].includes(made.data?.mime) ? made.data.mime : 'image/png';
+  const bytes = Buffer.from(base64, 'base64');
+  if (bytes.length === 0) return { ok: false, error: { code: 'IMAGE_EMPTY', message: 'The picture came back empty. Try again.' } };
+
+  const finalPrompt = typeof made.data?.prompt === 'string' ? made.data.prompt : prompt;
+  const saved = await saveGeneratedImage(bytes, mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png', model.code, { prompt, usedPrompt: finalPrompt, shape });
+  if (!saved.ok) return saved;
   return {
-    ok: false,
-    error: {
-      code: 'CLOUD_IMAGE_REQUIRED',
-      message: 'Image generation is handled by Zuri Cloud. Sign in to use your account-backed image allowance.',
+    ok: true,
+    data: {
+      model: { code: model.code, name: model.name },
+      image: saved.data,
+      previewUrl: `data:${mime};base64,${base64}`,
+      nairaPerImage: model.nairaPerImage,
+      // What the picture maker was actually told, so the person can see and reuse it.
+      prompt: typeof made.data?.prompt === 'string' ? made.data.prompt : prompt,
+      shape,
     },
   };
 }

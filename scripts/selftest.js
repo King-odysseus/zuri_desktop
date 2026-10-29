@@ -225,6 +225,17 @@ check('Zuri is the assistant in every chat request, whatever else the prompt say
   return 'identity first, agent prompt, thread prompt, date, style, language';
 });
 
+check('the prompt tells Zuri about the web tools it was handed, and only when it has them', () => {
+  const withTools = chatSystemPrompt({ now: new Date('2026-01-02T09:30:00Z'), webTools: true });
+  if (!withTools.includes('webSearch')) throw new Error('the prompt does not mention the search tool it was given');
+  if (withTools.includes('cannot see live websites')) throw new Error('the prompt still denies a capability the person switched on');
+  if (!withTools.includes('Friday')) throw new Error('the live date was dropped');
+
+  const withoutTools = chatSystemPrompt({ now: new Date('2026-01-02T09:30:00Z') });
+  if (!withoutTools.includes('cannot see live websites')) throw new Error('a reply with no web tool still claims it can browse');
+  return 'the web line follows the tools actually offered';
+});
+
 const { setStoreRoot, readSettings, saveSettings } = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
 setStoreRoot(fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-settings-')));
 
@@ -1184,13 +1195,10 @@ check('the opening screen and the bell show real data, not examples', () => {
   for (const example of ['Writing sprint', 'Design review', 'Launch plan', '12 tasks this week', 'Meeting with AI client']) {
     if (chat.includes(example)) throw new Error(`example text is back on the opening screen: ${example}`);
   }
-  if (!chat.includes('<WorkspaceOverview />')) throw new Error('the opening screen does not show the overview');
-  const overview = read('src/renderer-react/WorkspaceOverview.jsx');
-  for (const source of ['tasks?.list', 'reminders?.list', 'automations?.list']) {
-    if (!overview.includes(source)) throw new Error(`the overview does not read ${source}`);
-  }
+  if (chat.includes('WorkspaceOverview')) throw new Error('the dashboard cards are back on the opening screen');
   const sidebar = read('src/renderer-react/Sidebar.jsx');
-  if (!sidebar.includes("onPress={() => onNavigate('reminders')}")) throw new Error('the bell does not open Reminders');
+  if (!sidebar.includes("{ key: 'reminders'") || !sidebar.includes("key === 'reminders' && dueReminders > 0")) throw new Error('the menu does not open Reminders or show how many are due');
+  if (sidebar.includes('zuri-sidebar-rail')) throw new Error('the thin icon strip is back beside the sidebar');
   if (!sidebar.includes('reminders?.list')) throw new Error('the bell does not count real reminders');
   return 'no example text; bell opens Reminders with a real count';
 });
@@ -1675,6 +1683,29 @@ check('the Office pane is a composer, not a form', () => {
   return 'composer, streaming, review, and a kept conversation';
 });
 
+check('the Office pane waits to be told which app it is in', () => {
+  const script = read('src/addin/taskpane.js');
+  // Excel once showed a Word screen: when office.js was slow the pane assumed Word, then
+  // ran Word's API against a workbook, so it hung on "Reading the file..." for ever.
+  for (const source of ['_host_Info', 'Office.context.host', 'hostFromGlobals', 'detectHost']) {
+    if (!script.includes(source)) throw new Error(`the pane never asks Office for the host (${source})`);
+  }
+  if (script.includes('|| COPY.Word')) throw new Error('the pane falls back to a Word screen');
+  if (script.includes("state.host = 'Word';")) throw new Error('the pane assumes Word when Office is slow');
+  if (!script.includes('Waiting for Office')) throw new Error('the pane has no state for an unnamed host');
+  // A read that never settles left the chip reading "Reading the file..." all session.
+  if (!script.includes('withDeadline(')) throw new Error('a file read can wait for ever');
+
+  // A pane that cannot load office.js cannot know its host, which is how Excel ended up
+  // with a Word screen: the canonical address loads first and the other one is a fallback.
+  const page = read('src/addin/taskpane.html');
+  if (!page.includes('appsforoffice.microsoft.com/lib/1/hosted/office.js')) {
+    throw new Error('office.js is loaded only from an address that does not resolve everywhere');
+  }
+  if (!page.includes("typeof Office === 'undefined'")) throw new Error('office.js has no fallback address');
+  return 'four sources for the host, none of them a guess, and a reachable office.js';
+});
+
 check('a change block is checked before it can reach a file', async () => {
   const vm = await import('node:vm');
   const sandbox = { module: { exports: {} } };
@@ -1714,6 +1745,8 @@ check('a change block is checked before it can reach a file', async () => {
     ['broken JSON', '{"operations":[{"op":"clear"'],
     ['an empty plan', '{"operations":[]}'],
     ['an unknown style of grid', '{"operations":[{"op":"setValues","range":"A1:A2","values":"nope"}]}'],
+    ['a chart of a kind Excel has no name for', '{"operations":[{"op":"addChart","range":"A1:B4","chartType":"donut"}]}'],
+    ['a chart placed on a range', '{"operations":[{"op":"addChart","range":"A1:B4","at":"D1:E2"}]}'],
   ];
   for (const [label, raw] of refused) {
     const outcome = ops.parseBlock(raw);
@@ -1728,6 +1761,11 @@ check('a change block is checked before it can reach a file', async () => {
   // A sample JSON object in an answer is code, not a change.
   const sample = ops.splitReply('\u0060\u0060\u0060json\n{"hello":"world"}\n\u0060\u0060\u0060');
   if (sample.some((part) => part.type === 'ops')) throw new Error('an ordinary JSON snippet became a change');
+
+  // A chart with no place given is put clear of its own data.
+  const chart = ops.parseBlock('{"operations":[{"op":"addChart","range":"A1:B4","chartType":"line","title":"Sales"}]}');
+  if (chart.ok !== true || chart.operations[0].at !== 'D1') throw new Error('a chart is not placed beside its data');
+  if (!ops.describeOperation(chart.operations[0]).includes('line chart')) throw new Error('a chart cannot be described');
 
   // Short rows are padded, so Office is never handed a ragged grid.
   const padded = ops.parseBlock('{"operations":[{"op":"setValues","range":"A1:B2","values":[[1],[2,3]]}]}');

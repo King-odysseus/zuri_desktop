@@ -60,6 +60,7 @@ const CHANNELS = Object.freeze([
   'zuri:cloud:reset-password',
   'zuri:cloud:set-password',
   'zuri:cloud:account',
+  'zuri:cloud:update-account',
   'zuri:cloud:plans',
   // Extra-usage packs and one-off purchases. A top-up adds tokens to the current
   // allowance without changing plan, so it is a separate channel from checkout.
@@ -94,6 +95,11 @@ const CHANNELS = Object.freeze([
   // Asking for a picture: the renderer sends a prompt and a model code, never a
   // key; main calls the provider with the saved key and writes the file itself.
   'zuri:images:generate',
+  // The image library: everything drawn on this computer, one picture read on
+  // demand, and one deleted. Pictures are never kept in the cloud.
+  'zuri:images:library',
+  'zuri:images:read',
+  'zuri:images:remove',
   // The tool registry, so the agents page ticks the tools that really exist rather
   // than trusting a copy kept in the renderer.
   'zuri:tools:list',
