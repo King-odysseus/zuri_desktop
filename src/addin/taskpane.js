@@ -809,12 +809,12 @@
           for (var p = 0; p < operation.paragraphs.length; p += 1) {
             var paragraph = operation.paragraphs[p];
             anchor = anchor.insertParagraph(paragraph.text, where);
-            if (paragraph.style) anchor.style = paragraph.style;
+            applyWordStyle(anchor, paragraph.style);
             // Later paragraphs follow the one just written, or they arrive in reverse.
             where = 'After';
           }
         } else if (operation.op === 'applyStyle') {
-          selection.style = operation.style;
+          applyWordStyle(selection, operation.style);
         } else if (operation.op === 'replaceAll') {
           searches.push({ found: body.search(operation.find, { matchCase: operation.matchCase }), replace: operation.replace });
         } else if (operation.op === 'insertTable') {
@@ -838,6 +838,35 @@
     }, function (error) {
       throw new Error(officeMessage(error, 'Word would not accept that change.'));
     });
+  }
+
+  // Built-in Word styles are portable only through styleBuiltIn. Assigning a
+  // display name such as "Heading 1" through paragraph.style can make desktop
+  // Word reject the whole batch, leaving even the plain text unwritten.
+  function applyWordStyle(paragraph, requestedStyle) {
+    var key = String(requestedStyle || '').trim().toLowerCase().replace(/[ _-]+/g, '');
+    var builtIn = {
+      normal: 'Normal',
+      nospacing: 'NoSpacing',
+      heading1: 'Heading1',
+      heading2: 'Heading2',
+      heading3: 'Heading3',
+      heading4: 'Heading4',
+      heading5: 'Heading5',
+      heading6: 'Heading6',
+      heading7: 'Heading7',
+      heading8: 'Heading8',
+      heading9: 'Heading9',
+      title: 'Title',
+      subtitle: 'Subtitle',
+      quote: 'Quote',
+      intensequote: 'IntenseQuote',
+      subtleemphasis: 'SubtleEmphasis',
+      emphasis: 'Emphasis',
+      intenseemphasis: 'IntenseEmphasis',
+      listparagraph: 'ListParagraph',
+    }[key];
+    if (builtIn) paragraph.styleBuiltIn = builtIn;
   }
 
   function applyPowerPoint(operations) {

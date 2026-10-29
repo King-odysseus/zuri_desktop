@@ -1706,6 +1706,15 @@ check('the Office pane waits to be told which app it is in', () => {
   return 'four sources for the host, none of them a guess, and a reachable office.js';
 });
 
+check('Word paragraph writes use portable built-in styles', () => {
+  const script = read('src/addin/taskpane.js');
+  if (!script.includes('applyWordStyle(anchor, paragraph.style)')) throw new Error('Word paragraph writes still assign raw style names');
+  if (!script.includes('applyWordStyle(selection, operation.style)')) throw new Error('Word selection styles still assign raw style names');
+  if (!script.includes('paragraph.styleBuiltIn = builtIn')) throw new Error('Word paragraph styles are not assigned through styleBuiltIn');
+  if (!script.includes("heading1: 'Heading1'")) throw new Error('Heading 1 is not mapped to Word BuiltInStyleName');
+  return 'invalid display names cannot cancel the whole Word write';
+});
+
 check('a change block is checked before it can reach a file', async () => {
   const vm = await import('node:vm');
   const sandbox = { module: { exports: {} } };

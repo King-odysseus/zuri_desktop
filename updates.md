@@ -1079,3 +1079,10 @@
 - Other OS action: run "npm run test". Railway must redeploy for the account update route and rebuilt web bundle. Rebuild the Windows installer with "npm run dist".
 - Done on: Windows
 
+## 2026-10-29 - Windows
+
+- Fixed Word Office writes that were rejected when a generated paragraph carried a display-style name. Built-in styles now use Word's portable `styleBuiltIn` values, and unsupported style labels no longer cancel the whole text insertion.
+- Key files: src/addin/taskpane.js, scripts/selftest.js.
+- Other OS action: run `npm run test` after syncing. No dependency changes.
+- Done on: Windows
+
