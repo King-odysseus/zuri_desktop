@@ -7,6 +7,8 @@
 - Checked at 390, 900 and 1280 wide: the panel is hidden on a phone as before with no sideways scroll, the team is clear and the copy legible at both desktop widths, and the sign in, create account and reset password screens all keep the same panel. No console errors and no request for the removed drawing.
 - The drawing is gone (web/public/img/auth-aside.svg and its copy in server/public/img), so the preview server gained JPEG and WebP types: a picture sent as a generic binary stream is not drawn at all.
 - Photograph: Ninthgrid on Pexels, free to use without attribution.
+- The card the person actually fills in had kept the old framing on the same screen: "Your plan, usage and chats are waiting" and "One account for the desktop app and this dashboard". Those are now "Pick up where your agent left off" and "One account for your agent, on desktop and in the browser", so the whole screen speaks about the agent rather than about plans and dashboards.
+
 - Key files: web/src/styles.css, web/src/components/AuthShell.jsx, web/src/views/AuthView.jsx, web/public/img/auth-team.jpg, scripts/preview-web.mjs.
 - Other OS action: run "npm run test && npm run web:build". Railway must redeploy to serve the rebuilt web bundle. No new dependency and no database change.
 - Done on: Windows

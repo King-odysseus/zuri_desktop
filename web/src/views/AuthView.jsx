@@ -6,13 +6,13 @@ import { Button } from '../components/ui.jsx';
 const COPY = {
   signin: {
     title: 'Sign in',
-    lead: 'Your plan, usage and chats are waiting.',
+    lead: 'Pick up where your agent left off.',
     submit: 'Sign in',
     busy: 'Signing in...',
   },
   signup: {
     title: 'Create your account',
-    lead: 'One account for the desktop app and this dashboard.',
+    lead: 'One account for your agent, on desktop and in the browser.',
     submit: 'Create account',
     busy: 'Creating your account...',
   },
