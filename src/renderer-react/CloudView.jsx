@@ -172,7 +172,7 @@ export default function CloudView({ onNavigate }) {
           </header>
           {message !== '' && <p role="status" className="pb-4 text-sm text-muted">{message}</p>}
           {status === 'loading' && <p className="text-sm text-muted">Checking your cloud account...</p>}
-          {status === 'error' && <section className={section}><p className="text-sm">Cloud sign-in is not ready yet.</p><Button className="mt-4" variant="secondary" onPress={() => onNavigate?.('settings')}>Open Settings</Button></section>}
+          {status === 'error' && <section className={section}><p className="zuri-notice is-warning text-sm text-warning">Cloud sign-in is not ready yet.</p><Button className="mt-4" variant="secondary" onPress={() => onNavigate?.('settings')}>Open Settings</Button></section>}
           {status === 'signed-out' && <section className="border-t border-border pt-6">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent"><CloudIcon size={20} /></div>
             <h2 className="mt-4 text-xl font-medium">{resetting ? 'Reset your password' : 'Sign in to Zuri Cloud'}</h2>
@@ -250,7 +250,7 @@ export default function CloudView({ onNavigate }) {
                 <Input type="password" label="New password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="At least 8 characters" autoComplete="new-password" className="min-w-48 flex-1" />
                 <Button type="submit" variant="secondary" isDisabled={busy || newPassword === ''}>Save password</Button>
               </form>
-              {passwordNotice && <p role={passwordNotice.tone === 'error' ? 'alert' : 'status'} className={`mt-3 text-sm ${passwordNotice.tone === 'error' ? 'text-danger' : 'text-muted'}`}>{passwordNotice.text}</p>}
+              {passwordNotice && <p role={passwordNotice.tone === 'error' ? 'alert' : 'status'} className={`zuri-notice mt-3 text-sm ${passwordNotice.tone === 'error' ? 'is-danger text-danger' : 'is-success text-success'}`}>{passwordNotice.text}</p>}
             </section>
             <section className={section}>
               <h2 className={heading}>Payment history</h2>

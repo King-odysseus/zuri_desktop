@@ -47,6 +47,13 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-danger: var(--danger);
+  /* The two brand colours, so a screen can say `text-brand-blue` or
+     `bg-brand-navy` instead of reaching for the accent and hoping it is the right
+     one of the pair. */
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-blue-soft: var(--brand-blue-soft);
+  --color-brand-blue-ink: var(--brand-blue-ink);
+  --color-brand-navy: var(--brand-navy);
   --radius-control: var(--radius-lg);
   --radius-card: var(--radius-xl);
 }
@@ -73,32 +80,56 @@
      readable at 12px. */
   --muted: #5a6480;
   --faint: #8b93a8;
-  /* The accent is that same ink: a filled control is navy on white and every
-     marker that used to be blue is now the text colour. */
-  --accent: #0d1b3a;
-  --accent-hover: #1b2c52;
+  /* Two brand colours, the way the mark has two: the navy plate and a light blue
+     that marks anything live. Navy is the filled primary control and the panel
+     beside the page; the light blue is a link, a secondary control, the row you
+     are on, the focus ring and a chart bar. Both are kept so the page reads as
+     Zuri at a glance rather than as a grey page with dark text. */
+  --brand-navy: #0d1b3a;
+  --brand-navy-hover: #16264f;
+  --brand-blue: #2f6fed;
+  --brand-blue-hover: #2560d8;
+  --brand-blue-soft: #e8effc;
+  --brand-blue-ink: #1b47b8;
+  --accent: var(--brand-navy);
+  --accent-hover: var(--brand-navy-hover);
   --accent-foreground: #ffffff;
-  --accent-soft: #eef1f8;
-  --accent-text: #0d1b3a;
-  --selected: #ebedf3;
-  --selected-foreground: #0d1b3a;
-  /* The panel beside the page is a shade off white with no rule between them,
-     which is how the ChatGPT sidebar separates from its thread. */
-  --nav-surface: #f7f8fc;
-  --nav-foreground: #0d1b3a;
-  --nav-muted: #5a6480;
+  --accent-soft: var(--brand-blue-soft);
+  /* Links and inline accents take the light blue, dark enough to read on white. */
+  --accent-text: var(--brand-blue-ink);
+  --selected: var(--brand-blue-soft);
+  --selected-foreground: #12306f;
+  /* The panel beside the page is the brand navy, so the colour the logo is drawn
+     in is also a surface in the app rather than only the outline of a button.
+     Its rows are the same navy a step lighter, and the row you are on takes the
+     light blue so the current place is the thing that glows. */
+  --nav-surface: var(--brand-navy);
+  --nav-foreground: #eef2ff;
+  --nav-muted: #a7b4d6;
   --nav-border: transparent;
-  --nav-hover: #ebedf3;
-  --nav-active: #ebedf3;
-  --nav-field: #ffffff;
-  /* Status keeps meaning: a refusal, a warning and a live plan are still told
-     apart, but at a low saturation so they read as words rather than as paint. */
-  --success: #1a7f4b;
-  --success-soft: #eaf5ee;
-  --warning: #8a5a00;
-  --warning-soft: #fbf4e6;
-  --danger: #b4232f;
-  --danger-soft: #fbeced;
+  --nav-hover: #17274f;
+  --nav-active: #20356b;
+  --nav-field: #16244a;
+  /* The light blue as it appears ON the navy panel. The page's own --brand-blue-ink
+     is chosen to read on white, so it would vanish here; this is the same colour
+     lifted until it reads against navy. */
+  --nav-accent: #a9c8ff;
+  /* Status has to be recognised before it is read: green for a confirmation,
+     amber for an allowance running out, red for a refusal, the light blue for
+     news. Each carries a soft fill, an ink that still clears 4.5:1 on that fill,
+     and a line for the stripe down the side of a notice or a bar. */
+  --success: #15803d;
+  --success-soft: #e7f6ec;
+  --success-line: #8ed8a8;
+  --warning: #9a5b06;
+  --warning-soft: #fdf3e4;
+  --warning-line: #f2bd5c;
+  --danger: #c2253a;
+  --danger-soft: #fdecef;
+  --danger-line: #f1aeb9;
+  --info: var(--brand-blue-ink);
+  --info-soft: var(--brand-blue-soft);
+  --info-line: #b7cdfa;
   /* No elevation on the page. Only a floating layer (a menu, the phone's drawer)
      casts anything, because it has to sit visibly above what it covers. */
   --shadow-soft: none;
@@ -152,27 +183,41 @@
   --text: #e9ebf7;
   --muted: #b0b4dd;
   --faint: #7e83ad;
+  --brand-navy: #040130;
+  --brand-navy-hover: #0f0b46;
+  --brand-blue: #7aa2ff;
+  --brand-blue-hover: #9ab8ff;
+  --brand-blue-soft: #16224d;
+  --brand-blue-ink: #a9c1ff;
   --accent: #ffffff;
   --accent-hover: #e2e4f5;
   --accent-foreground: #040130;
-  --accent-soft: #14114a;
-  --accent-text: #e9ebf7;
-  --selected: #14114a;
-  --selected-foreground: #ffffff;
+  --accent-soft: var(--brand-blue-soft);
+  /* On the navy page the light blue is the only colour bright enough to read. */
+  --accent-text: var(--brand-blue-ink);
+  --selected: var(--brand-blue-soft);
+  --selected-foreground: #dbe6ff;
   /* The docked panel is one step darker than the page, as it is in ChatGPT. */
   --nav-surface: #030028;
   --nav-foreground: #e9ebf7;
   --nav-muted: #b0b4dd;
   --nav-border: transparent;
   --nav-hover: #0e0b40;
-  --nav-active: #14114a;
+  --nav-active: #16224d;
   --nav-field: #0b0838;
+  --nav-accent: #a9c1ff;
   --success: #6fce9a;
-  --success-soft: #1d3227;
+  --success-soft: #16301f;
+  --success-line: #2f6b4a;
   --warning: #e8b339;
   --warning-soft: #33290f;
+  --warning-line: #6b5116;
   --danger: #f08a8a;
   --danger-soft: #3a1f1f;
+  --danger-line: #6b2f35;
+  --info: var(--brand-blue-ink);
+  --info-soft: var(--brand-blue-soft);
+  --info-line: #2b3f7a;
   --shadow-soft: none;
   --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.5);
 }
@@ -218,12 +263,18 @@ a {
   color: var(--accent-text);
 }
 
+a:hover {
+  color: var(--brand-blue-hover);
+}
+
 [hidden] {
   display: none !important;
 }
 
+/* The focus ring is the light blue rather than the ink: on a navy button a navy
+   ring is invisible, and this is the one marker that must never be missed. */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand-blue);
   outline-offset: 2px;
 }
 
@@ -323,15 +374,18 @@ a {
   background: var(--accent-hover);
 }
 
-/* Secondary is a white control with a hairline, never a second filled pill. */
+/* Secondary is the light blue: a tinted control carrying the blue's own ink, so a
+   page has a second action colour instead of two shades of grey. It stays a tint
+   and never a second filled pill, so the navy primary still reads as the main. */
 .btn-secondary {
-  background: var(--surface);
-  border-color: var(--control-border);
-  color: var(--text);
+  background: var(--brand-blue-soft);
+  border-color: color-mix(in srgb, var(--brand-blue) 38%, transparent);
+  color: var(--brand-blue-ink);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--surface-secondary);
+  background: color-mix(in srgb, var(--brand-blue) 16%, var(--surface));
+  border-color: var(--brand-blue);
 }
 
 .btn-ghost {
@@ -420,7 +474,7 @@ a {
 }
 
 :is(.nav-item, .icon-btn, .btn, .chat-menu-row, .chat-menu-back, .sidebar-foot .btn, .chat-model-slot button, select, [role="menuitem"]):focus-visible {
-  outline: 2px solid var(--accent) !important;
+  outline: 2px solid var(--brand-blue) !important;
   outline-offset: -2px;
   border-radius: 0;
   box-shadow: none !important;
@@ -454,18 +508,27 @@ a {
   white-space: nowrap;
 }
 
+.chip-primary {
+  background: var(--brand-blue-soft);
+  border-color: color-mix(in srgb, var(--brand-blue) 34%, transparent);
+  color: var(--brand-blue-ink);
+}
+
 .chip-success {
   background: var(--success-soft);
+  border-color: var(--success-line);
   color: var(--success);
 }
 
 .chip-warning {
   background: var(--warning-soft);
+  border-color: var(--warning-line);
   color: var(--warning);
 }
 
 .chip-danger {
   background: var(--danger-soft);
+  border-color: var(--danger-line);
   color: var(--danger);
 }
 
@@ -478,20 +541,37 @@ a {
   max-width: var(--max-width);
   margin: 16px auto 0;
   padding: 12px 16px;
-  border: 1px solid var(--hairline);
-  border-left: 0;
+  border: 1px solid var(--info-line);
+  border-left: 4px solid var(--brand-blue);
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
   color: var(--text);
   font-size: 14px;
 }
 
+/* A status line is its colour before it is its sentence: the fill names the kind
+   from across the room, the ink says it again in words, and the stripe down the
+   left edge is what the eye catches first. Informational news is the light blue,
+   so good news never wears a warning's amber. */
+.notice.is-info {
+  background: var(--info-soft);
+  border-color: var(--info-line);
+  border-left-color: var(--brand-blue);
+  color: var(--info);
+}
+
 .notice.is-error {
   background: var(--danger-soft);
+  border-color: var(--danger-line);
+  border-left-color: var(--danger);
+  color: var(--danger);
 }
 
 .notice.is-success {
   background: var(--success-soft);
+  border-color: var(--success-line);
+  border-left-color: var(--success);
+  color: var(--success);
 }
 
 /* Landing */
@@ -1508,7 +1588,7 @@ body:has(.app) .app {
   height: 100%;
   width: 0;
   border-radius: 9999px;
-  background: var(--text);
+  background: var(--brand-navy);
   transition: width 400ms ease;
 }
 
@@ -1562,17 +1642,30 @@ body:has(.app) .app {
   text-align: center;
 }
 
+/* A warning is amber, and it says so with a stripe as well as a fill, so it cannot
+   be mistaken for an ordinary grey panel. */
 .alert {
   padding: 12px 16px;
-  border: 1px solid var(--hairline);
+  border: 1px solid var(--warning-line);
+  border-left: 4px solid var(--warning);
   border-radius: var(--radius-lg);
   background: var(--warning-soft);
-  color: var(--text);
+  color: var(--warning);
   font-size: 14px;
 }
 
 .alert.is-danger {
   background: var(--danger-soft);
+  border-color: var(--danger-line);
+  border-left-color: var(--danger);
+  color: var(--danger);
+}
+
+.alert.is-info {
+  background: var(--info-soft);
+  border-color: var(--info-line);
+  border-left-color: var(--brand-blue);
+  color: var(--info);
 }
 
 /* The account sits on the panel as a plain row: avatar, name, address. No card,
@@ -1665,11 +1758,12 @@ body:has(.app) .app {
   color: var(--nav-foreground);
 }
 
-/* Where you are is a soft grey row with the label picked out, which is the one
-   marker ChatGPT uses. No bar on the edge and no change of hue. */
+/* Where you are takes the light blue: the row keeps its quiet fill, and the label
+   and icon wear the brand's second colour, so the current place is the thing that
+   carries it. */
 .nav-item.is-active {
   background: var(--nav-active);
-  color: var(--nav-foreground);
+  color: var(--nav-accent);
   font-weight: 600;
 }
 
@@ -4967,6 +5061,27 @@ h4,
   line-height: 1.5;
 }
 
+/* The allowance banner on the overview. It keeps its own padding so the buttons
+   under it do not move, and takes the palette's tone so "nearly out" is amber and
+   "out" is red rather than both reading as a grey strip. */
+.calm-note.is-info {
+  background: var(--info-soft);
+  box-shadow: inset 3px 0 0 var(--brand-blue);
+  color: var(--info);
+}
+
+.calm-note.is-warning {
+  background: var(--warning-soft);
+  box-shadow: inset 3px 0 0 var(--warning);
+  color: var(--warning);
+}
+
+.calm-note.is-danger {
+  background: var(--danger-soft);
+  box-shadow: inset 3px 0 0 var(--danger);
+  color: var(--danger);
+}
+
 .calm-actions {
   display: flex;
   flex-wrap: wrap;
@@ -5030,16 +5145,18 @@ h4,
   height: 64px;
 }
 
+/* A quiet day is the light blue and the day you are living is the navy, so the
+   chart reads as the brand rather than as seven grey blocks. */
 .calm-week-bar {
   width: 100%;
   max-width: 28px;
   margin: 0 auto;
   border-radius: 4px 4px 0 0;
-  background: var(--hairline);
+  background: color-mix(in srgb, var(--brand-blue) 38%, var(--surface));
 }
 
 .calm-week-bar.is-today {
-  background: var(--accent, var(--text));
+  background: var(--brand-navy);
 }
 
 .calm-week-label {

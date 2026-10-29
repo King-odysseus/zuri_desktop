@@ -151,7 +151,7 @@ export default function FilesView() {
             </div>
 
             {status === 'loading' && <p className="text-sm text-muted">Reading the workspace folder...</p>}
-            {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+            {status === 'error' && <p role="alert" className="zuri-notice is-danger text-sm text-danger">{message}</p>}
 
             {status === 'ready' && files.length === 0 && (
               <div className="zuri-empty-state">
@@ -179,7 +179,7 @@ export default function FilesView() {
               </ul>
             )}
 
-            {truncated && <p className="mt-3 text-xs text-muted">The list is limited to the first workspace files.</p>}
+            {truncated && <p className="zuri-notice is-warning mt-3 text-xs text-warning">The list is limited to the first workspace files.</p>}
             {status === 'ready' && message !== '' && <p role="status" className="mt-4 text-sm text-muted">{message}</p>}
           </section>
 

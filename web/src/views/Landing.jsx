@@ -144,8 +144,8 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
       <section className={`${CONTAINER} py-12 sm:py-16 lg:py-20`}>
         <div className="grid items-center gap-12 lg:grid-cols-[46fr_54fr] lg:gap-14">
           <div className="flex min-w-0 flex-col items-start gap-5">
-            <span className="inline-flex items-center gap-2 rounded-full border border-hairline bg-surface px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-              <SparkIcon className="h-3.5 w-3.5 text-accent" aria-hidden="true" />
+            <span className="inline-flex items-center gap-2 rounded-full border border-brand-blue/35 bg-brand-blue-soft px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-brand-blue-ink">
+              <SparkIcon className="h-3.5 w-3.5 text-brand-blue" aria-hidden="true" />
               Your AI workspace
             </span>
 
@@ -170,7 +170,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
               <button
                 type="button"
                 onClick={() => onNavigate('/#how')}
-                className="inline-flex min-h-[var(--button-height)] items-center justify-center rounded-[var(--button-radius)] border border-hairline bg-surface px-[var(--button-padding-x)] text-[14px] font-semibold text-body transition-colors hover:bg-surface-secondary"
+                className="inline-flex min-h-[var(--button-height)] items-center justify-center rounded-[var(--button-radius)] border border-brand-blue/40 bg-brand-blue-soft px-[var(--button-padding-x)] text-[14px] font-semibold text-brand-blue-ink transition-colors hover:bg-brand-blue/15"
               >
                 See the app
               </button>
@@ -179,7 +179,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             <ul className="flex flex-col gap-2 text-[13.5px] text-muted">
               {HERO_POINTS.map((point) => (
                 <li key={point} className="flex items-start gap-2">
-                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-body" aria-hidden="true" />
+                  <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-brand-blue" aria-hidden="true" />
                   <span>{point}</span>
                 </li>
               ))}
@@ -219,7 +219,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
                 key={title}
                 className="flex min-w-0 flex-col gap-3 rounded-2xl border border-hairline bg-surface p-5"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-accent-soft text-accent">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-blue-soft text-brand-blue-ink">
                   <Icon className="h-4 w-4" aria-hidden="true" />
                 </span>
                 <h3 className="text-[14px] font-bold text-body">{title}</h3>
@@ -233,7 +233,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
       <section id="how" className={`${ANCHOR} w-full bg-canvas`}>
         <div className={`${CONTAINER} grid gap-10 py-14 sm:py-16 lg:grid-cols-2 lg:items-center lg:gap-16 lg:py-24`}>
           <div className="flex min-w-0 flex-col items-start gap-4">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-accent">How it works</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-blue-ink">How it works</span>
             <h2 className="max-w-[22ch] text-[24px] font-bold leading-[1.2] tracking-[-0.02em] text-body sm:text-[28px]">
               Three steps and Zuri is working with you.
             </h2>
@@ -257,7 +257,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
                 key={step.number}
                 className="flex min-w-0 items-start gap-3 rounded-xl bg-surface-secondary p-4"
               >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface text-[11px] font-bold text-accent">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-brand-blue-soft text-[11px] font-bold text-brand-blue-ink">
                   {step.number}
                 </span>
                 <span className="flex min-w-0 flex-col gap-1">
@@ -301,7 +301,7 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
                   >
                     {featured && (
                       <span
-                        className={`absolute right-3 top-3 rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${ON_ACCENT}`}
+                        className={`absolute right-3 top-3 rounded-full bg-brand-blue px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white`}
                       >
                         Popular
                       </span>

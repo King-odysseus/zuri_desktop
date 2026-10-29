@@ -157,8 +157,8 @@ export default function CloudAuthForm({ mode = 'sign-in', onModeChange, onSigned
           required
         />
       )}
-      {error !== '' && <p role="alert" className="text-sm text-danger">{error}</p>}
-      {notice !== '' && <p role="status" className="text-sm text-muted">{notice}</p>}
+      {error !== '' && <p role="alert" className="zuri-notice is-danger text-sm text-danger">{error}</p>}
+      {notice !== '' && <p role="status" className="zuri-notice text-sm text-info">{notice}</p>}
       <Button type="submit" variant="primary" fullWidth isDisabled={busy}>
         {busy ? 'Working...' : (SUBMIT_LABELS[mode] ?? SUBMIT_LABELS['sign-in'])}
       </Button>

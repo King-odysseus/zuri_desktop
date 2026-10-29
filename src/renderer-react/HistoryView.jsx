@@ -74,7 +74,7 @@ export default function HistoryView({ onSelectThread }) {
           </header>
 
           {status === 'loading' && <p className="text-sm text-muted">Loading chat history...</p>}
-          {status === 'error' && <p role="alert" className="text-sm text-danger">Chat history could not be loaded.</p>}
+          {status === 'error' && <p role="alert" className="zuri-notice is-danger text-sm text-danger">Chat history could not be loaded.</p>}
           {status === 'ready' && threads.length === 0 && <p className="text-sm text-muted">No conversations yet.</p>}
 
           {status === 'ready' && threads.length > 0 && (

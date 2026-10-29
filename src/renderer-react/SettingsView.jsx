@@ -431,7 +431,7 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
           </header>
 
           {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
-          {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+          {status === 'error' && <p role="alert" className="zuri-notice is-danger text-sm text-danger">{message}</p>}
           {status === 'ready' && message !== '' && <p role="status" className="zuri-settings-message">{message}</p>}
 
           {status === 'ready' && section === 'general' && (
@@ -619,7 +619,7 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
           {status === 'ready' && section === 'addin' && (
             <SettingsCard>
               <SettingsRow title="Office add-in" description="Adds Zuri to Word, PowerPoint and Excel for this Windows user. It needs Zuri running to answer requests.">
-                <Chip color={addin.installed ? 'primary' : 'default'}>{addin.installed ? 'Installed' : 'Not installed'}</Chip>
+                <Chip color={addin.installed ? 'success' : 'warning'}>{addin.installed ? 'Installed' : 'Not installed'}</Chip>
               </SettingsRow>
               {!addin.supported && (
                 <SettingsRow title="Not on this computer" description="The Office add-in is available on Windows only." />

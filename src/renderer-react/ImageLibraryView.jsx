@@ -150,7 +150,7 @@ export default function ImageLibraryView({ onNavigate }) {
           </header>
 
           {status === 'loading' && <p className="text-sm text-muted">Loading your pictures...</p>}
-          {status === 'error' && <p role="alert" className="text-sm text-danger">{note || 'The image library is only available inside the Zuri app.'}</p>}
+          {status === 'error' && <p role="alert" className="zuri-notice is-danger text-sm text-danger">{note || 'The image library is only available inside the Zuri app.'}</p>}
           {status === 'ready' && items.length === 0 && (
             <div className="flex flex-col items-start gap-3 py-8">
               <p className="text-sm text-muted">No pictures yet. Describe one in a chat, then choose a picture model from the + menu.</p>

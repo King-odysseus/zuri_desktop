@@ -115,7 +115,7 @@ export default function SearchView({ onSelectThread }) {
             <p className="text-sm text-muted">Search works inside the Zuri app, not in this preview.</p>
           )}
           {status === 'error' && (
-            <p role="alert" className="text-sm text-danger">Your conversations could not be read.</p>
+            <p role="alert" className="zuri-notice is-danger text-sm text-danger">Your conversations could not be read.</p>
           )}
 
           {status === 'ready' && needle === '' && (

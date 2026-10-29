@@ -31,7 +31,12 @@
   --color-selected: var(--selected);
   --color-selected-foreground: var(--selected-foreground);
   --color-control-border: var(--control-border);
-  --color-danger: #ef6b7a;
+  --color-danger: var(--danger);
+  --color-warning: var(--warning);
+  --color-success: var(--success);
+  --color-info: var(--info);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-navy: var(--brand-navy);
 }
 
 /* One height for every field, select trigger and page button. Mixing 40px
@@ -161,9 +166,13 @@ button,
   box-shadow: none !important;
 }
 
+/* Focus rings are the brand light blue, not --accent: --accent is the navy a filled
+   button is painted with, so a navy ring on a navy control disappeared. The halo is
+   the same colour at 32%, which is what makes the ring read as a glow rather than a
+   second hairline. */
 .zuri-datepicker input:focus {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
 .zuri-datepicker [class*='top-10'] {
@@ -318,7 +327,7 @@ button,
 
 .zuri-field-wrap input:focus {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
 .zuri-field-wrap input::placeholder,
@@ -338,7 +347,7 @@ button,
 
 .zuri-field:focus {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
 /*
@@ -364,11 +373,42 @@ button,
     --muted: #5a6480;
     --accent: #0d1b3a;
     --accent-foreground: #ffffff;
+    /* The two brand colours, the same pair the web dashboard uses: the navy the
+       logo is drawn in, and the light blue that marks anything live. Navy is a
+       filled primary control and the panel beside the thread; the light blue is a
+       link, a secondary control, the row you are on and the focus ring. */
+    --brand-navy: #0d1b3a;
+    --brand-navy-hover: #16264f;
+    --brand-blue: #2f6fed;
+    --brand-blue-hover: #2560d8;
+    --brand-blue-soft: #e8effc;
+    --brand-blue-ink: #1b47b8;
+    /* The panel beside the thread is the brand navy, so the colour the logo is
+       drawn in is also a surface in the app rather than only a button outline. */
+    --nav-surface: var(--brand-navy);
+    --nav-foreground: #eef2ff;
+    --nav-muted: #a7b4d6;
+    --nav-active: #20356b;
+    /* Status is recognised before it is read: green confirmation, amber allowance,
+       red refusal, light blue news. Each has a soft fill, an ink that still clears
+       4.5:1 on it, and a line for the stripe down the side of a notice. */
+    --success: #15803d;
+    --success-soft: #e7f6ec;
+    --success-line: #8ed8a8;
+    --warning: #9a5b06;
+    --warning-soft: #fdf3e4;
+    --warning-line: #f2bd5c;
+    --danger: #c2253a;
+    --danger-soft: #fdecef;
+    --danger-line: #f1aeb9;
+    --info: var(--brand-blue-ink);
+    --info-soft: var(--brand-blue-soft);
+    --info-line: #b7cdfa;
     --border: #e6e8f0;
     --separator: #e6e8f0;
     --field-background: #ffffff;
-    --selected: #ebedf3;
-    --selected-foreground: #0d1b3a;
+    --selected: var(--brand-blue-soft);
+    --selected-foreground: #12306f;
     --control-border: #e1e4ee;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%236b7f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
@@ -389,11 +429,35 @@ button,
     --muted: #b0b4dd;
     --accent: #ffffff;
     --accent-foreground: #040130;
+    /* The dark theme keeps the same two brand colours; on a navy page the light
+       blue is the only one bright enough to read. */
+    --brand-navy: #040130;
+    --brand-navy-hover: #0f0b46;
+    --brand-blue: #7aa2ff;
+    --brand-blue-hover: #9ab8ff;
+    --brand-blue-soft: #16224d;
+    --brand-blue-ink: #a9c1ff;
+    --nav-surface: #030028;
+    --nav-foreground: #e9ebf7;
+    --nav-muted: #b0b4dd;
+    --nav-active: #16224d;
+    --success: #6fce9a;
+    --success-soft: #16301f;
+    --success-line: #2f6b4a;
+    --warning: #e8b339;
+    --warning-soft: #33290f;
+    --warning-line: #6b5116;
+    --danger: #f08a8a;
+    --danger-soft: #3a1f1f;
+    --danger-line: #6b2f35;
+    --info: var(--brand-blue-ink);
+    --info-soft: var(--brand-blue-soft);
+    --info-line: #2b3f7a;
     --border: #221e63;
     --separator: #221e63;
     --field-background: #0b0838;
-    --selected: #14114a;
-    --selected-foreground: #ffffff;
+    --selected: var(--brand-blue-soft);
+    --selected-foreground: #dbe6ff;
     --control-border: #2b2673;
     --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23b0b4dd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
@@ -427,40 +491,41 @@ button,
   color: var(--selected-foreground) !important;
 }
 
-/* The panel is a shade off the page with no rule between them, the way ChatGPT's
-   sidebar sits beside its thread. Nothing here carries a hue. */
+/* The panel beside the thread is the brand navy, so the logo's own colour is a
+   surface in the app and not only the outline of a primary button. Its rows are
+   the same navy a step lighter, and the row you are on takes the light blue. */
 .zuri-sidebar-panel {
-  background: var(--surface-secondary) !important;
-  color: var(--surface-secondary-foreground) !important;
+  background: var(--nav-surface) !important;
+  color: var(--nav-foreground) !important;
 }
 
 .zuri-sidebar-panel .zuri-button,
 .zuri-sidebar-panel .text-muted {
-  color: var(--muted) !important;
+  color: var(--nav-muted) !important;
 }
 
 .zuri-sidebar-panel .zuri-button:hover,
 .zuri-sidebar-panel .zuri-button:focus-visible {
-  color: var(--surface-secondary-foreground) !important;
-  background: var(--selected) !important;
+  color: var(--nav-foreground) !important;
+  background: var(--nav-active) !important;
 }
 
-/* New chat is a navy control on the light panel and a white one in the dark
-   theme, the pair the rest of the dashboard uses. */
+/* New chat is the light blue on the navy panel, in both themes: it is the one
+   control that must stand off the panel it sits on. */
 .zuri-sidebar-panel .zuri-new-chat {
-  background: var(--accent) !important;
-  color: var(--accent-foreground) !important;
+  background: var(--brand-blue) !important;
+  color: #ffffff !important;
 }
 
 .zuri-sidebar-panel .zuri-new-chat:hover,
 .zuri-sidebar-panel .zuri-new-chat:focus-visible {
-  background: color-mix(in srgb, var(--accent) 86%, var(--foreground)) !important;
-  color: var(--accent-foreground) !important;
+  background: var(--brand-blue-hover) !important;
+  color: #ffffff !important;
 }
 
 .zuri-sidebar-panel .zuri-selected-pill {
-  background: var(--selected) !important;
-  color: var(--selected-foreground) !important;
+  background: var(--nav-active) !important;
+  color: var(--nav-foreground) !important;
 }
 
 /* Chat controls that float over the conversation: the sidebar toggle keeps the
@@ -500,7 +565,7 @@ button,
 }
 
 .zuri-chat-float:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand-blue);
   outline-offset: 2px;
 }
 
@@ -557,7 +622,7 @@ button,
 
 .zuri-dropdown-trigger:focus-visible {
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
 /* The composer already labels the mode through its surrounding controls. Keep
@@ -642,18 +707,47 @@ label {
   background: color-mix(in srgb, var(--accent) 86%, var(--foreground)) !important;
 }
 
+/* A destructive action fills with --danger itself. The old fill was a lighter mix of
+   that colour with the surface, which in the light theme came out closer to pink than
+   to a refusal. The ink stays white for the light theme's red; the dark theme overrides
+   it just below, because its --danger is a pale pink where white all but vanished. */
 .zuri-button-danger {
-  background: color-mix(in srgb, var(--color-danger) 88%, var(--surface)) !important;
+  background: var(--danger) !important;
   color: #ffffff !important;
 }
 
 .zuri-button-danger:hover,
 .zuri-button-danger:focus-visible {
-  background: var(--color-danger) !important;
+  background: color-mix(in srgb, var(--danger) 86%, var(--foreground)) !important;
 }
 
+/* White ink is right on the light theme's red, but the dark theme's --danger is a pale
+   pink, so the label there takes the tone's own soft colour: the pair the tokens already
+   define, inverted for a filled control. */
+[data-theme='dark'] .zuri-button-danger,
+[data-theme='dark'] .zuri-button-danger:hover,
+[data-theme='dark'] .zuri-button-danger:focus-visible {
+  color: var(--danger-soft) !important;
+}
+
+/* The secondary action was a border and nothing else, so beside the navy primary button
+   it read as an outline rather than a second, quieter control. It now takes the brand
+   light blue: the soft fill says it can be pressed, the light blue border keeps its edge
+   visible on that fill, and --brand-blue-ink is the blue dark enough to read on it in
+   both themes. */
 .zuri-button-secondary {
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--control-border)) !important;
+  border: 1px solid var(--info-line) !important;
+  background: var(--brand-blue-soft) !important;
+  color: var(--brand-blue-ink) !important;
+}
+
+/* Hover deepens the light-blue tint rather than filling the pill, so a page holding both
+   still puts the eye on the primary navy button first. */
+.zuri-button-secondary:hover,
+.zuri-button-secondary:focus-visible {
+  border-color: var(--brand-blue) !important;
+  background: color-mix(in srgb, var(--brand-blue) 20%, var(--brand-blue-soft)) !important;
+  color: var(--brand-blue-ink) !important;
 }
 
 .zuri-chip {
@@ -667,14 +761,78 @@ label {
 }
 
 .zuri-chip-danger {
-  background: color-mix(in srgb, var(--color-danger) 16%, var(--surface)) !important;
+  border-color: var(--danger-line) !important;
+  background: var(--danger-soft) !important;
   color: var(--color-danger) !important;
 }
 
-.zuri-chip-default,
-.zuri-chip-warning {
+.zuri-chip-default {
+
   background: var(--surface-tertiary) !important;
   color: var(--foreground) !important;
+}
+
+/* Chips wear the same tone pairs as the notices below, so a status reads the same in a
+   list and in a banner. Primary keeps the soft light-blue fill it already had from
+   --selected (that token is --brand-blue-soft), but its ink is now --brand-blue-ink: the
+   selected-row ink is a near navy, which on a label read as body text rather than as
+   information. */
+.zuri-chip-primary {
+  color: var(--brand-blue-ink) !important;
+}
+
+/* Warning shared the default rule and so came out the same grey as "nothing to see"; a
+   chip that needs attention is amber. It is split out of that rule above and restated
+   after it, so this tone wins. Success is new: a passing check had no chip of its own and
+   fell back to the neutral one. */
+.zuri-chip-warning {
+  border-color: var(--warning-line) !important;
+  background: var(--warning-soft) !important;
+  color: var(--warning) !important;
+}
+
+.zuri-chip-success {
+  border-color: var(--success-line) !important;
+  background: var(--success-soft) !important;
+  color: var(--success) !important;
+}
+
+/* One shape for a message that reports something instead of asking for input. Before
+   this every page drew its own strip, so a warning could look exactly like a success.
+   The base tone is info, the brand light blue; a caller adds .is-success, .is-warning or
+   .is-danger. The stripe down the left is the tone at full strength: it names the tone
+   before the sentence is read, and it still reads for someone who cannot tell the soft
+   fills apart. The text is the tone's own ink, the pair the tokens set to clear 4.5:1 on
+   that fill. */
+.zuri-notice {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--info-line);
+  border-left: 4px solid var(--info);
+  border-radius: 0.75rem;
+  background: var(--info-soft);
+  color: var(--info);
+  font-size: 0.875rem;
+}
+
+.zuri-notice.is-success {
+  border-color: var(--success-line);
+  border-left: 4px solid var(--success);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.zuri-notice.is-warning {
+  border-color: var(--warning-line);
+  border-left: 4px solid var(--warning);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.zuri-notice.is-danger {
+  border-color: var(--danger-line);
+  border-left: 4px solid var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 /* Shared page language. These selectors deliberately style the existing
@@ -903,7 +1061,9 @@ label {
 
 .zuri-danger-quiet:hover,
 .zuri-danger-quiet:focus-visible {
-  background: color-mix(in srgb, var(--color-danger) 14%, transparent) !important;
+  /* A 14% tint of the danger colour was barely a wash on a white page; the tone's own
+     soft fill is the same pink at a strength that reads as a hover. */
+  background: var(--danger-soft) !important;
   color: var(--color-danger) !important;
 }
 
@@ -984,7 +1144,7 @@ label {
 }
 
 .zuri-checkbox:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--brand-blue);
   outline-offset: 2px;
 }
 
@@ -1038,7 +1198,7 @@ label {
 .zuri-select select:focus-visible {
   outline: none !important;
   border-color: var(--accent) !important;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 32%, transparent) !important;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
 .zuri-select select:disabled {
@@ -1754,7 +1914,7 @@ html:has(.zuri-overlay-root) #root {
 }
 
 .zuri-danger-quiet {
-  color: var(--color-danger);
+  color: var(--danger);
 }
 
 .zuri-age-card {
@@ -1963,4 +2123,18 @@ html:has(.zuri-overlay-root) #root {
   padding: 0 0.875rem;
   border-radius: 999px;
   font-size: 0.8125rem;
+}
+
+/*
+ * The account card at the panel's foot sits ON the navy panel, so it has to take
+ * the panel's ink. Left to inherit, the trigger kept the page's navy-on-white
+ * colour and its name vanished into the surface behind it.
+ */
+.zuri-sidebar-panel .zuri-account-trigger,
+.zuri-sidebar-panel .zuri-account-name {
+  color: var(--nav-foreground);
+}
+
+.zuri-sidebar-panel .zuri-account-plan {
+  color: var(--nav-muted);
 }

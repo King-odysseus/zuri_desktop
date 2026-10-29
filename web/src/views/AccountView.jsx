@@ -10,6 +10,17 @@ function statusLabel(value) {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/**
+ * The pill colour for an account status: green while the account is in good
+ * standing, red once it is suspended, amber while it waits on something.
+ */
+function statusTone(value) {
+  const status = String(value ?? 'active').toLowerCase();
+  if (status === 'suspended' || status === 'blocked' || status === 'disabled') return ' chip-danger';
+  if (status === 'pending') return ' chip-warning';
+  return ' chip-success';
+}
+
 const PASSWORD_ERRORS = {
   PASSWORD_TOO_SHORT: 'Use at least 8 characters for your password.',
   PASSWORD_TOO_WEAK: 'Use at least 8 characters for your password.',
@@ -32,7 +43,7 @@ export default function AccountView({ me, onSignOut }) {
   const name = user.displayName || user.email || 'Zuri user';
   const [displayName, setDisplayName] = useState(user.displayName ?? '');
   const [nameBusy, setNameBusy] = useState(false);
-  const [nameMessage, setNameMessage] = useState('');
+  const [nameMessage, setNameMessage] = useState(null);
   const [passwordAdded, setPasswordAdded] = useState(false);
   const canSetPassword = user.hasPassword === false && !passwordAdded;
   const hasPassword = user.hasPassword === true || passwordAdded;
@@ -56,17 +67,17 @@ export default function AccountView({ me, onSignOut }) {
     if (nameBusy) return;
     const nextName = displayName.trim();
     if (nextName.length > 60) {
-      setNameMessage('Use 60 characters or fewer for your name.');
+      setNameMessage({ text: 'Use 60 characters or fewer for your name.', ok: false });
       return;
     }
     setNameBusy(true);
-    setNameMessage('');
+    setNameMessage(null);
     try {
       await updateAccountName(nextName);
-      setNameMessage('Name saved.');
+      setNameMessage({ text: 'Name saved.', ok: true });
       window.dispatchEvent(new CustomEvent('zuri:account-updated', { detail: { displayName: nextName } }));
     } catch (failure) {
-      setNameMessage(failure?.message ?? 'The name could not be saved.');
+      setNameMessage({ text: failure?.message ?? 'The name could not be saved.', ok: false });
     } finally {
       setNameBusy(false);
     }
@@ -104,7 +115,7 @@ export default function AccountView({ me, onSignOut }) {
           <h1>Account</h1>
           <p>Who is signed in, the plan behind it, and how to get back in next time.</p>
         </div>
-        <span className="chip">{statusLabel(user.status)}</span>
+        <span className={`chip${statusTone(user.status)}`}>{statusLabel(user.status)}</span>
       </div>
 
       <article className="card">
@@ -114,7 +125,7 @@ export default function AccountView({ me, onSignOut }) {
             <span>Your name</span>
             <input value={displayName} maxLength={60} onChange={(event) => setDisplayName(event.target.value)} placeholder="What should Zuri call you?" />
           </label>
-          {nameMessage && <p className="form-error" role="status">{nameMessage}</p>}
+          {nameMessage && <p className={nameMessage.ok ? 'form-success' : 'form-error'} role="status">{nameMessage.text}</p>}
           <div className="card-actions"><Button type="submit" disabled={nameBusy}>{nameBusy ? 'Saving...' : 'Save name'}</Button></div>
         </form>
         <div className="row-list" style={{ marginTop: 8 }}>

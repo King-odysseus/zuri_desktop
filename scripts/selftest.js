@@ -2067,6 +2067,137 @@ check('a chat can be filed into a project from its row menu', () => {
   return 'row menu files a chat, project screen holds instructions, files and chats';
 });
 
+// The palette was flattened once before: one grey ended up carrying every token, so
+// the page and the app both read as a wireframe with no brand colour in them, and
+// nobody noticed for weeks because nothing checked the colours. These assertions
+// pin the two brand colours to their hex values, keep the panel beside the page
+// navy, and make sure the status colours cannot be collapsed into one another, in
+// both stylesheets that paint a Zuri surface.
+check('brand palette keeps navy and the light blue', () => {
+  // The two brand colours are read out of the light theme block itself, because
+  // that is the theme a first visit lands on; the rest only has to exist in the file.
+  const BRAND_TOKENS = ['--brand-navy', '--brand-blue'];
+  const PALETTE_TOKENS = [
+    ...BRAND_TOKENS,
+    '--brand-blue-soft',
+    '--brand-blue-ink',
+    '--success',
+    '--success-soft',
+    '--success-line',
+    '--warning',
+    '--warning-soft',
+    '--warning-line',
+    '--danger',
+    '--danger-soft',
+    '--danger-line',
+    '--info',
+    '--info-soft',
+    '--info-line',
+  ];
+  // Green, amber, red: a person has to tell these apart before reading a word.
+  const STATUS_TOKENS = ['--success', '--warning', '--danger'];
+
+  // The `\s*:` after the name is what keeps --brand-navy from matching
+  // --brand-navy-hover, and --info from matching --info-soft.
+  const declares = (source, token) => new RegExp(`(?:^|[\\s;])${token}\\s*:`).test(source);
+
+  // One rule's body, found by the selector that opens it. The tokens sit directly
+  // in the rule and no rule here nests another, so the first closing brace ends it.
+  const blockOf = (source, selector) => {
+    const match = new RegExp(selector).exec(source);
+    if (!match) return '';
+    const open = source.indexOf('{', match.index);
+    const close = open < 0 ? -1 : source.indexOf('}', open);
+    return close < 0 ? '' : source.slice(open + 1, close);
+  };
+
+  // A token's value inside a block, or '' when the block never sets it.
+  const valueOf = (block, token) => {
+    const match = new RegExp(`(?:^|[\\s;])${token}\\s*:\\s*([^;]*);`).exec(block);
+    return match ? match[1].trim() : '';
+  };
+
+  // Status inks are written as var(--brand-blue-ink) in places, so comparing raw
+  // text would compare a name against a hex value. Follow the reference, with a
+  // depth guard so a token that pointed at itself could not loop forever.
+  const colourOf = (block, token, depth = 0) => {
+    const value = valueOf(block, token);
+    const reference = /^var\(\s*(--[a-z0-9-]+)\s*\)$/i.exec(value);
+    if (!reference || depth >= 4) return value;
+    return colourOf(block, reference[1], depth + 1);
+  };
+
+  const sheets = [
+    // A first visit lands on :root; :root[data-theme="dark"] only overrides it.
+    { file: 'web/src/styles.css', selector: ':root\\s*\\{' },
+    // The desktop app names both of its themes.
+    { file: 'src/renderer-react/app.css', selector: '\\[data-theme="light"\\]\\s*\\{' },
+  ].map(({ file, selector }) => {
+    const source = read(file);
+    return { file, source, light: blockOf(source, selector) };
+  });
+
+  for (const { file, source, light } of sheets) {
+    if (!light) throw new Error(`${file} no longer has a light theme block, so its colours cannot be read`);
+    for (const token of BRAND_TOKENS) {
+      if (!declares(light, token)) throw new Error(`${file} no longer sets ${token} in its light theme`);
+    }
+    for (const token of PALETTE_TOKENS) {
+      if (!declares(source, token)) {
+        throw new Error(`${file} has lost ${token}, so the shared palette is no longer complete`);
+      }
+    }
+  }
+
+  // Pinned by value, not only by name: a name pointed at the wrong grey still
+  // resolves and still paints, which is how the page went colourless before.
+  const web = sheets[0];
+  const navy = colourOf(web.light, '--brand-navy');
+  const blue = colourOf(web.light, '--brand-blue');
+  if (navy.toLowerCase() !== '#0d1b3a') {
+    throw new Error(`web/src/styles.css sets --brand-navy to ${navy || 'nothing'}; it must stay #0d1b3a or every navy surface drifts off brand`);
+  }
+  if (blue.toLowerCase() !== '#2f6fed') {
+    throw new Error(`web/src/styles.css sets --brand-blue to ${blue || 'nothing'}; it must stay #2f6fed or the links and live marks lose the brand colour`);
+  }
+  // They are a pair on purpose: a dark plate and a light accent. Set to one colour,
+  // the page has two names for the same paint and reads as grey again.
+  if (navy.toLowerCase() === blue.toLowerCase()) {
+    throw new Error(`web/src/styles.css paints --brand-navy and --brand-blue the same colour (${navy}); the navy has to stay dark and the light blue light`);
+  }
+
+  // The panel beside the page follows the brand by reference. A literal near-white
+  // here is exactly how the sidebar went grey before.
+  const navSurface = valueOf(web.light, '--nav-surface');
+  if (!/^var\(\s*--brand-navy\s*\)$/i.test(navSurface)) {
+    throw new Error(`web/src/styles.css sets --nav-surface to ${navSurface || 'nothing'}; it must be var(--brand-navy) so the panel beside the page stays navy instead of going back to a near-white grey`);
+  }
+
+
+  // One refusal must never wear a confirmation's colour, so the three inks of the
+  // status family have to resolve to three different hex values in both files.
+  const statusReport = (file, light) => {
+    const painted = new Map();
+    for (const token of STATUS_TOKENS) {
+      const hex = colourOf(light, token);
+      if (!/^#[0-9a-f]{3,8}$/i.test(hex)) {
+        throw new Error(`${file} sets ${token} to ${hex || 'nothing'} in its light theme, which is not a hex colour`);
+      }
+      const key = hex.toLowerCase();
+      if (painted.has(key)) {
+        throw new Error(`${file} paints ${token} the same as ${painted.get(key)} (${hex}); success, warning and danger each need their own colour or a refusal reads as a confirmation`);
+      }
+      painted.set(key, token);
+    }
+  }
+
+  // The three inks of the status family are compared once for each stylesheet, so a
+  // colour that is distinct in one file cannot hide as the same colour in the other.
+  sheets.forEach(({ file, light }) => {
+    statusReport(file, light);
+});
+});
+
 await Promise.all(pendingChecks);
 console.log(failures === 0 ? 'PASS selftest' : `FAIL selftest: ${failures} assertion(s) failed`);
 process.exitCode = failures === 0 ? 0 : 1;

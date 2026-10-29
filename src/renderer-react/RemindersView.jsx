@@ -238,7 +238,7 @@ export default function RemindersView() {
           {status === 'loading' && <p className="text-sm text-muted">Loading reminders...</p>}
 
           {status === 'error' && (
-            <p className="text-sm text-muted">
+            <p className="zuri-notice text-sm text-info">
               Your reminders only appear in the Zuri app, not in this preview.
             </p>
           )}

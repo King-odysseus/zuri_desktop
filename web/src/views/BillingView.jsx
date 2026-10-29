@@ -5,9 +5,12 @@ function statusChip(status) {
   const value = String(status ?? '').toLowerCase();
   const tone = value === 'success' || value === 'active'
     ? ' chip-success'
-    : value === 'failed' || value === 'past_due'
+    : value === 'failed' || value === 'past_due' || value === 'reversed'
       ? ' chip-danger'
-      : '';
+      // A payment still on its way is news, not a failure, so it reads amber.
+      : value === 'pending' || value === 'processing' || value === 'abandoned'
+        ? ' chip-warning'
+        : '';
   return <span className={`chip${tone}`}>{value || 'unknown'}</span>;
 }
 

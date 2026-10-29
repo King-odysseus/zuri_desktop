@@ -54,10 +54,14 @@ export function IconButton({ label, tone = 'quiet', size = 'md', className = '',
   );
 }
 
+// Tone names the site stylesheet paints; each rule sets only the fill and the text
+// colour, so a pill keeps its size whatever tone it is given.
+const CHIP_TONES = { accent: 'chip-accent', primary: 'chip-primary', success: 'chip-success', warning: 'chip-warning', danger: 'chip-danger' };
+
 /** A pill label: the plan tile's "Current plan", the hero's eyebrow and the preview chip. */
 export function Chip({ tone = 'default', className = '', children }) {
   return (
-    <Badge color="gray" className={`chip${tone === 'accent' ? ' chip-accent' : ''} ${className}`.trim()}>
+    <Badge color="gray" className={`chip${CHIP_TONES[tone] ? ` ${CHIP_TONES[tone]}` : ''} ${className}`.trim()}>
       {children}
     </Badge>
   );
@@ -88,7 +92,7 @@ export function UsageBar({ percent, warn = false, label = 'usage' }) {
 export function Notice({ kind = 'info', children }) {
   if (!children) return null;
   const colour = kind === 'error' ? 'failure' : kind === 'success' ? 'success' : 'gray';
-  const tone = kind === 'error' ? 'is-error' : kind === 'success' ? 'is-success' : '';
+  const tone = kind === 'error' ? 'is-error' : kind === 'success' ? 'is-success' : 'is-info';
   return (
     <Alert color={colour} className={`notice ${tone}`.trim()} role="status">
       {children}
@@ -101,8 +105,8 @@ export function InlineAlert({ tone = 'warning', children }) {
   if (!children) return null;
   return (
     <Alert
-      color={tone === 'danger' ? 'failure' : 'warning'}
-      className={`alert${tone === 'danger' ? ' is-danger' : ''}`}
+      color={tone === 'danger' ? 'failure' : tone === 'info' ? 'gray' : 'warning'}
+      className={`alert${tone === 'danger' ? ' is-danger' : tone === 'info' ? ' is-info' : ''}`}
       role="status"
     >
       {children}

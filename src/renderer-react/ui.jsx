@@ -8,11 +8,26 @@ const BUTTON_COLORS = {
   ghost: 'light',
 };
 
+// Flowbite's own badge palette, kept in step with the tones the app uses. The
+// zuri-chip rules paint over these classes, but a tone with no entry here would
+// still hand the badge a grey border and text underneath them.
 const BADGE_COLORS = {
   primary: 'info',
-  danger: 'failure',
-  default: 'gray',
+  success: 'success',
   warning: 'warning',
+  danger: 'failure',
+};
+
+// The chip contract has four tone classes: primary, success, warning and danger.
+// A tone outside that set emitted a class no stylesheet rule matched, so it fell
+// back to Flowbite's grey; every chip now resolves through this map, and `default`
+// is only another name for the primary tint.
+const CHIP_TONES = {
+  default: 'primary',
+  primary: 'primary',
+  success: 'success',
+  warning: 'warning',
+  danger: 'danger',
 };
 
 const FIELD_CLASSES = 'zuri-field w-full rounded-xl border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted';
@@ -79,7 +94,8 @@ export function Checkbox({ isSelected = false, onChange, isDisabled = false, cla
 }
 
 export function Chip({ color = 'default', size, className = '', children, ...props }) {
-  return <Badge color={BADGE_COLORS[color] ?? 'gray'} size={size} className={`zuri-chip zuri-chip-${color} rounded-full ${className}`.trim()} {...props}>{children}</Badge>;
+  const tone = CHIP_TONES[color] ?? 'primary';
+  return <Badge color={BADGE_COLORS[tone] ?? 'info'} size={size} className={`zuri-chip zuri-chip-${tone} rounded-full ${className}`.trim()} {...props}>{children}</Badge>;
 }
 
 export function Input({ label, id, isReadOnly = false, isDisabled = false, fullWidth = false, className = '', ...props }) {

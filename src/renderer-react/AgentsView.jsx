@@ -173,7 +173,7 @@ export default function AgentsView() {
           </header>
 
           {status === 'loading' && <p className="text-sm text-muted">Reading settings...</p>}
-          {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+          {status === 'error' && <p role="alert" className="zuri-notice is-danger text-sm text-danger">{message}</p>}
           {status === 'ready' && (
             <>
               <section aria-label="Agents">

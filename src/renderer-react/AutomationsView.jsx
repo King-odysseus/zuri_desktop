@@ -251,7 +251,7 @@ export default function AutomationsView() {
         </header>
 
         {status === 'loading' && <p className="text-sm text-muted">Loading automations...</p>}
-        {status === 'error' && <p role="alert" className="text-sm text-danger">{message}</p>}
+        {status === 'error' && <p role="alert" className="zuri-notice is-danger text-sm text-danger">{message}</p>}
 
         {status === 'ready' && message !== '' && <p role="status" className="text-sm text-muted">{message}</p>}
 
@@ -317,7 +317,7 @@ export default function AutomationsView() {
                       <p className="truncate text-sm font-medium">{automation.prompt}</p>
                       <p className="mt-1 text-xs text-muted">{describeCadence(automation.cadence)} - {describeNextRun(automation.nextRunAt)}</p>
                     </div>
-                    <Chip size="sm" color={automation.enabled === false ? 'default' : 'primary'}>{automation.enabled === false ? 'Paused' : automation.dryRun === true ? 'Preview' : 'Enabled'}</Chip>
+                    <Chip size="sm" color={automation.enabled === false ? 'warning' : 'primary'}>{automation.enabled === false ? 'Paused' : automation.dryRun === true ? 'Preview' : 'Enabled'}</Chip>
                     <Checkbox aria-label={`Enable ${automation.prompt}`} isSelected={automation.enabled !== false} onChange={() => void toggleEnabled(automation)}>Enabled</Checkbox>
                     <Button size="sm" variant="ghost" onPress={() => openEdit(automation)}>Edit</Button>
                     <Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void remove(automation)}>Delete</Button>
@@ -328,7 +328,7 @@ export default function AutomationsView() {
           </section>
         )}
 
-        {status === 'ready' && runs.length > 0 && <section><h2 className="mb-2 text-lg font-medium">Recent runs</h2><ul className="flex flex-col divide-y divide-border">{runs.slice(0, 5).map((run) => <li key={run.id} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="truncate">{run.prompt ?? run.automationId ?? 'Automation run'}</span><Chip size="sm" color={run.status === 'failed' ? 'danger' : 'default'}>{run.status ?? 'unknown'}</Chip></li>)}</ul></section>}
+        {status === 'ready' && runs.length > 0 && <section><h2 className="mb-2 text-lg font-medium">Recent runs</h2><ul className="flex flex-col divide-y divide-border">{runs.slice(0, 5).map((run) => <li key={run.id} className="flex items-center justify-between gap-3 py-2 text-sm"><span className="truncate">{run.prompt ?? run.automationId ?? 'Automation run'}</span><Chip size="sm" color={run.status === 'failed' ? 'danger' : run.status === 'completed' ? 'success' : 'default'}>{run.status ?? 'unknown'}</Chip></li>)}</ul></section>}
         </div>
       </div>
     </main>

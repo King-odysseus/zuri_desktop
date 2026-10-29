@@ -241,7 +241,9 @@ export default function OverviewView({ me, usage, onViewChange }) {
       </div>
 
       {banner && (
-        <div role="status" className="calm-note">
+        // The note keeps its own spacing, so the tone is a colour class on it
+        // rather than the alert panel, which would move the buttons below it.
+        <div role="status" className={`calm-note ${banner.tone === 'danger' ? 'is-danger' : banner.tone === 'warning' ? 'is-warning' : 'is-info'}`}>
           {banner.message}{' '}
           <button type="button" onClick={() => onViewChange?.('plans')} className="calm-link">
             {banner.action}

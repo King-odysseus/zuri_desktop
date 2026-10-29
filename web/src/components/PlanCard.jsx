@@ -48,7 +48,7 @@ export default function PlanCard({
     <article className={`plan-card${isCurrent ? ' is-current' : ''}`}>
       <div className="plan-top">
         <span className="plan-name">{plan.name}</span>
-        {isCurrent && <Chip>Current plan</Chip>}
+        {isCurrent && <Chip tone="primary">Current plan</Chip>}
       </div>
       <p className="plan-price">
         {formatNaira(plan.amountKobo)}
