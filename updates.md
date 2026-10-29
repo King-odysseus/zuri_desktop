@@ -1,3 +1,12 @@
+## 2026-10-29 - Windows (the Naira picture prices line up, a Lagos dusk behind the form, pictures in the model picker)
+
+- The "Pictures, priced in Naira" cards sat in one narrow column with a wide empty strip beside them. Two different rules in the web stylesheet were both named `.image-grid`: the landing page's three price cards and the saved-picture library. The library rule came later and won, so the price cards were laid out as a shelf of small library tiles. The library is now `.image-library-grid`, and the three price cards take the full width of the page as three equal columns.
+- The sign-in and sign-up panel was a flat grey column beside the form. It now shows a drawn scene: a lagoon at dusk with a bridge, a low city skyline with lit windows and masts, a sun on the water, and a glowing network of connected points in the sky, finished with an ankara-inspired geometric border. The words on the panel are light in both themes because the scene is dark at every size. It is vector art, so it stays sharp at any window size and costs about 12 KB.
+- The model picker beside Send now closes with a Pictures group holding Zuri Sketch, Zuri Canvas and Zuri Studio, read from the server's own model catalogue. A model the plan does not include stays in the list, greyed, with the plan it needs, rather than vanishing. Choosing one turns the composer into a picture prompt ("Describe the picture to draw"); Send then goes to POST /api/images instead of the chat, the picture joins the thread with a line saying what drew it, and it is filed in the Images library on that device. A file waiting to be attached is refused with a plain sentence, because a picture request reads only words.
+- Key files: web/src/styles.css, web/src/views/ChatView.jsx, web/src/views/ImagesView.jsx, web/public/img/auth-aside.svg, scripts/preview-web.mjs.
+- Other OS action: run "npm run test && npm run web:build". Railway must redeploy to serve the rebuilt web bundle. No new dependency and no database change.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (Office add-in shows thinking while replies stream)
 
 - The Office pane now paints a visible "Thinking..." card as soon as a request starts, instead of leaving an empty assistant row until the first token arrives. The existing streaming cursor remains active while reply text is being received.
