@@ -1,3 +1,17 @@
+## 2026-10-29 - Windows (a created task says so in colour, and an Office edit actually lands)
+
+- The Office pane applied a plan once per streamed word when edits were set to Always allow, because the change card is rebuilt on every repaint and each rebuild applied it again. That is why the same refusal appeared twice in a row, and it could apply one plan to a workbook more than once. A plan now runs at most once, and the Apply button is spent once an automatic apply has started.
+- One wrong operation also threw away the whole plan and reported it as one sentence that named no operation, which is why an Excel edit could fail with nothing reaching the sheet and no way to see why. Plans are now carried out one operation at a time, each in its own batch, so a refusal is named beside the line of the plan it belongs to and the operations that do work still land.
+- A chart or a table asked for over an empty range is refused with a plain reason before it is sent, because Excel answers that with an argument error that names no cause.
+- Column widths are now set on the range itself rather than through getEntireColumn(), which is one fewer host call that can fail on its own.
+- A created to-do, reminder or automation used to be only a sentence. It now draws a green confirmation card under the reply (a pill, the name and what was set up), described once in src/shared/notableActions.js so the desktop window and the browser chat word it the same way.
+- src/shared had to join the installer's file list in package.json. Without that the packaged window would have opened without the file it imports, which is a start-up crash rather than a missing card.
+- When the second attempt at a wordless reply failed for a reason of its own (no credit, a network fault), that reason was discarded and the person was told the model had said nothing. The real failure is now what they see.
+- Checked: the full suite passes, 243 checks, none failing, including three new ones for the card (all three kinds describe a card, nothing paints an empty one, and both apps read the one shared description with src/shared packaged). The card's light and dark appearance was checked in a browser against the built stylesheet. Not checked by machine: the Office apply needs a real Excel window, which this machine cannot drive.
+- Key files: src/addin/taskpane.js, src/shared/notableActions.js, src/main/providers/chat.js, src/renderer-react/ChatPanel.jsx, src/renderer-react/app.css, web/src/views/ChatView.jsx, web/src/styles.css, package.json, scripts/selftest.js.
+- Other OS action: npm run cloud:deploy for the browser bundle; npm run dist and reinstall for the desktop.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (Zuri searches on its own, and asks one question when the ask is vague)
 
 - The browser and the phone had a search tool and no instruction to use it, so they answered from memory and hedged about being unable to browse. Both prompts now say to decide for themselves when to search, name the cases that need it (jobs, prices, news, travel, availability), forbid telling the person to look it up themselves, and forbid claiming a search that did not happen.
