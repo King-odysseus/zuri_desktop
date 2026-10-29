@@ -308,6 +308,36 @@ function modelLabelPositions(messages) {
     return show;
   });
 }
+/**
+ * How tall a popover that opens upward may be.
+ *
+ * The model list and the + menu hang above the composer, and the composer is not always
+ * at the bottom of the window: an empty chat centres it and the quick-ask card is short.
+ * A fixed share of the window therefore still let the first rows sit above the top edge,
+ * out of reach. Measuring the trigger when the popover opens turns the room actually
+ * left above it into a scroll area instead.
+ * @param {boolean} open
+ * @param {import('react').RefObject<HTMLElement>} anchorRef Element the popover hangs above
+ * @returns {number} Pixel cap for the popover, or 0 while it is closed.
+ */
+function usePopoverMaxHeight(open, anchorRef) {
+  const [maxHeight, setMaxHeight] = useState(0);
+  useEffect(() => {
+    if (!open) return undefined;
+    const measure = () => {
+      const box = anchorRef.current?.getBoundingClientRect();
+      if (!box) return;
+      // 8px is the gap the popover keeps from its trigger and 12px the clearance from
+      // the window edge; 120px keeps a usable sliver when the room left is tiny.
+      setMaxHeight(Math.max(120, Math.round(box.top - 20)));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [open, anchorRef]);
+  return open ? maxHeight : 0;
+}
+
 export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar, openingKind = 'question' }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [draft, setDraft] = useState(() => {
@@ -366,6 +396,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [modelMenu, setModelMenu] = useState(false);
   const modelMenuRef = useRef(null);
   const menuRef = useRef(null);
+  // Both popovers open upward, so their height follows the room left above the composer.
+  const modelMenuMaxHeight = usePopoverMaxHeight(modelMenu, modelMenuRef);
+  const addMenuMaxHeight = usePopoverMaxHeight(menuView !== '', menuRef);
   const composerRef = useRef(null);
   const scrollRef = useRef(null);
   // Starts true so opening a thread lands on its newest message.
@@ -1239,7 +1272,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   row would sit above the top edge. The viewport cap lets it scroll
                   instead, so no row becomes unreachable. */}
               {menuView !== '' && (
-                <div role="menu" aria-label="Add to message" className="absolute bottom-full left-0 z-20 mb-2 max-h-[min(60vh,26rem)] w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg">
+                <div role="menu" aria-label="Add to message" className="absolute bottom-full left-0 z-20 mb-2 w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg" style={addMenuMaxHeight ? { maxHeight: addMenuMaxHeight } : undefined}>
                   {menuView === 'main' ? (
                     <>
                       <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseAttachment())}>
@@ -1386,7 +1419,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               {/* Chat models first, then picture models, so the same popup can also draw.
                   It opens upward too, so it carries the same viewport cap and scrolls. */}
               {modelMenu && (
-                <div role="menu" aria-label="Chat model" className="absolute bottom-full right-0 z-20 mb-2 max-h-[min(60vh,26rem)] w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg">
+                <div role="menu" aria-label="Chat model" className="absolute bottom-full right-0 z-20 mb-2 w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg" style={modelMenuMaxHeight ? { maxHeight: modelMenuMaxHeight } : undefined}>
                   <p className="px-3 pb-1 pt-2 text-xs text-muted">Zuri answers this chat with:</p>
                   {ZURI_MODELS.map((entry) => (
                     <button
