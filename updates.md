@@ -1,3 +1,15 @@
+## 2026-10-29 - Windows (Zuri searches on its own, and asks one question when the ask is vague)
+
+- The browser and the phone had a search tool and no instruction to use it, so they answered from memory and hedged about being unable to browse. Both prompts now say to decide for themselves when to search, name the cases that need it (jobs, prices, news, travel, availability), forbid telling the person to look it up themselves, and forbid claiming a search that did not happen.
+- The same block says to ask exactly one short question when the ask is too vague to search well, with a default offered so a one-word answer is enough, then act.
+- The tools list is now validated before the prompt is assembled, because whether any tools are offered decides what the prompt says about searching. The validation used to sit after that point, which would have read an undeclared value.
+- Verified against the live server. Asking find me a job returned a clarifying question naming role and place, with defaults, and no tool call. Asking any project manager jobs in Scotland this week returned two webSearch calls on its own. Running the full loop (search, feed results back, answer) produced four self-chosen searches including a refined one, survived a search that returned nothing, and ended in a real answer naming s1jobs, totaljobs and LinkedIn with links and an honest note that only index pages were visible.
+- Also verified in a browser on the live site, signed in: the Tasks page loads and says Zuri can add tasks from a chat, adding one by hand wrote it and the list showed it, ticking it moved it to done, and the Reminders page loads with its form. Both are reachable from the dashboard navigation.
+- Checked: full suite passes, 240 checks, none failing. Three new checks assert the search sentence and the one-question rule exist in both the server prompt and the desktop prompt, so the two apps cannot drift apart.
+- Key files: server/src/text.js, server/src/app.js, src/main/providers/chat.js, scripts/check-chat-sync.mjs.
+- Other OS action: npm run cloud:deploy is required for the browser and phone behaviour; the desktop needs no deploy.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (tasks and reminders work in the browser and on a phone, and a picture can actually be attached)
 
 - The browser chat offered only the search tool, so a to-do or a reminder asked for there came back as words. Both are now offered, backed by new server routes, and the web app gained Tasks and Reminders pages so the rows are visible and editable outside the desktop app. This is what makes the same account work across the app, the website and Android, which bundles the web build.
