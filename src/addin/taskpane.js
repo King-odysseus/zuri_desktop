@@ -30,6 +30,7 @@
     stop: document.getElementById('stop'),
     newChat: document.getElementById('new-chat'),
     modelLabel: document.getElementById('model-label'),
+    edits: document.getElementById('edits-mode'),
     status: document.getElementById('status'),
   };
 
@@ -42,6 +43,10 @@
 
   var state = {
     host: '',
+    // 'ask' shows the plan and waits; 'always' applies it as it arrives. Held per
+    // browser rather than per account: it is a preference about this machine, and
+    // someone on a shared computer should not inherit another person's answer.
+    edits: 'ask',
     messages: [],
     streaming: false,
     controller: null,
@@ -604,6 +609,29 @@
     }
   }
 
+  /**
+   * Whether Zuri may change the file without being asked. "Always allow" is the
+   * standing answer, so it survives a reload; "ask" is the safe default.
+   * @returns {'ask'|'always'}
+   */
+  function readEditsMode() {
+    try {
+      return window.localStorage.getItem('zuri.addin.edits') === 'always' ? 'always' : 'ask';
+    } catch (error) {
+      return 'ask';
+    }
+  }
+
+  function writeEditsMode(mode) {
+    state.edits = mode === 'always' ? 'always' : 'ask';
+    if (pane.edits) pane.edits.value = state.edits;
+    try {
+      window.localStorage.setItem('zuri.addin.edits', state.edits);
+    } catch (error) {
+      // A private window refuses storage; the choice still holds for this session.
+    }
+  }
+
   function buildChangeCard(segment) {
     var card = el('div', 'ops');
 
@@ -630,12 +658,30 @@
     var applyButton = el('button', 'apply', 'Apply');
     applyButton.type = 'button';
     actions.appendChild(applyButton);
-    actions.appendChild(el('span', 'ops-note', 'Nothing changes until you press Apply.'));
+
+    // The second button answers the question for good, the way an agent that is
+    // trusted with a file works: apply this one and stop asking.
+    var alwaysButton = el('button', 'ghost', 'Always allow');
+    alwaysButton.type = 'button';
+    alwaysButton.title = 'Apply this change and apply later ones without asking';
+    actions.appendChild(alwaysButton);
     card.appendChild(actions);
 
     applyButton.addEventListener('click', function () {
       applyPlan(card, actions, applyButton, plan);
     });
+    alwaysButton.addEventListener('click', function () {
+      writeEditsMode('always');
+      applyPlan(card, actions, applyButton, plan);
+    });
+
+    if (state.edits === 'always') {
+      // No second permission question: the standing answer was given already.
+      actions.appendChild(el('span', 'ops-note', 'Applying automatically, because edits are always allowed.'));
+      applyPlan(card, actions, applyButton, plan);
+    } else {
+      actions.appendChild(el('span', 'ops-note', 'Nothing changes until you press Apply.'));
+    }
 
     return card;
   }
@@ -1329,6 +1375,17 @@
       return;
     }
     wired = true;
+
+    // The standing answer to "may I change the file", restored on every open.
+    writeEditsMode(readEditsMode());
+    if (pane.edits) {
+      pane.edits.addEventListener('change', function () {
+        writeEditsMode(pane.edits.value);
+        setStatus(state.edits === 'always'
+          ? 'Zuri will apply its changes to this file without asking.'
+          : 'Zuri will ask before changing this file.');
+      });
+    }
 
     pane.send.addEventListener('click', sendMessage);
     pane.stop.addEventListener('click', function () {

@@ -176,6 +176,19 @@ async function seedThread(root) {
 }
 
 async function main() {
+  // The browser chat is the Android app too, so whatever the desktop offers a chat
+  // model has to be offered there. Reading the source is the honest check: the file
+  // is not loaded by this harness, but a tool that vanishes from the list is a
+  // regression the person would feel as Zuri refusing to do something it can do.
+  const chatView = await fs.readFile(path.join('web/src/views/ChatView.jsx'), 'utf8');
+  check(chatView.includes('const CREATE_TASK_TOOL'), 'the browser chat offers the task tool');
+  check(chatView.includes('const CREATE_REMINDER_TOOL'), 'the browser chat offers the reminder tool');
+  check(chatView.includes('const WEB_SEARCH_TOOL'), 'the browser chat offers the search tool');
+  check(
+    chatView.includes('[WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL]'),
+    'the browser chat offers the same tools to a chat model',
+  );
+
   // The sync refuses to run when nobody is signed in, and a real session is only
   // readable with the app's own encryption, so this runs inside Electron for the
   // same reason firstrun.js does.
@@ -191,7 +204,8 @@ async function main() {
     // No keyring on this machine: the signed-in paths cannot be reached, and saying
     // so is better than reporting a pass for work that never ran.
     console.log(`SKIP chat sync - a session cannot be stored here (${session?.error?.code ?? 'unknown'})`);
-    await fs.rm(root, { recursive: true, force: true });
+
+  await fs.rm(root, { recursive: true, force: true });
     app.quit();
     return;
   }

@@ -17,18 +17,20 @@ import {
   api,
   appendMessage,
   createConversation,
+  createReminder,
+  createTask,
   deleteConversation,
   fetchConversation,
   fetchConversations,
   fetchPictureModels,
   fetchProjects,
+  fileDisplayUrl,
   renameConversation,
   searchWeb,
   setConversationFlags,
   setConversationProject,
-  signUpload,
   streamChat,
-  uploadAttachment,
+  uploadFile,
 } from '../lib/api.js';
 import { LogoMark } from '../components/Icons.jsx';
 import { formatRelativeTime, greetingFor } from '../lib/format.js';
@@ -69,6 +71,44 @@ const HISTORY_LIMIT = 20;
  * is waiting on every one of them.
  */
 const MAX_TOOL_ROUNDS = 3;
+
+/**
+ * Adding a to-do and setting a reminder ride with every message, the same way they
+ * do in the desktop app: both are rows the person can edit or delete, so neither
+ * needs a confirmation, and both are how a browser conversation stops being only
+ * words. They differ from a search: the search answers the question, these leave
+ * something behind in the account.
+ */
+const CREATE_TASK_TOOL = {
+  name: 'createTask',
+  description: 'Add a task to the Tasks page of the person you are helping. Use it when they ask you to remember or keep track of something to do, such as "add a task to send the file to Greg". Put what needs doing in title.',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'What the task is, in one short sentence.' },
+      notes: { type: 'string', description: 'Optional extra detail.' },
+      due: { type: 'string', description: 'Optional date the task is due, written as 2026-11-02.' },
+      priority: { type: 'string', enum: ['low', 'normal', 'high'], description: 'Optional. normal unless they say it is urgent or can wait.' },
+    },
+    required: ['title'],
+  },
+};
+
+const CREATE_REMINDER_TOOL = {
+  name: 'createReminder',
+  description: 'Set a reminder so the person is notified at a moment they choose. Use it when they say "remind me", "let me know at 6", or ask to hear about something later. A reminder always needs a moment: if they gave none, ask for one instead of guessing.',
+  parameters: {
+    type: 'object',
+    properties: {
+      title: { type: 'string', description: 'What to remind them of.' },
+      dueAt: { type: 'string', description: 'When to notify them, as a date and time like 2026-11-02T18:00.' },
+      repeat: { type: 'string', enum: ['once', 'interval', 'daily'], description: 'Optional: once by default.' },
+      intervalMinutes: { type: 'number', description: 'Only with repeat interval: minutes between reminders.' },
+      timeOfDay: { type: 'string', description: 'Only with repeat daily: the 24-hour time, such as 09:30.' },
+    },
+    required: ['title', 'dueAt'],
+  },
+};
 
 const WEB_SEARCH_TOOL = {
   name: 'webSearch',
@@ -150,16 +190,16 @@ function MenuBack({ children, onBack }) {
  * What the browser can attach.
  *
  * Two routes, because two kinds of file mean different things. A picture or a PDF
- * has no useful text, so it is uploaded to Cloudinary and the message carries a
- * link to it: the CDN stores and serves the bytes, and the account stores only the
- * link. A text file is read here and its words travel inside the message, which
- * keeps a small note cheap and searchable.
+ * has no useful text, so its bytes go to this account's own file store and the
+ * message carries a link to it: the server keeps and serves the file, and the
+ * account stores only the link. A text file is read here and its words travel
+ * inside the message, which keeps a small note cheap and searchable.
  */
 const ATTACHMENT_TYPES = /.(txt|text|md|markdown|csv|tsv|json|log|yml|yaml|html|css|js|jsx|ts|tsx|py|sql|xml)$/i;
 const ATTACHMENT_MAX_BYTES = 200_000;
-/** The server's cap, repeated here so an oversized file is refused before it is read. */
-const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
-/** The kinds Cloudinary is signed for; matching image/png, image/jpeg, image/webp, image/gif, application/pdf. */
+/** The server's cap on one upload, repeated here so an oversized file is refused before it is read. */
+const UPLOAD_MAX_BYTES = 4 * 1024 * 1024;
+/** The kinds the file store takes; matching image/png, image/jpeg, image/webp, image/gif, application/pdf. */
 const UPLOAD_TYPES = /^(image\/(png|jpeg|webp|gif)|application\/pdf)$/;
 
 /**
@@ -222,6 +262,50 @@ function titleFromQuestion(text) {
   const clean = text.replace(/\s+/g, ' ').trim();
   if (!clean) return 'New chat';
   return clean.length <= 60 ? clean : `${clean.slice(0, 57).trimEnd()}...`;
+}
+
+/**
+ * The address a stored file is drawn from, and opened by.
+ *
+ * A turn that has just been sent already carries a finished address, because the
+ * upload answered with one. A turn loaded from the account carries only the
+ * file's own path, and an image tag cannot send the Authorization header, so the
+ * token is added at draw time. The link uses the same address rather than the
+ * bare path, or opening the file in a new tab would be refused.
+ * @param {{ url?: string, displayUrl?: string } | null} attachment
+ * @returns {string}
+ */
+function fileAddress(attachment) {
+  if (!attachment) return '';
+  const ready = typeof attachment.displayUrl === 'string' ? attachment.displayUrl : '';
+  if (ready !== '') return ready;
+  return fileDisplayUrl(attachment.url ?? '');
+}
+
+/**
+ * What the model is told about a file it cannot read.
+ *
+ * The old wording ("its contents are not readable here") left a model with
+ * nothing to say, so a picture came back with a vague reply or a guess dressed
+ * up as one. The note now states what happened, forbids pretending to look, and
+ * says what to do instead: one short sentence, then a question. A caption the
+ * person typed travels beside this note as their own message, so it can still be
+ * answered normally.
+ * @param {{ name?: string, kind?: string }} attached
+ * @returns {string}
+ */
+function unreadableFileNote(attached) {
+  const name = attached.name || 'a file';
+  const kind = attached.kind || 'unknown kind';
+  if (String(kind).startsWith('image/')) {
+    return [
+      `A picture came with this message: ${name} (${kind}).`,
+      'This chat cannot see inside a picture, so do not describe it, guess at what it shows, or claim to have looked at it.',
+      'Say in one short sentence that you cannot see the picture here, then ask what they want done with it.',
+      'If they wrote something with it, answer that, and mention the picture only if it matters.',
+    ].join('\n');
+  }
+  return `A file came with this message: ${name} (${kind}). Its contents are not readable here.`;
 }
 
 /**
@@ -298,8 +382,71 @@ function stoppedReply() {
  * would end the person's reply. Stop is the one exception, since a stopped reply
  * must not turn into another request.
  */
+/**
+ * A call's arguments as an object. The server hands them over as a JSON string, but a
+ * supplier that writes its own call can send an object, and a model can emit broken
+ * JSON. None of those may throw at the person: a call that cannot be read becomes an
+ * empty set of arguments, and the tool then says what it is missing.
+ * @param {{ arguments?: unknown }} call
+ * @returns {Record<string, unknown>}
+ */
+function toolArguments(call) {
+  const raw = call?.arguments;
+  if (raw && typeof raw === 'object') return raw;
+  if (typeof raw !== 'string' || raw.trim() === '') return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
 async function runToolCall(call, signal, onStatus) {
   const name = typeof call?.name === 'string' ? call.name : '';
+  const args = toolArguments(call);
+
+  // A to-do and a reminder are written straight into the account, so the sentence
+  // is said before the request rather than after it, and a refusal is handed back
+  // to the model in words it can act on.
+  if (name === CREATE_TASK_TOOL.name) {
+    if (typeof args.title !== 'string' || args.title.trim() === '') return 'A task needs a title, so nothing was added. Ask what the task should say.';
+    onStatus(`Adding the task "${args.title.trim()}"`);
+    try {
+      const task = await createTask({
+        title: args.title.trim(),
+        notes: typeof args.notes === 'string' ? args.notes : '',
+        due: typeof args.due === 'string' ? args.due : '',
+        priority: typeof args.priority === 'string' ? args.priority : 'normal',
+      });
+      if (signal?.aborted) throw stoppedReply();
+      return `Added the task "${task?.title ?? args.title.trim()}" to their Tasks page.`;
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
+      return `The task was not added: ${error?.message || 'the account refused it.'}`;
+    }
+  }
+
+  if (name === CREATE_REMINDER_TOOL.name) {
+    const due = new Date(String(args.dueAt ?? ''));
+    if (Number.isNaN(due.getTime())) return 'A reminder needs the moment to fire, and none was readable. Ask when they want to be reminded.';
+    onStatus(`Setting a reminder for ${due.toLocaleString()}`);
+    try {
+      const reminder = await createReminder({
+        title: typeof args.title === 'string' && args.title.trim() !== '' ? args.title.trim() : 'Reminder',
+        dueAt: due.toISOString(),
+        repeat: typeof args.repeat === 'string' ? args.repeat : 'once',
+        intervalMinutes: typeof args.intervalMinutes === 'number' ? args.intervalMinutes : undefined,
+        timeOfDay: typeof args.timeOfDay === 'string' ? args.timeOfDay : undefined,
+      });
+      if (signal?.aborted) throw stoppedReply();
+      return `Set a reminder for ${due.toLocaleString()}: "${reminder?.title ?? 'Reminder'}".`;
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
+      return `The reminder was not set: ${error?.message || 'the account refused it.'}`;
+    }
+  }
+
   if (name !== WEB_SEARCH_TOOL.name) return `The tool "${name}" is not available in this chat.`;
 
   const asked = webSearchQuery(call);
@@ -516,9 +663,10 @@ export default function ChatView({
   }, [refreshHistory]);
 
   /**
-   * Read the chosen file in the browser. Nothing is uploaded: the text is held in
-   * memory and travels with the next message, the way the desktop app puts an
-   * attached file in front of the question.
+   * Take the chosen file. A text file is read here and held in memory, so its words
+   * travel with the next message, the way the desktop app puts an attached file in
+   * front of the question. A picture or a PDF is sent to this account's own file
+   * store and only the link travels.
    */
   const chooseAttachment = useCallback(async (event) => {
     const file = event.target.files?.[0];
@@ -526,21 +674,20 @@ export default function ChatView({
     event.target.value = '';
     if (!file) return;
 
-    // A picture or a PDF goes to Cloudinary, so the browser never has to turn it
-    // into text it cannot read and the account never stores the bytes.
+    // A picture or a PDF goes to this account's own file store, so the browser
+    // never has to turn it into text it cannot read and the message carries a
+    // link to the bytes rather than the bytes themselves.
     if (UPLOAD_TYPES.test(file.type)) {
       if (file.size > UPLOAD_MAX_BYTES) {
-        setAttachNote('That file is over 10MB. Try a smaller one.');
+        setAttachNote('That file is over 4MB. Try a smaller one.');
         return;
       }
       setAttachNote('Uploading...');
       try {
-        const signed = await signUpload();
-        if (!signed.signature) {
-          setAttachNote('Attachments are not switched on for this account yet. A text file still works.');
-          return;
-        }
-        const uploaded = await uploadAttachment(file, signed);
+        const uploaded = await uploadFile(file);
+        // displayUrl is the same file with this tab's token in the query string,
+        // because an image tag cannot send the Authorization header. The plain
+        // path stays on `url`, which is what the saved turn keeps.
         setAttachment({ ...uploaded, text: '', size: file.size });
         setAttachNote('');
       } catch (error) {
@@ -732,13 +879,14 @@ export default function ChatView({
 
     // What the model reads. A text file is quoted under a heading, the way the
     // desktop places an attachment in front of the prompt. A picture or a PDF has
-    // no text to quote, so the model is told a file came with the turn and given
-    // its link; it is never told it can see something it cannot.
+    // no text to quote, so the model is told plainly what came with the turn and,
+    // for a picture, that it cannot see the contents; it is never told it can see
+    // something it cannot.
     const labelled = attached ? attached.name : '';
     const withFile = attached
       ? (attached.text
         ? [`Attached file: ${labelled}`, attached.text].join('\n\n')
-        : `A file came with this message: ${labelled} (${attached.kind}). Its contents are not readable here.`)
+        : unreadableFileNote(attached))
       : question;
     const withQuestion = attached && question !== '' ? `${question}\n\n${withFile}` : withFile;
     // The length the person picked rides with the question, the way the attachment
@@ -757,7 +905,10 @@ export default function ChatView({
         : `${question}\n\n[Attached file: ${labelled}]`)
       : question;
     // Only an uploaded file becomes an attachment on the saved turn; a text file's
-    // words are already in the message, so the account stores nothing extra.
+    // words are already in the message, so the account stores nothing extra. The
+    // display address is left out on purpose: it carries this tab's session token,
+    // and writing that into the account would be a leak. The bubble rebuilds it
+    // from the path whenever the turn is drawn.
     const storedAttachment = attached?.url
       ? { url: attached.url, name: attached.name, kind: attached.kind, bytes: attached.size ?? attached.bytes ?? 0 }
       : null;
@@ -845,7 +996,7 @@ export default function ChatView({
        * are added to that copy alone, because saveExchange keeps only the question
        * and the final answer.
        */
-      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL];
+      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL];
       let wire = outgoing;
       let answer = '';
       // One round past the cap, with no tools offered, so a model that keeps
@@ -1487,18 +1638,22 @@ export default function ChatView({
                 {/* A prompt is shown exactly as typed. A reply goes through the desktop's
                     own renderer, so code, lists, tables and links read the same on both. */}
                 {message.attachment && (
-                  // The file came from this account's own Cloudinary folder, so the
-                  // link is a CDN address rather than anything the server serves.
+                  // The file is kept by this account's own server. The address an
+                  // image tag can load carries the token in its query string,
+                  // because an <img> cannot send the Authorization header, and a
+                  // turn loaded from the account holds only the plain path, so
+                  // fileAddress() completes it here. The link opens that same
+                  // address: the bare path would be refused without the header.
                   // A picture is drawn small enough to keep the thread readable; a
-                  // PDF is a named row, because a page thumbnail would be another
-                  // transformation to pay for.
+                  // PDF is a named row, because a page thumbnail would mean
+                  // rendering the file to make a picture of a picture.
                   message.attachment.kind?.startsWith('image/') ? (
-                    <a className="chat-attachment" href={message.attachment.url} target="_blank" rel="noopener noreferrer">
-                      <img src={message.attachment.url} alt={message.attachment.name} loading="lazy" decoding="async" />
+                    <a className="chat-attachment" href={fileAddress(message.attachment)} target="_blank" rel="noopener noreferrer">
+                      <img src={fileAddress(message.attachment)} alt={message.attachment.name} loading="lazy" decoding="async" />
                       <span>{message.attachment.name}</span>
                     </a>
                   ) : (
-                    <a className="chat-attachment is-file" href={message.attachment.url} target="_blank" rel="noopener noreferrer">
+                    <a className="chat-attachment is-file" href={fileAddress(message.attachment)} target="_blank" rel="noopener noreferrer">
                       <FileIcon size={ICON_SIZE.lg} />
                       <span>{message.attachment.name}</span>
                     </a>
@@ -1612,12 +1767,25 @@ export default function ChatView({
           {shareNote !== '' && <p className="chat-note">{shareNote}</p>}
           {attachNote !== '' && <p className="chat-note is-error">{attachNote}</p>}
           {attachment && (
-            <div className="chat-attachment">
-              <PaperclipIcon size={14} aria-hidden="true" />
+            // The file waiting to go. A picture is drawn as itself, so a phone user
+            // sees what they picked before sending instead of a name they have to
+            // trust; a PDF or a text file keeps the named row.
+            <div className="chat-attachment is-pending">
+              {String(attachment.kind ?? '').startsWith('image/') ? (
+                <img
+                  className="chat-attachment-thumb"
+                  src={fileAddress(attachment)}
+                  alt={attachment.name}
+                  decoding="async"
+                />
+              ) : (
+                <PaperclipIcon size={14} aria-hidden="true" />
+              )}
               <span className="chat-attachment-name" title={attachment.name}>{attachment.name}</span>
               <span className="chat-attachment-meta">
-                {/* Said plainly: the text is sent with the message and the file
-                    itself is never uploaded. */}
+                {/* Said plainly: the words of a text file travel inside the
+                    message, while a picture or a PDF is kept by this account's
+                    own file store and sent as a link. */}
                 sent with this message
               </span>
               <IconButton

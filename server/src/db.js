@@ -1,4 +1,4 @@
-import pg from 'pg';
+import { createRequire } from 'node:module';
 import { QUOTA_WINDOW_HOURS, windowTokensForPlan } from './limits.js';
 import { findTopupPack, TOPUP_VALID_DAYS } from './topups.js';
 
@@ -62,6 +62,49 @@ export const PROJECT_FILE_LIMIT = 20;
 export const PROJECT_NAME_MAX_LENGTH = 60;
 export const PROJECT_INSTRUCTIONS_MAX_LENGTH = 4000;
 export const PROJECT_FILE_CONTENT_MAX_LENGTH = 20000;
+
+// A to-do list is a list, not a filing cabinet, so both caps are roomy enough for a
+// year of ordinary work and small enough that one account cannot fill the database.
+// The title and note caps are also what stop a single row being used as a place to
+// keep a whole document.
+export const TASK_LIMIT = 500;
+export const TASK_TITLE_MAX_LENGTH = 200;
+export const TASK_NOTES_MAX_LENGTH = 2000;
+// due holds a date the person typed (see the note in db/schema.sql), so it only has to
+// fit one date and a little slack; the cap stops the column becoming a second notes.
+export const TASK_DUE_MAX_LENGTH = 40;
+export const REMINDER_LIMIT = 200;
+export const REMINDER_TITLE_MAX_LENGTH = 200;
+
+// The only values the Tasks and Reminders screens know how to draw. A value outside
+// these lists would be stored and then shown as nothing, so a route refuses it before
+// it ever reaches here.
+export const TASK_PRIORITIES = Object.freeze(['low', 'normal', 'high']);
+export const REMINDER_REPEATS = Object.freeze(['once', 'interval', 'daily']);
+
+// A picture attached in the chat is held here when no outside image host is set up, so
+// the cap is the size of one small picture rather than a photo library: it keeps a row
+// small enough to read into memory and hand back in one response.
+export const STORED_FILE_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
+ * One stored file, without its bytes.
+ *
+ * The data column is never part of this shape. A screen draws a name and a size, and
+ * sending the picture back inside a JSON list would cost the response as much as the
+ * file itself. created_at goes out as it comes from Postgres, the way a project's does,
+ * so a client formats one kind of timestamp everywhere.
+ * @param {object} row @returns {object}
+ */
+function publicStoredFile(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    bytes: Number(row.bytes ?? 0),
+    createdAt: row.created_at,
+  };
+}
 
 // Postgres raises 22P02 for an id that is not a uuid, which a handler would report as
 // a server fault. A caller that invents an id should learn nothing, so a malformed id
@@ -144,9 +187,56 @@ function publicProjectFile(row) {
   };
 }
 
+/**
+ * One task, as a screen draws it.
+ *
+ * due travels back as the text that was typed rather than being turned into a Date,
+ * so the browser and the phone show the day the person wrote (see db/schema.sql).
+ * @param {object} row @returns {object}
+ */
+function publicTask(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    notes: row.notes ?? '',
+    due: row.due ?? '',
+    priority: row.priority,
+    done: row.done === true,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * One reminder.
+ *
+ * dueAt is a real instant here, so it goes out as an ISO string: that is the one form
+ * every client reads back without adding a timezone of its own.
+ * @param {object} row @returns {object}
+ */
+function publicReminder(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    dueAt: row.due_at instanceof Date ? row.due_at.toISOString() : String(row.due_at),
+    repeat: row.repeat,
+    intervalMinutes: row.interval_minutes === null || row.interval_minutes === undefined ? null : Number(row.interval_minutes),
+    timeOfDay: row.time_of_day ?? null,
+    done: row.done === true,
+    createdAt: row.created_at,
+  };
+}
+
+// The driver is required on first use rather than at import. This module also carries the
+// limit constants the routes are built from, so reading a constant (from a route module or
+// a test) must not need the PostgreSQL client installed. A server without it still fails
+// where it matters: when a pool is opened at boot.
+const loadPostgres = () => createRequire(import.meta.url)('pg');
+
 /** @param {string} connectionString @param {NodeJS.ProcessEnv} [environment] @returns {import('pg').Pool} */
 export function createDatabase(connectionString, environment = process.env) {
-  return new pg.Pool({
+  const { Pool } = loadPostgres();
+  return new Pool({
     connectionString,
     ssl: environment.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
     max: 10,
@@ -1374,6 +1464,193 @@ export function createRepository(pool) {
         instructions: project.instructions,
         files: files.rows.map((row) => ({ name: row.name, content: row.content })),
       };
+    },
+    /**
+     * The account's tasks, open ones first and newest first inside each group.
+     *
+     * user_id leads the WHERE clause, so one account is never handed another's list
+     * however the id or the sort is chosen.
+     * @param {string} userId
+     * @returns {Promise<object[]>}
+     */
+    async listTasks(userId) {
+      const result = await pool.query(
+        'SELECT id, title, notes, due, priority, done, created_at, updated_at FROM tasks ' +
+          'WHERE user_id = $1 ORDER BY done ASC, created_at DESC, id LIMIT $2',
+        [userId, TASK_LIMIT],
+      );
+      return result.rows.map(publicTask);
+    },
+    /**
+     * Add one task.
+     *
+     * The per-account cap is decided inside the insert, so two tasks arriving at once
+     * cannot both pass a limit that only one of them should. A signed-in session means
+     * the account row exists, so an insert that matches nothing can only be the cap.
+     * @param {{ userId: string, title: string, notes?: string, due?: string, priority?: string }} task
+     * @returns {Promise<object>}
+     */
+    async createTask({ userId, title, notes = '', due = '', priority = 'normal' }) {
+      const result = await pool.query(
+        'INSERT INTO tasks (user_id, title, notes, due, priority) ' +
+          'SELECT u.id, $2::text, $3::text, $4::text, $5::text FROM users u ' +
+          'WHERE u.id = $1::uuid ' +
+          'AND (SELECT COUNT(*) FROM tasks WHERE user_id = $1::uuid) < $6::integer ' +
+          'RETURNING id, title, notes, due, priority, done, created_at, updated_at',
+        [userId, title, notes, due, priority, TASK_LIMIT],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('This account already holds as many tasks as it can store.');
+        error.code = 'TASK_LIMIT';
+        throw error;
+      }
+      return publicTask(row);
+    },
+    /**
+     * Change the parts of a task that were actually sent.
+     *
+     * Null means "this field was not sent", never "set it to nothing", so ticking the
+     * box cannot wipe the notes somebody typed. Ownership is part of the same
+     * statement, so an id belonging to another account matches no row and reads as
+     * missing rather than being changed.
+     * @param {{ userId: string, id: string, title?: string|null, notes?: string|null, due?: string|null, priority?: string|null, done?: boolean|null }} change
+     * @returns {Promise<object|null>}
+     */
+    async updateTask({ userId, id, title = null, notes = null, due = null, priority = null, done = null }) {
+      if (!isUuid(id)) return null;
+      const result = await pool.query(
+        'UPDATE tasks SET title = COALESCE($3::text, title), notes = COALESCE($4::text, notes), ' +
+          'due = COALESCE($5::text, due), priority = COALESCE($6::text, priority), ' +
+          'done = COALESCE($7::boolean, done), updated_at = NOW() ' +
+          'WHERE id = $1 AND user_id = $2 ' +
+          'RETURNING id, title, notes, due, priority, done, created_at, updated_at',
+        [id, userId, title, notes, due, priority, done],
+      );
+      const row = result.rows[0];
+      return row ? publicTask(row) : null;
+    },
+    /**
+     * Delete one task and report how many rows went.
+     *
+     * The count is what lets the route tell "deleted" from "no such task of yours", so
+     * a foreign id answers 404 rather than a cheerful 200.
+     * @param {{ userId: string, id: string }} task
+     * @returns {Promise<number>}
+     */
+    async deleteTask({ userId, id }) {
+      if (!isUuid(id)) return 0;
+      const result = await pool.query('DELETE FROM tasks WHERE id = $1 AND user_id = $2', [id, userId]);
+      return result.rowCount;
+    },
+    /**
+     * The account's reminders, the ones still to come first and the soonest at the top.
+     * @param {string} userId
+     * @returns {Promise<object[]>}
+     */
+    async listReminders(userId) {
+      const result = await pool.query(
+        'SELECT id, title, due_at, repeat, interval_minutes, time_of_day, done, created_at FROM reminders ' +
+          'WHERE user_id = $1 ORDER BY done ASC, due_at ASC, id LIMIT $2',
+        [userId, REMINDER_LIMIT],
+      );
+      return result.rows.map(publicReminder);
+    },
+    /**
+     * Add one reminder.
+     *
+     * due_at is written as a timestamptz so the instant is stored unambiguously; the
+     * route has already proved it parses. interval_minutes and time_of_day stay null
+     * unless the repeat rule uses them, so a row never carries two rules at once. The
+     * cap works the same way as a task's: decided inside the insert.
+     * @param {{ userId: string, title: string, dueAt: string, repeat?: string, intervalMinutes?: number|null, timeOfDay?: string|null }} reminder
+     * @returns {Promise<object>}
+     */
+    async createReminder({ userId, title, dueAt, repeat = 'once', intervalMinutes = null, timeOfDay = null }) {
+      const result = await pool.query(
+        'INSERT INTO reminders (user_id, title, due_at, repeat, interval_minutes, time_of_day) ' +
+          'SELECT u.id, $2::text, $3::timestamptz, $4::text, $5::integer, $6::text FROM users u ' +
+          'WHERE u.id = $1::uuid ' +
+          'AND (SELECT COUNT(*) FROM reminders WHERE user_id = $1::uuid) < $7::integer ' +
+          'RETURNING id, title, due_at, repeat, interval_minutes, time_of_day, done, created_at',
+        [userId, title, dueAt, repeat, intervalMinutes, timeOfDay, REMINDER_LIMIT],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('This account already holds as many reminders as it can store.');
+        error.code = 'REMINDER_LIMIT';
+        throw error;
+      }
+      return publicReminder(row);
+    },
+    /**
+     * Tick a reminder off, or put it back.
+     *
+     * done is the only field a reminder changes: the time and the rule are what the
+     * person asked for, and editing either is a new reminder rather than a quiet
+     * rewrite of something they are relying on to go off.
+     * @param {{ userId: string, id: string, done: boolean }} change
+     * @returns {Promise<object|null>}
+     */
+    async updateReminder({ userId, id, done }) {
+      if (!isUuid(id)) return null;
+      const result = await pool.query(
+        'UPDATE reminders SET done = $3::boolean WHERE id = $1 AND user_id = $2 ' +
+          'RETURNING id, title, due_at, repeat, interval_minutes, time_of_day, done, created_at',
+        [id, userId, done],
+      );
+      const row = result.rows[0];
+      return row ? publicReminder(row) : null;
+    },
+    /**
+     * Delete one reminder and report how many rows went.
+     * @param {{ userId: string, id: string }} reminder
+     * @returns {Promise<number>}
+     */
+    async deleteReminder({ userId, id }) {
+      if (!isUuid(id)) return 0;
+      const result = await pool.query('DELETE FROM reminders WHERE id = $1 AND user_id = $2', [id, userId]);
+      return result.rowCount;
+    },
+    /**
+     * Store one picture and hand back its public shape.
+     *
+     * The bytes go in exactly as they arrived, with no re-encoding: a picture that has
+     * already been through one lossy round trip would lose detail every time it is
+     * attached again. bytes repeats the length of data so a list can show a size without
+     * reading the column, and the public shape deliberately leaves the data out.
+     * @param {{ userId: string, name: string, kind: string, bytes: number, data: Buffer }} file
+     * @returns {Promise<object>}
+     */
+    async createStoredFile({ userId, name, kind, bytes, data }) {
+      const result = await pool.query(
+        'INSERT INTO stored_files (user_id, name, kind, bytes, data) ' +
+          'VALUES ($1::uuid, $2::text, $3::text, $4::integer, $5::bytea) ' +
+          'RETURNING id, name, kind, bytes, created_at',
+        [userId, name, kind, bytes, data],
+      );
+      return publicStoredFile(result.rows[0]);
+    },
+    /**
+     * One stored picture, bytes included, only when the caller owns it.
+     *
+     * The owner sits in the WHERE clause rather than in a check made afterwards, so no
+     * arrangement of arguments reaches another account's picture. An id that is not a
+     * uuid is answered as missing before it touches Postgres, so a malformed id and a
+     * foreign one are indistinguishable to the caller. data arrives as a Buffer because
+     * that is how pg decodes a bytea column.
+     * @param {{ userId: string, id: string }} file
+     * @returns {Promise<{ id: string, name: string, kind: string, bytes: number, data: Buffer } | null>}
+     */
+    async findStoredFile({ userId, id }) {
+      if (!isUuid(id)) return null;
+      const result = await pool.query(
+        'SELECT id, name, kind, bytes, data FROM stored_files WHERE user_id = $1 AND id = $2',
+        [userId, id],
+      );
+      const row = result.rows[0];
+      if (!row) return null;
+      return { id: row.id, name: row.name, kind: row.kind, bytes: Number(row.bytes), data: row.data };
     },
     async revokeSession(tokenHash) {
       await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);

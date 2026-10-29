@@ -372,3 +372,90 @@ ALTER TABLE conversations ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES pr
 -- project before it sorts, so the index carries both columns.
 CREATE INDEX IF NOT EXISTS conversations_project_idx
   ON conversations(project_id, updated_at DESC);
+
+-- Tasks and reminders mirror the desktop app's own Tasks and Reminders pages, so
+-- one account keeps the same to-do list whether the person is typing in the
+-- browser, on a phone or in the app on the desk. They live here because the list
+-- belongs to the account rather than to the machine: a to-do written in the app
+-- has to be waiting when the phone opens, and a reminder has to still be due after
+-- a reinstall.
+--
+-- Neither is metered or held behind a plan. A line of text costs nothing to store,
+-- and charging for a to-do would only push people back to a notes file.
+
+-- due is TEXT, not a date or a timestamp, because it holds what the person typed:
+-- a plain calendar date such as 2026-11-02, or an empty string for "no date yet".
+-- A date column would pin a timezone to it, so somebody in Lagos who typed
+-- 2026-11-02 would be shown 2026-11-01 once the server read it back as UTC. Keeping
+-- the text means nothing is converted and nobody's deadline moves by a day.
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  notes TEXT NOT NULL DEFAULT '',
+  due TEXT NOT NULL DEFAULT '',
+  priority TEXT NOT NULL DEFAULT 'normal',
+  done BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The list screen asks one question: this account's open work, newest first, with
+-- the finished items behind it. done sits in the middle so counting what is still
+-- open never walks the rows that are already dealt with.
+CREATE INDEX IF NOT EXISTS tasks_user_done_created_idx
+  ON tasks(user_id, done, created_at DESC);
+
+-- due_at is TIMESTAMPTZ, unlike a task's due above, because the two mean different
+-- things. A reminder has to go off at one exact moment, so it is a real instant and
+-- the timezone is part of the answer. repeat records how it comes back: once never
+-- does, interval returns every interval_minutes, daily returns at time_of_day, a
+-- HH:MM string in the account's own local time. interval_minutes and time_of_day
+-- stay null when that repeat does not use them, so a row never stores a rule that
+-- contradicts its own repeat value.
+CREATE TABLE IF NOT EXISTS reminders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  due_at TIMESTAMPTZ NOT NULL,
+  repeat TEXT NOT NULL DEFAULT 'once',
+  interval_minutes INTEGER,
+  time_of_day TEXT,
+  done BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- "What falls due next for this account" is the only read the reminder screen
+-- makes, so the index is the owner, whether it has been dealt with, and the moment
+-- it falls due.
+CREATE INDEX IF NOT EXISTS reminders_user_done_due_idx
+  ON reminders(user_id, done, due_at);
+
+-- A picture uploaded in the browser chat used to go straight to an outside image host.
+-- On a deployment where that host is not configured the upload failed, so the picture
+-- never appeared and Zuri never saw it. This table is the fallback that keeps a small
+-- picture with the account that sent it, so attaching a photo works even when nothing
+-- outside this service is set up.
+--
+-- The bytes live in the row rather than on disk because this service runs where the
+-- filesystem is thrown away on the next deploy, and a picture that disappears would
+-- take the meaning of the conversation with it. data is BYTEA so a PNG is stored
+-- exactly as it arrived; bytes repeats its length because every list read needs the
+-- size and reading a whole image column just to measure it would be wasteful.
+--
+-- Reading is always scoped to the owner: this is somebody's picture, so the query that
+-- returns data matches on user_id as well as id, and one account can never fetch
+-- another account's file.
+CREATE TABLE IF NOT EXISTS stored_files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  bytes INTEGER NOT NULL,
+  data BYTEA NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Newest first for one account is the only order this table is ever read in.
+CREATE INDEX IF NOT EXISTS stored_files_user_created_idx
+  ON stored_files(user_id, created_at DESC);

@@ -9,8 +9,8 @@ import { createRequestLimiter, limitsForPlan, PLAN_LIMITS } from './limits.js';
 import { DEFAULT_MODELS, canUseModel, findModel, imagePriceKobo, imageSupplierCostMicroUsd, isImageModel, limitsForModel, microUsdToKobo, publicImageModel, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
 import { verifyPaystackSignature } from './paystack.js';
 import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
-import { CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from './db.js';
-import { checkedAttachment, signUpload } from './uploads.js';
+import { CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH, REMINDER_REPEATS, REMINDER_TITLE_MAX_LENGTH, STORED_FILE_MAX_BYTES, TASK_DUE_MAX_LENGTH, TASK_NOTES_MAX_LENGTH, TASK_PRIORITIES, TASK_TITLE_MAX_LENGTH } from './db.js';
+import { ALLOWED_UPLOAD_TYPES, checkedAttachment, signUpload } from './uploads.js';
 import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './images.js';
 import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, answerStyleLength } from './text.js';
 import { searchWeb } from './tools.js';
@@ -89,6 +89,190 @@ function projectName(value) {
 /** Standing instructions are prose the model reads, so only the length is bounded. */
 function projectInstructions(value) {
   return typeof value === 'string' ? value.trim().slice(0, PROJECT_INSTRUCTIONS_MAX_LENGTH) : '';
+}
+
+// Tasks and reminders are the two lists the desktop app already keeps in local files.
+// They sit at the top level of /api because they belong to the account rather than to a
+// project or a chat, and the browser, the phone and the app all read the same shapes.
+const TASKS_PATH = '/api/tasks';
+const REMINDERS_PATH = '/api/reminders';
+// Tasks and reminders carry the field names the desktop app already uses in its local
+// files, so a list can move between the two without a translation step.
+// Uploaded pictures live at the top level too: a file belongs to the account, not to
+// one chat, and the same picture can be attached to a second question later.
+const FILES_PATH = '/api/files';
+// The picture arrives as base64 inside a JSON body rather than as a multipart form:
+// every other endpoint here already speaks JSON, and a second body format would need a
+// parser of its own for one upload. A 4 MB picture is about 5.3 MB once encoded, so the
+// read cap has to sit above the file cap or every allowed picture is refused first.
+const MAX_FILE_BODY_BYTES = 6 * 1024 * 1024;
+// The name is shown in the chat bubble and never used as a path, so it only has to be
+// short enough not to become a document of its own.
+const STORED_FILE_NAME_MAX_LENGTH = 200;
+const STORED_FILE_MAX_MB = STORED_FILE_MAX_BYTES / (1024 * 1024);
+// The picture types this route can verify byte by byte, taken from the list of
+// attachments Zuri already accepts. A PDF is allowed as an attachment elsewhere but it
+// is not a picture and has no signature check here, so it cannot come through this
+// route. An image type nobody can verify would be worse than a refusal, because the
+// browser is told to trust whatever type was stored.
+const STORED_IMAGE_KINDS = new Set([...ALLOWED_UPLOAD_TYPES].filter((type) => type.startsWith('image/')));
+
+/**
+ * Does the buffer really begin with the bytes that kind describes?
+ *
+ * The stored kind becomes the content-type the browser is given later, so a file that
+ * merely says it is a PNG must never be believed: a mislabelled upload is the usual way
+ * a script arrives. Only the picture types this route accepts are recognised here, and
+ * a type with no signature check is refused rather than waved through.
+ * @param {string} kind the declared MIME type
+ * @param {Buffer} buffer the decoded upload
+ * @returns {boolean}
+ */
+function looksLikeImage(kind, buffer) {
+  if (!Buffer.isBuffer(buffer)) return false;
+  switch (kind) {
+    // The eight-byte PNG signature.
+    case 'image/png':
+      return buffer.length >= 8 && buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47
+        && buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a;
+    // Every JPEG opens with FF D8 FF; the fourth byte names the marker and varies.
+    case 'image/jpeg':
+      return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    // GIF87a and GIF89a share their first six bytes.
+    case 'image/gif': {
+      const header = buffer.toString('latin1', 0, Math.min(buffer.length, 6));
+      return header === 'GIF87a' || header === 'GIF89a';
+    }
+    // A WebP file is a RIFF container whose form type is WEBP.
+    case 'image/webp':
+      return buffer.length >= 12
+        && buffer.toString('latin1', 0, 4) === 'RIFF'
+        && buffer.toString('latin1', 8, 12) === 'WEBP';
+    default:
+      return false;
+  }
+}
+// Two shapes hold everywhere below. A refusal carries a code the screen switches on and
+// a sentence the person can act on. And an id the caller may not see answers exactly
+// like one that does not exist, so nothing can be probed for by watching the status.
+
+/** A checked field that cannot be stored, carrying the code the screen switches on. */
+function refusal(code, message) {
+  return { ok: false, code, message };
+}
+
+/**
+ * The task fields a request may carry, checked once so POST and PATCH answer the same
+ * sentence for the same mistake.
+ *
+ * A field the body did not carry comes back as null, which is how PATCH says "leave
+ * this alone": null never means "set it to nothing", so ticking a box cannot wipe the
+ * notes somebody typed. A field that was sent and is wrong is refused rather than
+ * ignored, because a form that quietly drops what was typed looks like it worked.
+ * @param {object} body
+ * @returns {{ ok: boolean, code?: string, message?: string, title?: string|null, notes?: string|null, due?: string|null, priority?: string|null, done?: boolean|null }}
+ */
+function checkedTask(body) {
+  const checked = { ok: true, title: null, notes: null, due: null, priority: null, done: null };
+
+  if (body.title !== undefined) {
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    if (title === '' || title.length > TASK_TITLE_MAX_LENGTH) {
+      return refusal('TASK_TITLE_REQUIRED', `Give the task a title of 1 to ${TASK_TITLE_MAX_LENGTH} characters.`);
+    }
+    checked.title = title;
+  }
+
+  if (body.notes !== undefined) {
+    const notes = typeof body.notes === 'string' ? body.notes.trim() : '';
+    if (typeof body.notes !== 'string' || notes.length > TASK_NOTES_MAX_LENGTH) {
+      return refusal('TASK_NOTES_TOO_LONG', `Keep the notes to ${TASK_NOTES_MAX_LENGTH} characters or fewer.`);
+    }
+    checked.notes = notes;
+  }
+
+  // due is a date the person typed, so it is not parsed into an instant here: an empty
+  // string means "no date yet", and anything long enough to be prose is refused.
+  if (body.due !== undefined) {
+    const due = typeof body.due === 'string' ? body.due.trim() : '';
+    if (typeof body.due !== 'string' || due.length > TASK_DUE_MAX_LENGTH) {
+      return refusal('TASK_DUE_INVALID', 'Use a date such as 2026-11-02, or leave it empty.');
+    }
+    checked.due = due;
+  }
+
+  if (body.priority !== undefined) {
+    const priority = typeof body.priority === 'string' ? body.priority.trim() : '';
+    if (!TASK_PRIORITIES.includes(priority)) {
+      return refusal('TASK_PRIORITY_INVALID', 'Choose low, normal or high for the priority.');
+    }
+    checked.priority = priority;
+  }
+
+  if (body.done !== undefined) {
+    if (typeof body.done !== 'boolean') return refusal('TASK_DONE_INVALID', 'Send true or false for done.');
+    checked.done = body.done;
+  }
+
+  return checked;
+}
+
+/**
+ * The reminder fields a request may carry.
+ *
+ * dueAt is the one that has to be real: a reminder that cannot be placed at an instant
+ * can never go off, so a date that does not parse is refused instead of being stored
+ * with a guessed time. The rule a repeat needs (a number of minutes, or a time of day)
+ * is demanded only for the repeat that uses it, so a row never carries two rules.
+ * @param {object} body
+ * @returns {{ ok: boolean, code?: string, message?: string, title?: string|null, dueAt?: string|null, repeat?: string|null, intervalMinutes?: number|null, timeOfDay?: string|null }}
+ */
+function checkedReminder(body) {
+  const checked = { ok: true, title: null, dueAt: null, repeat: null, intervalMinutes: null, timeOfDay: null };
+
+  if (body.title !== undefined) {
+    const title = typeof body.title === 'string' ? body.title.trim() : '';
+    if (title === '' || title.length > REMINDER_TITLE_MAX_LENGTH) {
+      return refusal('REMINDER_TITLE_REQUIRED', `Give the reminder a title of 1 to ${REMINDER_TITLE_MAX_LENGTH} characters.`);
+    }
+    checked.title = title;
+  }
+
+  if (body.dueAt !== undefined) {
+    const parsed = typeof body.dueAt === 'string' ? new Date(body.dueAt) : null;
+    if (!parsed || Number.isNaN(parsed.getTime())) {
+      return refusal('REMINDER_INVALID_DUE', 'Give the reminder a real date and time, for example 2026-11-02T09:00:00Z.');
+    }
+    // Stored in one standard form, so the browser and the phone read back the same
+    // moment whichever of them wrote it.
+    checked.dueAt = parsed.toISOString();
+  }
+
+  if (body.repeat !== undefined) {
+    const repeat = typeof body.repeat === 'string' ? body.repeat.trim() : '';
+    if (!REMINDER_REPEATS.includes(repeat)) {
+      return refusal('REMINDER_REPEAT_INVALID', 'Choose once, interval or daily for the repeat.');
+    }
+    checked.repeat = repeat;
+  }
+
+  if (body.intervalMinutes !== undefined && body.intervalMinutes !== null) {
+    const minutes = Number(body.intervalMinutes);
+    if (typeof body.intervalMinutes === 'boolean' || !Number.isInteger(minutes) || minutes <= 0) {
+      return refusal('REMINDER_INVALID_INTERVAL', 'Give the repeat an interval in whole minutes, one or more.');
+    }
+    checked.intervalMinutes = minutes;
+  }
+
+  if (body.timeOfDay !== undefined && body.timeOfDay !== null) {
+    const timeOfDay = typeof body.timeOfDay === 'string' ? body.timeOfDay.trim() : '';
+    if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(timeOfDay)) {
+      return refusal('REMINDER_INVALID_TIME', 'Give the daily time as HH:MM, for example 07:30.');
+    }
+    checked.timeOfDay = timeOfDay;
+  }
+
+  return checked;
 }
 
 /**
@@ -1592,6 +1776,277 @@ export function createApp(dependencies = {}) {
         if (refused) return refused;
         console.error('[zuri-cloud] projects', error?.message ?? error);
         return response(500, { ok: false, error: { code: 'PROJECT_FAILED', message: 'That project could not be saved.' } });
+      }
+    }
+
+    // Tasks and reminders: the two lists the desktop app keeps in local JSON files,
+    // stored here instead so one account carries them between the app, the browser and
+    // a phone. Both belong to the account, so the owner always comes from the token and
+    // never from the body.
+    //
+    // Neither is plan gated, unlike the chat routes below. Storing "call Greg on Monday"
+    // costs nothing to serve, and putting a to-do behind a subscription would only send
+    // people back to a notes file.
+    if (url.pathname === TASKS_PATH || url.pathname.startsWith(`${TASKS_PATH}/`)) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (dependencies.repository?.listTasks === undefined) return response(503, { ok: false, error: { code: 'TASKS_NOT_CONFIGURED', message: 'Tasks are not configured yet.' } });
+
+      const userId = session.user.id;
+      const [taskId] = url.pathname.slice(TASKS_PATH.length).split('/').filter(Boolean);
+
+      try {
+        if (!taskId) {
+          if (request.method === 'GET') return response(200, { ok: true, data: { tasks: await dependencies.repository.listTasks(userId) } });
+          if (request.method === 'POST') {
+            const checked = checkedTask(await readJson(request));
+            if (!checked.ok) return response(400, { ok: false, error: { code: checked.code, message: checked.message } });
+            // A field the body left out reads as null above, so a task posted with no
+            // title at all has to be told apart from one that never sent the field.
+            if (checked.title === null) {
+              return response(400, { ok: false, error: { code: 'TASK_TITLE_REQUIRED', message: `Give the task a title of 1 to ${TASK_TITLE_MAX_LENGTH} characters.` } });
+            }
+            const task = await dependencies.repository.createTask({
+              userId,
+              title: checked.title,
+              notes: checked.notes ?? '',
+              due: checked.due ?? '',
+              priority: checked.priority ?? 'normal',
+            });
+            return response(200, { ok: true, data: { task } });
+          }
+          return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST for the task list.' } });
+        }
+
+        if (request.method === 'PATCH') {
+          const checked = checkedTask(await readJson(request));
+          if (!checked.ok) return response(400, { ok: false, error: { code: checked.code, message: checked.message } });
+          const task = await dependencies.repository.updateTask({
+            userId,
+            id: taskId,
+            title: checked.title,
+            notes: checked.notes,
+            due: checked.due,
+            priority: checked.priority,
+            done: checked.done,
+          });
+          // The repository scopes on user_id, so a task belonging to another account
+          // comes back as nothing and is reported exactly like a missing one.
+          if (!task) return response(404, { ok: false, error: { code: 'TASK_NOT_FOUND', message: 'That task does not exist.' } });
+          return response(200, { ok: true, data: { task } });
+        }
+
+        if (request.method === 'DELETE') {
+          const removed = await dependencies.repository.deleteTask({ userId, id: taskId });
+          if (!removed) return response(404, { ok: false, error: { code: 'TASK_NOT_FOUND', message: 'That task does not exist.' } });
+          return response(200, { ok: true, data: { id: taskId } });
+        }
+
+        return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use PATCH or DELETE for one task.' } });
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'TASK_LIMIT') return response(409, { ok: false, error: { code: 'TASK_LIMIT_REACHED', message: 'This account already holds as many tasks as it can store. Remove one to add another.' } });
+        console.error('[zuri-cloud] tasks', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'TASK_FAILED', message: 'That task could not be saved.' } });
+      }
+    }
+
+    if (url.pathname === REMINDERS_PATH || url.pathname.startsWith(`${REMINDERS_PATH}/`)) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (dependencies.repository?.listReminders === undefined) return response(503, { ok: false, error: { code: 'REMINDERS_NOT_CONFIGURED', message: 'Reminders are not configured yet.' } });
+
+      const userId = session.user.id;
+      const [reminderId] = url.pathname.slice(REMINDERS_PATH.length).split('/').filter(Boolean);
+
+      try {
+        if (!reminderId) {
+          if (request.method === 'GET') return response(200, { ok: true, data: { reminders: await dependencies.repository.listReminders(userId) } });
+          if (request.method === 'POST') {
+            const checked = checkedReminder(await readJson(request));
+            if (!checked.ok) return response(400, { ok: false, error: { code: checked.code, message: checked.message } });
+            if (checked.title === null) {
+              return response(400, { ok: false, error: { code: 'REMINDER_TITLE_REQUIRED', message: `Give the reminder a title of 1 to ${REMINDER_TITLE_MAX_LENGTH} characters.` } });
+            }
+            if (checked.dueAt === null) {
+              return response(400, { ok: false, error: { code: 'REMINDER_INVALID_DUE', message: 'Give the reminder a real date and time, for example 2026-11-02T09:00:00Z.' } });
+            }
+            // Each repeat rule needs the one value that makes it a rule. A daily
+            // reminder with no time of day, or an interval with no gap, could never be
+            // scheduled, so it is refused here rather than stored to fail later.
+            const repeat = checked.repeat ?? 'once';
+            if (repeat === 'interval' && checked.intervalMinutes === null) {
+              return response(400, { ok: false, error: { code: 'REMINDER_INVALID_INTERVAL', message: 'Give the repeat an interval in whole minutes, one or more.' } });
+            }
+            if (repeat === 'daily' && checked.timeOfDay === null) {
+              return response(400, { ok: false, error: { code: 'REMINDER_INVALID_TIME', message: 'Give the daily time as HH:MM, for example 07:30.' } });
+            }
+            const reminder = await dependencies.repository.createReminder({
+              userId,
+              title: checked.title,
+              dueAt: checked.dueAt,
+              repeat,
+              intervalMinutes: repeat === 'interval' ? checked.intervalMinutes : null,
+              timeOfDay: repeat === 'daily' ? checked.timeOfDay : null,
+            });
+            return response(200, { ok: true, data: { reminder } });
+          }
+          return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST for the reminder list.' } });
+        }
+
+        if (request.method === 'PATCH') {
+          const body = await readJson(request);
+          if (typeof body.done !== 'boolean') {
+            return response(400, { ok: false, error: { code: 'REMINDER_DONE_INVALID', message: 'Send true or false for done.' } });
+          }
+          const reminder = await dependencies.repository.updateReminder({ userId, id: reminderId, done: body.done });
+          if (!reminder) return response(404, { ok: false, error: { code: 'REMINDER_NOT_FOUND', message: 'That reminder does not exist.' } });
+          return response(200, { ok: true, data: { reminder } });
+        }
+
+        if (request.method === 'DELETE') {
+          const removed = await dependencies.repository.deleteReminder({ userId, id: reminderId });
+          if (!removed) return response(404, { ok: false, error: { code: 'REMINDER_NOT_FOUND', message: 'That reminder does not exist.' } });
+          return response(200, { ok: true, data: { id: reminderId } });
+        }
+
+        return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use PATCH or DELETE for one reminder.' } });
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'REMINDER_LIMIT') return response(409, { ok: false, error: { code: 'REMINDER_LIMIT_REACHED', message: 'This account already holds as many reminders as it can store. Remove one to add another.' } });
+        console.error('[zuri-cloud] reminders', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'REMINDER_FAILED', message: 'That reminder could not be saved.' } });
+      }
+    }
+
+    // Storing one picture.
+    //
+    // Signing in is required and a paid plan is not. Attaching a picture is not a model
+    // call: it costs a row, and the same chat screen that asks for a subscription before
+    // it will send a question still has to be able to attach the picture to it. Gating
+    // this would only make the attach button fail for the people who then pay.
+    //
+    // The reply carries a url rather than the bytes, because the chat bubble draws the
+    // picture from that url and the message itself has to stay small.
+    if (url.pathname === FILES_PATH) {
+      if (request.method !== 'POST') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to upload a file.' } });
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to attach a file.' } }, { 'www-authenticate': 'Bearer' });
+      if (dependencies.repository?.createStoredFile === undefined) return response(503, { ok: false, error: { code: 'FILES_NOT_CONFIGURED', message: 'File storage is not configured yet.' } });
+
+      let body;
+      try {
+        body = await readJson(request, MAX_FILE_BODY_BYTES);
+      } catch (error) {
+        // The body is refused before it is parsed, so this is the only place a picture
+        // that is simply too big is caught. 413 rather than 400 says which side of the
+        // request has to change.
+        if (error?.code === 'BODY_TOO_LARGE') return response(413, { ok: false, error: { code: 'FILE_TOO_LARGE', message: `A picture can be up to ${STORED_FILE_MAX_MB} MB. Send a smaller picture.` } });
+        if (error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: 'INVALID_JSON', message: error.message } });
+        throw error;
+      }
+
+      // The kind decides two things at once: what the browser will be told the bytes are
+      // later, and therefore what it is allowed to do with them. Keeping it to the
+      // picture types this route can verify is half of keeping a script out; the byte
+      // check below is the other half.
+      const kind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : '';
+      if (!ALLOWED_UPLOAD_TYPES.has(kind) || !STORED_IMAGE_KINDS.has(kind)) {
+        return response(400, { ok: false, error: { code: 'FILE_TYPE_NOT_ALLOWED', message: `Send a PNG, JPEG, GIF or WebP picture up to ${STORED_FILE_MAX_MB} MB.` } });
+      }
+
+      const name = typeof body.name === 'string' ? body.name.trim() : '';
+      if (name === '' || name.length > STORED_FILE_NAME_MAX_LENGTH) {
+        return response(400, { ok: false, error: { code: 'FILE_NAME_REQUIRED', message: `Give the file a name of 1 to ${STORED_FILE_NAME_MAX_LENGTH} characters.` } });
+      }
+
+      const buffer = Buffer.from(typeof body.dataBase64 === 'string' ? body.dataBase64.trim() : '', 'base64');
+      // Nothing at all and more than the cap are the same answer for the screen: the
+      // size is unusable, so it asks the person to attach the picture again. They share
+      // one code for that reason and differ only in the status, because an empty paste
+      // is a mistake in the request while an oversized file is a limit being hit.
+      if (buffer.byteLength === 0) {
+        return response(400, { ok: false, error: { code: 'FILE_TOO_LARGE', message: 'That file is empty. Attach the picture again.' } });
+      }
+      if (buffer.byteLength > STORED_FILE_MAX_BYTES) {
+        return response(413, { ok: false, error: { code: 'FILE_TOO_LARGE', message: `A picture can be up to ${STORED_FILE_MAX_MB} MB. Send a smaller picture.` } });
+      }
+
+      // The declared kind is not proof of anything. These bytes are sniffed so a file
+      // that claims to be a PNG and is really something else is refused here rather than
+      // served back to a browser under a type it chose for itself.
+      if (!looksLikeImage(kind, buffer)) {
+        return response(400, { ok: false, error: { code: 'FILE_TYPE_NOT_ALLOWED', message: 'Those bytes are not the picture they say they are. Attach the file again.' } });
+      }
+
+      try {
+        const stored = await dependencies.repository.createStoredFile({
+          userId: session.user.id,
+          name,
+          kind,
+          bytes: buffer.byteLength,
+          data: buffer,
+        });
+        return response(200, { ok: true, data: { file: { ...stored, url: `${FILES_PATH}/${stored.id}` } } });
+      } catch (error) {
+        console.error('[zuri-cloud] store file', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'FILE_SAVE_FAILED', message: 'That picture could not be saved.' } });
+      }
+    }
+
+    // Serving a stored picture back.
+    //
+    // This is the one route that will take a token out of the query string. An <img src>
+    // cannot carry a bearer header: the browser fetches the picture on its own, with
+    // whatever it put in the URL and nothing else. So ?t= is accepted here and nowhere
+    // else, and it is validated exactly like the header is. The cost of that exemption
+    // is that such a url is a secret: it can land in a referrer, a screenshot or a log,
+    // so this handler never logs the url, and the reply is marked private so no shared
+    // cache keeps a copy to hand to somebody else.
+    //
+    // A token is required either way. There is no version of this route that serves a
+    // picture to nobody in particular, because the picture belongs to an account. A row
+    // that is missing and a row that belongs to another account answer the same 404, so
+    // an id cannot be probed for existence, and ids are random uuids, so guessing one is
+    // not a way in.
+    if (url.pathname.startsWith(`${FILES_PATH}/`)) {
+      if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET to read a file.' } });
+      // Exactly one segment after the path. Anything longer is not a file id.
+      const segments = url.pathname.slice(FILES_PATH.length).split('/').filter(Boolean);
+      if (segments.length !== 1) return response(404, { ok: false, error: { code: 'FILE_NOT_FOUND', message: 'That file does not exist.' } });
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const presented = bearerToken(request) || (url.searchParams.get('t') ?? '').trim();
+      const session = await dependencies.auth.authenticate(presented);
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to see that file.' } }, { 'www-authenticate': 'Bearer' });
+      if (dependencies.repository?.findStoredFile === undefined) return response(503, { ok: false, error: { code: 'FILES_NOT_CONFIGURED', message: 'File storage is not configured yet.' } });
+
+      try {
+        const file = await dependencies.repository.findStoredFile({ userId: session.user.id, id: segments[0] });
+        // Another account's file is reported exactly like one that never existed.
+        if (!file) return response(404, { ok: false, error: { code: 'FILE_NOT_FOUND', message: 'That file does not exist.' } });
+        return new Response(file.data, {
+          status: 200,
+          headers: {
+            'content-type': file.kind,
+            'content-length': String(file.bytes),
+            // The id never changes for a given picture, so it serves as the entity tag.
+            etag: `"${file.id}"`,
+            // Private: one account's picture must not be kept by a shared cache.
+            'cache-control': 'private, max-age=3600',
+            // The stored type is one we sniffed, and this stops the browser deciding on
+            // a different interpretation of the same bytes.
+            'x-content-type-options': 'nosniff',
+            // A url that carries ?t= must not travel anywhere as a referrer, so this
+            // response stops the browser sending one from whatever it loads.
+            'referrer-policy': 'no-referrer',
+          },
+        });
+      } catch (error) {
+        console.error('[zuri-cloud] read file', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'FILE_READ_FAILED', message: 'That picture could not be read.' } });
       }
     }
 

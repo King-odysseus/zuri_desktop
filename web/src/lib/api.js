@@ -1,5 +1,130 @@
 // Talks to the Zuri Cloud API. The bearer token lives in sessionStorage so it
 // disappears when the tab closes; it is never written to localStorage.
+
+/*
+ * Tasks and reminders.
+ *
+ * One list each, owned by the account rather than by a conversation, so a task
+ * Zuri adds from one chat is the same row the Tasks page ticks off later. Writes
+ * send only the fields that were given: a blank date means "no date" and is left
+ * out entirely, which lets the server's own defaults fill a field nobody touched.
+ */
+
+/** @param {unknown} value @returns {string} Trimmed text, or '' for anything else. */
+function trimmedText(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+/**
+ * Every task on the account, open and finished together. The page does the
+ * sorting, so the order the server keeps is not relied on here.
+ * @returns {Promise<Array<{ id: string, title: string, notes: string, due: string, priority: 'low' | 'normal' | 'high', done: boolean, createdAt?: string, updatedAt?: string }>>}
+ */
+export async function listTasks() {
+  const data = await api('/api/tasks');
+  return Array.isArray(data?.tasks) ? data.tasks : [];
+}
+
+/**
+ * Add one task.
+ * @param {{ title: string, notes?: string, due?: string, priority?: 'low' | 'normal' | 'high' }} input
+ * @returns {Promise<object>} The stored task, including the id needed to edit it.
+ */
+export async function createTask(input = {}) {
+  const body = { title: trimmedText(input.title) };
+  const notes = trimmedText(input.notes);
+  if (notes !== '') body.notes = notes;
+  const due = trimmedText(input.due);
+  if (due !== '') body.due = due;
+  const priority = trimmedText(input.priority);
+  if (priority !== '') body.priority = priority;
+  const data = await api('/api/tasks', { method: 'POST', body: JSON.stringify(body) });
+  return data?.task ?? {};
+}
+
+/**
+ * Change one task. A field left out of the patch is not sent at all, so ticking a
+ * task done cannot blank the date or the title a chat gave it.
+ * @param {string} id
+ * @param {{ title?: string, notes?: string, due?: string, priority?: 'low' | 'normal' | 'high', done?: boolean }} patch
+ * @returns {Promise<object>} The task as the server now holds it.
+ */
+export async function updateTask(id, patch = {}) {
+  const body = {};
+  if (typeof patch.title === 'string') body.title = patch.title.trim();
+  if (typeof patch.notes === 'string') body.notes = patch.notes.trim();
+  // An empty string is meaningful here: it clears a date the person removed.
+  if (typeof patch.due === 'string') body.due = patch.due.trim();
+  if (typeof patch.priority === 'string') body.priority = patch.priority;
+  if (typeof patch.done === 'boolean') body.done = patch.done;
+  const data = await api(`/api/tasks/${encodeURIComponent(id)}`, { method: 'PATCH', body: JSON.stringify(body) });
+  return data?.task ?? {};
+}
+
+/**
+ * Delete one task.
+ * @param {string} id
+ * @returns {Promise<{ id: string }>}
+ */
+export async function deleteTask(id) {
+  const data = await api(`/api/tasks/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return data ?? { id };
+}
+
+/**
+ * Every reminder on the account.
+ * @returns {Promise<Array<{ id: string, title: string, dueAt: string, repeat: 'once' | 'interval' | 'daily', intervalMinutes?: number, timeOfDay?: string, done: boolean, createdAt?: string }>>}
+ */
+export async function listReminders() {
+  const data = await api('/api/reminders');
+  return Array.isArray(data?.reminders) ? data.reminders : [];
+}
+
+/**
+ * Add one reminder. dueAt is a full ISO string, which is what the server keeps;
+ * the page converts the browser's local date-and-time field before calling here.
+ * @param {{ title: string, dueAt: string, repeat?: 'once' | 'interval' | 'daily', intervalMinutes?: number, timeOfDay?: string }} input
+ * @returns {Promise<object>} The stored reminder.
+ */
+export async function createReminder(input = {}) {
+  const body = { title: trimmedText(input.title), dueAt: trimmedText(input.dueAt) };
+  const repeat = trimmedText(input.repeat);
+  if (repeat !== '') body.repeat = repeat;
+  // Anything unreadable is left out rather than sent as NaN, which the server
+  // would store as a reminder that never fires again.
+  const interval = Math.round(Number(input.intervalMinutes));
+  if (Number.isFinite(interval) && interval > 0) body.intervalMinutes = interval;
+  const timeOfDay = trimmedText(input.timeOfDay);
+  if (timeOfDay !== '') body.timeOfDay = timeOfDay;
+  const data = await api('/api/reminders', { method: 'POST', body: JSON.stringify(body) });
+  return data?.reminder ?? {};
+}
+
+/**
+ * Tick a reminder off, or put it back on the list. The server owns what "done"
+ * means for a repeating reminder, so only that one flag is sent.
+ * @param {string} id
+ * @param {{ done: boolean }} patch
+ * @returns {Promise<object>} The reminder as the server now holds it.
+ */
+export async function updateReminder(id, patch = {}) {
+  const data = await api(`/api/reminders/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ done: Boolean(patch.done) }),
+  });
+  return data?.reminder ?? {};
+}
+
+/**
+ * Delete one reminder.
+ * @param {string} id
+ * @returns {Promise<{ id: string }>}
+ */
+export async function deleteReminder(id) {
+  const data = await api(`/api/reminders/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  return data ?? { id };
+}
+
 const TOKEN_KEY = 'zuri-cloud-token';
 const API_BASE_URL = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
@@ -805,6 +930,96 @@ export async function setPassword(password) {
     body: JSON.stringify({ password }),
   });
 }
+
+/**
+ * Read a file as base64, without the "data:<kind>;base64," prefix.
+ *
+ * FileReader is used rather than File.arrayBuffer() because turning bytes into
+ * base64 by hand in a browser means writing the encoder; readAsDataURL already
+ * does that work, so only its prefix is stripped here.
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+function readAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('That file could not be read. Try choosing it again.'));
+    reader.onload = () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      const comma = result.indexOf(',');
+      if (comma === -1) {
+        reject(new Error('That file could not be read. Try choosing it again.'));
+        return;
+      }
+      resolve(result.slice(comma + 1));
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * The address an image tag can load for a stored file.
+ *
+ * An <img> cannot send the Authorization header, so the session token travels in
+ * the query string instead, which is the one other way GET /api/files/<id> takes
+ * it. An image tag and a new tab both load an address with no header, so both
+ * need the token there; the path itself is left exactly as it was stored.
+ *
+ * The path is made absolute the same way api() builds its request URLs, since
+ * the site and the API may sit on different origins.
+ * @param {string} url A file's own path, such as /api/files/abc.
+ * @param {string} [token] Defaults to the token this tab holds.
+ * @returns {string} An address for an image tag, or '' when there is no path.
+ */
+export function fileDisplayUrl(url, token = readToken()) {
+  const path = typeof url === 'string' ? url.trim() : '';
+  if (path === '') return '';
+  // Only a path this API serves needs a token. A file already addressed by a
+  // whole URL (a picture an older build filed on a CDN) is left exactly as it is:
+  // nothing there reads a token, and one could break a signed address.
+  if (!path.startsWith('/')) return path;
+  const absolute = `${API_BASE_URL}${path}`;
+  if (token === '') return absolute;
+  const separator = absolute.includes('?') ? '&' : '?';
+  return `${absolute}${separator}t=${encodeURIComponent(token)}`;
+}
+
+/**
+ * Upload one file to this account's own file store.
+ *
+ * The bytes travel inside a JSON body as base64, so the request is same-origin
+ * and carries the bearer token like every other call in this module. The reply
+ * names the file's path, which GET /api/files/<id> serves; displayUrl is that
+ * path with this tab's token already on it, ready for an image tag.
+ *
+ * A refusal is thrown by api() with the server's own wording, so a picture over
+ * the 4 MB limit reads as the server's own sentence rather than a generic one.
+ * @param {File} file
+ * @returns {Promise<{ url: string, name: string, kind: string, bytes: number, displayUrl: string }>}
+ */
+export async function uploadFile(file) {
+  const kind = typeof file.type === 'string' && file.type !== '' ? file.type : 'application/octet-stream';
+  const data = await api('/api/files', {
+    method: 'POST',
+    body: JSON.stringify({ name: file.name, kind, dataBase64: await readAsBase64(file) }),
+  });
+  const stored = data?.file ?? {};
+  const url = typeof stored.url === 'string' ? stored.url.trim() : '';
+  if (url === '') throw new Error('The upload finished without a link to the file.');
+  return {
+    url,
+    name: typeof stored.name === 'string' && stored.name !== '' ? stored.name : file.name,
+    kind: typeof stored.kind === 'string' && stored.kind !== '' ? stored.kind : kind,
+    bytes: Number.isFinite(Number(stored.bytes)) ? Number(stored.bytes) : file.size,
+    displayUrl: fileDisplayUrl(url),
+  };
+}
+
+/*
+ * The two Cloudinary helpers below are still used by the projects screen, so the
+ * chat stops calling them but they stay. Nothing new should reach for them:
+ * uploadFile above is same-origin and needs no third-party account.
+ */
 
 /**
  * Ask the account to sign one upload.

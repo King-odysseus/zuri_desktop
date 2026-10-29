@@ -4094,8 +4094,8 @@ h4,
 }
 
 /* A file that came with a turn. A picture is drawn small enough that the thread
-   still reads as a conversation; a PDF is a named row, since a page thumbnail
-   would be another transformation to pay for on every open. */
+   still reads as a conversation; a PDF is a named row, since drawing a page of it
+   as a picture would mean rendering the file to show that it is a file. */
 .chat-attachment {
   display: block;
   width: fit-content;
@@ -4136,6 +4136,55 @@ h4,
   padding: 0;
   color: var(--text);
   font-size: 13px;
+}
+
+/* The file waiting above the composer, which is a different shape from the same
+   class in the thread: there the picture is the attachment and is drawn full
+   size, here it is one 44px thumbnail beside a name. Reusing the class keeps one
+   border and one set of tokens for the only two places a file is shown. */
+.chat-attachment.is-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  padding: 6px 8px;
+  overflow: visible;
+  background: var(--surface-secondary);
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* A fixed square with cover, so one tall picture does not make the row as tall as
+   the composer and the name keeps the rest of the row. */
+.chat-attachment.is-pending .chat-attachment-thumb {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  max-width: 44px;
+  max-height: 44px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+}
+
+.chat-attachment.is-pending .chat-attachment-name {
+  padding: 0;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-attachment.is-pending .chat-attachment-meta {
+  padding: 0;
+}
+
+/* A phone drops the note and keeps the picture, the name and the remove control:
+   the note repeats what Send already does, and the name needs the room. */
+@media (max-width: 480px) {
+  .chat-attachment.is-pending .chat-attachment-meta {
+    display: none;
+  }
 }
 
 /* The actions menu on a chat row. One control per row instead of four icons, so
@@ -5284,3 +5333,221 @@ h4,
     width: 100%;
   }
 }
+
+/*
+ * Tasks and reminders.
+ *
+ * A task and a reminder read the same way: a round tick, the words, a quiet line
+ * under them, and a delete at the end, so one set of classes draws both lists.
+ * The card, the fields and the buttons are the shared ones already on the page;
+ * a class here only ever draws a shape that did not exist before.
+ */
+
+/* Three fields across a wide page, stacked on a phone. The long one takes two
+   thirds, because a title wraps and a date never does. */
+.task-form-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+@media (min-width: 720px) {
+  .task-form-grid {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
+    align-items: end;
+  }
+}
+
+/* The minutes field holds one number, so it never needs the whole card width. */
+.reminder-interval-field {
+  max-width: 240px;
+}
+
+.task-list,
+.reminder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-row,
+.reminder-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+}
+
+.task-row:hover,
+.reminder-row:hover {
+  background: var(--surface-secondary);
+}
+
+/* The tick is the shared icon button, so it keeps its own size and semantics and
+   only its skin changes: round, outlined, and filled with brand blue once done. */
+.icon-btn.task-tick,
+.icon-btn.reminder-tick {
+  flex: 0 0 auto;
+  border: 1.5px solid var(--strong);
+  border-radius: 999px;
+  background: var(--field-background);
+  color: var(--brand-navy);
+}
+
+.icon-btn.task-tick:hover,
+.icon-btn.reminder-tick:hover {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue-ink);
+}
+
+.icon-btn.task-tick[aria-pressed="true"],
+.icon-btn.reminder-tick[aria-pressed="true"] {
+  border-color: var(--brand-blue);
+  background: var(--brand-blue);
+  color: #ffffff;
+}
+
+.icon-btn.task-tick[aria-pressed="true"]:hover,
+.icon-btn.reminder-tick[aria-pressed="true"]:hover {
+  border-color: var(--brand-blue-hover);
+  background: var(--brand-blue-hover);
+  color: #ffffff;
+}
+
+/* A tick is the one control a thumb aims at without reading it, so it grows on a
+   touch screen while the rest of the row keeps its size. */
+@media (pointer: coarse), (max-width: 640px) {
+  .icon-btn.task-tick,
+  .icon-btn.reminder-tick {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+  }
+}
+
+/* 180px is a floor: below it the words keep their own line instead of being
+   squeezed to one character per line on a 390px phone. */
+.task-row-body,
+.reminder-row-body {
+  display: flex;
+  flex: 1 1 180px;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.task-row-title,
+.reminder-row-title {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: break-word;
+}
+
+.task-row-meta,
+.reminder-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.task-row-due.is-late {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Finished work stays readable but stops competing with the open list. */
+.task-row.is-done .task-row-title,
+.reminder-row.is-done .reminder-row-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.task-row-done,
+.reminder-row-done {
+  color: var(--muted);
+}
+
+.task-row-actions,
+.reminder-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+/* The delete question takes its own line under the row, so a phone never has to
+   fit two more controls beside the title. */
+.task-confirm,
+.reminder-confirm {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-left: 2px;
+}
+
+.task-confirm-note,
+.reminder-confirm-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Last in the file, so it outranks the shared ghost button's muted ink. */
+.task-confirm-delete {
+  color: var(--danger);
+}
+
+/* The empty state is the dashed box the project page already uses for a list with
+   nothing in it, with a mark above so the page does not read as broken. */
+.task-empty,
+.reminder-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 26px 18px;
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-xl);
+  background: var(--surface-secondary);
+  text-align: center;
+}
+
+.task-empty-icon,
+.reminder-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  margin-bottom: 4px;
+  border-radius: 999px;
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue-ink);
+}
+
+.task-empty-title,
+.reminder-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.task-empty-note,
+.reminder-empty-note {
+  max-width: 46ch;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
