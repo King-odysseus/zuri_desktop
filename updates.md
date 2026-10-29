@@ -9,6 +9,16 @@
 - Other OS action: run "npm run test && npm run web:build". Railway must redeploy to serve the rebuilt web bundle. No new dependency and no database change.
 - Done on: Windows
 
+## 2026-10-29 - Windows (a tool call written into the reply runs instead of being printed)
+
+- Asked "search the web for job opportunities for project manager in Scotland", the desktop app answered with `<tool_call>{"name": "webSearch", ...}</tool_call>` in the bubble. Zuri Flash had written its tool request into the reply text and left the structured calls field empty, and the signed-in route read only that field, so the request was printed as the answer and no search ran.
+- The reader that already handled DeepSeek's DSML markup now reads both spellings, and it runs on the account route, which is the one the shipped app uses. A call naming a tool that round offers is run, its result goes back to the model, and the model then writes the real answer. A call naming anything else is dropped rather than run.
+- The markup is held back while the reply streams, so it is never painted and then taken away: only text before a tool block is shown, and a trailing "<" waits until the next chunk proves it is ordinary text. Nothing of the markup reaches the screen or the saved chat.
+- A call read out of the text is given an id (`call_text_0`), because the tool result has to quote the same id the assistant turn used and the text carries none.
+- Key files: src/main/providers/chat.js, scripts/selftest.js (two checks: the reader, and a whole round driven through the real send code).
+- Other OS action: run "npm run test". No new dependency and no database change. The installed app needs a rebuilt installer to carry it.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (the Naira picture prices line up, a Lagos dusk behind the form, pictures in the model picker)
 
 - The "Pictures, priced in Naira" cards sat in one narrow column with a wide empty strip beside them. Two different rules in the web stylesheet were both named `.image-grid`: the landing page's three price cards and the saved-picture library. The library rule came later and won, so the price cards were laid out as a shelf of small library tiles. The library is now `.image-library-grid`, and the three price cards take the full width of the page as three equal columns.

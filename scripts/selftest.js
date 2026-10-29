@@ -72,6 +72,43 @@ check('the Windows app identity uses the Zuri icon', () => {
   return 'Zuri icon assets and taskbar identity are configured';
 });
 
+check('Android wears the same Zuri mark as the desktop and web', () => {
+  // The phone was the one surface still shipping the stock Capacitor art: a grey
+  // cross on a white plate and a blue cross on the splash. Nothing checked it, so
+  // it drifted. These assertions read files only (no image decoding), which is
+  // enough to catch the artwork being replaced by the template again.
+  const res = 'android/app/src/main/res';
+  const missing = [];
+  for (const density of ['mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi']) {
+    for (const name of ['ic_launcher.png', 'ic_launcher_round.png', 'ic_launcher_foreground.png']) {
+      if (!exists(`${res}/mipmap-${density}/${name}`)) missing.push(`mipmap-${density}/${name}`);
+    }
+  }
+  // Only the folders Capacitor draws a splash for; drawable-v24 held icon vectors, not a splash.
+  const splashFolders = fs.readdirSync(path.join(root, res)).filter((entry) => /^drawable(-(land|port)-(mdpi|hdpi|xhdpi|xxhdpi|xxxhdpi))?$/.test(entry));
+  for (const folder of splashFolders) {
+    if (!exists(`${res}/${folder}/splash.png`)) missing.push(`${folder}/splash.png`);
+  }
+  if (missing.length > 0) throw new Error(`missing ${missing.join(', ')}`);
+
+  const plate = read(`${res}/values/ic_launcher_background.xml`);
+  if (!/#0D1B3A/i.test(plate)) throw new Error('the adaptive icon plate is not the brand navy');
+
+  const theme = read(`${res}/values/colors.xml`);
+  for (const name of ['colorPrimary', 'colorPrimaryDark', 'colorAccent']) {
+    if (!new RegExp(`name="${name}"`).test(theme)) throw new Error(`the Android theme does not define ${name}`);
+  }
+  if (!/#0D1B3A/i.test(theme)) throw new Error('the Android theme is not the brand navy');
+
+  // The Capacitor template's teal, and the white X it drew, must not come back.
+  for (const file of fs.readdirSync(path.join(root, res), { recursive: true })) {
+    if (typeof file !== 'string' || !file.endsWith('.xml')) continue;
+    const body = read(`${res}/${file.split(path.sep).join('/')}`);
+    if (/#26A69A/i.test(body)) throw new Error(`${file} still carries the Capacitor teal`);
+  }
+  return 'launcher, adaptive and splash art plus theme colours';
+});
+
 check('main loads the React entry without a legacy fallback', () => {
   const source = read('src/main/main.js');
   if (!source.includes("path.join(moduleDir, '..', '..', 'dist-react', 'index.html')")) {
@@ -138,7 +175,7 @@ check('own prompts carry a copy action, not only replies', () => {
   return 'prompts and replies both copy through one path';
 });
 
-const { splitDsml, answerStylePolicy, chatSystemPrompt, ZURI_IDENTITY_PROMPT, resolveChatTarget } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+const { splitToolCalls, visiblePrefixLength, answerStylePolicy, chatSystemPrompt, ZURI_IDENTITY_PROMPT, resolveChatTarget } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
 
 // The desktop app showed supplier ids (gpt-4o-mini) while the product sells Zuri
 // names, so the picker now offers the catalogue. Each row still stores the real
@@ -172,11 +209,42 @@ check('DSML tool markup is hidden from the reply and read as tool calls', () => 
   const markup =
     'Let me look.<｜DSML｜function_calls><｜DSML｜invoke name="webSearch">' +
     '<｜DSML｜parameter name="query" string="true">terms</｜DSML｜parameter></｜DSML｜invoke></｜DSML｜function_calls>';
-  const { visible, calls } = splitDsml(markup);
+  const { visible, calls } = splitToolCalls(markup);
   if (visible !== 'Let me look.') throw new Error(`visible text was "${visible}"`);
   if (calls.length !== 1 || calls[0].name !== 'webSearch') throw new Error('call not read');
   if (JSON.parse(calls[0].arguments).query !== 'terms') throw new Error('argument not read');
-  if (splitDsml('1 < 2').visible !== '1 < 2') throw new Error('plain text was altered');
+  if (splitToolCalls('1 < 2').visible !== '1 < 2') throw new Error('plain text was altered');
+});
+
+check('a tool call written into the reply text runs instead of being shown', () => {
+  // What this came from: Zuri Flash answered a web question with the raw markup, so
+  // the person read the request instead of the answer it should have fetched. The
+  // installed app uses the account route, which has to read this shape too.
+  const markup =
+    'Looking that up.\n<tool_call>\n' +
+    '{"name": "webSearch", "arguments": {"query": "project manager jobs Scotland"}}\n</tool_call>';
+  const { visible, calls } = splitToolCalls(markup);
+  if (visible !== 'Looking that up.') throw new Error(`visible text was "${visible}"`);
+  if (calls.length !== 1 || calls[0].name !== 'webSearch') throw new Error('call not read');
+  if (JSON.parse(calls[0].arguments).query !== 'project manager jobs Scotland') throw new Error('argument not read');
+  // The tool turn has to quote an id, so a call read out of the text needs one.
+  if (calls[0].id === '') throw new Error('the call has no id for the tool turn to quote');
+  // A supplier usually sends the call with no words around it.
+  const alone = splitToolCalls('<tool_call>{"name": "webSearch", "arguments": {"query": "x"}}</tool_call>');
+  if (alone.visible !== '') throw new Error(`visible text was "${alone.visible}"`);
+  if (alone.calls.length !== 1) throw new Error('a call on its own was not read');
+  // A block that is not a call must not become one, and plain text keeps its "<".
+  if (splitToolCalls('<tool_call>not json</tool_call>').calls.length !== 0) throw new Error('a broken block was read as a call');
+  // A half-arrived block is held back, and a complete one is never painted.
+  if (visiblePrefixLength('Answer <tool') !== 'Answer '.length) throw new Error('half a block would be painted');
+  if (visiblePrefixLength('Answer. <tool_call>{"name": "x"}</tool_call>') !== 'Answer. '.length) {
+    throw new Error('markup would be painted');
+  }
+  // The account route is the one the installed app uses, so it has to read the round.
+  if (!read('src/main/providers/chat.js').includes('...round.calls.filter(')) {
+    throw new Error('the account route ignores calls written into the text');
+  }
+  return 'both spellings, and the account route reads them';
 });
 
 check('the reply policy follows the saved answer style', () => {
@@ -1289,6 +1357,61 @@ check('a reply in Act mode builds files, asks before editing, and carries skills
   }
 });
 await Promise.all(pendingChecks);
+
+// The screenshot this came from: asked to search the web, Zuri Flash answered with
+// the raw request it meant to make, so the person read the request and no search
+// ran. The supplier writes the call into the text and leaves the calls field empty,
+// so this drives the real send code to prove the app now runs it instead.
+check('a call written into the reply text is run, not printed', async () => {
+  const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const { sendChatMessage } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+  const previousRoot = store.getStoreRoot();
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-text-call-'));
+  try {
+    store.setStoreRoot(scratch);
+    const thread = (await store.createThread({ title: 'Jobs' })).data;
+    await store.appendMessage(thread.id, { role: 'user', content: 'Search the web for project manager jobs in Scotland' });
+
+    // readFile rather than webSearch: the shape under test is the same and a check
+    // must never reach the network. The file does not exist, which is the point:
+    // the failure still proves the call was read and handed to the tool.
+    const markup = '<tool_call>\n{"name": "readFile", "arguments": {"path": "missing-notes.txt"}}\n</tool_call>';
+    const script = [{ content: markup }, { content: 'Here are the roles I found.' }];
+    const requests = [];
+    const deltas = [];
+    const result = await sendChatMessage(thread.id, {
+      mode: 'ask',
+      emit: (event) => {
+        if (typeof event.delta === 'string') deltas.push(event.delta);
+      },
+      cloudReply: async (request) => {
+        requests.push(JSON.parse(JSON.stringify(request.conversation.turns)));
+        const round = script[Math.min(requests.length - 1, script.length - 1)];
+        return { ok: true, data: { ...round, modelCode: 'zuri-flash' } };
+      },
+    });
+    if (!result.ok) throw new Error(result.error?.message ?? 'the reply failed');
+    if (requests.length !== 2) throw new Error(`the model was asked ${requests.length} times, expected a second round after the call`);
+    const answerTurn = requests[1].at(-1);
+    if (answerTurn?.role !== 'tool') throw new Error('the second round did not carry a tool result');
+    if (answerTurn.toolCallId !== 'call_text_0') throw new Error(`the result quoted "${answerTurn.toolCallId}"`);
+    const outcome = JSON.parse(answerTurn.content);
+    if (outcome.ok !== false) throw new Error('a missing file should have come back as a failure');
+    // A name the round does not offer never reaches the tool, and that is what used to
+    // happen to every call written this way.
+    for (const neverRan of ['TOOL_UNKNOWN', 'TOOL_DECLINED']) {
+      if (outcome.error?.code === neverRan) throw new Error(`the call never ran: ${neverRan}`);
+    }
+    const saved = result.data.thread.messages.at(-1).content;
+    if (saved.includes('tool_call')) throw new Error('the markup was saved as the reply');
+    if (saved !== 'Here are the roles I found.') throw new Error(`the saved reply was "${saved}"`);
+    if (deltas.join('').includes('tool_call')) throw new Error('the markup was painted in the chat');
+    return 'the call ran, and neither the chat nor the saved reply carries the markup';
+  } finally {
+    store.setStoreRoot(previousRoot);
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+});
 
 // The chip has to sit in the message row and offer the one catalogue, or a person
 // has to leave the chat to change model, which is what this change removes.

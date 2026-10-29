@@ -860,23 +860,72 @@ async function readEventStream(body, onEvent) {
   }
 }
 
-// DeepSeek sometimes writes its tool request into the reply text as DSML markup
-// (`<｜DSML｜function_calls>...`) instead of a real tool_calls field. Left alone it
-// would show up in the chat, so the markup is cut from the text and read as calls.
-const DSML_START = /<[|｜\s]*DSML/;
-const DSML_HOLD_BACK = 16;
+// A supplier's tool request sometimes arrives as text instead of a tool_calls field,
+// and every spelling of that has to be read here or the request is printed in the
+// chat as if it were the answer and the tool never runs. DeepSeek writes DSML markup
+// (`<｜DSML｜function_calls>...`); Zuri Flash and the other OpenAI-compatible models
+// write `<tool_call>{"name": ..., "arguments": {...}}</tool_call>`.
+const TOOL_MARKUP_START = /<[|｜\s]*DSML|<tool_call>/i;
+const TOOL_CALL_BLOCK = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/gi;
+// A "<" that may be the first character of a tool block still arriving in the next
+// chunk is not painted until it is known to be ordinary text.
+const TOOL_MARKUP_HOLD_BACK = 16;
 
 /**
- * Split reply text into what the person should read and any DSML tool calls.
+ * How much of a half-arrived reply is safe to paint: everything before a tool block,
+ * and none of a trailing "<" that a later chunk may turn into one.
+ * @param {string} text
+ * @returns {number}
+ */
+export function visiblePrefixLength(text) {
+  const marker = text.search(TOOL_MARKUP_START);
+  if (marker !== -1) return marker;
+  const tail = text.lastIndexOf('<');
+  return tail !== -1 && text.length - tail < TOOL_MARKUP_HOLD_BACK ? tail : text.length;
+}
+
+/**
+ * One `<tool_call>` body as a call. Its arguments arrive as an object where every
+ * other call carries them as a JSON string, so they are put back into that shape.
+ * @param {string} body
+ * @param {number} index
+ * @returns {{ id: string, name: string, arguments: string } | null}
+ */
+function textToolCall(body, index) {
+  let parsed;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    // Not JSON, so not a call. The block is still markup and is dropped with it.
+    return null;
+  }
+  const name = typeof parsed?.name === 'string' ? parsed.name.trim() : '';
+  if (name === '') return null;
+  const args = parsed.arguments ?? parsed.parameters ?? {};
+  return {
+    // The tool turn has to quote the id the assistant turn used as well, and a call
+    // written into the text has none, so it is given one the supplier cannot reuse.
+    id: `call_text_${index}`,
+    name,
+    arguments: typeof args === 'string' ? args : JSON.stringify(args),
+  };
+}
+
+/**
+ * Split reply text into what the person should read and any tool calls written into
+ * it as markup. Markup always ends the readable part: a model that writes a call says
+ * nothing after it.
  * @param {string} text
  * @returns {{ visible: string, calls: { id: string, name: string, arguments: string }[] }}
  */
-export function splitDsml(text) {
-  const start = text.search(DSML_START);
-  if (start === -1) return { visible: text, calls: [] };
+export function splitToolCalls(text) {
+  const source = typeof text === 'string' ? text : '';
+  const start = source.search(TOOL_MARKUP_START);
+  if (start === -1) return { visible: source, calls: [] };
 
   const calls = [];
-  const chunks = text.slice(start).split(/invoke\s+name="/).slice(1);
+  // DSML names the tool on an invoke tag and its arguments on parameter tags.
+  const chunks = source.slice(start).split(/invoke\s+name="/).slice(1);
   for (const chunk of chunks) {
     const name = chunk.slice(0, chunk.indexOf('"'));
     if (name === '') continue;
@@ -884,9 +933,14 @@ export function splitDsml(text) {
     for (const match of chunk.matchAll(/parameter\s+name="([^"]+)"[^>]*>([\s\S]*?)<\s*\/[^>]*?parameter\s*>/g)) {
       args[match[1]] = match[2].trim();
     }
-    calls.push({ id: '', name, arguments: JSON.stringify(args) });
+    calls.push({ id: `call_text_${calls.length}`, name, arguments: JSON.stringify(args) });
   }
-  return { visible: text.slice(0, start).trimEnd(), calls };
+  // The simpler spelling wraps the whole call, name and arguments, in JSON.
+  for (const block of source.matchAll(TOOL_CALL_BLOCK)) {
+    const call = textToolCall(block[1], calls.length);
+    if (call !== null) calls.push(call);
+  }
+  return { visible: source.slice(0, start).trimEnd(), calls };
 }
 
 /**
@@ -1012,14 +1066,9 @@ async function streamReply(provider, model, key, conversation, options = {}) {
       reply += text;
       if (typeof options.onDelta !== 'function') return;
 
-      // Stream only what comes before any DSML markup, and hold back a trailing "<"
+      // Stream only what comes before a tool block, and hold back a trailing "<"
       // that might be the start of one split across two chunks.
-      const marker = reply.search(DSML_START);
-      let limit = marker;
-      if (marker === -1) {
-        const tail = reply.lastIndexOf('<');
-        limit = tail !== -1 && reply.length - tail < DSML_HOLD_BACK ? tail : reply.length;
-      }
+      const limit = visiblePrefixLength(reply);
       if (limit > streamedLength) {
         options.onDelta(reply.slice(streamedLength, limit));
         streamedLength = limit;
@@ -1040,7 +1089,7 @@ async function streamReply(provider, model, key, conversation, options = {}) {
     return failure('CHAT_PROVIDER_ERROR', `${config.label} reported: ${streamedFailure}`);
   }
 
-  const split = splitDsml(reply);
+  const split = splitToolCalls(reply);
   // Markup calls only count when tools were offered; otherwise the model is asking for
   // something this turn cannot do, so the markup is dropped and the rest is shown.
   const offeredNames = (options.tools ?? []).map((tool) => tool.name);
@@ -1615,19 +1664,53 @@ export async function sendChatMessage(threadId, options = {}) {
     let textSoFar = '';
     for (;;) {
       const toolsForRound = rounds < MAX_TOOL_ROUNDS ? offeredForAccount : [];
+      // This round's own words, markup included, and how much of them has been
+      // painted. A tool block is held back rather than typed into the reply.
+      let heard = '';
+      let painted = 0;
+      const paint = (limit) => {
+        if (limit <= painted) return;
+        emit({ threadId, delta: heard.slice(painted, limit) });
+        painted = limit;
+      };
       reached = await options.cloudReply({
         conversation: { system: conversation.system, turns: wire },
         settings: modelSettings,
         tools: toolsForRound,
         signal: options.signal,
         emit: (event) => {
-          if (typeof event.delta === 'string') textSoFar += event.delta;
-          emit({ threadId, ...event });
+          if (typeof event.delta !== 'string') {
+            emit({ threadId, ...event });
+            return;
+          }
+          heard += event.delta;
+          paint(visiblePrefixLength(heard));
         },
       });
       if (!reached.ok) break;
 
-      const calls = Array.isArray(reached.data?.toolCalls) ? reached.data.toolCalls : [];
+      // A supplier that writes its call into the text returns an empty calls field,
+      // so this round's words are read for calls as well. What is left is what the
+      // person reads and what gets saved, never the markup.
+      const round = splitToolCalls(
+        typeof reached.data?.content === 'string' && reached.data.content !== '' ? reached.data.content : heard,
+      );
+      if (!reached.data) reached.data = {};
+      reached.data.content = round.visible;
+      // Whatever was held back arrives now, including a "<" that turned out to be
+      // ordinary text rather than the start of a block.
+      if (round.visible.length > painted) {
+        emit({ threadId, delta: round.visible.slice(painted) });
+        painted = round.visible.length;
+      }
+      textSoFar += round.visible;
+
+      const calls = [
+        ...(Array.isArray(reached.data.toolCalls) ? reached.data.toolCalls : []),
+        // Only a tool this round offers may run. Anything else is a request the round
+        // cannot answer, so its markup is dropped and the words around it are shown.
+        ...round.calls.filter((call) => toolsForRound.some((tool) => tool.name === call.name)),
+      ];
       if (calls.length === 0 || toolsForRound.length === 0) break;
 
       // The call and its results have to travel with the next round, or the model
