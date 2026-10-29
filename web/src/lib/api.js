@@ -691,7 +691,16 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, project
           continue;
         }
 
-        if (event.type === 'done') return { ...(event.data ?? {}), content: event.data?.content || content, toolCalls: [] };
+        // The done frame carries any tool calls, so a streamed tool round still
+        // says what to run. The text stays the streamed text when the frame omits it.
+        if (event.type === 'done') {
+          return {
+            ...(event.data ?? {}),
+            content: event.data?.content || content,
+            toolCalls: Array.isArray(event.data?.toolCalls) ? event.data.toolCalls : [],
+            reasoningContent: typeof event.data?.reasoningContent === 'string' ? event.data.reasoningContent : '',
+          };
+        }
 
         if (event.type === 'error') {
           const error = new Error(event.error?.message ?? 'The chat request failed.');

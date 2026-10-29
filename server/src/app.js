@@ -14,6 +14,7 @@ import { checkedAttachment, signUpload } from './uploads.js';
 import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './images.js';
 import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, answerStyleLength } from './text.js';
 import { searchWeb } from './tools.js';
+import { splitToolCalls, visiblePrefixLength, visibleText } from './markup.js';
 // The fixed DuckDuckGo search lives in tools.js. This module only decides who may
 // call it.
 
@@ -886,48 +887,6 @@ export function createApp(dependencies = {}) {
           return response(mapped.status, mapped.body, mapped.headers);
         }
 
-        // A request that offers tools is answered whole, not streamed. The point of
-        // such a round is the calls, not the words, and the app has to run them and
-        // come back: streaming halfway through a tool loop only delays the decision.
-        if (offeredTools.data.length > 0) {
-          try {
-            const result = await dependencies.chatProvider({
-              messages: messages.data,
-              model: zuriModel.supplierModel,
-              supplier: zuriModel.supplier,
-              maxTokens: limits.maxOutputTokens,
-              signal: AbortSignal.timeout(120_000),
-              tools: offeredTools.data,
-            });
-            // The round is charged whether or not it also produced text: the tokens
-            // were spent either way, and a loop that only billed the last round would
-            // be free for anyone willing to call tools.
-            await commitReply(result);
-            releaseLease();
-            return response(200, {
-              ok: true,
-              data: {
-                requestId,
-                model: zuriModel.code,
-                modelName: zuriModel.name,
-                content: plainDashes(result.content),
-                toolCalls: Array.isArray(result.toolCalls) ? result.toolCalls : [],
-                // A reasoning supplier (DeepSeek Flash) refuses a tool round unless the
-                // thinking that produced the calls comes back with them. It is passed to
-                // the caller and echoed on the next request; nobody is shown it.
-                reasoningContent: typeof result.reasoningContent === 'string' ? result.reasoningContent : '',
-                usage: result.usage,
-              },
-            });
-          } catch (error) {
-            if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
-            const mapped = failureFor(error);
-            if (mapped.status === 500 || error?.code === 'PROVIDER_REQUEST_FAILED') console.error('[zuri-cloud] chat', error?.message ?? error);
-            return response(mapped.status, mapped.body);
-          } finally {
-            releaseLease();
-          }
-        }
 
         // A streamed reply is what the desktop app asks for, so the answer appears
         // word by word instead of after a long silence. The body is server-sent
@@ -949,19 +908,53 @@ export function createApp(dependencies = {}) {
                 }
               };
               try {
+                // Everything received but not yet known to be ordinary words.
+                let pending = '';
+                let painted = 0;
                 const result = await dependencies.chatProvider({
                   messages: messages.data,
                   model: zuriModel.supplierModel,
                   supplier: zuriModel.supplier,
                   maxTokens: limits.maxOutputTokens,
                   signal: AbortSignal.timeout(120_000),
-                  onDelta: (text) => send({ type: 'delta', text: plainDashes(text) }),
+                  tools: offeredTools.data,
+                  // A supplier sometimes writes the request into the text instead of
+                  // returning it as a call, so the reply is read for both shapes.
+                  // A tool request written into the text is held back rather than
+                  // painted: showing it, even for one frame, is the bug this guards.
+                  onDelta: (text) => {
+                    pending += typeof text === 'string' ? text : '';
+                    const safe = visiblePrefixLength(pending);
+                    if (safe <= 0) return;
+                    const piece = pending.slice(0, safe);
+                    pending = pending.slice(safe);
+                    painted += piece.length;
+                    send({ type: 'delta', text: plainDashes(piece) });
+                  },
                 });
                 plainReply(result);
                 await commitReply(result);
-                // The supplier's model name stays server-side; customers see the
-                // Zuri name.
-                send({ type: 'done', data: { requestId, model: zuriModel.code, modelName: zuriModel.name, content: result.content, usage: result.usage } });
+                // Whatever the hold-back kept, in case a trailing "<" turned out to
+                // be ordinary text, and the reply with any markup removed. A request
+                // written into the text becomes a real call here, so it still runs.
+                const split = splitToolCalls(result.content);
+                const visible = split.visible;
+                if (visible.length > painted) send({ type: 'delta', text: plainDashes(visible.slice(painted)) });
+                // The calls ride in the done frame: streaming a tool round means the
+                // words still arrive as they are written, and the caller learns what
+                // to run from here instead of from a whole JSON body.
+                const calls = Array.isArray(result.toolCalls) && result.toolCalls.length > 0 ? result.toolCalls : split.calls;
+                send({ type: 'done', data: {
+                  requestId,
+                  model: zuriModel.code,
+                  modelName: zuriModel.name,
+                  content: plainDashes(visible),
+                  toolCalls: calls,
+                  // A reasoning supplier refuses the next round unless the thinking
+                  // that produced the calls comes back with them. Nobody is shown it.
+                  reasoningContent: typeof result.reasoningContent === 'string' ? result.reasoningContent : '',
+                  usage: result.usage,
+                } });
               } catch (error) {
                 // Nothing reached the person, so the plan is not charged for it.
                 if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
@@ -997,7 +990,19 @@ export function createApp(dependencies = {}) {
           const result = await dependencies.chatProvider({ messages: messages.data, model: zuriModel.supplierModel, supplier: zuriModel.supplier, maxTokens: limits.maxOutputTokens, signal: AbortSignal.timeout(120_000) });
           await commitReply(result);
           // The supplier's model name stays server-side; customers see the Zuri name.
-          return response(200, { ok: true, data: { requestId, model: zuriModel.code, modelName: zuriModel.name, content: plainDashes(result.content), usage: result.usage } });
+          const split = splitToolCalls(result.content);
+          return response(200, {
+            ok: true,
+            data: {
+              requestId,
+              model: zuriModel.code,
+              modelName: zuriModel.name,
+              content: plainDashes(split.visible),
+              toolCalls: Array.isArray(result.toolCalls) && result.toolCalls.length > 0 ? result.toolCalls : split.calls,
+              reasoningContent: typeof result.reasoningContent === 'string' ? result.reasoningContent : '',
+              usage: result.usage,
+            },
+          });
         } catch (error) {
           if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
           const mapped = failureFor(error);

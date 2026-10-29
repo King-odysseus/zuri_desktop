@@ -854,13 +854,20 @@ export default function ChatView({
         // Stop ends the whole loop, which is why the signal is read between rounds
         // and not only by the request in flight.
         if (controller.signal.aborted) throw stoppedReply();
-        const offerTools = round < MAX_TOOL_ROUNDS && tools.length > 0;
+        // The closing round keeps the tools offered. Taking them away makes a model
+        // write the call into its text instead, which is the markup nobody should
+        // ever see, and the answer comes back empty. Offering them and asking for
+        // words gets an answer that uses what the search already found.
+        const closing = round === MAX_TOOL_ROUNDS && tools.length > 0;
+        const offerTools = tools.length > 0;
         // Each round paints its own words, so a previous round's sentence does not
         // sit above the search that replaced it.
         reply = '';
         setStreamReply('');
         const result = await streamChat({
-          messages: wire,
+          messages: closing
+            ? [...wire, { role: 'user', content: 'Answer now in plain words, using what you already have. Do not call another tool.' }]
+            : wire,
           model,
           // A chat inside a project names it, so the server adds that project's
           // instructions and files to the prompt before the question is sent.

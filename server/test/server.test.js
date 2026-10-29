@@ -1,4 +1,19 @@
 import assert from 'node:assert/strict';
+import { readChatStream } from '../../src/main/providers/sse.js';
+
+/**
+ * The data of the one `done` frame of a streamed reply, read with the same reader the
+ * desktop uses. Tool rounds stream now, so a test that wants the calls reads them
+ * from there rather than from a JSON body.
+ * @param {Response} response
+ * @returns {Promise<any>}
+ */
+async function doneFrame(response) {
+  const read = await readChatStream(response, () => {});
+  if (read?.ok !== true) throw new Error('the stream carried no done frame');
+  return read.data;
+}
+
 import { createHmac } from 'node:crypto';
 import { readdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
@@ -952,10 +967,10 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
     body: JSON.stringify({ model: 'zuri-flash', stream: true, tools, messages: [{ role: 'user', content: 'Read my notes' }] }),
   }));
   assert.equal(called.status, 200);
-  // A tool round is answered whole, so the app can act on the call without waiting
-  // on a stream that has nothing useful to stream.
-  assert.match(called.headers.get('content-type') ?? '', /application\/json/);
-  const round = (await called.json()).data;
+  // A tool round streams like any other reply, so the words still arrive as they
+  // are written even when a search is offered; the calls ride in the done frame.
+  assert.match(called.headers.get('content-type') ?? '', /text\/event-stream/);
+  const round = await doneFrame(called);
   assert.equal(round.toolCalls.length, 1);
   assert.equal(round.toolCalls[0].name, 'readFile');
   assert.equal(seen[0].tools.length, 1, 'the definition reached the supplier');
