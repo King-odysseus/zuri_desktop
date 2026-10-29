@@ -58,6 +58,22 @@
   var previewHost = (new URLSearchParams(window.location.search).get('preview') || '').toLowerCase();
   var wired = false;
 
+  /**
+   * Plans already applied, by the identity built from the plan itself.
+   *
+   * paintAssistant runs again for every streamed word, so each of those repaints
+   * rebuilt the card and applied the whole plan once more under "Always allow".
+   * One entry per plan means the first card applies it and later copies only say
+   * what it did.
+   * @type {Object<string, { done: boolean, note: string }>}
+   */
+  var appliedPlans = {};
+
+  /** The same summary and operations always give the same key, so a repaint matches. */
+  function planKey(plan) {
+    return String(plan.summary || '') + '|' + JSON.stringify(plan.operations);
+  }
+
   /* Which Office app is this? ---------------------------------------------- */
 
   /** "excel" in, "Excel" out, and "" for anything else. */
@@ -711,15 +727,76 @@
     return null;
   }
 
+  /**
+   * Carry out a plan and report what happened to every operation in it.
+   *
+   * A plan may only be run once: the card is rebuilt for each streamed word, so
+   * "Always allow" used to apply the same plan again on every one of those rebuilds.
+   * @param {HTMLElement} card
+   * @param {HTMLElement} actions
+   * @param {HTMLButtonElement} button
+   * @param {object} plan
+   * @returns {void}
+   */
   function applyPlan(card, actions, button, plan) {
+    var key = planKey(plan);
+    var earlier = appliedPlans[key];
+    // The same card may try again when nothing reached the file. Every other card is a
+    // repaint of this one, and a repaint must never start the plan a second time.
+    var retry = earlier !== undefined && earlier.button === button && earlier.done === true && earlier.reached !== true;
+    if (earlier !== undefined && retry !== true) {
+      // In flight, already applied, or a repainted card: it says what happened the
+      // first time and offers only what is still allowed.
+      actions.textContent = '';
+      var settled = earlier.done === true && earlier.reached === true;
+      actions.appendChild(el('span', settled ? 'done' : 'ops-note', earlier.note));
+      // A plan that reached nothing can be pressed again by hand; one that landed cannot.
+      button.disabled = earlier.done !== true || earlier.reached === true;
+      return;
+    }
+    // Recorded before the first await, so a card painted mid-apply knows the plan is
+    // spoken for rather than starting it a second time.
+    appliedPlans[key] = { done: false, reached: false, note: 'Applying...', button: button };
     button.disabled = true;
     button.textContent = 'Applying...';
 
     applyOperations(plan.operations)
-      .then(function (applied) {
+      .then(function (report) {
+        var applied = report.applied.length;
+        var failed = report.failures.length;
+
         actions.textContent = '';
-        actions.appendChild(el('span', 'done', 'Applied ' + applied.length + ' change' + (applied.length === 1 ? '' : 's') + '. Press Ctrl+Z in Office to undo.'));
-        setStatus('Done. The file has been changed.');
+        if (applied > 0) {
+          actions.appendChild(el('span', 'done', 'Applied ' + countChanges(applied) + '. Press Ctrl+Z in Office to undo.'));
+        } else {
+          // Nothing reached the file, so the button comes back for another go.
+          button.disabled = false;
+          button.textContent = 'Apply';
+        }
+        // Each refusal is named with the line of the plan it belongs to: one sentence
+        // that named no operation is what the person could not act on.
+        for (var failureIndex = 0; failureIndex < failed; failureIndex += 1) {
+          card.appendChild(el('div', 'ops-error', 'Could not ' + lowerFirst(report.failures[failureIndex].description) + ': ' + report.failures[failureIndex].message));
+        }
+        if (applied > 0 && failed > 0) {
+          card.appendChild(el('div', 'ops-note', countChanges(applied) + ' did reach the file. The rest can be asked for again.'));
+        }
+        appliedPlans[key] = {
+          done: true,
+          reached: applied > 0,
+          button: button,
+          note: applied === 0 ? 'Nothing was applied.'
+            : failed === 0 ? 'Applied ' + countChanges(applied) + '.'
+              : 'Applied ' + applied + ' of ' + (applied + failed) + ' changes.',
+        };
+
+        if (applied === 0) {
+          setStatus('The change was not applied.', true);
+          return;
+        }
+        setStatus(failed === 0
+          ? 'Done. The file has been changed.'
+          : 'Some changes were applied. The rest are listed on the card.', failed !== 0);
         // The file has moved on, so the next question is answered against what is there now.
         return readContext().then(function (context) {
           state.context = context;
@@ -730,11 +807,122 @@
         button.disabled = false;
         button.textContent = 'Apply';
         card.appendChild(el('div', 'ops-error', error.message || 'Office would not accept that change.'));
+        // A guard refused the plan outright (a preview, or another app's change), so a
+        // repaint must not try it again either.
+        appliedPlans[key] = { done: true, reached: false, note: error.message || 'That change was not applied.', button: button };
         setStatus('The change was not applied.', true);
       });
   }
 
   /* Writing to the file ---------------------------------------------------- */
+
+  /** The app named in a failure, so the sentence reads "Excel would not accept that change." */
+  var APPLIER_NAMES = { excel: 'Excel', word: 'Word', powerpoint: 'PowerPoint' };
+
+  /**
+   * Run a plan one operation at a time, so one refusal cannot cancel the rest.
+   *
+   * Office throws away a whole batch when a single call in it is wrong, which used to
+   * leave the file untouched and answer with one sentence that named no operation.
+   * Each operation therefore goes through its applier on its own, in the order the
+   * plan lists them.
+   * @param {Array<object>} operations
+   * @param {string} host The app these operations belong to: excel, word or powerpoint.
+   * @param {function(Array<object>): Promise<Array>} applier Writes exactly one operation.
+   * @param {function(object): Promise<void>} [preflight] Refuses a doomed operation first.
+   * @returns {Promise<{ applied: string[], failures: Array<{ description: string, message: string }> }>}
+   */
+  function runPlanOneByOne(operations, host, applier, preflight) {
+    var applied = [];
+    var failures = [];
+    var chain = Promise.resolve();
+
+    for (var index = 0; index < operations.length; index += 1) {
+      // A plan may mix apps, so this app carries out its own lines and leaves the rest.
+      if (hostFor(operations[index]) !== host) continue;
+      chain = chain.then(runPlanStep(operations[index], host, applier, preflight, applied, failures));
+    }
+
+    return chain.then(function () {
+      return { applied: applied, failures: failures };
+    });
+  }
+
+  /**
+   * One operation of a plan, as a step the chain above waits for.
+   *
+   * The failure handler belongs to the same promise as the success handler, so a
+   * refusal is recorded and the operations after it still run.
+   * @param {object} operation
+   * @param {string} host
+   * @param {function(Array<object>): Promise<Array>} applier
+   * @param {function(object): Promise<void>|undefined} preflight
+   * @param {string[]} applied
+   * @param {Array<{ description: string, message: string }>} failures
+   * @returns {function(): Promise<void>}
+   */
+  function runPlanStep(operation, host, applier, preflight, applied, failures) {
+    return function () {
+      var refusal = preflight ? preflight(operation) : Promise.resolve();
+      return refusal.then(function () {
+        return applier([operation]);
+      }).then(function () {
+        applied.push(ZuriOps.describeOperation(operation));
+      }, function (error) {
+        failures.push({
+          description: ZuriOps.describeOperation(operation),
+          message: officeMessage(error, APPLIER_NAMES[host] + ' would not accept that change.'),
+        });
+      });
+    };
+  }
+
+  /**
+   * Skip a chart or a table whose source range holds nothing.
+   *
+   * Excel answers such a request with an argument error that names no cause, and a
+   * chart of empty cells is never what was asked for, so the range is read first and
+   * the operation is refused with a reason a person can act on.
+   * @param {object} operation
+   * @returns {Promise<void>} Rejects with a plain reason when the range is empty.
+   */
+  function checkExcelSource(operation) {
+    if (operation.op !== 'addChart' && operation.op !== 'createTable') return Promise.resolve();
+    return excelSourceIsEmpty(operation).then(function (empty) {
+      if (!empty) return;
+      throw new Error(operation.op === 'addChart'
+        ? 'that range has no data yet, so there is nothing to chart.'
+        : 'that range has no data yet, so there is nothing to make a table from.');
+    });
+  }
+
+  /**
+   * Whether every cell in the range holds nothing.
+   *
+   * A range that cannot be read answers "no": the operation that follows reports its
+   * own refusal, which says more than a guess made here.
+   * @param {object} operation
+   * @returns {Promise<boolean>}
+   */
+  function excelSourceIsEmpty(operation) {
+    return Excel.run(function (context) {
+      var sheet = operation.sheet === '' ? context.workbook.worksheets.getActiveWorksheet() : context.workbook.worksheets.getItem(operation.sheet);
+      var range = sheet.getRange(operation.range).load('values');
+      return context.sync().then(function () {
+        var values = range.values || [];
+        for (var row = 0; row < values.length; row += 1) {
+          var line = values[row] || [];
+          for (var column = 0; column < line.length; column += 1) {
+            var cell = line[column];
+            if (cell !== '' && cell !== null && cell !== undefined) return false;
+          }
+        }
+        return true;
+      });
+    }).catch(function () {
+      return false;
+    });
+  }
 
   function applyOperations(operations) {
     if (previewHost !== '') {
@@ -749,9 +937,9 @@
         return Promise.reject(new Error('That change was written for another Office app, so nothing was applied.'));
       }
     }
-    if (state.host === 'Excel') return applyExcel(operations);
-    if (state.host === 'PowerPoint') return applyPowerPoint(operations);
-    return applyWord(operations);
+    if (state.host === 'Excel') return runPlanOneByOne(operations, 'excel', applyExcel, checkExcelSource);
+    if (state.host === 'PowerPoint') return runPlanOneByOne(operations, 'powerpoint', applyPowerPoint);
+    return runPlanOneByOne(operations, 'word', applyWord);
   }
 
   function hostFor(operation) {
@@ -806,7 +994,10 @@
           if (operation.wrapText !== undefined) range.format.wrapText = operation.wrapText;
           if (operation.align !== undefined) range.format.horizontalAlignment = operation.align;
         } else if (operation.op === 'columnWidth') {
-          range.getEntireColumn().format.columnWidth = operation.width;
+          // Set on the range itself: this is the documented way to size the columns a
+          // range touches, and it skips getEntireColumn(), one more host call that can
+          // fail on its own and leave the width unchanged.
+          range.format.columnWidth = operation.width;
         } else if (operation.op === 'autofit') {
           range.format.autofitColumns();
           range.format.autofitRows();
@@ -1016,6 +1207,17 @@
     return box;
   }
 
+  /** "1 change", "2 changes": a count that reads as a sentence. */
+  function countChanges(count) {
+    return count + ' change' + (count === 1 ? '' : 's');
+  }
+
+  /** "Set the column width of H1" only reads after "Could not " once it is lowercase. */
+  function lowerFirst(text) {
+    var value = String(text === undefined || text === null ? '' : text);
+    return value === '' ? value : value.charAt(0).toLowerCase() + value.slice(1);
+  }
+
   function officeMessage(error, fallback) {
     if (error && typeof error.message === 'string' && error.message.trim() !== '') return error.message;
     return fallback;
@@ -1201,6 +1403,26 @@
     }
   }
 
+  /**
+   * Record every plan a restored conversation already applied.
+   *
+   * The cards are drawn again when the pane opens, and in "Always allow" mode a card
+   * applies its plan, so without this a reload would write those changes to the file
+   * a second time.
+   * @returns {void}
+   */
+  function markRestoredPlans() {
+    for (var index = 0; index < state.messages.length; index += 1) {
+      var segments = ZuriOps.splitReply(state.messages[index].content);
+      for (var part = 0; part < segments.length; part += 1) {
+        if (segments[part].type !== 'ops' || segments[part].result.ok !== true) continue;
+        var key = planKey(segments[part].result);
+        if (appliedPlans[key]) continue;
+        appliedPlans[key] = { done: true, reached: true, note: 'Applied earlier in this chat.', button: null };
+      }
+    }
+  }
+
   function documentUrl() {
     try {
       return (Office.context.document.url || '').split('#')[0];
@@ -1345,6 +1567,9 @@
   function newChat() {
     if (state.streaming && state.controller) state.controller.abort();
     state.messages = [];
+    // A new chat is a fresh start, so a change applied in the old one can be asked
+    // for again here.
+    appliedPlans = {};
     state.model = '';
     pane.modelLabel.textContent = '';
     setStatus('');
@@ -1367,6 +1592,9 @@
           : 'Ask Zuri to change this file';
     paintHostCopy();
     restore();
+    // Restored cards are marked as already applied before they are drawn, so opening
+    // the pane never writes those changes to the file again.
+    markRestoredPlans();
     renderThread();
 
     // A retry after a slow start reuses the screen, so the listeners are wired only once.

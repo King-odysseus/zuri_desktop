@@ -5551,3 +5551,99 @@ h4,
   color: var(--muted);
 }
 
+
+/* A created to-do, reminder or automation, painted under the reply that made it.
+   Same class names and same shape as the desktop window's card, so one feature
+   looks like one feature on both. Green is carried by the stripe and the pill
+   rather than the text, so the words keep their normal contrast in both themes. */
+.chat-notables {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 720px;
+  margin: 4px 0 8px;
+}
+
+.zuri-notable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--success-line);
+  border-left: 3px solid var(--success);
+  border-radius: 14px;
+  background: var(--success-soft);
+  color: var(--text);
+}
+
+.zuri-notable-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.zuri-notable-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 10px 1px 4px;
+  border: 1px solid var(--success-line);
+  border-radius: 999px;
+  background: var(--glass);
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.zuri-notable-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--success);
+  color: var(--success-soft);
+  font-size: 10px;
+  line-height: 1;
+}
+
+.zuri-notable-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.zuri-notable-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.zuri-notable-line {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.zuri-notable-line dt {
+  flex: none;
+  min-width: 76px;
+  color: var(--muted);
+}
+
+.zuri-notable-line dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}

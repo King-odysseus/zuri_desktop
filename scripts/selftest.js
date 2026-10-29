@@ -1396,6 +1396,54 @@ check('the opening screen and the bell show real data, not examples', () => {
 // The whole path in one go, on the real send code with a stand-in account. It uses the
 // shared store location, so the checks around it must be finished first and this one
 // must finish before the next starts.
+/* ---------------------------------------------------------------------------
+   A created to-do says so in colour
+
+   The card under a reply is described once, in src/shared/notableActions.js, and
+   both the desktop window and the browser chat paint what it returns. Before this
+   a created task was only ever a sentence, so nothing on screen said "done".
+   ------------------------------------------------------------------------ */
+
+const { describeNotable, notableKindFor } = await import(pathToFileURL(path.join(root, 'src/shared/notableActions.js')).href);
+
+check('a created task, reminder and automation each describe a card', () => {
+  const card = describeNotable('task', { id: 't1', title: 'Send Zuri to Greg', due: '2026-11-02', priority: 'high' });
+  if (card === null) throw new Error('a task produced no card');
+  if (card.badge !== 'Task created') throw new Error(`the task badge reads ${card.badge}`);
+  if (card.title !== 'Send Zuri to Greg') throw new Error(`the task title reads ${card.title}`);
+  if (!card.lines.some((line) => line.label === 'Due' && line.value === '2026-11-02')) throw new Error('the due date is missing from the card');
+  if (!card.lines.some((line) => line.label === 'Priority')) throw new Error('the priority is missing from the card');
+
+  const reminder = describeNotable('reminder', { id: 'r1', title: 'Take the tablets', dueAt: '2026-10-30T07:30:00.000Z', repeat: 'daily', timeOfDay: '07:30' });
+  if (reminder === null || reminder.badge !== 'Reminder set') throw new Error('a reminder produced no card');
+  if (!reminder.lines.some((line) => line.label === 'Repeats' && line.value === 'Every day at 07:30')) throw new Error(`the repeat reads ${JSON.stringify(reminder.lines)}`);
+
+  const automation = describeNotable('automation', { id: 'a1', prompt: 'Watch for NHS project manager jobs', mode: 'act', cadence: { type: 'interval', minutes: 180 } });
+  if (automation === null || automation.badge !== 'Automation created') throw new Error('an automation produced no card');
+  if (!automation.lines.some((line) => line.label === 'Runs' && line.value === 'Every 3 hours')) throw new Error(`the schedule reads ${JSON.stringify(automation.lines)}`);
+  return 'three kinds';
+});
+
+check('a record with nothing to name never paints an empty card', () => {
+  if (describeNotable('task', { id: 't2' }) !== null) throw new Error('a task with no title produced a card');
+  if (describeNotable('task', null) !== null) throw new Error('a missing record produced a card');
+  if (describeNotable('webSearch', { query: 'jobs' }) !== null) throw new Error('a tool that creates nothing produced a card');
+  if (notableKindFor('createTask') !== 'task') throw new Error('createTask is not read as a task');
+  if (notableKindFor('webSearch') !== '') throw new Error('webSearch is read as something it does not create');
+  return 'nothing painted';
+});
+
+check('both apps paint the card from the one shared description', () => {
+  for (const file of ['src/renderer-react/ChatPanel.jsx', 'web/src/views/ChatView.jsx']) {
+    if (!read(file).includes('shared/notableActions.js')) throw new Error(`${file} does not read the shared card`);
+  }
+  if (!read('src/main/providers/chat.js').includes('shared/notableActions.js')) throw new Error('the main process does not describe its own tool results');
+  // The installer only ships what package.json lists, so a shared file outside that
+  // list would be missing from the packaged app and the window would not open.
+  if (!JSON.stringify(packageJson.build.files).includes('src/shared/**/*')) throw new Error('the installer does not package src/shared');
+  return 'one description';
+});
+
 await Promise.all(pendingChecks);
 check('a reply in Act mode builds files, asks before editing, and carries skills and project rules', async () => {
   const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);

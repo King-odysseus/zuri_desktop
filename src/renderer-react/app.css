@@ -2147,6 +2147,121 @@ html:has(.zuri-overlay-root) #root {
   color: var(--nav-foreground);
 }
 
+/* A task, reminder or automation Zuri has just made is painted as a confirmation card
+   under the reply, the way ChatGPT shows "Task created": the stripe and the pill carry
+   the green before a word is read, so it cannot be mistaken for a warning. The body
+   text stays --foreground, because a paragraph of green ink would not clear 4.5:1. */
+.zuri-notable {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  min-width: 0;
+  padding: 0.75rem 0.875rem;
+  border: 1px solid var(--success-line);
+  border-left: 3px solid var(--success);
+  border-radius: 0.9rem;
+  background: var(--success-soft);
+  color: var(--foreground);
+}
+
+.zuri-notable-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+/* The pill sits on the card's own tint, so it takes the page background: white in the
+   light theme, navy in the dark one, and the green pair reads on both. */
+.zuri-notable-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.0625rem 0.5rem 0.0625rem 0.1875rem;
+  border: 1px solid var(--success-line);
+  border-radius: 999px;
+  background: var(--background);
+  color: var(--success);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.01em;
+}
+
+/* A filled disc behind the tick, so the glyph still reads at 10px. */
+.zuri-notable-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  background: var(--success);
+  color: var(--success-soft);
+}
+
+.zuri-notable-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.zuri-notable-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+/* Label and value share one line, the label in a fixed column, so a list of lines
+   lines up down the card. */
+.zuri-notable-line {
+  display: flex;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.zuri-notable-line dt {
+  flex: none;
+  min-width: 4.75rem;
+  color: var(--muted);
+}
+
+.zuri-notable-line dd {
+  margin: 0;
+  min-width: 0;
+  color: var(--foreground);
+  overflow-wrap: anywhere;
+}
+
+.zuri-notable-open {
+  margin-left: auto;
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--success-line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--success);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.zuri-notable-open:hover {
+  background: var(--background);
+}
+
+.zuri-notable-open:focus-visible {
+  outline: 2px solid var(--success);
+  outline-offset: 2px;
+}
+
 .zuri-sidebar-panel .zuri-account-plan {
   color: var(--nav-muted);
 }

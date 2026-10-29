@@ -6,6 +6,9 @@ import { ZURI_MODELS, zuriModelFor, zuriModelName } from './zuriModels.js';
 // The rewrite row under the newest reply. Shared with the web chat, so the two
 // surfaces cannot offer different choices.
 import { QUICK_ADJUSTMENTS } from './answerAdjustments.js';
+// The card for something Zuri has just created, described once for both this app and the
+// web chat, so the two surfaces cannot word the same event differently.
+import { describeNotable } from '../shared/notableActions.js';
 import {
   ArrowUpIcon,
   CheckIcon,
@@ -283,6 +286,74 @@ function FileCard({ file, api, onPreview }) {
   );
 }
 
+// The three sections a created something can send you back to. A card naming anything
+// else must not become a button that navigates nowhere.
+const NOTABLE_VIEWS = ['tasks', 'reminders', 'automations'];
+
+/**
+ * The created-something card an event carries, or null when there is nothing to draw.
+ *
+ * The main process sends the finished card. notableActions.js is the one description of
+ * its wording, so a main process that forwards only the kind and the record still gets
+ * the same card, while a frame with no title is dropped rather than drawn empty.
+ * @param {any} event One frame from the chat stream.
+ * @returns {{ id: string, badge: string, title: string, lines: Array<{ label: string, value: string }>, action: string } | null}
+ */
+function notableFrom(event) {
+  const raw = event?.notable;
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
+
+  const card = typeof raw.title === 'string' && raw.title.trim() !== ''
+    ? raw
+    : describeNotable(raw.kind, raw.data);
+  if (card === null || typeof card !== 'object' || typeof card.title !== 'string' || card.title.trim() === '') return null;
+
+  return {
+    id: typeof card.id === 'string' ? card.id : '',
+    badge: typeof card.badge === 'string' ? card.badge.trim() : '',
+    title: card.title.trim(),
+    // A line with no value would print its label against nothing.
+    lines: Array.isArray(card.lines)
+      ? card.lines.filter((line) => line && typeof line.label === 'string' && typeof line.value === 'string' && line.value.trim() !== '')
+      : [],
+    action: typeof card.action === 'string' ? card.action : '',
+  };
+}
+
+/**
+ * One "something was created" card under the reply: what was made, when it fires, and the
+ * way back to it. Green is the whole point: it has to read as good news at a glance and
+ * never as a warning, so the stripe and the badge carry the tone before the text is read.
+ */
+function NotableCard({ card, onOpen }) {
+  return (
+    <div className="zuri-notable">
+      <div className="zuri-notable-head">
+        {card.badge !== '' && (
+          <span className="zuri-notable-badge">
+            <span className="zuri-notable-check" aria-hidden="true"><CheckIcon size={10} /></span>
+            {card.badge}
+          </span>
+        )}
+        {onOpen && (
+          <button type="button" className="zuri-notable-open" onClick={onOpen}>Open</button>
+        )}
+      </div>
+      <p className="zuri-notable-title">{card.title}</p>
+      {card.lines.length > 0 && (
+        <dl className="zuri-notable-lines">
+          {card.lines.map((line, lineIndex) => (
+            <div className="zuri-notable-line" key={`${line.label}-${lineIndex}`}>
+              <dt>{line.label}</dt>
+              <dd>{line.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
+}
+
 /**
  * The model a chat was last answered with, read from its stored replies.
  *
@@ -374,6 +445,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [messages, setMessages] = useState([]);
   const [streamingText, setStreamingText] = useState('');
   const [streamingFiles, setStreamingFiles] = useState([]);
+  // Cards for what this turn created. They outlive the reply, because a to-do that was
+  // just made is worth reading a moment longer, and are dropped when the next turn starts.
+  const [notables, setNotables] = useState([]);
   const [replying, setReplying] = useState(false);
   const [activity, setActivity] = useState('');
   const [error, setError] = useState('');
@@ -502,6 +576,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       if (typeof event.delta === 'string') setStreamingText((current) => current + event.delta);
       if (typeof event.status === 'string') setActivity(event.status);
       if (Array.isArray(event.files)) setStreamingFiles((current) => [...current, ...event.files]);
+      // A created task, reminder or automation arrives as a finished card, already
+      // built by the same description the web chat paints.
+      const notable = notableFrom(event);
+      if (notable !== null) setNotables((current) => [...current, notable]);
       if (event.approval && typeof event.approval.id === 'string') setApproval(event.approval);
       // Main closes a card itself when the step timed out or Stop was pressed.
       if (typeof event.approvalClosed === 'string') {
@@ -887,6 +965,8 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setError('');
     setStreamingText('');
     setStreamingFiles([]);
+    // A card belongs to the turn that made it, so it never carries over to the next one.
+    setNotables([]);
     setReplying(true);
 
     try {
@@ -965,6 +1045,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setError('');
     setStreamingText('');
     setStreamingFiles([]);
+    setNotables([]);
     setReplying(true);
     setMessages((current) => (current.at(-1)?.role === 'assistant' ? current.slice(0, -1) : current));
 
@@ -1315,6 +1396,22 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             {streamingFiles.length > 0 && (
               <div className="flex max-w-[85%] flex-col gap-2 self-start">
                 {streamingFiles.map((file) => <FileCard key={file.path} file={file} api={api} onPreview={compact ? undefined : previewFile} />)}
+              </div>
+            )}
+            {/* Under the reply and above the activity line: the card is part of the answer,
+                not a status message about it. Each card offers Open only where there is a
+                section to open, which is why the quick-ask overlay draws no button. */}
+            {notables.length > 0 && (
+              <div className="flex w-full max-w-[85%] flex-col gap-2 self-start">
+                {notables.map((card, cardIndex) => (
+                  <NotableCard
+                    key={card.id !== '' ? card.id : `${cardIndex}-${card.title}`}
+                    card={card}
+                    onOpen={typeof onNavigate === 'function' && NOTABLE_VIEWS.includes(card.action)
+                      ? () => onNavigate(card.action)
+                      : undefined}
+                  />
+                ))}
               </div>
             )}
             {replying && activity !== '' && <p className="self-start text-sm text-muted">{activity}...</p>}

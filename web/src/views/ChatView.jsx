@@ -10,6 +10,9 @@ import FormattedMessage from '../../../src/renderer-react/FormattedMessage.jsx';
 // The desktop's rewrite row, imported rather than copied: the browser chat had no
 // rewrite buttons at all while the list lived inside the desktop panel.
 import { QUICK_ADJUSTMENTS } from '../../../src/renderer-react/answerAdjustments.js';
+// One description of a created to-do, reminder or automation, shared with the
+// desktop window so the two cannot word the same card differently.
+import { describeNotable } from '../../../src/shared/notableActions.js';
 import { copyText } from '../../../src/renderer-react/clipboard.js';
 import { shareText } from '../lib/share.js';
 import {
@@ -402,7 +405,7 @@ function toolArguments(call) {
   }
 }
 
-async function runToolCall(call, signal, onStatus) {
+async function runToolCall(call, signal, onStatus, onNotable) {
   const name = typeof call?.name === 'string' ? call.name : '';
   const args = toolArguments(call);
 
@@ -420,6 +423,9 @@ async function runToolCall(call, signal, onStatus) {
         priority: typeof args.priority === 'string' ? args.priority : 'normal',
       });
       if (signal?.aborted) throw stoppedReply();
+      // Handed over before the sentence, so the card appears with the confirmation
+      // rather than after the whole reply has finished.
+      if (typeof onNotable === 'function') onNotable('task', task);
       return `Added the task "${task?.title ?? args.title.trim()}" to their Tasks page.`;
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
@@ -440,6 +446,7 @@ async function runToolCall(call, signal, onStatus) {
         timeOfDay: typeof args.timeOfDay === 'string' ? args.timeOfDay : undefined,
       });
       if (signal?.aborted) throw stoppedReply();
+      if (typeof onNotable === 'function') onNotable('reminder', reminder);
       return `Set a reminder for ${due.toLocaleString()}: "${reminder?.title ?? 'Reminder'}".`;
     } catch (error) {
       if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
@@ -528,6 +535,8 @@ export default function ChatView({
    */
   const [toolStatus, setToolStatus] = useState('');
   const [streamError, setStreamError] = useState(null);
+  // What this reply has created so far, painted under it as it goes.
+  const [notables, setNotables] = useState([]);
   const [saveWarning, setSaveWarning] = useState('');
   // One file at a time, as the desktop composer allows, so the message stays one turn.
   const [attachment, setAttachment] = useState(null);
@@ -717,6 +726,7 @@ export default function ChatView({
   const resetReply = useCallback(() => {
     setStreamReply('');
     setStreamError(null);
+    setNotables([]);
     setSaveWarning('');
     setToolStatus('');
   }, []);
@@ -1058,7 +1068,11 @@ export default function ChatView({
           ...(reasoningContent === '' ? {} : { reasoningContent }),
         }];
         for (const call of calls) {
-          const outcome = await runToolCall(call, controller.signal, setToolStatus);
+          const outcome = await runToolCall(call, controller.signal, setToolStatus, (kind, record) => {
+            const card = describeNotable(kind, record);
+            if (card === null) return;
+            setNotables((rows) => [...rows, { ...card, id: `${kind}-${rows.length}-${record?.id ?? ''}` }]);
+          });
           if (run !== runRef.current) return;
           wire = [...wire, {
             role: 'tool',
@@ -1735,6 +1749,32 @@ export default function ChatView({
               </div>
             </Fragment>
           ))}
+
+          {notables.length > 0 && (
+            <div className="chat-notables">
+              {notables.map((card) => (
+                <div className="zuri-notable" key={card.id}>
+                  <div className="zuri-notable-head">
+                    <span className="zuri-notable-badge">
+                      <span className="zuri-notable-check" aria-hidden="true">&#10003;</span>
+                      {card.badge}
+                    </span>
+                  </div>
+                  <p className="zuri-notable-title">{card.title}</p>
+                  {card.lines.length > 0 && (
+                    <dl className="zuri-notable-lines">
+                      {card.lines.map((line, lineIndex) => (
+                        <div className="zuri-notable-line" key={`${line.label}-${lineIndex}`}>
+                          <dt>{line.label}</dt>
+                          <dd>{line.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {streaming && (
             <article className="chat-bubble chat-bubble-assistant is-streaming">

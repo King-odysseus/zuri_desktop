@@ -27,6 +27,9 @@ import { DEFAULT_PROVIDER, PROVIDERS, getKey } from '../secrets.js';
 import { replyThroughAccount } from './cloud-chat.js';
 import { appendMessage, findAgent, readStore, removeTrailingReply } from '../store.js';
 import { agentAllowedTools, runTool, TOOLS } from '../tools/index.js';
+// The row that names what was just created is described once, in the module both the
+// desktop window and the browser chat read, so the two can never word it differently.
+import { describeNotable, notableKindFor } from '../../shared/notableActions.js';
 
 /**
  * Tools the model may call on its own in chat, only when the person has switched web
@@ -1869,6 +1872,17 @@ export async function sendChatMessage(threadId, options = {}) {
         if (decision === null) outcome = failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
         else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed });
         else outcome = failure('TOOL_DECLINED', decision.reason);
+
+        // A created to-do, reminder or automation is worth more than the sentence that
+        // mentions it, so the window is given the record to draw a card from. The id
+        // rides on the call, which is what keeps two cards from the same turn apart.
+        if (outcome.ok) {
+          const madeKind = notableKindFor(call.name);
+          if (madeKind !== '') {
+            const card = describeNotable(madeKind, outcome.data);
+            if (card !== null) emit({ threadId, notable: { id: `${madeKind}-${call.id || rounds}-${rounds}`, ...card } });
+          }
+        }
         const madeFile = FILE_TOOL_NAMES.has(call.name) && outcome.ok;
         if (madeFile) {
           const { path: filePath, name, kind, bytes } = outcome.data;
@@ -1918,6 +1932,10 @@ export async function sendChatMessage(threadId, options = {}) {
           }
         },
       });
+      // When the second attempt fails for a reason of its own (no credit, a network
+      // fault, a refusal), that reason is what the person needs to see. Returning the
+      // silent first round instead hid the only useful sentence in the turn.
+      if (retry.ok !== true && retry.error?.code && retry.error.code !== 'CHAT_EMPTY_REPLY') return retry;
       if (retry.ok) {
         const last = splitToolCalls(
           typeof retry.data?.content === 'string' && retry.data.content !== '' ? retry.data.content : askedAgain,

@@ -45,6 +45,7 @@
       "package.json",
       "src/main/**/*",
       "src/addin/**/*",
+      "src/shared/**/*",
       "dist-react/**/*"
     ],
     "extraResources": [
