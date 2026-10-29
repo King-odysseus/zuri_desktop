@@ -1715,6 +1715,16 @@ check('Word paragraph writes use portable built-in styles', () => {
   return 'invalid display names cannot cancel the whole Word write';
 });
 
+check('the admin route is reachable before the server checks the account', () => {
+  const dashboard = read('web/src/views/Dashboard.jsx');
+  const admin = read('web/src/views/AdminView.jsx');
+  if (!dashboard.includes("{view === 'admin' && <AdminView />}") ) throw new Error('the admin view is still hidden behind client-side state');
+  if (!dashboard.includes("isAdmin || view === 'admin'")) throw new Error('a deep-linked admin view cannot show its navigation');
+  if (!admin.includes('Your sign-in has expired')) throw new Error('expired admin sessions have no recovery message');
+  if (!admin.includes('This account is not marked as a Zuri administrator')) throw new Error('non-admin refusals have no recovery message');
+  return 'the API remains authoritative, with a visible recovery path';
+});
+
 check('a change block is checked before it can reach a file', async () => {
   const vm = await import('node:vm');
   const sandbox = { module: { exports: {} } };

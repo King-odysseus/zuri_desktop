@@ -39,7 +39,9 @@ export const NAV_ITEMS = [
 const ADMIN_ITEM = { id: 'admin', label: 'Admin', icon: <ShieldIcon /> };
 
 function NavList({ view, onViewChange, isAdmin }) {
-  const items = isAdmin ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
+  // Keep a deep-linked /admin view visible while it loads. The API remains the
+  // authority, so a non-admin still receives the normal server refusal.
+  const items = isAdmin || view === 'admin' ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
   return items.map((item) => (
     <button
       key={item.id}
@@ -235,7 +237,7 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           {view === 'billing' && (
             <BillingView me={account.me} billing={account.billing} usage={account.usage} />
           )}
-          {view === 'admin' && user.isAdmin === true && <AdminView />}
+          {view === 'admin' && <AdminView />}
 
           {!isChat && (
             <div className="app-foot">

@@ -17,7 +17,16 @@ export default function AdminView() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState('');
   const [busy, setBusy] = useState(false);
-  const load = useCallback(async () => { try { setOverview(await fetchAdminOverview(days)); setError(''); } catch (failure) { setError(failure.status === 403 ? 'This area is for Zuri administrators.' : failure.message); } }, [days]);
+  const load = useCallback(async () => {
+    try {
+      setOverview(await fetchAdminOverview(days));
+      setError('');
+    } catch (failure) {
+      if (failure.status === 401) setError('Your sign-in has expired. Sign in again, then open Admin.');
+      else if (failure.status === 403) setError('This account is not marked as a Zuri administrator. Sign out and sign in with the administrator account.');
+      else setError(failure.message);
+    }
+  }, [days]);
   useEffect(() => { void load(); }, [load]);
   function edit(field, value) { setSaved(''); setDraft((current) => ({ ...current, [field]: value })); }
   async function save(event) { event.preventDefault(); setBusy(true); setSaved(''); try { const model = { ...draft }; for (const field of NUMBER_FIELDS) model[field] = Number(model[field]); await saveAdminModel(model); setDraft(null); setSaved(`${model.name} saved.`); await load(); } catch (failure) { setError(failure.message); } finally { setBusy(false); } }

@@ -1086,3 +1086,10 @@
 - Other OS action: run `npm run test` after syncing. No dependency changes.
 - Done on: Windows
 
+## 2026-10-29 - Windows
+
+- Admin deep links now render the admin screen before the API permission check, and expired or non-admin sessions receive a clear recovery message. The rebuilt web bundle includes the change.
+- Key files: web/src/views/Dashboard.jsx, web/src/views/AdminView.jsx, scripts/selftest.js, server/public/index.html, server/public/assets/index-W9g1ek5t.js.
+- Other OS action: run `npm run test` after syncing. No dependency changes.
+- Done on: Windows
+
