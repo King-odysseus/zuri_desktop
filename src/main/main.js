@@ -5,7 +5,7 @@ import { randomUUID } from 'node:crypto';
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
-import { APPROVAL_TIMEOUT_MS, CHAT_STREAM_CHANNEL, askForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
+import { APPROVAL_TIMEOUT_MS, CHAT_STREAM_CHANNEL, chatForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
 import { lastQuestion, replyThroughAccount, webSearchContext } from './providers/cloud-chat.js';
 import { readChatStream } from './providers/sse.js';
 import { formatSummaryMarkdown, summaryFileName } from './documents.js';
@@ -1341,7 +1341,7 @@ async function handleSettingsAddinStatus() {
 
 async function handleSettingsAddinInstall() {
   try {
-    await installAddin(getStoreRoot(), (request) => askForAddin(request, { cloudReply: cloudChatReply }));
+    await installAddin(getStoreRoot(), (request) => chatForAddin(request, { cloudReply: cloudChatReply }));
     return { ok: true, data: await addinStatus(getStoreRoot()) };
   } catch (error) {
     console.error('[zuri:addin] install', error);
@@ -2156,7 +2156,7 @@ app.whenReady().then(async () => {
   registerOverlayHotkey();
 
   try {
-    await resumeAddin(getStoreRoot(), (request) => askForAddin(request, { cloudReply: cloudChatReply }));
+    await resumeAddin(getStoreRoot(), (request) => chatForAddin(request, { cloudReply: cloudChatReply }));
   } catch (error) {
     console.error('[zuri:addin] resume', error);
   }

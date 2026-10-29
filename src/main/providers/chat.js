@@ -1255,54 +1255,218 @@ export async function summarizeText(document = {}, options = {}) {
   };
 }
 
-const WORD_ADDIN_SYSTEM_PROMPT =
-  'You are Zuri, an AI assistant made by Tijha, working inside Microsoft Word, Excel or PowerPoint. Never call yourself Claude or name another assistant or AI company as your maker. ' +
-  'Do what the person asks using the document text they give you. ' +
-  'Reply with only the text to put in the document: no greeting, no explanation, no markdown fences.';
+/**
+ * What Zuri is told about the document it is working in.
+ *
+ * The pane cannot read this reply the way a chat window can: it needs operations it
+ * can carry out through Office's own API. So the contract is spelled out in full,
+ * with the exact operation names and their fields, and the model is told plainly that
+ * it cannot touch the file itself. Prose alone would leave the person copying and
+ * pasting, which is the thing the pane exists to stop.
+ */
+const ADDIN_IDENTITY =
+  'You are Zuri, an AI assistant made by Tijha. You are working inside Microsoft Office, in a small task pane beside the person\'s file. ' +
+  'Never call yourself Claude, and never name another assistant or AI company as your maker. ' +
+  'Write like a helpful colleague at the next desk: short plain sentences, no preamble, no restating the question, no asking permission you have already been given.';
+
+/** The example the model copies, in the shape of the app it is running in. */
+function addinExample(host) {
+  if (host === 'excel') {
+    return '  {"summary":"Fill the remaining column with formulas","operations":[{"op":"setFormulas","range":"E3:E26","formulas":[["=C3-D3"],["=C4-D4"]]}]}';
+  }
+  if (host === 'powerpoint') {
+    return '  {"summary":"Add a closing slide","operations":[{"op":"addSlide","title":"Thank you","body":"Questions and next steps"}]}';
+  }
+  return '  {"summary":"Add a section heading","operations":[{"op":"insertParagraphs","where":"end","paragraphs":[{"text":"Where we are","style":"Heading 1"},{"text":"Revenue came in ahead of plan."}]}]}';
+}
+
+/**
+ * The shared half of the contract: how a change is written and what it must respect.
+ * The worked example is the host's own, because a model shown an Excel operation in
+ * Word will sometimes copy it, and the pane would have to refuse the whole plan.
+ */
+function addinEditContract(host) {
+  return [
+    'You cannot change the file yourself. You propose the change, the person presses Apply, and Office carries it out.',
+    '',
+    'How to propose a change',
+    '- Write one or two short sentences about what you are about to do, then one fenced block tagged zuri holding a single JSON object:',
+    '  \u0060\u0060\u0060zuri',
+    addinExample(host),
+    '  \u0060\u0060\u0060',
+    '- Put every operation in that one block, in the order it should run, at most 40.',
+    '- If the person only asked a question, answer it and write no block at all.',
+    '- Never say a change is done, saved, written or applied. The person applies it, and the next message shows you the file with the change in it.',
+    '',
+    'What the change must respect',
+    '- Work only from the file content you are given. Never invent cells, labels, numbers, headings, slide text or names that are not there.',
+    '- Use the real ranges and sheet names from the map you are given. Do not overwrite cells that already hold something unless the person asked for that.',
+    '- Prefer formulas to typed-in numbers, so the file still adds up when a value changes.',
+    '- A grid must be rectangular: every row in values or formulas needs the same number of cells.',
+    '- Keep the JSON valid: double quotes around every key and string, no comments, no trailing commas.',
+  ].join('\n');
+}
+
+/** The operation list for one host, so the model never sees a name it cannot use. */
+function addinOperationList(host) {
+  if (host === 'excel') {
+    return [
+      'Operations you can use here',
+      '{"op":"setValues","range":"D3:D26","values":[[3000],[300]]}                    write literal values, one array per row',
+      '{"op":"setFormulas","range":"E3:E26","formulas":[["=C3-D3"],["=C4-D4"]]}         write formulas; each string starts with "="',
+      '{"op":"setNumberFormat","range":"F3:F26","format":"0.0%"}                       display format for cells',
+      '{"op":"format","range":"A1:F1","bold":true,"fill":"#1F2A44","color":"#FFFFFF","size":12,"wrapText":true,"align":"center"}',
+      '{"op":"columnWidth","range":"A1:F1","width":16}                                width of the columns the range touches',
+      '{"op":"autofit","range":"A1:F30"}                                             fit columns and rows to their contents',
+      '{"op":"addWorksheet","name":"Summary","activate":true}',
+      '{"op":"clear","range":"G1:G30"}                                              clears the contents only',
+      '{"op":"createTable","range":"A1:F30","name":"BudgetTable","hasHeaders":true}',
+      '',
+      'Excel notes',
+      '- Any range operation also takes "sheet":"Budget" to work on a sheet other than the active one.',
+      '- Formulas use Excel syntax with a leading "=" and comma separators. Escape a double quote inside a formula: "=SUMIF($B$3:$B$26,\\\"Expense\\",$D$3:$D$26)".',
+      '- Use $ for a reference that must not move when it is filled down, such as $C$3.',
+      '- A percentage, a date or money is a number format, not text: write the number and set the format.',
+      '- The sheet map you are given starts each line with its row number and uses tabs between cells, so count nothing by eye.',
+    ].join('\n');
+  }
+  if (host === 'powerpoint') {
+    return [
+      'Operations you can use here',
+      '{"op":"addSlide","title":"Where we are","body":"Three points, one per line"}',
+      '{"op":"setSlideTitle","slide":3,"title":"What changed this quarter"}',
+      '{"op":"setShapeText","slide":3,"shape":"Title 1","text":"What changed this quarter"}',
+      '{"op":"addTextBox","slide":3,"text":"...","left":40,"top":120,"width":540,"height":120,"size":18,"bold":true}',
+      '{"op":"setSelectedText","text":"..."}                                        replaces the text the person selected',
+      '',
+      'PowerPoint notes',
+      '- Slides number from 1, the way the thumbnail pane counts them.',
+      '- Positions and sizes are in points. A 16:9 slide is 960 by 540, so keep text between 36 and 920 across and 24 and 500 down.',
+      '- Keep a slide to one message. If the deck needs three points, that is one slide with three short lines, not three slides.',
+    ].join('\n');
+  }
+  return [
+    'Operations you can use here',
+    '{"op":"replaceSelection","text":"..."}                                        replaces the selected text',
+    '{"op":"insertAfterSelection","text":"..."}                                    adds a paragraph after the selection',
+    '{"op":"insertParagraphs","where":"end","paragraphs":[{"text":"2026 budget","style":"Heading 1"},{"text":"Plain body text"}]}',
+    '{"op":"applyStyle","style":"Heading 2"}                                       styles the selected text',
+    '{"op":"replaceAll","find":"ACME","replace":"Zuri"}',
+    '{"op":"insertTable","where":"end","rows":[["Region","Sales"],["Lagos","1200"]]}',
+    '',
+    'Word notes',
+    '- "where" is one of start, end, afterSelection or replaceSelection.',
+    "- Style names are Word's own: Title, Subtitle, Heading 1, Heading 2, Normal, Quote, List Bullet, List Number.",
+    "- Keep the document's existing voice and heading levels. A rewrite replaces words, not structure, unless the person asked for a new structure.",
+  ].join('\n');
+}
+
+/** @param {unknown} value @returns {'word'|'excel'|'powerpoint'} */
+function normaliseAddinHost(value) {
+  const host = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return host === 'excel' ? 'excel' : host === 'powerpoint' ? 'powerpoint' : 'word';
+}
+
+/** The whole instruction for one host: identity, contract, operations, and the file's name. */
+function addinSystemPrompt(host) {
+  const name = host === 'excel' ? 'Microsoft Excel' : host === 'powerpoint' ? 'Microsoft PowerPoint' : 'Microsoft Word';
+  const noun = host === 'excel' ? 'sheet' : host === 'powerpoint' ? 'deck' : 'document';
+  return [
+    'You are working in ' + name + ', in a task pane beside one ' + noun + '.',
+    addinEditContract(host),
+    addinOperationList(host),
+  ].join('\n\n');
+}
 
 /** Longest slice of a document sent along with an add-in request; every character is billed. */
 const ADDIN_CONTEXT_LIMIT = 30_000;
 
-/**
- * One question from the Word add-in: an instruction plus the selected text or the
- * document, answered once with the configured provider. Not saved to any chat.
- * @param {{ prompt?: string, context?: string }} request
- * @param {{ fetchImpl?: typeof fetch, signal?: AbortSignal }} [options]
- * @returns {Promise<{ ok: true, data: { text: string } } | { ok: false, error: { code: string, message: string } }>}
- */
-export async function askForAddin(request = {}, options = {}) {
-  const prompt = typeof request.prompt === 'string' ? request.prompt.trim() : '';
-  if (prompt === '') return failure('ADDIN_EMPTY_PROMPT', 'Type what you want Zuri to do first.');
+/** Longest single message kept from the pane's conversation, in characters. */
+const ADDIN_MESSAGE_LIMIT = 6_000;
 
+/** How many turns of the pane's conversation travel with a question. */
+const ADDIN_TURN_LIMIT = 20;
+
+const ADDIN_ROLES = new Set(['user', 'assistant']);
+
+/**
+ * The pane's conversation, cleaned: only the two roles, only text, and capped so a
+ * long session cannot grow the request without bound.
+ * @param {unknown} value
+ * @returns {Array<{ role: string, content: string }>}
+ */
+function addinTurns(value) {
+  const turns = [];
+  for (const entry of Array.isArray(value) ? value : []) {
+    if (typeof entry?.content !== 'string' || !ADDIN_ROLES.has(entry.role)) continue;
+    const content = entry.content.trim();
+    if (content === '') continue;
+    turns.push({ role: entry.role, content: content.slice(0, ADDIN_MESSAGE_LIMIT) });
+  }
+  return turns.slice(-ADDIN_TURN_LIMIT);
+}
+
+/**
+ * One turn of the Office task pane: the conversation so far, the file as it stands,
+ * and the host it is running in.
+ *
+ * The file is attached to the newest question rather than to every turn. Older turns
+ * then stay short, and the answer is always given against what the file holds now,
+ * which is what makes a follow-up like "now format that column" work after an apply.
+ *
+ * @param {{ messages?: unknown, host?: unknown, context?: unknown }} request
+ * @param {{ cloudReply?: Function, fetchImpl?: typeof fetch, signal?: AbortSignal, emit?: (event: object) => void }} [options]
+ * @returns {Promise<{ ok: true, data: { text: string, model: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+export async function chatForAddin(request = {}, options = {}) {
+  const turns = addinTurns(request.messages);
+  if (!turns.some((turn) => turn.role === 'user')) {
+    return failure('ADDIN_EMPTY_PROMPT', 'Type what you want Zuri to do first.');
+  }
+
+  const host = normaliseAddinHost(request.host);
+  const noun = host === 'excel' ? 'sheet' : host === 'powerpoint' ? 'deck' : 'document';
+  const context = typeof request.context === 'string' ? request.context.slice(0, ADDIN_CONTEXT_LIMIT) : '';
+
+  const newest = turns[turns.length - 1];
+  const conversationTurns = turns.slice(0, -1);
+  conversationTurns.push({
+    role: 'user',
+    content: context.trim() === ''
+      ? newest.content
+      : newest.content + '\n\nCurrent content of the ' + noun + ':\n' + context,
+  });
+
+  const system = [ADDIN_IDENTITY, addinSystemPrompt(host), currentTimeContext()].join('\n\n');
   const settings = await readStore('settings');
   if (!settings.ok) return settings;
+
   if (typeof options.cloudReply === 'function') {
-    const context = typeof request.context === 'string' ? request.context.slice(0, ADDIN_CONTEXT_LIMIT) : '';
-    const content = context === '' ? prompt : `${prompt}\n\nDocument text:\n${context}`;
     const reply = await options.cloudReply({
-      conversation: { system: [WORD_ADDIN_SYSTEM_PROMPT, currentTimeContext()].join('\n\n'), turns: [{ role: 'user', content }] },
+      conversation: { system: system, turns: conversationTurns },
       settings: settings.data,
       signal: options.signal,
       emit: options.emit,
       tools: [],
     });
     if (reply?.ok !== true) return reply ?? failure('ADDIN_CLOUD_FAILED', 'Zuri could not answer that document request.');
-    return { ok: true, data: { text: String(reply.data?.content ?? '').trim() } };
+    return {
+      ok: true,
+      data: {
+        text: String(reply.data?.content ?? '').trim(),
+        model: String(reply.data?.modelName || reply.data?.modelCode || 'Zuri'),
+      },
+    };
   }
+
   const { provider, model } = resolveChatTarget(settings.data);
   const key = getKey(provider);
   if (key === null) {
-    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri Cloud to use the Office add-in.');
+    return failure('CLOUD_AUTH_REQUIRED', 'Sign in to Zuri to use the Office add-in.');
   }
-
-  const context = typeof request.context === 'string' ? request.context.slice(0, ADDIN_CONTEXT_LIMIT) : '';
-  const content = context === '' ? prompt : `${prompt}\n\nDocument text:\n${context}`;
-  const reply = await streamReply(provider, model, key, {
-    system: [WORD_ADDIN_SYSTEM_PROMPT, currentTimeContext()].join('\n\n'),
-    turns: [{ role: 'user', content }],
-  }, options);
+  const reply = await streamReply(provider, model, key, { system: system, turns: conversationTurns }, options);
   if (!reply.ok) return reply;
-  return { ok: true, data: { text: reply.text.trim() } };
+  return { ok: true, data: { text: reply.text.trim(), model: reply.label ?? 'Zuri' } };
 }
 
 /**

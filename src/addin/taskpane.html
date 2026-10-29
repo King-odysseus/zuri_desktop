@@ -2,39 +2,58 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="zuri-token" content="__ZURI_TOKEN__" />
     <title>Zuri</title>
     <link rel="stylesheet" href="taskpane.css" />
     <script src="https://appsforoffice.officeapps.live.com/lib/1/hosted/office.js"></script>
   </head>
   <body>
-    <main>
-      <h1>Zuri</h1>
-      <p class="hint">Select some text or cells, or leave nothing selected to use the whole document or sheet.</p>
+    <!--
+      One screen: a conversation that stays on the page, with the composer pinned to
+      the bottom edge the way the app and the web chat do it. The file context is a
+      one line chip above the composer rather than a box the person has to read, and
+      a change the model proposes arrives as a card with an Apply button, so nothing
+      reaches the document without being read first.
+    -->
+    <div class="pane">
+      <header class="pane-head">
+        <div class="pane-title">
+          <span class="mark" aria-hidden="true">Z</span>
+          <div class="pane-titles">
+            <strong>Zuri</strong>
+            <span class="pane-sub" id="host-label">Connecting to Office...</span>
+          </div>
+        </div>
+        <button id="new-chat" class="ghost" type="button" title="Start a new chat">New chat</button>
+      </header>
 
-      <div class="context-head">
-        <label for="context">Text Zuri will use</label>
-        <button id="refresh-context" type="button" class="link-button">Refresh</button>
-      </div>
-      <textarea id="context" rows="6" readonly placeholder="Select something in your file, then refresh."></textarea>
+      <main class="thread" id="thread" aria-live="polite">
+        <div class="empty" id="empty">
+          <h2 id="empty-title">What should we do here?</h2>
+          <p id="empty-line">Zuri can write formulas, reshape a table, or draft what goes in the file.</p>
+          <div class="suggestions" id="suggestions"></div>
+        </div>
+      </main>
 
-      <label for="prompt">What should Zuri do?</label>
-      <textarea id="prompt" rows="4" placeholder="Rewrite this more formally"></textarea>
-
-      <div class="row">
-        <button id="ask" type="button">Ask Zuri</button>
-        <span id="status" role="status"></span>
-      </div>
-
-      <label for="answer">Zuri's answer</label>
-      <textarea id="answer" rows="9" placeholder="The answer appears here. You can edit it before using it."></textarea>
-
-      <div class="row">
-        <button id="replace" type="button" class="secondary" disabled>Replace selection</button>
-        <button id="insert" type="button" class="secondary" disabled>Insert below</button>
-      </div>
-    </main>
+      <footer class="composer">
+        <div class="context" id="context-row">
+          <span class="context-dot" aria-hidden="true"></span>
+          <span class="context-text" id="context-text">Reading the file...</span>
+          <button class="link" id="refresh-context" type="button">Refresh</button>
+        </div>
+        <div class="composer-box">
+          <textarea id="prompt" rows="1" placeholder="Ask Zuri to change this file" aria-label="Message Zuri"></textarea>
+          <div class="composer-bar">
+            <span class="model" id="model-label"></span>
+            <button id="send" type="button" class="send" title="Send">Send</button>
+            <button id="stop" type="button" class="stop is-hidden" title="Stop">Stop</button>
+          </div>
+        </div>
+        <p class="fine" id="status" role="status"></p>
+      </footer>
+    </div>
+    <script src="ops.js"></script>
     <script src="taskpane.js"></script>
   </body>
 </html>

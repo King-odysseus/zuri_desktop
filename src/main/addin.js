@@ -26,6 +26,7 @@ const STATIC_FILES = Object.freeze({
   '/taskpane.html': { file: 'taskpane.html', type: 'text/html; charset=utf-8' },
   '/taskpane.js': { file: 'taskpane.js', type: 'text/javascript; charset=utf-8' },
   '/taskpane.css': { file: 'taskpane.css', type: 'text/css; charset=utf-8' },
+  '/ops.js': { file: 'ops.js', type: 'text/javascript; charset=utf-8' },
 });
 
 /** Where the certificate, secret and manifest live, under Zuri's own data folder. */
@@ -170,6 +171,13 @@ function hostIsLocal(request, port) {
   return host === `localhost:${port}` || host === `127.0.0.1:${port}`;
 }
 
+/** One event frame of the reply stream, as the browser's event-stream reader expects it. */
+function sendEvent(response, payload) {
+  response.write(`data: ${JSON.stringify(payload)}
+
+`);
+}
+
 /** @param {import('node:http').ServerResponse} response @param {number} status @param {unknown} body */
 function sendJson(response, status, body) {
   const text = JSON.stringify(body);
@@ -210,11 +218,16 @@ function readJsonBody(request) {
  *   pfx: Buffer,
  *   passphrase: string,
  *   port?: number,
- *   ask: (request: { prompt: string, context: string }) => Promise<{ ok: boolean, data?: { text: string }, error?: { message: string } }>
+ *   chat: (request: {
+ *     messages: Array<{ role: string, content: string }>,
+ *     host: string,
+ *     context: string,
+ *     emit?: (event: object) => void,
+ *   }) => Promise<{ ok: boolean, data?: { text: string, model?: string }, error?: { message: string } }>
  * }} options
  * @returns {Promise<{ port: number, token: string }>}
  */
-export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, ask }) {
+export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, chat }) {
   if (running) return { port, token: running.token };
   const token = randomBytes(24).toString('hex');
 
@@ -235,13 +248,46 @@ export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, ask
         return response.end(text);
       }
 
-      if (request.method === 'POST' && route === '/api/ask') {
+      if (request.method === 'POST' && route === '/api/chat') {
         if (!sameSecret(request.headers['x-zuri-token'] ?? '', token)) {
           return sendJson(response, 401, { ok: false, error: { message: 'Reopen the Zuri pane in Office and try again.' } });
         }
+
         const body = await readJsonBody(request);
-        const answer = await ask({ prompt: String(body?.prompt ?? ''), context: String(body?.context ?? '') });
-        return sendJson(response, answer.ok ? 200 : 400, answer);
+        // The reply streams so the pane can draw it while it is written, and a long
+        // edit is not a blank panel. Headers go out before the first token, so a
+        // failure from here on travels as an event rather than as a status code.
+        response.writeHead(200, {
+          'content-type': 'text/event-stream; charset=utf-8',
+          'cache-control': 'no-store',
+          connection: 'keep-alive',
+        });
+
+        let open = true;
+        request.once('close', () => { open = false; });
+        const emit = (event) => {
+          if (!open) return;
+          if (typeof event?.delta === 'string' && event.delta !== '') sendEvent(response, { delta: event.delta });
+          else if (typeof event?.status === 'string' && event.status !== '') sendEvent(response, { status: event.status });
+        };
+
+        try {
+          const answer = await chat({
+            messages: Array.isArray(body?.messages) ? body.messages : [],
+            host: String(body?.host ?? ''),
+            context: String(body?.context ?? ''),
+            emit,
+          });
+          if (answer?.ok === true) {
+            sendEvent(response, { done: true, text: answer.data?.text ?? '', model: answer.data?.model ?? '' });
+          } else {
+            sendEvent(response, { error: { message: answer?.error?.message ?? 'Zuri could not answer that.' } });
+          }
+        } catch (error) {
+          console.error('[zuri:addin] chat', error?.message ?? error);
+          sendEvent(response, { error: { message: 'Zuri could not answer that. Try again.' } });
+        }
+        return response.end();
       }
 
       return sendJson(response, 404, { ok: false, error: { message: 'Not found.' } });
@@ -288,14 +334,14 @@ export async function addinStatus(dataRoot) {
  * Create the certificate, write the manifest, start the page and register it with Word
  * for this Windows user.
  * @param {string} dataRoot
- * @param {(request: { prompt: string, context: string }) => Promise<any>} ask
+ * @param {(request: object) => Promise<any>} chat
  */
-export async function installAddin(dataRoot, ask) {
+export async function installAddin(dataRoot, chat) {
   if (process.platform !== 'win32') throw new Error('The Office add-in is only available on Windows.');
   const paths = addinPaths(dataRoot);
   const state = await ensureCertificate(paths);
 
-  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, ask });
+  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, chat });
   await fs.writeFile(paths.manifest, buildManifest({ id: state.manifestId, port: ADDIN_PORT }), 'utf8');
   const added = await runReg(['add', REGISTRY_KEY, '/v', REGISTRY_VALUE, '/t', 'REG_SZ', '/d', paths.manifest, '/f']);
   if (added.code !== 0) throw new Error('Windows would not let Zuri register the add-in for Word.');
@@ -304,14 +350,14 @@ export async function installAddin(dataRoot, ask) {
 /**
  * Start the page again after a restart, when the add-in was installed before.
  * @param {string} dataRoot
- * @param {(request: { prompt: string, context: string }) => Promise<any>} ask
+ * @param {(request: object) => Promise<any>} chat
  */
-export async function resumeAddin(dataRoot, ask) {
+export async function resumeAddin(dataRoot, chat) {
   if (process.platform !== 'win32') return;
   const paths = addinPaths(dataRoot);
   const state = await readState(paths);
   if (!state?.passphrase) return;
-  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, ask });
+  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, chat });
 }
 
 /**
