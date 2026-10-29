@@ -894,7 +894,7 @@ export function createApp(dependencies = {}) {
           } catch (error) {
             if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
             const mapped = failureFor(error);
-            if (mapped.status === 500) console.error('[zuri-cloud] chat', error?.message ?? error);
+            if (mapped.status === 500 || error?.code === 'PROVIDER_REQUEST_FAILED') console.error('[zuri-cloud] chat', error?.message ?? error);
             return response(mapped.status, mapped.body);
           } finally {
             releaseLease();
@@ -938,7 +938,7 @@ export function createApp(dependencies = {}) {
                 // Nothing reached the person, so the plan is not charged for it.
                 if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
                 const mapped = failureFor(error);
-                if (mapped.status === 500) console.error('[zuri-cloud] chat', error?.message ?? error);
+                if (mapped.status === 500 || error?.code === 'PROVIDER_REQUEST_FAILED') console.error('[zuri-cloud] chat', error?.message ?? error);
                 send({ type: 'error', error: mapped.body.error });
               } finally {
                 releaseLease();
@@ -973,7 +973,7 @@ export function createApp(dependencies = {}) {
         } catch (error) {
           if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
           const mapped = failureFor(error);
-          if (mapped.status === 500) console.error('[zuri-cloud] chat', error?.message ?? error);
+          if (mapped.status === 500 || error?.code === 'PROVIDER_REQUEST_FAILED') console.error('[zuri-cloud] chat', error?.message ?? error);
           return response(mapped.status, mapped.body);
         } finally {
           releaseLease();

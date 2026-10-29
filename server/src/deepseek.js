@@ -11,6 +11,133 @@
  */
 
 /**
+ * Statuses worth trying again: the supplier is busy rather than refusing.
+ *
+ * A 429 or a 503 is the ordinary way an overloaded supplier says "not now", and
+ * the same request a moment later usually succeeds, so the person should not see a
+ * failure for it.
+ */
+const RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+
+/** How long to wait before each retry, in milliseconds. */
+const RETRY_DELAYS_MS = [400, 1200];
+
+function wait(ms) {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
+/**
+ * The supplier's own explanation, flattened to one short line.
+ *
+ * Both suppliers answer a refusal with JSON carrying an error message, but a few
+ * replies are plain text, so anything unreadable is still kept as text.
+ * @param {string} bodyText
+ * @returns {string}
+ */
+function supplierMessage(bodyText) {
+  const text = String(bodyText ?? '');
+  try {
+    const parsed = JSON.parse(text);
+    const said = parsed?.error?.message ?? parsed?.message ?? '';
+    if (typeof said === 'string' && said.trim() !== '') return said.trim().slice(0, 160);
+  } catch {
+    // Not JSON: the text itself is the explanation.
+  }
+  return text.replace(/\s+/g, ' ').trim().slice(0, 160);
+}
+
+/**
+ * What a supplier's refusal actually means, in a sentence worth reading.
+ *
+ * Every refusal used to read "The AI provider rejected the request", and the
+ * response body was dropped without being read. An empty supplier balance, a key
+ * that had been rotated and a model the supplier no longer serves were therefore
+ * the same words to the person and nothing at all in the log. The status picks the
+ * sentence and the supplier's own message is kept beside it.
+ * @param {number} status
+ * @param {string} bodyText
+ * @returns {Error}
+ */
+function supplierFailure(status, bodyText) {
+  const detail = supplierMessage(bodyText);
+  const suffix = detail === '' ? '' : ` (${detail})`;
+  let reason = 'rejected';
+  let message = 'The AI provider rejected the request.';
+  if (status === 401 || status === 403) {
+    reason = 'key_rejected';
+    message = "The AI provider refused Zuri's key, so no reply could be made.";
+  } else if (status === 402) {
+    reason = 'no_credit';
+    message = "The AI provider's account is out of credit, so no reply could be made.";
+  } else if (status === 404) {
+    reason = 'model_unknown';
+    message = 'The AI provider could not find the model Zuri asked for.';
+  } else if (status === 429) {
+    reason = 'rate_limited';
+    message = 'The AI provider is taking too many requests. Try again in a moment.';
+  } else if (status >= 500) {
+    reason = 'unavailable';
+    message = 'The AI provider is temporarily unavailable. Try again in a moment.';
+  }
+  const error = new Error(message + suffix);
+  error.code = 'PROVIDER_REQUEST_FAILED';
+  error.status = status;
+  error.reason = reason;
+  error.providerStatus = status;
+  error.providerMessage = detail;
+  return error;
+}
+
+/** Read a refused response and turn it into the error above. */
+async function refusalFrom(response) {
+  const body = await response.text().catch(() => '');
+  return supplierFailure(response.status, body);
+}
+
+/**
+ * POST to a supplier, trying again while it is busy rather than refusing.
+ *
+ * The retry sits on the response itself, before any of its text is read, so a
+ * repeat can never show the person the same words twice. Stopping the request, or
+ * a refusal that repeating cannot fix, is never retried.
+ * @param {typeof fetch} fetchImpl
+ * @param {string} target
+ * @param {RequestInit} init
+ * @param {AbortSignal} [signal]
+ * @returns {Promise<Response>}
+ */
+async function postWithRetry(fetchImpl, target, init, signal) {
+  for (let attempt = 0; ; attempt += 1) {
+    let result = null;
+    let networkError = null;
+    try {
+      result = await fetchImpl(target, init);
+    } catch (error) {
+      // A person who pressed Stop is not a fault worth repeating.
+      if (signal?.aborted || error?.name === 'AbortError') throw error;
+      networkError = error;
+    }
+    if (result?.ok) return result;
+
+    const status = result?.status ?? 0;
+    const busy = networkError !== null || RETRY_STATUSES.has(status);
+    if (busy && attempt < RETRY_DELAYS_MS.length) {
+      await wait(RETRY_DELAYS_MS[attempt]);
+      continue;
+    }
+    if (networkError) {
+      const error = new Error('The AI provider could not be reached. Check the connection and try again.');
+      error.code = 'PROVIDER_REQUEST_FAILED';
+      error.status = 0;
+      error.reason = 'unreachable';
+      error.providerMessage = String(networkError?.message ?? '').slice(0, 160);
+      throw error;
+    }
+    throw await refusalFrom(result);
+  }
+}
+
+/**
  * Walk a server-sent-events body and hand each `data:` payload to the caller.
  *
  * Only `data:` lines carry content; `event:` and `id:` lines are framing, and a
@@ -160,27 +287,25 @@ export function createDeepSeekClient({ apiKey, endpoint, fetchImpl = fetch }) {
     const offered = Array.isArray(tools) ? tools : [];
     const wire = openAiMessages(messages);
     const toolPayload = offered.length > 0 ? { tools: openAiTools(offered) } : {};
-    const result = await fetchImpl(target, {
+    const result = await postWithRetry(fetchImpl, target, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${apiKey}`,
         'content-type': 'application/json',
       },
+      // The conversation is converted and the tools are attached here. Both were
+      // built and then left out of the body, so a tool round reached the supplier
+      // as a plain chat with no tools at all: the model could only describe the
+      // call it wanted to make, never make it.
       body: JSON.stringify(
         streaming
           // include_usage makes the last frame carry the token counts; without it a
           // streamed reply reports no usage and the quota would have to guess.
-          ? { model, messages, max_tokens: maxTokens, stream: true, stream_options: { include_usage: true } }
-          : { model, messages, max_tokens: maxTokens, stream: false },
+          ? { model, messages: wire, max_tokens: maxTokens, stream: true, stream_options: { include_usage: true }, ...toolPayload }
+          : { model, messages: wire, max_tokens: maxTokens, stream: false, ...toolPayload },
       ),
       signal,
-    });
-    if (!result.ok) {
-      const error = new Error('The AI provider rejected the request.');
-      error.code = 'PROVIDER_REQUEST_FAILED';
-      error.status = result.status;
-      throw error;
-    }
+    }, signal);
 
     if (!streaming) {
       const payload = await result.json();
@@ -215,7 +340,16 @@ export function createDeepSeekClient({ apiKey, endpoint, fetchImpl = fetch }) {
     // The name comes once and the argument JSON is split across frames, so they are
     // gathered per index and only parsed once the stream ends.
     const partialCalls = new Map();
+    // A supplier can open the stream and then report a fault inside it. Without
+    // this the reply simply looked empty, which hid the real reason.
+    let streamFailure = null;
     await readSse(result, (payload) => {
+      if (payload?.error) {
+        const said = typeof payload.error?.message === 'string' ? payload.error.message : '';
+        streamFailure = supplierFailure(0, said);
+        streamFailure.reason = 'stream_error';
+        return;
+      }
       const delta = payload?.choices?.[0]?.delta?.content;
       if (typeof delta === 'string' && delta !== '') {
         content += delta;
@@ -235,6 +369,7 @@ export function createDeepSeekClient({ apiKey, endpoint, fetchImpl = fetch }) {
       if (payload?.usage && typeof payload.usage === 'object') usage = payload.usage;
     });
 
+    if (streamFailure) throw streamFailure;
     const toolCalls = [...partialCalls.values()]
       .filter((call) => call.name !== '')
       .map((call, index) => ({ id: call.id || `call_${index}`, name: call.name, arguments: call.arguments || '{}' }));
@@ -328,7 +463,7 @@ export function createAnthropicClient({ apiKey, endpoint = 'https://api.anthropi
         })),
       }
       : {};
-    const result = await fetchImpl(target, {
+    const result = await postWithRetry(fetchImpl, target, {
       method: 'POST',
       headers: {
         'x-api-key': apiKey,
@@ -344,13 +479,7 @@ export function createAnthropicClient({ apiKey, endpoint = 'https://api.anthropi
         ...(streaming ? { stream: true } : {}),
       }),
       signal,
-    });
-    if (!result.ok) {
-      const error = new Error('The AI provider rejected the request.');
-      error.code = 'PROVIDER_REQUEST_FAILED';
-      error.status = result.status;
-      throw error;
-    }
+    }, signal);
 
     if (!streaming) {
       const payload = await result.json();
@@ -423,8 +552,11 @@ export function createAnthropicClient({ apiKey, endpoint = 'https://api.anthropi
         return;
       }
       if (type === 'error') {
-        streamError = new Error('The AI provider rejected the request.');
-        streamError.code = 'PROVIDER_REQUEST_FAILED';
+        // The event names the reason; dropping it left the person with the same
+        // sentence whatever had gone wrong.
+        const said = typeof payload?.error?.message === 'string' ? payload.error.message : '';
+        streamError = supplierFailure(0, said);
+        streamError.reason = 'stream_error';
       }
     });
 

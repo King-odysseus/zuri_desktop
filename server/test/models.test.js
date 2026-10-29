@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createApp } from '../src/app.js';
-import { createAnthropicClient } from '../src/deepseek.js';
+import { createAnthropicClient, createDeepSeekClient } from '../src/deepseek.js';
 import { PLANS } from '../src/plans.js';
 import { limitsForPlan } from '../src/limits.js';
 import {
@@ -414,5 +414,100 @@ assert.equal(committed.costMicroUsd, 28);
     'schema.sql must not seed the retired Zuri Code name',
   );
 }
+
+
+// The OpenAI-compatible client. Three things are pinned here because all three
+// were wrong at once and none of them showed up as a failing request: the tools and
+// the converted conversation never reached the supplier, a busy supplier was
+// reported as a refusal, and the supplier's own reason was thrown away, so every
+// failure read "The AI provider rejected the request".
+const readFileTool = {
+  name: 'readFile',
+  description: 'Read one file.',
+  parameters: { type: 'object', properties: { path: { type: 'string' } } },
+};
+
+let openAiRequest;
+const openAi = createDeepSeekClient({
+  apiKey: 'test-key',
+  fetchImpl: async (_url, request) => {
+    openAiRequest = { ...request, body: JSON.parse(request.body) };
+    return new Response(JSON.stringify({
+      id: 'chat_test',
+      model: 'deepseek-flash',
+      choices: [{ message: { role: 'assistant', content: 'ok', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'readFile', arguments: '{"path":"a.txt"}' } }] } }],
+      usage: { prompt_tokens: 5, completion_tokens: 2 },
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  },
+});
+const openAiResult = await openAi({
+  messages: [
+    { role: 'user', content: 'Read a.txt' },
+    { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{"path":"a.txt"}' }] },
+    { role: 'tool', toolCallId: 'call_1', content: 'file body' },
+  ],
+  model: 'deepseek-flash',
+  maxTokens: 100,
+  tools: [readFileTool],
+});
+assert.equal(openAiRequest.body.tools[0].function.name, 'readFile', 'the tools offered to the model must be sent, not built and dropped');
+assert.equal(openAiRequest.body.messages[1].tool_calls[0].id, 'call_1', 'an assistant turn that asked for a tool must carry the call');
+assert.equal(openAiRequest.body.messages[2].tool_call_id, 'call_1', 'a tool result must name the call it answers');
+assert.equal(openAiResult.toolCalls[0].name, 'readFile');
+
+/** @returns {Promise<Error | null>} The refusal, or null when the call succeeded. */
+async function refusalOf(client, input = {}) {
+  try {
+    await client({ messages: [{ role: 'user', content: 'hi' }], model: 'deepseek-flash', maxTokens: 10, ...input });
+    return null;
+  } catch (error) {
+    return error;
+  }
+}
+
+const outOfCredit = createDeepSeekClient({
+  apiKey: 'test-key',
+  fetchImpl: async () => new Response(JSON.stringify({ error: { message: 'Insufficient Balance' } }), { status: 402 }),
+});
+const creditError = await refusalOf(outOfCredit);
+assert.equal(creditError.code, 'PROVIDER_REQUEST_FAILED');
+assert.equal(creditError.reason, 'no_credit');
+assert.match(creditError.message, /out of credit/, 'an empty supplier balance must not read as a generic refusal');
+assert.match(creditError.message, /Insufficient Balance/, "the supplier's own explanation must be kept");
+
+let busyAttempts = 0;
+const busyThenFine = createDeepSeekClient({
+  apiKey: 'test-key',
+  fetchImpl: async () => {
+    busyAttempts += 1;
+    if (busyAttempts === 1) return new Response(JSON.stringify({ error: { message: 'Server is busy' } }), { status: 503 });
+    return new Response(JSON.stringify({ model: 'deepseek-flash', choices: [{ message: { role: 'assistant', content: 'second try' } }] }), { status: 200 });
+  },
+});
+const retried = await busyThenFine({ messages: [{ role: 'user', content: 'hi' }], model: 'deepseek-flash', maxTokens: 10 });
+assert.equal(busyAttempts, 2, 'a busy supplier must be tried again rather than shown to the person');
+assert.equal(retried.content, 'second try');
+
+let keyAttempts = 0;
+const badKey = createDeepSeekClient({
+  apiKey: 'test-key',
+  fetchImpl: async () => {
+    keyAttempts += 1;
+    return new Response(JSON.stringify({ error: { message: 'Authentication Fails' } }), { status: 401 });
+  },
+});
+const keyError = await refusalOf(badKey);
+assert.equal(keyAttempts, 1, 'a refused key is not worth repeating');
+assert.equal(keyError.reason, 'key_rejected');
+assert.match(keyError.message, /refused Zuri's key/);
+
+// A supplier can open the stream and only then report the fault.
+const failedStream = createDeepSeekClient({
+  apiKey: 'test-key',
+  fetchImpl: async () => new Response('data: {"error":{"message":"Server overloaded"}}\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } }),
+});
+const streamError2 = await refusalOf(failedStream, { onDelta: () => {} });
+assert.equal(streamError2.reason, 'stream_error', 'a fault inside the stream must be reported as one');
+assert.match(streamError2.message, /Server overloaded/);
 
 console.log('PASS server models');
