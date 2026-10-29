@@ -2021,19 +2021,24 @@ body:has(.app) .app {
   min-height: calc(100dvh - var(--bar-height));
 }
 
-/* A flat panel beside the form: no photograph, no scrim, no gradient. On a phone it
-   is gone rather than a 148px strip of colour to scroll past. */
+/* A drawn scene beside the form: a Lagos lagoon at dusk, a bridge and the city,
+   with a network of connected points over it. It is vector art rather than a
+   photograph, so it stays sharp at any window size, costs a few kilobytes and
+   needs no image licence. On a phone the panel is gone rather than a strip of
+   colour to scroll past. */
 .auth-aside {
   position: relative;
   display: none;
   overflow: hidden;
-  background: var(--surface-secondary);
+  background: #071026 url("/img/auth-aside.svg") center center / cover no-repeat;
   isolation: isolate;
 }
 
-/* The copy sits on the panel now, so it takes the page's own ink. */
-.auth-aside .brand {
-  color: var(--text);
+/* The scene is dark at every size, so the copy on it is light in both themes. */
+.auth-aside .brand,
+.auth-aside .brand-mark {
+  color: #ffffff;
+  text-shadow: 0 1px 8px rgba(3, 8, 18, 0.55);
 }
 
 /* Below 900px the aside is not drawn at all: there is no picture to carry, and the
@@ -2568,7 +2573,8 @@ a.download-card:hover {
 
   .auth-aside-inner h1 {
     max-width: 16ch;
-    color: var(--text);
+    color: #ffffff;
+    text-shadow: 0 1px 14px rgba(3, 8, 18, 0.65);
     font-size: clamp(26px, 2.6vw, 38px);
     font-weight: 600;
     letter-spacing: -0.03em;
@@ -2577,9 +2583,18 @@ a.download-card:hover {
 
   .auth-aside-inner p {
     max-width: 40ch;
-    color: var(--muted);
+    color: rgba(255, 255, 255, 0.84);
     font-size: 15px;
     line-height: 1.6;
+    text-shadow: 0 1px 12px rgba(3, 8, 18, 0.6);
+  }
+
+  /* Over a picture the chips read as glass rather than as card furniture. */
+  .auth-aside .auth-trust li {
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(8, 18, 36, 0.55);
+    color: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(6px);
   }
 
   .auth-brand {
@@ -3201,6 +3216,19 @@ a.download-card:hover {
   font-size: 12px;
 }
 
+/* A picture drawn in the chat: square, never wider than the bubble, and clickable
+   at full size through the link the library keeps. */
+.chat-picture {
+  display: block;
+  width: min(100%, 340px);
+  aspect-ratio: 1;
+  margin-bottom: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  object-fit: cover;
+}
+
 .chat-bubble-user .chat-text {
   color: var(--text);
 }
@@ -3593,6 +3621,32 @@ a.download-card:hover {
   flex: 1 1 auto;
   text-align: left;
   white-space: nowrap;
+}
+
+/* The picture models are a second group in the same list, so their heading is a
+   label rather than a row: it cannot be chosen and holds no check mark. */
+.chat-model-group {
+  margin: 2px 0 0;
+  padding: 8px 10px 2px;
+  border-top: 1px solid color-mix(in srgb, var(--control-border) 60%, transparent);
+  color: var(--faint);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* The plan a greyed picture model needs, said in the row rather than only on hover,
+   because a phone has no hover. */
+.chat-model-plan {
+  color: var(--faint);
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.chat-menu-row:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* The list is drawn from the chip's own right edge, so it always sits under the
@@ -4382,7 +4436,9 @@ h4,
   max-width: 360px;
 }
 
-.image-grid {
+/* The saved-picture library, not the pricing cards: those share the class name's
+   idea but must keep their own three-column grid, so they are .image-grid. */
+.image-library-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 12px;

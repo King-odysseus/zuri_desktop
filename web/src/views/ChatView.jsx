@@ -11,6 +11,7 @@ import { copyText } from '../../../src/renderer-react/clipboard.js';
 import { shareText } from '../lib/share.js';
 import {
   DEFAULT_CHAT_MODEL,
+  api,
   appendMessage,
   createConversation,
   deleteConversation,
@@ -27,6 +28,9 @@ import {
 import { LogoMark } from '../components/Icons.jsx';
 import { formatRelativeTime, greetingFor } from '../lib/format.js';
 import { clearChatDraft, readChatDraft, saveChatDraft } from '../lib/drafts.js';
+// A picture made in the chat is filed with the pictures made on the Images page:
+// one library, whichever screen drew it.
+import { blobFromBase64, savePicture } from '../lib/imageStore.js';
 
 /*
  * The chat models a customer can choose, in the order the plans climb. The codes
@@ -82,13 +86,15 @@ const SLASH_COMMANDS = [
 
 /* One row of the add menu. A menu item is a button, not a link, because nothing
    here navigates: each row changes the message being written. */
-function MenuItem({ children, onSelect, role = 'menuitem', checked, className = '' }) {
+function MenuItem({ children, onSelect, role = 'menuitem', checked, className = '', disabled = false, title }) {
   return (
     <Button
       type="button"
       variant="ghost"
       role={role}
       aria-checked={role === 'menuitemradio' ? checked : undefined}
+      disabled={disabled}
+      title={title}
       className={`chat-menu-row ${className}`.trim()}
       onClick={onSelect}
     >
@@ -251,6 +257,14 @@ export default function ChatView({
 
   const [draft, setDraft] = useState(() => readChatDraft());
   const [model, setModel] = useState(DEFAULT_CHAT_MODEL);
+  // The picture models are the server's catalogue, not a list repeated here: a plan
+  // decides which of them this account may use, and the picker says so.
+  const [pictureModels, setPictureModels] = useState([]);
+  const [drawing, setDrawing] = useState(false);
+  // Declared with the state rather than lower down, because the send callback's
+  // dependency list reads it while the component is still rendering.
+  const pictureModel = pictureModels.find((entry) => entry.code === model) ?? null;
+  const modelName = pictureModel?.name || modelNameFor(model);
   const [streaming, setStreaming] = useState(false);
   const [streamReply, setStreamReply] = useState('');
   const [streamError, setStreamError] = useState(null);
@@ -595,6 +609,13 @@ export default function ChatView({
     const attached = questionOverride === null ? attachment : null;
     if ((!question && !attached) || streaming) return;
 
+    // A picture request reads only words, so a file waiting to go is refused rather
+    // than quietly left out of the picture it has no part in.
+    if (pictureModel && attached) {
+      setAttachNote('Picture models work from your words only. Remove the file, or pick a chat model.');
+      return;
+    }
+
     // What the model reads. A text file is quoted under a heading, the way the
     // desktop places an attachment in front of the prompt. A picture or a PDF has
     // no text to quote, so the model is told a file came with the turn and given
@@ -648,6 +669,48 @@ export default function ChatView({
     let reply = '';
 
     try {
+      /*
+       * A picture model reads only words, so its turn is shaped differently: the
+       * image endpoint draws one picture, which the account pays for out of the
+       * same allowance. The picture joins the thread straight away and is filed in
+       * the Images library; the saved chat keeps the sentence saying so, because a
+       * conversation row holds words.
+       */
+      if (pictureModel) {
+        setDrawing(true);
+        const made = await api('/api/images', {
+          method: 'POST',
+          body: JSON.stringify({ prompt: question, model: pictureModel.code, shape: 'square', improve: true }),
+        });
+        const drawnBy = made?.modelName || pictureModel.name;
+        let filed = '';
+        try {
+          await savePicture({
+            blob: blobFromBase64(made.imageBase64, made.mime),
+            prompt: question,
+            usedPrompt: made.prompt ?? question,
+            model: drawnBy,
+            shape: 'square',
+          });
+          filed = ' It is saved in your Images library.';
+        } catch {
+          // A browser that refuses storage (private browsing) still shows the
+          // picture; the sentence just does not promise it was kept.
+        }
+        if (run !== runRef.current) return;
+        const note = `${drawnBy} drew this picture.${filed}`;
+        setThread((previous) => ({
+          ...previous,
+          messages: [...previous.messages, {
+            role: 'assistant',
+            content: note,
+            picture: `data:${made.mime};base64,${made.imageBase64}`,
+          }],
+        }));
+        await saveExchange(conversationId, said, note, run, null);
+        return;
+      }
+
       const result = await streamChat({
         messages: outgoing,
         model,
@@ -686,12 +749,13 @@ export default function ChatView({
         }));
       }
       setStreamReply('');
-      if (error?.name !== 'AbortError') setStreamError(failureOf(error, 'The reply could not be completed.'));
+      if (error?.name !== 'AbortError') setStreamError(failureOf(error, pictureModel ? 'The picture could not be made.' : 'The reply could not be completed.'));
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
       setStreaming(false);
+      setDrawing(false);
     }
-  }, [draft, streaming, openId, thread.messages, model, resetReply, saveExchange, projectId]);
+  }, [draft, streaming, openId, thread.messages, model, resetReply, saveExchange, projectId, pictureModel]);
 
   const editMessage = useCallback((message) => {
     const content = typeof message?.content === 'string' ? message.content : '';
@@ -925,6 +989,27 @@ export default function ChatView({
     // showThread is a dependency because the field is not on screen until it is true.
   }, [draft, showThread]);
 
+  /*
+   * One picker for everything Zuri can make, so the picture models are read from
+   * the same catalogue the Images page uses. A model the plan leaves out stays in
+   * the list, greyed with the plan it needs: hiding it would let the picker look
+   * like the whole story. The catalogue itself needs a paid plan, so a refusal
+   * here just leaves the chat models in place.
+   */
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      try {
+        const listed = await api('/api/models');
+        if (!active || !Array.isArray(listed)) return;
+        setPictureModels(listed.filter((entry) => entry.kind === 'image'));
+      } catch {
+        if (active) setPictureModels([]);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
   const onComposerKeyDown = (event) => {
     if (event.key !== 'Enter' || event.shiftKey) return;
     // An IME pick can arrive as Enter; that is text, not a send.
@@ -934,7 +1019,6 @@ export default function ChatView({
   };
 
   const sessionExpired = listError?.status === 401 || threadError?.status === 401 || streamError?.status === 401;
-  const modelName = modelNameFor(model);
   // The phone row is short, so the label drops its "Zuri" prefix there rather than
   // disappearing: an unlabelled chevron does not say which model will answer.
   const modelShortName = modelName.replace(/^Zuri\s+/, '');
@@ -1208,7 +1292,14 @@ export default function ChatView({
                   )
                 )}
                 {message.role === 'assistant'
-                  ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
+                  ? (
+                    <>
+                      {message.picture && (
+                        <img className="chat-picture" src={message.picture} alt={message.content} decoding="async" />
+                      )}
+                      <div className="chat-answer"><FormattedMessage content={message.content} /></div>
+                    </>
+                  )
                   : <p className="chat-text">{message.content}</p>}
               </article>
                 <div className="chat-bubble-actions">
@@ -1257,7 +1348,7 @@ export default function ChatView({
             <article className="chat-bubble chat-bubble-assistant is-streaming">
               {streamReply
                 ? <div className="chat-answer"><FormattedMessage content={streamReply} /></div>
-                : <p className="chat-text">Zuri is thinking...</p>}
+                : <p className="chat-text">{drawing ? 'Zuri is drawing your picture...' : 'Zuri is thinking...'}</p>}
             </article>
           )}
         </div>
@@ -1387,7 +1478,7 @@ export default function ChatView({
               className="chat-input"
               rows={1}
               value={draft}
-              placeholder="Ask Zuri anything"
+              placeholder={pictureModel ? 'Describe the picture to draw' : 'Ask Zuri anything'}
               aria-label="Message"
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={onComposerKeyDown}
@@ -1430,6 +1521,32 @@ export default function ChatView({
                       {model === entry.code && <CheckIcon size={14} aria-hidden="true" />}
                     </MenuItem>
                   ))}
+                  {/* The picture models close the same list. One Zuri can make words
+                      and pictures, so the picker does not send anyone to a second
+                      screen to find the other half of it. */}
+                  {pictureModels.length > 0 && (
+                    <>
+                      <p className="chat-model-group" role="presentation">Pictures</p>
+                      {pictureModels.map((entry) => (
+                        <MenuItem
+                          key={entry.code}
+                          role="menuitemradio"
+                          checked={model === entry.code}
+                          disabled={!entry.available}
+                          title={entry.available ? `Draws a picture with ${entry.name}` : `${entry.name} needs the ${entry.minPlan} plan`}
+                          onSelect={() => {
+                            setModel(entry.code);
+                            setModelMenuOpen(false);
+                          }}
+                        >
+                          <span className="chat-model-name">{entry.name}</span>
+                          {entry.available
+                            ? (model === entry.code && <CheckIcon size={14} aria-hidden="true" />)
+                            : <span className="chat-model-plan">{entry.minPlan}</span>}
+                        </MenuItem>
+                      ))}
+                    </>
+                  )}
                 </div>
               )}
             </div>

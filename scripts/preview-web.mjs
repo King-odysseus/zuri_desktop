@@ -8,7 +8,9 @@ const ROOT = path.join(process.cwd(), 'server', 'public');
 // A second preview can run beside the first, so the port is not fixed. The
 // signed-in views are reviewed independently of any other agent's session.
 const PORT = Number(process.env.PORT) || 8099;
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8' };
+// The web app's own pictures are served too, so a preview shows the same panel a
+// visitor sees; without the SVG type a browser refuses to draw the artwork at all.
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
 const plans = [
   { code: 'starter', name: 'Starter', currency: 'NGN', amountKobo: 250000, monthlyTokens: 2000000 },
   { code: 'pro', name: 'Pro', currency: 'NGN', amountKobo: 600000, monthlyTokens: 6000000 },
@@ -23,6 +25,20 @@ const imagePrices = [
   { code: 'zuri-sketch', name: 'Zuri Sketch', minPlan: 'starter', plans: [{ code: 'starter', priceKobo: 6_000, images: 41 }, { code: 'pro', priceKobo: 4_800, images: 125 }, { code: 'power', priceKobo: 6_000, images: 250 }, { code: 'max', priceKobo: 4_800, images: 833 }] },
   { code: 'zuri-canvas', name: 'Zuri Canvas', minPlan: 'pro', plans: [{ code: 'starter', priceKobo: 33_000, images: 7 }, { code: 'pro', priceKobo: 26_400, images: 22 }, { code: 'power', priceKobo: 33_000, images: 45 }, { code: 'max', priceKobo: 26_400, images: 151 }] },
   { code: 'zuri-studio', name: 'Zuri Studio', minPlan: 'max', plans: [{ code: 'starter', priceKobo: 90_000, images: 2 }, { code: 'pro', priceKobo: 72_000, images: 8 }, { code: 'power', priceKobo: 90_000, images: 16 }, { code: 'max', priceKobo: 72_000, images: 55 }] },
+];
+
+// The signed-in model catalogue, with the sample Pro plan's own answer on what it
+// may use. The picture models close the same list the chat models open.
+const modelCatalogue = [
+  { code: 'zuri-flash', name: 'Zuri Flash', kind: 'chat', available: true, minPlan: 'starter' },
+  { code: 'zuri-pro', name: 'Zuri Pro', kind: 'chat', available: true, minPlan: 'pro' },
+  { code: 'zuri-max', name: 'Zuri Max', kind: 'chat', available: false, minPlan: 'max' },
+  { code: 'zuri-code', name: 'Zuri Core', kind: 'chat', available: true, minPlan: 'starter' },
+  { code: 'zuri-reason', name: 'Zuri Reason', kind: 'chat', available: true, minPlan: 'pro' },
+  { code: 'zuri-elite', name: 'Zuri Elite', kind: 'chat', available: false, minPlan: 'max' },
+  { code: 'zuri-sketch', name: 'Zuri Sketch', kind: 'image', available: true, minPlan: 'starter' },
+  { code: 'zuri-canvas', name: 'Zuri Canvas', kind: 'image', available: true, minPlan: 'pro' },
+  { code: 'zuri-studio', name: 'Zuri Studio', kind: 'image', available: false, minPlan: 'max' },
 ];
 
 // Sample admin report; PREVIEW_ADMIN=1 makes the sample account an administrator.
@@ -543,6 +559,19 @@ createServer(async (request, response) => {
     ],
   });
   if (url.pathname === '/api/billing/checkout') return json(response, { authorizationUrl: '#' });
+  if (url.pathname === '/api/models') return json(response, modelCatalogue);
+  if (url.pathname === '/api/images' && request.method === 'POST') {
+    // A stand-in picture, so a picture drawn in the chat can be reviewed offline.
+    const picture = await readFile(path.join(ROOT, 'img', 'app-preview.png'));
+    return json(response, {
+      requestId: 'preview-picture',
+      model: 'zuri-canvas',
+      modelName: 'Zuri Canvas',
+      mime: 'image/png',
+      imageBase64: picture.toString('base64'),
+      prompt: 'a stand-in picture from the preview server',
+    });
+  }
 
   if (url.pathname === '/api/chat' && request.method === 'POST') { streamChatRoute(response); return; }
   if (await conversationRoute(request, response, url)) return;

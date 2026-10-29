@@ -177,7 +177,7 @@ export default function ImagesView() {
       {pictures.length === 0 && <p className="project-empty">No pictures yet. Your first one will appear here.</p>}
       {pictures.length > 0 && shown.length === 0 && <p className="project-empty">No picture matches that search.</p>}
 
-      <div className="image-grid">
+      <div className="image-library-grid">
         {shown.map((picture) => (
           <button key={picture.id} type="button" className="image-tile" onClick={() => { setOpenId(picture.id); setConfirmId(''); }} aria-label={`Open picture: ${picture.prompt}`}>
             <img src={urls.get(picture.id)} alt={picture.prompt} loading="lazy" decoding="async" />
