@@ -2063,16 +2063,38 @@ body:has(.app) .app {
   min-height: calc(100dvh - var(--bar-height));
 }
 
-/* A drawn scene beside the form: a Lagos lagoon at dusk, a bridge and the city,
-   with a network of connected points over it. It is vector art rather than a
-   photograph, so it stays sharp at any window size, costs a few kilobytes and
-   needs no image licence. On a phone the panel is gone rather than a strip of
-   colour to scroll past. */
+/* A photograph beside the form: three colleagues in a Lagos office working
+   something out together on one laptop. A drawing of a city said nothing about
+   what Zuri is for, while three people round a screen say it without a caption,
+   which leaves the copy free to make the larger claim that the agent is for work
+   and for the rest of the day too.
+
+   Photograph: Ninthgrid on Pexels, free to use without attribution.
+
+   The wall behind them is pale, so white copy needs a strong fall-off rather than
+   a tint. The horizontal scrim is near opaque where every word sits and then
+   clears, so the people come out of the dark instead of sitting behind smoked
+   glass. Its stops are in pixels, not percentages: the copy is a fixed measure
+   while the panel is not, so a percentage scrim would hold at 1280 and leave the
+   paragraph sitting on a white shirt at 900, where the same text fills two thirds
+   of a much narrower panel. A lighter vertical one dims the top and bottom for the
+   brand and the trust chips.
+
+   On a phone the panel is gone rather than a strip of photograph to scroll past. */
 .auth-aside {
   position: relative;
   display: none;
   overflow: hidden;
-  background: #071026 url("/img/auth-aside.svg") center center / cover no-repeat;
+  background-color: #0b1220;
+  background-image:
+    linear-gradient(180deg, rgba(5, 10, 20, 0.72) 0%, rgba(5, 10, 20, 0.06) 26%, rgba(5, 10, 20, 0.1) 70%, rgba(5, 10, 20, 0.7) 100%),
+    linear-gradient(90deg, rgba(5, 10, 20, 0.95) 0px, rgba(5, 10, 20, 0.92) 340px, rgba(5, 10, 20, 0.76) 440px, rgba(5, 10, 20, 0.36) 570px, rgba(5, 10, 20, 0.04) 700px, rgba(5, 10, 20, 0) 100%),
+    url("/img/auth-team.jpg");
+  /* The trio stand about a third of the way down the frame, so the crop keeps
+     their faces when a narrow window takes the sides rather than the middle. */
+  background-position: center, center, center 34%;
+  background-size: cover;
+  background-repeat: no-repeat;
   isolation: isolate;
 }
 
@@ -2629,6 +2651,26 @@ a.download-card:hover {
     padding: 56px 48px;
   }
 
+  /* A small label above the headline. It names the thing the page is selling
+     before the headline makes its claim, so "agent" is the first word the eye
+     meets on the panel. */
+  .auth-aside-inner .auth-eyebrow {
+    display: inline-flex;
+    width: fit-content;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.26);
+    border-radius: 999px;
+    background: rgba(8, 18, 36, 0.55);
+    padding: 5px 12px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    backdrop-filter: blur(6px);
+  }
+
   .auth-aside-inner h1 {
     max-width: 16ch;
     color: #ffffff;
@@ -2640,7 +2682,7 @@ a.download-card:hover {
   }
 
   .auth-aside-inner p {
-    max-width: 40ch;
+    max-width: 34ch;
     color: rgba(255, 255, 255, 0.84);
     font-size: 15px;
     line-height: 1.6;

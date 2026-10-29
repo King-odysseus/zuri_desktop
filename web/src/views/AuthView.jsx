@@ -105,11 +105,11 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
 
   return (
     <AuthShell
-      asideTitle={mode === 'signup' ? 'Your AI command centre, in the cloud.' : 'Good to see you again.'}
+      asideTitle={mode === 'signup' ? 'One agent for work, and for everything else.' : 'Welcome back to your agent.'}
       asideCopy={
         mode === 'signup'
-          ? 'One account for the assistant on your desktop and this dashboard. Start with Starter, then move up a plan when the work grows.'
-          : 'Your threads, your files and your plan are waiting on the other side of this form.'
+          ? 'Draft the report, plan the trip, chase the invoice, remember the appointment. Zuri keeps the whole of your day in one place, on your desktop and in the browser.'
+          : 'Your threads, files and plan are exactly where you left them, on your desktop and in the browser.'
       }
       onNavigate={onNavigate}
     >

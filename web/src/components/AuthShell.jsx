@@ -1,5 +1,5 @@
 import Footer from './Footer.jsx';
-import { BoltIcon, BrainIcon, GlobeIcon, LockIcon, LogoMark } from './Icons.jsx';
+import { AgentIcon, BoltIcon, BrainIcon, GlobeIcon, LockIcon, LogoMark } from './Icons.jsx';
 
 const TRUST = [
   { icon: <LockIcon />, label: 'Encrypted in transit' },
@@ -38,6 +38,10 @@ export default function AuthShell({ asideTitle, asideCopy, onNavigate, children 
             </span>
             <span className="brand-name">Zuri Cloud</span>
           </button>
+          <span className="auth-eyebrow">
+            <AgentIcon size={13} aria-hidden="true" />
+            Your AI agent
+          </span>
           <h1>{asideTitle}</h1>
           <p>{asideCopy}</p>
           <ul className="auth-trust">

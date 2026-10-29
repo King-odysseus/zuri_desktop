@@ -9,8 +9,18 @@ const ROOT = path.join(process.cwd(), 'server', 'public');
 // signed-in views are reviewed independently of any other agent's session.
 const PORT = Number(process.env.PORT) || 8099;
 // The web app's own pictures are served too, so a preview shows the same panel a
-// visitor sees; without the SVG type a browser refuses to draw the artwork at all.
-const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png' };
+// visitor sees. Each picture needs its own type: a browser will not draw one sent
+// as a generic binary stream, which is what an unlisted extension falls back to.
+const TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.svg': 'image/svg+xml',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+};
 const plans = [
   { code: 'starter', name: 'Starter', currency: 'NGN', amountKobo: 250000, monthlyTokens: 2000000 },
   { code: 'pro', name: 'Pro', currency: 'NGN', amountKobo: 600000, monthlyTokens: 6000000 },

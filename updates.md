@@ -1,3 +1,16 @@
+## 2026-10-29 - Windows (the sign-in panel shows a team, and leads with the agent)
+
+- The dark panel beside the sign-in form was a drawn scene of a Lagos lagoon at dusk with a network of points over it. It said nothing about what Zuri is for. It is now a photograph of three colleagues in a Lagos office working something out together on one laptop, so the picture carries the teamwork idea and the copy is free to make the claim.
+- The panel now names the product before it makes a claim: a small "Your AI agent" label sits above the headline, matching the "Your AI workspace" label the landing page already uses.
+- The copy leads on the agent and on range rather than on billing. Sign in reads "Welcome back to your agent."; create account reads "One agent for work, and for everything else." with a line about the report, the trip, the invoice and the appointment, which is the productivity and everyday-life framing rather than a plan or a dashboard.
+- The photograph is pale behind the copy, so the cover is a fall-off rather than a tint: near opaque where the text sits, clearing to nothing at the right edge, so the people come out of the dark. Its stops are in pixels, not percentages, because the text is a fixed measure while the panel is not. A percentage scrim held at 1280 but left the paragraph sitting on a white shirt at 900, where the same text fills two thirds of a much narrower panel. The paragraph is also narrowed to 34ch so it stops short of the laptop screen.
+- Checked at 390, 900 and 1280 wide: the panel is hidden on a phone as before with no sideways scroll, the team is clear and the copy legible at both desktop widths, and the sign in, create account and reset password screens all keep the same panel. No console errors and no request for the removed drawing.
+- The drawing is gone (web/public/img/auth-aside.svg and its copy in server/public/img), so the preview server gained JPEG and WebP types: a picture sent as a generic binary stream is not drawn at all.
+- Photograph: Ninthgrid on Pexels, free to use without attribution.
+- Key files: web/src/styles.css, web/src/components/AuthShell.jsx, web/src/views/AuthView.jsx, web/public/img/auth-team.jpg, scripts/preview-web.mjs.
+- Other OS action: run "npm run test && npm run web:build". Railway must redeploy to serve the rebuilt web bundle. No new dependency and no database change.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (a chat started in the browser now arrives in the desktop app)
 
 - Chat history was going up to the account but never coming back down as a new chat. Every sync ran from the list of chats already on the machine: it pushed those up and pulled new turns into them. A conversation started in the browser has no local chat to pull into, so no run could ever reach it, and it stayed invisible on the desktop for ever. Only the reverse case worked, which is why a desktop chat showed up on the web.
