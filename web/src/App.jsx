@@ -24,7 +24,7 @@ import {
 } from './lib/api.js';
 import { applyTheme, preferredTheme } from './lib/theme.js';
 
-const VIEWS = ['chat', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
+const VIEWS = ['chat', 'projects', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
 const CHAT_PATH = '/chat';
 const LEGAL_PATHS = ['/privacy', '/terms'];
 // The Android app has no marketing page to land on: signed out, it opens on sign-in.
@@ -52,7 +52,12 @@ function readRoute() {
  * @returns {string}
  */
 function viewFromPath(pathname) {
-  return pathname.replace(/\/+$/, '') === CHAT_PATH ? 'chat' : 'overview';
+  // The address is the only way back into a section after a reload or a shared
+  // link, so every section in VIEWS is recognised here rather than defaulting
+  // quietly to the overview.
+  const section = pathname.replace(/\/+$/, '').replace(/^\//, '');
+  if (section === CHAT_PATH.replace(/^\//, '')) return 'chat';
+  return VIEWS.includes(section) ? section : 'overview';
 }
 
 export default function App() {

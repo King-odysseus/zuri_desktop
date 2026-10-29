@@ -1,22 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Textarea } from 'flowbite-react';
-import {
-  AlignLeft,
-  ArrowUp,
-  Check,
-  ChevronLeft,
-  ChevronUp,
-  Command,
-  Copy,
-  Paperclip,
-  Pencil,
-  Plus,
-  RefreshCw,
-  Share2,
-  Square,
-  Trash2,
-  X,
-} from 'lucide-react';
+import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, FileIcon, FolderIcon, ICON_SIZE, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
 import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
 import ConversationSearch from '../components/ConversationSearch.jsx';
 import { LogoMark } from '../components/Icons.jsx';
@@ -33,8 +17,13 @@ import {
   deleteConversation,
   fetchConversation,
   fetchConversations,
+  fetchProjects,
   renameConversation,
+  setConversationFlags,
+  setConversationProject,
+  signUpload,
   streamChat,
+  uploadAttachment,
 } from '../lib/api.js';
 import { formatRelativeTime, greetingFor } from '../lib/format.js';
 import { clearChatDraft, readChatDraft, saveChatDraft } from '../lib/drafts.js';
@@ -93,14 +82,14 @@ const SLASH_COMMANDS = [
 
 /* One row of the add menu. A menu item is a button, not a link, because nothing
    here navigates: each row changes the message being written. */
-function MenuItem({ children, onSelect, role = 'menuitem', checked }) {
+function MenuItem({ children, onSelect, role = 'menuitem', checked, className = '' }) {
   return (
     <Button
       type="button"
       variant="ghost"
       role={role}
       aria-checked={role === 'menuitemradio' ? checked : undefined}
-      className="chat-menu-row"
+      className={`chat-menu-row ${className}`.trim()}
       onClick={onSelect}
     >
       {children}
@@ -117,21 +106,27 @@ function MenuBack({ children, onBack }) {
       className="chat-menu-back"
       onClick={onBack}
     >
-      <ChevronLeft size={14} aria-hidden="true" />
+      <ChevronLeftIcon size={14} aria-hidden="true" />
       {children}
     </Button>
   );
 }
 
 /*
- * What the browser can attach. The desktop app reads any file from disk and can
- * send a photo; a web page cannot reach the disk and the account server has no
- * upload route, so a file is read here and its text travels inside the message.
- * That is why only text is offered, and why the contents are not written to the
- * saved chat: the reply can quote the file, the account never stores it.
+ * What the browser can attach.
+ *
+ * Two routes, because two kinds of file mean different things. A picture or a PDF
+ * has no useful text, so it is uploaded to Cloudinary and the message carries a
+ * link to it: the CDN stores and serves the bytes, and the account stores only the
+ * link. A text file is read here and its words travel inside the message, which
+ * keeps a small note cheap and searchable.
  */
 const ATTACHMENT_TYPES = /.(txt|text|md|markdown|csv|tsv|json|log|yml|yaml|html|css|js|jsx|ts|tsx|py|sql|xml)$/i;
 const ATTACHMENT_MAX_BYTES = 200_000;
+/** The server's cap, repeated here so an oversized file is refused before it is read. */
+const UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+/** The kinds Cloudinary is signed for; matching image/png, image/jpeg, image/webp, image/gif, application/pdf. */
+const UPLOAD_TYPES = /^(image\/(png|jpeg|webp|gif)|application\/pdf)$/;
 
 /**
  * The name a model code is shown under. The picker already holds the names, but the
@@ -155,6 +150,35 @@ function stamp(conversation) {
 }
 
 /** Newest first, whatever order the server answered in. */
+/*
+ * ChatGPT puts a long history under period headings, so a week of chats reads as
+ * a few stretches rather than one undifferentiated list. The heading is attached
+ * to the first chat of each stretch and drawn by the row's own CSS, which keeps
+ * markup and behaviour apart.
+ */
+function dayBucket(conversation) {
+  const when = stamp(conversation);
+  if (!when) return 'Older';
+  const days = Math.floor((Date.now() - when) / 86_400_000);
+  if (days <= 0) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days <= 7) return 'Previous 7 days';
+  if (days <= 30) return 'Previous 30 days';
+  return 'Older';
+}
+
+function withGroupHeadings(conversations, searching) {
+  let previous = '';
+  return conversations.map((conversation) => {
+    // A search result list is answering one question, so period headings would
+    // only push the matches apart.
+    const bucket = searching ? '' : dayBucket(conversation);
+    const heading = bucket === previous ? '' : bucket;
+    previous = bucket;
+    return { conversation, heading };
+  });
+}
+
 function newestFirst(conversations) {
   return [...conversations].sort((left, right) => stamp(right) - stamp(left));
 }
@@ -176,6 +200,9 @@ function chatMessages(messages) {
     .map((message) => ({
       role: message.role,
       content: typeof message.content === 'string' ? message.content : '',
+      // A turn may carry one uploaded file. It is passed through as the server
+      // sent it, and the bubble decides how to draw it.
+      attachment: message.attachment ?? null,
     }));
 }
 
@@ -197,6 +224,11 @@ export default function ChatView({
   navigation = null,
   navCollapsed = false,
   onToggleCollapsed = () => {},
+  // When the dashboard opens chat from inside a project, that project's id arrives
+  // here. Every new thread is then filed into it, and the list only shows its own.
+  projectId = '',
+  projectName = '',
+  onLeaveProject = null,
 }) {
   const [conversations, setConversations] = useState([]);
   const [listStatus, setListStatus] = useState('loading');
@@ -238,6 +270,14 @@ export default function ChatView({
   const [renamingId, setRenamingId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [confirmId, setConfirmId] = useState(null);
+  // Which chat row has its actions menu open. Only one at a time, as ChatGPT does.
+  const [rowMenuId, setRowMenuId] = useState(null);
+  // The row menu's project list is a second view inside the same menu, so choosing
+  // where a chat belongs does not open a dialog over the conversation.
+  const [projectPickerFor, setProjectPickerFor] = useState(null);
+  const [projects, setProjects] = useState([]);
+  const [projectsStatus, setProjectsStatus] = useState('');
+  const [filingId, setFilingId] = useState('');
   // Which bubble was just copied, so its button can say so for a moment. -1 means
   // none, because index 0 is a real message.
   const [copiedIndex, setCopiedIndex] = useState(-1);
@@ -261,14 +301,14 @@ export default function ChatView({
   const loadConversations = useCallback(async (query = '') => {
     setListStatus('loading');
     try {
-      setConversations(newestFirst(await fetchConversations(query)));
+      setConversations(newestFirst(await fetchConversations(query, projectId)));
       setListError(null);
     } catch (error) {
       setListError(failureOf(error, 'Your saved chats could not be loaded.'));
     } finally {
       setListStatus('ready');
     }
-  }, []);
+  }, [projectId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -281,6 +321,26 @@ export default function ChatView({
     saveChatDraft(draft);
   }, [draft]);
 
+  // A row menu closes on Escape or on a press anywhere else, which is what a menu
+  // is expected to do. Without it the panel stayed open behind the next action.
+  useEffect(() => {
+    if (rowMenuId === null) return undefined;
+    const closeOnPress = (event) => {
+      if (event.target.closest?.('.chat-row-menu')) return;
+      if (event.target.closest?.('[aria-expanded="true"]')) return;
+      setRowMenuId(null);
+    };
+    const closeOnEscape = (event) => {
+      if (event.key === 'Escape') setRowMenuId(null);
+    };
+    document.addEventListener('pointerdown', closeOnPress);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOnPress);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [rowMenuId]);
+
   /*
    * The same conversation can be moving on another device: the desktop app mirrors
    * its threads to this account and a second tab may be open. Nothing can be pushed
@@ -290,7 +350,7 @@ export default function ChatView({
   const refreshHistory = useCallback(async () => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
     try {
-      setConversations(newestFirst(await fetchConversations(conversationQuery)));
+      setConversations(newestFirst(await fetchConversations(conversationQuery, projectId)));
       setListError(null);
     } catch {
       // A background refresh is a nicety: the list already on screen stays put, and
@@ -312,7 +372,7 @@ export default function ChatView({
     } catch {
       // Same reasoning as the list: what is open stays open.
     }
-  }, [conversationQuery, openId, streaming]);
+  }, [conversationQuery, openId, streaming, projectId]);
 
   useEffect(() => {
     const onVisible = () => {
@@ -339,12 +399,37 @@ export default function ChatView({
     event.target.value = '';
     if (!file) return;
 
+    // A picture or a PDF goes to Cloudinary, so the browser never has to turn it
+    // into text it cannot read and the account never stores the bytes.
+    if (UPLOAD_TYPES.test(file.type)) {
+      if (file.size > UPLOAD_MAX_BYTES) {
+        setAttachNote('That file is over 10MB. Try a smaller one.');
+        return;
+      }
+      setAttachNote('Uploading...');
+      try {
+        const signed = await signUpload();
+        if (!signed.signature) {
+          setAttachNote('Attachments are not switched on for this account yet. A text file still works.');
+          return;
+        }
+        const uploaded = await uploadAttachment(file, signed);
+        setAttachment({ ...uploaded, text: '', size: file.size });
+        setAttachNote('');
+      } catch (error) {
+        // The message is the server's own wording where it gave one, so a size or
+        // type refusal reads as an instruction rather than a generic failure.
+        setAttachNote(error?.message || 'That file could not be uploaded. Try again.');
+      }
+      return;
+    }
+
     if (!ATTACHMENT_TYPES.test(file.name)) {
-      setAttachNote('The web chat can attach text files: txt, md, csv, json, log and code. Photos and documents work in the desktop app.');
+      setAttachNote('The web chat can attach text files, pictures and PDFs. Anything else opens in the desktop app.');
       return;
     }
     if (file.size > ATTACHMENT_MAX_BYTES) {
-      setAttachNote('That file is over 200 KB. Try a smaller one, or attach it in the desktop app.');
+      setAttachNote('That text file is over 200 KB. Try a smaller one, or attach it in the desktop app.');
       return;
     }
     try {
@@ -471,12 +556,12 @@ export default function ChatView({
    * on the first send, so opening a chat and changing your mind saves nothing.
    */
   const saveExchange = useCallback(
-    async (conversationId, question, answer, run) => {
+    async (conversationId, question, answer, run, attachment = null) => {
       const title = titleFromQuestion(question);
       try {
         let id = conversationId;
         if (!id) {
-          const created = await createConversation(title, model);
+          const created = await createConversation(title, model, projectId);
           id = typeof created?.id === 'string' ? created.id : '';
           if (!id) throw new Error('The new chat did not come back with an id.');
           if (run === runRef.current) {
@@ -486,7 +571,7 @@ export default function ChatView({
           }
         }
         await appendMessage(id, [
-          { role: 'user', content: question },
+          { role: 'user', content: question, attachment },
           { role: 'assistant', content: answer },
         ]);
         if (run === runRef.current) loadConversations();
@@ -501,7 +586,7 @@ export default function ChatView({
         );
       }
     },
-    [loadConversations, model],
+    [loadConversations, model, projectId],
   );
 
   const send = useCallback(async (questionOverride = null) => {
@@ -510,25 +595,33 @@ export default function ChatView({
     const attached = questionOverride === null ? attachment : null;
     if ((!question && !attached) || streaming) return;
 
-    // What the model reads: the question with the file's text under a heading, the
-    // way an attachment is placed in front of the prompt on the desktop.
+    // What the model reads. A text file is quoted under a heading, the way the
+    // desktop places an attachment in front of the prompt. A picture or a PDF has
+    // no text to quote, so the model is told a file came with the turn and given
+    // its link; it is never told it can see something it cannot.
+    const labelled = attached ? attached.name : '';
     const withFile = attached
-      ? (question === ''
-        ? `Attached file: ${attached.name}\n\n${attached.text}`
-        : `${question}\n\nAttached file: ${attached.name}\n\n${attached.text}`)
+      ? (attached.text
+        ? [`Attached file: ${labelled}`, attached.text].join('\n\n')
+        : `A file came with this message: ${labelled} (${attached.kind}). Its contents are not readable here.`)
       : question;
+    const withQuestion = attached && question !== '' ? `${question}\n\n${withFile}` : withFile;
     // The length the person picked rides with the question, the way the attachment
-    // text does. It is sent but not saved, so the transcript keeps only the words
-    // said; a saved chat re-opened later answers at whatever length is chosen then.
-    const prompt = withFile === '' ? question : `${withFile}\n\n${ANSWER_LENGTH_RULES[answerLength]}`;
+    // does. It is sent but not saved, so the transcript keeps only the words said.
+    const prompt = withQuestion === '' ? question : `${withQuestion}\n\n${ANSWER_LENGTH_RULES[answerLength]}`;
     // What the bubble and the saved chat keep: the words, plus a line naming the
-    // file. The contents stay out of the account, because a web page cannot upload
-    // them and the server has nowhere to put them.
+    // file. A link, where there is one, is stored beside the turn rather than
+    // inside the words, so the thread draws a thumbnail instead of a long address.
     const said = attached
       ? (question === ''
-        ? `[Attached file: ${attached.name}]`
-        : `${question}\n\n[Attached file: ${attached.name}]`)
+        ? `[Attached file: ${labelled}]`
+        : `${question}\n\n[Attached file: ${labelled}]`)
       : question;
+    // Only an uploaded file becomes an attachment on the saved turn; a text file's
+    // words are already in the message, so the account stores nothing extra.
+    const storedAttachment = attached?.url
+      ? { url: attached.url, name: attached.name, kind: attached.kind, bytes: attached.size ?? attached.bytes ?? 0 }
+      : null;
 
     const run = (runRef.current += 1);
     const conversationId = openId;
@@ -546,7 +639,7 @@ export default function ChatView({
     setStreaming(true);
     setThread((previous) => ({
       ...previous,
-      messages: [...previous.messages, { role: 'user', content: said }],
+      messages: [...previous.messages, { role: 'user', content: said, attachment: storedAttachment }],
     }));
     atBottomRef.current = true;
 
@@ -558,6 +651,9 @@ export default function ChatView({
       const result = await streamChat({
         messages: outgoing,
         model,
+        // A chat inside a project names it, so the server adds that project's
+        // instructions and files to the prompt before the question is sent.
+        projectId,
         signal: controller.signal,
         onDelta: (text) => {
           if (run !== runRef.current) return;
@@ -578,7 +674,7 @@ export default function ChatView({
         messages: [...previous.messages, { role: 'assistant', content: answer }],
       }));
       setStreamReply('');
-      await saveExchange(conversationId, said, answer, run);
+      await saveExchange(conversationId, said, answer, run, storedAttachment);
     } catch (error) {
       if (run !== runRef.current) return;
       // Stop, or a dropped connection, keeps what already arrived on screen: it
@@ -595,7 +691,7 @@ export default function ChatView({
       if (abortRef.current === controller) abortRef.current = null;
       setStreaming(false);
     }
-  }, [draft, streaming, openId, thread.messages, model, resetReply, saveExchange]);
+  }, [draft, streaming, openId, thread.messages, model, resetReply, saveExchange, projectId]);
 
   const editMessage = useCallback((message) => {
     const content = typeof message?.content === 'string' ? message.content : '';
@@ -651,6 +747,81 @@ export default function ChatView({
     [openId, backToList],
   );
 
+
+  /**
+   * Open the project list in a row's menu, reading it the first time.
+   *
+   * The list is fetched on demand rather than on mount: most visits to the chat
+   * never move a chat, and a person with no projects should not pay a request for
+   * every page load.
+   */
+  const openProjectPicker = useCallback(async (conversationId) => {
+    setConfirmId(null);
+    setProjectPickerFor(conversationId);
+    if (projects.length > 0 || projectsStatus === 'loaded') return;
+    setProjectsStatus('loading');
+    try {
+      const list = await fetchProjects();
+      setProjects(list);
+      setProjectsStatus('loaded');
+    } catch (error) {
+      setProjectsStatus('failed');
+      setListError(failureOf(error, 'Your projects could not be loaded.'));
+    }
+  }, [projects.length, projectsStatus]);
+
+  /**
+   * File one chat into a project, or take it out with null.
+   *
+   * Inside a project the list is that project's own, so a chat moved somewhere else
+   * has to leave it, exactly as an archived chat does. Filed from the whole history,
+   * the row simply records where it now belongs.
+   */
+  const fileConversation = useCallback(
+    async (conversation, targetProjectId) => {
+      setFilingId(conversation.id);
+      try {
+        const updated = await setConversationProject(conversation.id, targetProjectId);
+        setConversations((previous) => {
+          const moved = previous.map((item) => (item.id === conversation.id ? { ...item, ...updated } : item));
+          const nowInThisProject = String(updated?.projectId ?? '') === String(projectId ?? '');
+          return nowInThisProject ? moved : moved.filter((item) => item.id !== conversation.id);
+        });
+        if (String(updated?.projectId ?? '') !== String(projectId ?? '') && openId === conversation.id) backToList();
+        setProjectPickerFor(null);
+        setRowMenuId(null);
+      } catch (error) {
+        setListError(failureOf(error, 'That chat could not be moved into a project.'));
+      } finally {
+        setFilingId('');
+      }
+    },
+    [backToList, openId, projectId],
+  );
+
+  /**
+   * Move a chat in the list, the way ChatGPT's row menu does.
+   *
+   * Pinning and archiving are one call because they answer the same question,
+   * where the chat belongs. The row is updated in place from the server's answer
+   * rather than refetched, so the list does not flicker while it moves.
+   */
+  const moveConversation = useCallback(
+    async (conversation, flags) => {
+      try {
+        const updated = await setConversationFlags(conversation.id, flags);
+        setConversations((previous) => previous.map((item) => (item.id === conversation.id ? { ...item, ...updated } : item)));
+        // A filed chat leaves the list, and the thread it was showing goes with it.
+        if (flags.archived === true) {
+          setConversations((previous) => previous.filter((item) => item.id !== conversation.id));
+          if (openId === conversation.id) backToList();
+        }
+      } catch (error) {
+        setListError(failureOf(error, 'That chat could not be moved.'));
+      }
+    },
+    [openId, backToList],
+  );
   const scrollToEnd = useCallback(() => {
     const node = messagesRef.current;
     if (node) node.scrollTop = node.scrollHeight;
@@ -786,20 +957,35 @@ export default function ChatView({
             because this one closes the list rather than the drawer. */}
         <div className="chat-list-head">
           <IconButton label="Close saved chats" onClick={closeList}>
-            <X size={18} aria-hidden="true" />
+            <CloseIcon size={18} aria-hidden="true" />
           </IconButton>
         </div>
         {/* The same navigation panel the other pages show, so a chat has one sidebar
             holding both the destinations and the conversations. */}
         {navigation && <div className="chat-nav">{navigation}</div>}
 
+        {/* Inside a project the list is that project's own, so it says which one and
+            offers the way back to the projects screen. Without this a person could not
+            tell the project history from the whole history. */}
+        {projectId !== '' && (
+          <div className="chat-project">
+            <span className="chat-project-name">
+              <FolderIcon size={16} aria-hidden="true" />
+              {projectName === '' ? 'This project' : projectName}
+            </span>
+            {onLeaveProject && (
+              <Button variant="ghost" className="chat-project-leave" onClick={onLeaveProject}>
+                All chats
+              </Button>
+            )}
+          </div>
+        )}
+
         <ConversationSearch
           value={conversationQuery}
           onChange={setConversationQuery}
           onClear={() => setConversationQuery('')}
         />
-
-        <p className="chat-recents-label">Recents</p>
 
         <div className="chat-recents-list">
           {listStatus === 'loading' && <p className="chat-recents-empty">Loading your chats...</p>}
@@ -811,8 +997,8 @@ export default function ChatView({
             </p>
           )}
 
-          {conversations.map((conversation) => (
-            <div key={conversation.id} className={`chat-recent${conversation.id === openId ? ' is-active' : ''}`}>
+          {withGroupHeadings(conversations, conversationQuery.trim() !== '').map(({ conversation, heading }) => (
+            <div key={conversation.id} data-group={heading || undefined} className={`chat-recent${conversation.id === openId ? ' is-active' : ''}`}>
               {renamingId === conversation.id ? (
                 <form
                   className="chat-recent-form"
@@ -830,14 +1016,14 @@ export default function ChatView({
                     autoFocus
                   />
                   <IconButton type="submit" size="sm" label="Save name" disabled={renameDraft.trim() === ''}>
-                    <Check size={14} aria-hidden="true" />
+                    <CheckIcon size={14} aria-hidden="true" />
                   </IconButton>
                   <IconButton
                     size="sm"
                     label="Cancel renaming"
                     onClick={() => { setRenamingId(null); setRenameDraft(''); }}
                   >
-                    <X size={14} aria-hidden="true" />
+                    <CloseIcon size={14} aria-hidden="true" />
                   </IconButton>
                 </form>
               ) : (
@@ -849,32 +1035,99 @@ export default function ChatView({
                     aria-current={conversation.id === openId ? 'page' : undefined}
                     title={conversation.title || 'New chat'}
                   >
-                    <span className="chat-recent-title">{conversation.title || 'New chat'}</span>
+                    <span className="chat-recent-title">
+                      {conversation.pinned && <PinIcon size={12} filled aria-hidden="true" />}
+                      {conversation.title || 'New chat'}
+                    </span>
                     <span className="chat-recent-meta">{formatRelativeTime(stamp(conversation) || undefined)}</span>
                   </button>
                   <span className="chat-recent-actions">
+                    {/*
+                      * One control per row, as ChatGPT draws it: the actions appear in a
+                      * menu rather than sitting on the row. Four icons beside a title
+                      * left no room for the title itself, and a row is read far more
+                      * often than it is acted on.
+                      */}
                     <IconButton
                       size="sm"
-                      label={`Rename ${conversation.title || 'chat'}`}
-                      onClick={() => { setRenamingId(conversation.id); setRenameDraft(conversation.title ?? ''); }}
+                      label={`Actions for ${conversation.title || 'chat'}`}
+                      aria-expanded={rowMenuId === conversation.id}
+                      onClick={() => { setRowMenuId(rowMenuId === conversation.id ? null : conversation.id); setConfirmId(null); }}
                     >
-                      <Pencil size={14} aria-hidden="true" />
+                      <MoreIcon size={14} aria-hidden="true" />
                     </IconButton>
-                    <IconButton
-                      size="sm"
-                      tone={confirmId === conversation.id ? 'danger' : 'quiet'}
-                      label={confirmId === conversation.id
-                        ? `Confirm deleting ${conversation.title || 'chat'}`
-                        : `Delete ${conversation.title || 'chat'}`}
-                      onClick={() => {
-                        // Deleting takes two clicks: the first arms the row, the second
-                        // removes it, so a stray tap cannot lose a conversation.
-                        if (confirmId === conversation.id) void removeConversation(conversation.id);
-                        else setConfirmId(conversation.id);
-                      }}
-                    >
-                      <Trash2 size={14} aria-hidden="true" />
-                    </IconButton>
+                    {rowMenuId === conversation.id && projectPickerFor === conversation.id && (
+                      <div className="chat-row-menu chat-row-menu-projects" role="menu" aria-label="Move this chat to a project">
+                        <MenuBack
+                          onBack={() => {
+                            setProjectPickerFor(null);
+                            setRowMenuId(null);
+                          }}
+                        >
+                          Move to project
+                        </MenuBack>
+                        {projectsStatus === 'loading' && <p className="chat-menu-note">Reading your projects...</p>}
+                        {filingId === conversation.id && <p className="chat-menu-note">Moving this chat...</p>}
+                        {projectsStatus === 'failed' && <p className="chat-menu-note">Your projects could not be loaded.</p>}
+                        {projectsStatus === 'loaded' && projects.length === 0 && (
+                          <p className="chat-menu-note">No projects yet. Make one on the Projects page.</p>
+                        )}
+                        {projects.map((project) => (
+                          <MenuItem
+                            key={project.id}
+                            role="menuitemradio"
+                            checked={String(conversation.projectId ?? '') === String(project.id)}
+                            onSelect={() => void fileConversation(conversation, project.id)}
+                          >
+                            <FolderIcon size={14} aria-hidden="true" />
+                            <span className="chat-menu-label">{project.name || 'Untitled project'}</span>
+                            {String(conversation.projectId ?? '') === String(project.id) && <CheckIcon size={14} aria-hidden="true" />}
+                          </MenuItem>
+                        ))}
+                        {String(conversation.projectId ?? '') !== '' && (
+                          <MenuItem
+                            role="menuitemradio"
+                            checked={false}
+                            onSelect={() => void fileConversation(conversation, null)}
+                          >
+                            <CloseIcon size={14} aria-hidden="true" />
+                            Take out of its project
+                          </MenuItem>
+                        )}
+                      </div>
+                    )}
+                    {rowMenuId === conversation.id && projectPickerFor !== conversation.id && (
+                      <div className="chat-row-menu" role="menu">
+                        <MenuItem onSelect={() => { setRowMenuId(null); setRenamingId(conversation.id); setRenameDraft(conversation.title ?? ''); }}>
+                          <EditIcon size={14} aria-hidden="true" />
+                          Rename
+                        </MenuItem>
+                        <MenuItem onSelect={() => void openProjectPicker(conversation.id)}>
+                          <FolderIcon size={14} aria-hidden="true" />
+                          {conversation.projectId ? 'Move to another project' : 'Move to project'}
+                        </MenuItem>
+                        <MenuItem onSelect={() => { setRowMenuId(null); void moveConversation(conversation, { pinned: !conversation.pinned }); }}>
+                          <PinIcon size={14} filled={conversation.pinned === true} aria-hidden="true" />
+                          {conversation.pinned ? 'Unpin' : 'Pin to top'}
+                        </MenuItem>
+                        <MenuItem onSelect={() => { setRowMenuId(null); void moveConversation(conversation, { archived: true }); }}>
+                          <ArchiveIcon size={14} aria-hidden="true" />
+                          Archive
+                        </MenuItem>
+                        <MenuItem
+                          className={confirmId === conversation.id ? 'is-danger' : ''}
+                          onSelect={() => {
+                            // Deleting takes two choices: the first arms the item, the
+                            // second removes the chat, so one stray press cannot lose one.
+                            if (confirmId === conversation.id) { setRowMenuId(null); void removeConversation(conversation.id); }
+                            else setConfirmId(conversation.id);
+                          }}
+                        >
+                          <DeleteIcon size={14} aria-hidden="true" />
+                          {confirmId === conversation.id ? 'Confirm delete' : 'Delete'}
+                        </MenuItem>
+                      </div>
+                    )}
                   </span>
                 </>
               )}
@@ -900,11 +1153,11 @@ export default function ChatView({
             className="chat-back"
             onClick={backToList}
           >
-            <ChevronLeft size={18} aria-hidden="true" />
+            <ChevronLeftIcon size={18} aria-hidden="true" />
           </IconButton>
           <div className="chat-floats-end">
             <IconButton label="New chat" onClick={startNewChat}>
-              <Plus size={18} aria-hidden="true" />
+              <PlusIcon size={18} aria-hidden="true" />
             </IconButton>
           </div>
         </div>
@@ -945,6 +1198,24 @@ export default function ChatView({
               <article className={`chat-bubble chat-bubble-${message.role}`}>
                 {/* A prompt is shown exactly as typed. A reply goes through the desktop's
                     own renderer, so code, lists, tables and links read the same on both. */}
+                {message.attachment && (
+                  // The file came from this account's own Cloudinary folder, so the
+                  // link is a CDN address rather than anything the server serves.
+                  // A picture is drawn small enough to keep the thread readable; a
+                  // PDF is a named row, because a page thumbnail would be another
+                  // transformation to pay for.
+                  message.attachment.kind?.startsWith('image/') ? (
+                    <a className="chat-attachment" href={message.attachment.url} target="_blank" rel="noopener noreferrer">
+                      <img src={message.attachment.url} alt={message.attachment.name} loading="lazy" decoding="async" />
+                      <span>{message.attachment.name}</span>
+                    </a>
+                  ) : (
+                    <a className="chat-attachment is-file" href={message.attachment.url} target="_blank" rel="noopener noreferrer">
+                      <FileIcon size={ICON_SIZE.lg} />
+                      <span>{message.attachment.name}</span>
+                    </a>
+                  )
+                )}
                 {message.role === 'assistant'
                   ? <div className="chat-answer"><FormattedMessage content={message.content} /></div>
                   : <p className="chat-text">{message.content}</p>}
@@ -956,7 +1227,7 @@ export default function ChatView({
                       label="Edit and send again"
                       onClick={() => editMessage(message)}
                     >
-                      <Pencil size={14} aria-hidden="true" />
+                      <EditIcon size={14} aria-hidden="true" />
                     </IconButton>
                   )}
                   {message.role === 'assistant' && index === lastAnswerIndex && (
@@ -966,7 +1237,7 @@ export default function ChatView({
                       label="Regenerate reply"
                       onClick={regenerateReply}
                     >
-                      <RefreshCw size={14} aria-hidden="true" />
+                      <RegenerateIcon size={14} aria-hidden="true" />
                     </IconButton>
                   )}
                   <IconButton
@@ -975,7 +1246,7 @@ export default function ChatView({
                     label={copiedIndex === index ? 'Copied' : message.role === 'user' ? 'Copy your message' : "Copy Zuri's reply"}
                     onClick={() => void copyMessage(message, index)}
                   >
-                    {copiedIndex === index ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                    {copiedIndex === index ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
                   </IconButton>
                   <IconButton
                     size="sm"
@@ -983,7 +1254,7 @@ export default function ChatView({
                     label="Share message"
                     onClick={() => void shareMessage(message)}
                   >
-                    <Share2 size={14} aria-hidden="true" />
+                    <ShareIcon size={14} aria-hidden="true" />
                   </IconButton>
                 </div>
               </article>
@@ -1019,7 +1290,7 @@ export default function ChatView({
           {attachNote !== '' && <p className="chat-note is-error">{attachNote}</p>}
           {attachment && (
             <div className="chat-attachment">
-              <Paperclip size={14} aria-hidden="true" />
+              <PaperclipIcon size={14} aria-hidden="true" />
               <span className="chat-attachment-name" title={attachment.name}>{attachment.name}</span>
               <span className="chat-attachment-meta">
                 {/* Said plainly: the text is sent with the message and the file
@@ -1031,7 +1302,7 @@ export default function ChatView({
                 label="Remove attached file"
                 onClick={() => { setAttachment(null); setAttachNote(''); }}
               >
-                <X size={14} aria-hidden="true" />
+                <CloseIcon size={14} aria-hidden="true" />
               </IconButton>
             </div>
           )}
@@ -1058,7 +1329,7 @@ export default function ChatView({
                 aria-expanded={menuView !== ''}
                 onClick={() => setMenuView((current) => (current === '' ? 'main' : ''))}
               >
-                <Plus size={18} aria-hidden="true" />
+                <PlusIcon size={18} aria-hidden="true" />
               </IconButton>
               {menuView !== '' && (
                 <div
@@ -1069,16 +1340,16 @@ export default function ChatView({
                   {menuView === 'main' ? (
                     <>
                       <MenuItem onSelect={() => pickMenuItem(() => fileRef.current?.click())}>
-                        <Paperclip size={16} aria-hidden="true" />
+                        <PaperclipIcon size={16} aria-hidden="true" />
                         <span>Attach a file</span>
                       </MenuItem>
                       <MenuItem onSelect={() => setMenuView('length')}>
-                        <AlignLeft size={16} aria-hidden="true" />
+                        <AlignLeftIcon size={16} aria-hidden="true" />
                         <span className="flex-1">Reply length</span>
                         <span className="text-xs capitalize text-[var(--muted)]">{answerLength}</span>
                       </MenuItem>
                       <MenuItem onSelect={() => setMenuView('commands')}>
-                        <Command size={16} aria-hidden="true" />
+                        <CommandIcon size={16} aria-hidden="true" />
                         <span>Slash commands</span>
                       </MenuItem>
                     </>
@@ -1094,7 +1365,7 @@ export default function ChatView({
                         >
                           <span className="flex-1">{label}</span>
                           <span className="text-xs text-[var(--muted)]">{hint}</span>
-                          {answerLength === value && <Check size={16} aria-hidden="true" />}
+                          {answerLength === value && <CheckIcon size={16} aria-hidden="true" />}
                         </MenuItem>
                       ))}
                     </>
@@ -1116,7 +1387,7 @@ export default function ChatView({
               type="file"
               className="chat-file-input"
               aria-label="Attach a file"
-              accept=".txt,.text,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.html,.css,.js,.jsx,.ts,.tsx,.py,.sql,.xml"
+              accept=".txt,.text,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.html,.css,.js,.jsx,.ts,.tsx,.py,.sql,.xml,image/png,image/jpeg,image/webp,image/gif,application/pdf"
               onChange={(event) => void chooseAttachment(event)}
             />
             <Textarea
@@ -1145,7 +1416,7 @@ export default function ChatView({
                   <span className="chat-model-label-full">{modelName}</span>
                   <span className="chat-model-label-short">{modelShortName}</span>
                 </span>
-                <ChevronUp
+                <ChevronUpIcon
                   size={16}
                   aria-hidden="true"
                   className={`chat-model-chevron${modelMenuOpen ? ' is-open' : ''}`}
@@ -1164,7 +1435,7 @@ export default function ChatView({
                       }}
                     >
                       <span className="chat-model-name">{entry.name}</span>
-                      {model === entry.code && <Check size={14} aria-hidden="true" />}
+                      {model === entry.code && <CheckIcon size={14} aria-hidden="true" />}
                     </MenuItem>
                   ))}
                 </div>
@@ -1173,11 +1444,11 @@ export default function ChatView({
 
             {streaming ? (
               <IconButton label="Stop reply" className="chat-send" onClick={stop}>
-                <Square size={14} aria-hidden="true" />
+                <StopIcon size={14} aria-hidden="true" />
               </IconButton>
             ) : (
               <IconButton type="submit" label="Send" className="chat-send" disabled={draft.trim() === '' && !attachment}>
-                <ArrowUp size={18} aria-hidden="true" />
+                <SendIcon size={18} aria-hidden="true" />
               </IconButton>
             )}
           </form>

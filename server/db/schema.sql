@@ -310,3 +310,65 @@ EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
 CREATE INDEX IF NOT EXISTS usage_credits_user_expiry_idx ON usage_credits (user_id, expires_at);
+
+-- A message may carry one uploaded file. The bytes live on Cloudinary, never in
+-- this database: the column holds only the delivery details, so a thread row
+-- stays small and a download never passes through the API.
+ALTER TABLE conversation_messages ADD COLUMN IF NOT EXISTS attachment JSONB;
+
+-- A chat can be held at the top of the list, or filed away out of it. Both are
+-- flags on the row rather than a second table, because they describe the
+-- conversation itself and a thread has exactly one such state.
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS pinned BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- A project is one piece of work that several chats belong to. The instructions
+-- live on the project rather than on each chat, so a rule written once is read
+-- by every thread that is filed under it, and a customer who starts a new chat
+-- does not restate the same background. It is owned by one account and cascade
+-- deletes with it: a project cannot outlive the customer who made it.
+CREATE TABLE IF NOT EXISTS projects (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  instructions TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- The project list is always "this account's projects, most recently used
+-- first", so the index leads with the owner and then walks updated_at backwards.
+CREATE INDEX IF NOT EXISTS projects_user_updated_idx
+  ON projects(user_id, updated_at DESC);
+
+-- Reference files a project hands to the model with every question in it. The
+-- small ones keep their text in this column so a prompt can include it directly;
+-- a picture or a PDF has no text to extract, so it carries its link instead and
+-- its content stays empty. bytes is what the file weighed, so a list can show a
+-- size without reading the text it is deliberately not sending.
+CREATE TABLE IF NOT EXISTS project_files (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT '',
+  bytes BIGINT NOT NULL DEFAULT 0,
+  url TEXT,
+  content TEXT NOT NULL DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- A project's files are read together, in the order they were added, so the
+-- index pairs the project with the time inside it.
+CREATE INDEX IF NOT EXISTS project_files_project_created_idx
+  ON project_files(project_id, created_at);
+
+-- A chat belongs to a project, or to none. SET NULL rather than CASCADE is the
+-- whole point: deleting a project files its chats back into the plain history
+-- instead of destroying work the customer wrote. An old thread keeps every
+-- message it had, it simply stops having a project.
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
+
+-- Opening a project lists its chats newest first, and that read filters on the
+-- project before it sorts, so the index carries both columns.
+CREATE INDEX IF NOT EXISTS conversations_project_idx
+  ON conversations(project_id, updated_at DESC);

@@ -53,6 +53,16 @@ export const MESSAGE_LIMIT = 500;
 export const CONVERSATION_LIST_LIMIT = 100;
 export const CONVERSATION_SEARCH_MAX_LENGTH = 120;
 
+// Projects are a workplace, not an archive, so both caps are small on purpose: enough
+// for the work in front of somebody and small enough that a picker is one response.
+// Reference files are capped per project because every one of them is read into a
+// prompt, and the text cap is what stops one file crowding a whole request.
+export const PROJECT_LIMIT = 50;
+export const PROJECT_FILE_LIMIT = 20;
+export const PROJECT_NAME_MAX_LENGTH = 60;
+export const PROJECT_INSTRUCTIONS_MAX_LENGTH = 4000;
+export const PROJECT_FILE_CONTENT_MAX_LENGTH = 20000;
+
 // Postgres raises 22P02 for an id that is not a uuid, which a handler would report as
 // a server fault. A caller that invents an id should learn nothing, so a malformed id
 // is answered exactly like a missing one and never reaches the database.
@@ -66,7 +76,7 @@ function isUuid(value) {
 // The message count travels with each conversation row, so the list is one query
 // rather than one query per thread.
 const CONVERSATION_COLUMNS =
-  'SELECT c.id, c.title, c.model, c.origin, c.created_at, c.updated_at, COUNT(m.id)::INT AS message_count ' +
+  'SELECT c.id, c.title, c.model, c.origin, c.pinned, c.archived, c.project_id, c.created_at, c.updated_at, COUNT(m.id)::INT AS message_count ' +
   'FROM conversations c LEFT JOIN conversation_messages m ON m.conversation_id = c.id ';
 
 /** @param {object} row @returns {object} */
@@ -77,6 +87,11 @@ function publicConversation(row) {
     model: row.model,
     origin: row.origin,
     messageCount: Number(row.message_count ?? 0),
+    pinned: row.pinned === true,
+    archived: row.archived === true,
+    // null means the chat was never filed under a project, which is where every
+    // chat written before projects existed still sits.
+    projectId: row.project_id ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -84,7 +99,49 @@ function publicConversation(row) {
 
 /** @param {object} row @returns {object} */
 function publicConversationMessage(row) {
-  return { id: row.id, role: row.role, content: row.content, createdAt: row.created_at };
+  return { id: row.id, role: row.role, content: row.content, attachment: row.attachment ?? null, createdAt: row.created_at };
+}
+
+// Both counts travel with the project row, so drawing the list is one query rather
+// than two more per project. They are correlated subqueries and not joins because a
+// project with no chats and no files still has to be listed, at zero.
+const PROJECT_COLUMNS =
+  'SELECT p.id, p.name, p.instructions, p.created_at, p.updated_at, ' +
+  '(SELECT COUNT(*)::INT FROM project_files f WHERE f.project_id = p.id) AS file_count, ' +
+  '(SELECT COUNT(*)::INT FROM conversations c WHERE c.project_id = p.id) AS conversation_count ' +
+  'FROM projects p ';
+
+/** @param {object} row @returns {object} */
+function publicProject(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    instructions: row.instructions,
+    fileCount: Number(row.file_count ?? 0),
+    conversationCount: Number(row.conversation_count ?? 0),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * One project file, without its text.
+ *
+ * The content is deliberately left out and only its length travels: a list of twenty
+ * files must stay a small response, and the text is read on demand by the chat route
+ * rather than downloaded to every screen that shows the names.
+ * @param {object} row @returns {object}
+ */
+function publicProjectFile(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    kind: row.kind,
+    bytes: Number(row.bytes ?? 0),
+    url: row.url ?? null,
+    contentLength: Number(row.content_length ?? 0),
+    createdAt: row.created_at,
+  };
 }
 
 /** @param {string} connectionString @param {NodeJS.ProcessEnv} [environment] @returns {import('pg').Pool} */
@@ -877,17 +934,25 @@ export function createRepository(pool) {
      * The owner filter is in the query rather than a check made afterwards, so there is
      * no arrangement of arguments that reaches another account's rows. The list is
      * capped because a client renders a sidebar, not an export.
+     *
+     * A project id narrows the list to the chats filed under it, and an empty one
+     * lists every project. An id that is not a uuid answers with an empty list instead
+     * of reaching Postgres, which would raise a syntax fault on the cast, so a caller
+     * who invents an id learns nothing either way.
      * @param {string} userId
      * @returns {Promise<Array<object>>}
      */
-    async listConversations(userId, search = '') {
+    async listConversations(userId, search = '', includeArchived = false, projectId = null) {
+      // An empty string is "no project filter"; anything else has to be a real id.
+      const wantedProject = text(projectId);
+      if (wantedProject !== '' && !isUuid(wantedProject)) return [];
       const query = text(search).slice(0, CONVERSATION_SEARCH_MAX_LENGTH);
       const result = await pool.query(
         CONVERSATION_COLUMNS +
-          'WHERE c.user_id = $1 AND ($2 = \'\' OR c.title ILIKE \'%\' || $2 || \'%\' OR EXISTS (' +
+          'WHERE c.user_id = $1 AND ($4::boolean OR c.archived = FALSE) AND ($5::uuid IS NULL OR c.project_id = $5::uuid) AND ($2 = \'\' OR c.title ILIKE \'%\' || $2 || \'%\' OR EXISTS (' +
           'SELECT 1 FROM conversation_messages sm WHERE sm.conversation_id = c.id AND sm.content ILIKE \'%\' || $2 || \'%\')) ' +
-          'GROUP BY c.id ORDER BY c.updated_at DESC LIMIT $3',
-        [userId, query, CONVERSATION_LIST_LIMIT],
+          'GROUP BY c.id ORDER BY c.pinned DESC, c.updated_at DESC LIMIT $3',
+        [userId, query, CONVERSATION_LIST_LIMIT, includeArchived === true, wantedProject === '' ? null : wantedProject],
       );
       return result.rows.map(publicConversation);
     },
@@ -940,7 +1005,7 @@ export function createRepository(pool) {
       // Two turns can share a timestamp, so the id breaks the tie and keeps the order
       // identical between two reads of the same thread.
       const messages = await pool.query(
-        'SELECT m.id, m.role, m.content, m.created_at FROM conversation_messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.user_id = $1 AND m.conversation_id = $2 ORDER BY m.created_at, m.id',
+        'SELECT m.id, m.role, m.content, m.attachment, m.created_at FROM conversation_messages m JOIN conversations c ON c.id = m.conversation_id WHERE c.user_id = $1 AND m.conversation_id = $2 ORDER BY m.created_at, m.id',
         [userId, conversationId],
       );
       return { conversation: publicConversation(row), messages: messages.rows.map(publicConversationMessage) };
@@ -955,7 +1020,7 @@ export function createRepository(pool) {
      * @param {{ userId: string, conversationId: string, role: string, content: string }} details
      * @returns {Promise<{ message: object, conversation: object } | null>} null when the caller does not own the thread.
      */
-    async appendMessage({ userId, conversationId, role, content }) {
+    async appendMessage({ userId, conversationId, role, content, attachment = null }) {
       if (!isUuid(conversationId)) return null;
       const client = await pool.connect();
       try {
@@ -975,8 +1040,8 @@ export function createRepository(pool) {
           throw error;
         }
         const inserted = await client.query(
-          'INSERT INTO conversation_messages (conversation_id, role, content) VALUES ($1, $2, $3) RETURNING id, role, content, created_at',
-          [conversationId, role, content],
+          'INSERT INTO conversation_messages (conversation_id, role, content, attachment) VALUES ($1, $2, $3, $4) RETURNING id, role, content, attachment, created_at',
+          [conversationId, role, content, attachment === null ? null : JSON.stringify(attachment)],
         );
         // A thread names itself after its first question, so the list reads like history
         // instead of a wall of "New chat". Only the untouched default is replaced: a
@@ -1044,6 +1109,34 @@ export function createRepository(pool) {
       return row ? publicConversation(row) : null;
     },
     /**
+     * Hold a thread at the top of the list, or file it out of the list.
+     *
+     * Both arrive in one call because they answer the same question, where a chat
+     * belongs. A null field means "leave it as it is", so the row menu can change
+     * one without asserting the other. Archiving does not touch updated_at:
+     * filing a chat away is not using it, and a thread brought back from the
+     * archive should return to the position it held.
+     * @param {string} userId
+     * @param {string} conversationId
+     * @param {{ pinned?: boolean|null, archived?: boolean|null }} flags
+     * @returns {Promise<object|null>} null when the caller does not own the thread.
+     */
+    async setConversationFlags(userId, conversationId, { pinned = null, archived = null }) {
+      if (!isUuid(conversationId)) return null;
+      const result = await pool.query(
+        'UPDATE conversations SET pinned = COALESCE($3::boolean, pinned), archived = COALESCE($4::boolean, archived) ' +
+          'WHERE id = $1 AND user_id = $2 RETURNING id',
+        [conversationId, userId, pinned, archived],
+      );
+      if (result.rowCount === 0) return null;
+      const current = await pool.query(
+        CONVERSATION_COLUMNS + 'WHERE c.user_id = $1 AND c.id = $2 GROUP BY c.id',
+        [userId, conversationId],
+      );
+      const row = current.rows[0];
+      return row ? publicConversation(row) : null;
+    },
+    /**
      * Delete a thread. The schema's cascade takes its messages with it, so nothing is
      * left behind to be read by a later query.
      * @param {string} userId
@@ -1054,6 +1147,223 @@ export function createRepository(pool) {
       if (!isUuid(conversationId)) return false;
       const result = await pool.query('DELETE FROM conversations WHERE id = $1 AND user_id = $2 RETURNING id', [conversationId, userId]);
       return result.rowCount > 0;
+    },
+    /**
+     * The account's projects, most recently used first.
+     *
+     * The owner filter is in the statement rather than a check made afterwards, so no
+     * arrangement of arguments reaches another account's projects. The list is capped
+     * because a client renders a picker, not an export.
+     * @param {string} userId
+     * @returns {Promise<Array<object>>}
+     */
+    async listProjects(userId) {
+      const result = await pool.query(
+        PROJECT_COLUMNS + 'WHERE p.user_id = $1 ORDER BY p.updated_at DESC LIMIT $2',
+        [userId, PROJECT_LIMIT],
+      );
+      return result.rows.map(publicProject);
+    },
+    /**
+     * Start a project.
+     *
+     * The count guard is part of the insert, exactly as it is in createConversation, so
+     * two requests arriving together cannot both pass a check that only one of them
+     * should. No row comes back exactly when the account is at its limit, which is a
+     * normal answer for the handler rather than a database fault.
+     * @param {{ userId: string, name: string, instructions?: string }} details
+     * @returns {Promise<object>}
+     */
+    async createProject({ userId, name, instructions = '' }) {
+      const result = await pool.query(
+        'INSERT INTO projects (user_id, name, instructions) ' +
+          'SELECT $1::uuid, $2::text, $3::text ' +
+          'WHERE (SELECT COUNT(*) FROM projects WHERE user_id = $1::uuid) < $4::integer ' +
+          'RETURNING id, name, instructions, created_at, updated_at',
+        [userId, name, instructions, PROJECT_LIMIT],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('This account already holds as many projects as it can store.');
+        error.code = 'PROJECT_LIMIT';
+        throw error;
+      }
+      // A project that was just created holds nothing yet, so both counts are known.
+      return publicProject({ ...row, file_count: 0, conversation_count: 0 });
+    },
+    /**
+     * One project with its reference files.
+     *
+     * An id that is not a uuid is answered as missing before it reaches Postgres, the
+     * same way getConversation does it, so a malformed id and another account's id look
+     * identical to the caller. The file read carries the owner in its own WHERE clause
+     * as well, so it cannot reach another account's project even if it is reused.
+     * @param {string} userId
+     * @param {string} projectId
+     * @returns {Promise<{ project: object, files: Array<object> } | null>} null when the caller does not own the project.
+     */
+    async getProject(userId, projectId) {
+      if (!isUuid(projectId)) return null;
+      const found = await pool.query(PROJECT_COLUMNS + 'WHERE p.user_id = $1 AND p.id = $2', [userId, projectId]);
+      const row = found.rows[0];
+      if (!row) return null;
+      // Only the length of each file's text is selected, never the text itself. Files
+      // added together can share a timestamp, so the id breaks the tie and keeps the
+      // order identical between two reads of the same project.
+      const files = await pool.query(
+        'SELECT f.id, f.name, f.kind, f.bytes, f.url, COALESCE(LENGTH(f.content), 0)::INT AS content_length, f.created_at ' +
+          'FROM project_files f JOIN projects p ON p.id = f.project_id WHERE p.user_id = $1 AND f.project_id = $2 ORDER BY f.created_at, f.id',
+        [userId, projectId],
+      );
+      return { project: publicProject(row), files: files.rows.map(publicProjectFile) };
+    },
+    /**
+     * Rename a project or rewrite its instructions.
+     *
+     * A null field means "leave it as it is", the same convention setConversationFlags
+     * uses, so a dialog that edits only the name cannot blank instructions it never
+     * showed. updated_at moves because the list is ordered by it, and a project somebody
+     * just edited is the one they are working in.
+     * @param {string} userId
+     * @param {string} projectId
+     * @param {{ name?: string|null, instructions?: string|null }} changes
+     * @returns {Promise<object|null>} null when the caller does not own the project.
+     */
+    async updateProject(userId, projectId, { name = null, instructions = null }) {
+      if (!isUuid(projectId)) return null;
+      const updated = await pool.query(
+        'UPDATE projects SET name = COALESCE($3::text, name), instructions = COALESCE($4::text, instructions), updated_at = NOW() ' +
+          'WHERE id = $1 AND user_id = $2 RETURNING id',
+        [projectId, userId, name, instructions],
+      );
+      if (updated.rowCount === 0) return null;
+      const current = await pool.query(PROJECT_COLUMNS + 'WHERE p.user_id = $1 AND p.id = $2', [userId, projectId]);
+      const row = current.rows[0];
+      return row ? publicProject(row) : null;
+    },
+    /**
+     * Delete a project.
+     *
+     * Its reference files cascade with it, but its chats do not: project_id on the
+     * conversation is ON DELETE SET NULL, so the work written inside a project returns
+     * to the plain history instead of vanishing with the folder it was filed in.
+     * @param {string} userId
+     * @param {string} projectId
+     * @returns {Promise<boolean>} false when the caller does not own the project.
+     */
+    async deleteProject(userId, projectId) {
+      if (!isUuid(projectId)) return false;
+      const result = await pool.query('DELETE FROM projects WHERE id = $1 AND user_id = $2 RETURNING id', [projectId, userId]);
+      return result.rowCount > 0;
+    },
+    /**
+     * Add one reference file to a project.
+     *
+     * Ownership and the per-project cap are both decided inside the insert, so a file
+     * can never land on somebody else's project and two files arriving together cannot
+     * both pass a cap that only one of them should. An insert that matches nothing is
+     * ambiguous on its own, because the project is either missing or full, so those two
+     * are told apart by one follow-up read that only runs in that case.
+     * @param {{ userId: string, projectId: string, name: string, kind?: string, bytes?: number, url?: string|null, content?: string }} file
+     * @returns {Promise<object|null>} null when the caller does not own the project.
+     */
+    async addProjectFile({ userId, projectId, name, kind = '', bytes = 0, url = null, content = '' }) {
+      if (!isUuid(projectId)) return null;
+      const result = await pool.query(
+        'INSERT INTO project_files (project_id, name, kind, bytes, url, content) ' +
+          'SELECT p.id, $3::text, $4::text, $5::bigint, $6::text, $7::text FROM projects p ' +
+          'WHERE p.id = $1::uuid AND p.user_id = $2::uuid ' +
+          'AND (SELECT COUNT(*) FROM project_files WHERE project_id = $1::uuid) < $8::integer ' +
+          'RETURNING id, name, kind, bytes, url, COALESCE(LENGTH(content), 0)::INT AS content_length, created_at',
+        [projectId, userId, name, kind, bytes, url, content, PROJECT_FILE_LIMIT],
+      );
+      const row = result.rows[0];
+      if (row) return publicProjectFile(row);
+      const owned = await pool.query('SELECT id FROM projects WHERE id = $1 AND user_id = $2', [projectId, userId]);
+      if (owned.rowCount === 0) return null;
+      const error = new Error('This project already holds as many reference files as it can store.');
+      error.code = 'PROJECT_FILE_LIMIT';
+      throw error;
+    },
+    /**
+     * Remove one reference file from a project the caller owns.
+     *
+     * Ownership is checked through the project in the same statement, so a file id
+     * belonging to another account matches nothing and reports the same false as a file
+     * that has already been deleted.
+     * @param {string} userId
+     * @param {string} projectId
+     * @param {string} fileId
+     * @returns {Promise<boolean>} false when the caller owns no such file.
+     */
+    async deleteProjectFile(userId, projectId, fileId) {
+      if (!isUuid(projectId) || !isUuid(fileId)) return false;
+      const result = await pool.query(
+        'DELETE FROM project_files AS f USING projects AS p WHERE f.id = $3 AND f.project_id = $1 AND p.id = f.project_id AND p.user_id = $2 RETURNING f.id',
+        [projectId, userId, fileId],
+      );
+      return result.rowCount > 0;
+    },
+    /**
+     * File a chat under a project, or take it out of one.
+     *
+     * A project id is accepted only when it belongs to the same account, so the column
+     * cannot be used to point a chat at somebody else's project. A null or an empty
+     * string is the "no project" answer rather than a refusal, because unfiling a chat
+     * is an ordinary thing to do. updated_at moves with the change: the chat was just
+     * reorganised, so it belongs where the list puts it.
+     * @param {string} userId
+     * @param {string} conversationId
+     * @param {string|null} projectId
+     * @returns {Promise<object|null>} null when the caller does not own the chat, or does not own the project.
+     */
+    async setConversationProject(userId, conversationId, projectId) {
+      if (!isUuid(conversationId)) return null;
+      const wanted = text(projectId);
+      // A non-empty id has to be well formed before the cast and has to be this
+      // account's project before it is written.
+      if (wanted !== '') {
+        if (!isUuid(wanted)) return null;
+        const owned = await pool.query('SELECT id FROM projects WHERE id = $1 AND user_id = $2', [wanted, userId]);
+        if (owned.rowCount === 0) return null;
+      }
+      const result = await pool.query(
+        'UPDATE conversations SET project_id = $3::uuid, updated_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id',
+        [conversationId, userId, wanted === '' ? null : wanted],
+      );
+      if (result.rowCount === 0) return null;
+      const current = await pool.query(
+        CONVERSATION_COLUMNS + 'WHERE c.user_id = $1 AND c.id = $2 GROUP BY c.id',
+        [userId, conversationId],
+      );
+      const row = current.rows[0];
+      return row ? publicConversation(row) : null;
+    },
+    /**
+     * What a project hands to the model with every question asked inside it.
+     *
+     * Only files that hold text are included: a picture or a PDF has no extracted words,
+     * so including it would spend prompt tokens on an empty string. Ownership is checked
+     * through the project in both reads, so no prompt can be built from another
+     * account's instructions or files.
+     * @param {string} userId
+     * @param {string} projectId
+     * @returns {Promise<{ name: string, instructions: string, files: Array<{ name: string, content: string }> } | null>}
+     */
+    async projectContext(userId, projectId) {
+      if (!isUuid(projectId)) return null;
+      const found = await pool.query('SELECT id, name, instructions FROM projects WHERE id = $1 AND user_id = $2', [projectId, userId]);
+      const project = found.rows[0];
+      if (!project) return null;
+      const files = await pool.query(
+        "SELECT f.name, f.content FROM project_files f JOIN projects p ON p.id = f.project_id WHERE p.user_id = $1 AND f.project_id = $2 AND f.content <> '' ORDER BY f.created_at, f.id",
+        [userId, projectId],
+      );
+      return {
+        name: project.name,
+        instructions: project.instructions,
+        files: files.rows.map((row) => ({ name: row.name, content: row.content })),
+      };
     },
     async revokeSession(tokenHash) {
       await pool.query('UPDATE sessions SET revoked_at = NOW() WHERE token_hash = $1', [tokenHash]);

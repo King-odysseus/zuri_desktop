@@ -1,4 +1,4 @@
-import { Search, X } from 'lucide-react';
+import { CloseIcon, SearchIcon } from '../../../src/renderer-react/Icons.jsx';
 
 /** Search control for the saved conversation list. */
 export default function ConversationSearch({ value = '', onChange, onClear }) {
@@ -6,7 +6,7 @@ export default function ConversationSearch({ value = '', onChange, onClear }) {
 
   return (
     <label className="conversation-search">
-      <Search size={16} aria-hidden="true" />
+      <SearchIcon size={16} aria-hidden="true" />
       <span className="sr-only">Search conversations</span>
       <input
         type="search"
@@ -23,7 +23,7 @@ export default function ConversationSearch({ value = '', onChange, onClear }) {
           aria-label="Clear conversation search"
           onClick={() => onClear?.()}
         >
-          <X size={14} aria-hidden="true" />
+          <CloseIcon size={14} aria-hidden="true" />
         </button>
       )}
     </label>

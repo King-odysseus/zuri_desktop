@@ -80,6 +80,12 @@ const app = createApp({
   paystackSecretKey: config.paystackSecretKey,
   paystackPlanCodes: config.paystackPlanCodes,
   paystackCallbackUrl: config.paystackCallbackUrl,
+  // Attachments: the app only ever signs, so these three values are all it needs.
+  cloudinary: {
+    cloudName: config.cloudinaryCloudName,
+    apiKey: config.cloudinaryApiKey,
+    apiSecret: config.cloudinaryApiSecret,
+  },
   googleClientId: config.googleClientId,
   mailer,
   // A reset link has to be absolute, so an unset SITE_URL falls back to the

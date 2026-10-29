@@ -386,7 +386,7 @@ a {
   height: 18px;
   stroke: currentColor;
   fill: none;
-  stroke-width: 1.7;
+  stroke-width: 2;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -1080,7 +1080,6 @@ a {
   :is(.sidebar, .chat-recents).is-collapsed .sidebar-note,
   :is(.sidebar, .chat-recents).is-collapsed .sidebar-download,
   :is(.sidebar, .chat-recents).is-collapsed .conversation-search,
-  :is(.sidebar, .chat-recents).is-collapsed .chat-recents-label,
   :is(.sidebar, .chat-recents).is-collapsed .chat-recents-list,
   :is(.sidebar, .chat-recents).is-collapsed .chat-recents-foot,
   :is(.sidebar, .chat-recents).is-collapsed .chat-list-head {
@@ -1602,6 +1601,13 @@ body:has(.app) .app {
   stroke-linejoin: round;
 }
 
+@media (min-width: 768px) {
+  .nav-item {
+    min-height: 38px;
+    gap: 10px;
+  }
+}
+
 .nav-item:hover {
   background: var(--nav-hover);
   color: var(--nav-foreground);
@@ -1686,8 +1692,8 @@ body:has(.app) .app {
     position: sticky;
     top: 0;
     z-index: 1;
-    flex: 0 0 264px;
-    width: 264px;
+    flex: 0 0 260px;
+    width: 260px;
     height: 100dvh;
     padding: 24px 16px;
     border-right: 1px solid var(--nav-border);
@@ -1764,15 +1770,16 @@ body:has(.app) .app {
  * shapes. The only image is the brand mark.
  * ------------------------------------------------------------------------- */
 
-/* The mark is drawn in greys: a monochrome interface carries identity in the shape,
-   not in a hue, and the mark was the last colour left on the page. */
+/* The mark is the app icon: a navy rounded square with a white speech bubble, and
+   it keeps its own colours now. A grayscale filter used to run over it here, which
+   turned the blue plate into a heavy grey block on every page; the plate is the
+   brand navy instead, so the mark reads as Zuri rather than as a dark square. */
 .zuri-logo {
   display: block;
   flex: 0 0 auto;
   max-width: 100%;
   object-fit: contain;
   border-radius: 8px;
-  filter: grayscale(1);
 }
 
 .brand-mark {
@@ -2869,16 +2876,6 @@ a.download-card:hover {
 /* No filled control here any more: starting a chat is what the Chat destination
    does, so the column carries the search and the saved chats only. */
 
-.chat-recents-label {
-  margin: 14px 0 0;
-  padding: 0 8px;
-  color: var(--nav-muted);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
 .conversation-search {
   display: flex;
   align-items: center;
@@ -2966,6 +2963,25 @@ a.download-card:hover {
 
 .chat-recent:hover {
   background: var(--nav-hover);
+}
+
+/* The period headings of the saved list. The wrapper wraps so the label takes a
+   row of its own and sits outside the hover pill, as ChatGPT draws it. */
+.chat-recent[data-group] {
+  position: relative;
+  margin-top: 30px;
+}
+
+.chat-recent[data-group]::before {
+  content: attr(data-group);
+  position: absolute;
+  top: -24px;
+  left: 10px;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--muted);
 }
 
 .chat-recent.is-active {
@@ -3676,8 +3692,8 @@ a.download-card:hover {
 
 @media (min-width: 900px) {
   .chat-recents {
-    flex: 0 0 264px;
-    width: 264px;
+    flex: 0 0 260px;
+    width: 260px;
   }
 
   .chat-recent-actions {
@@ -3723,4 +3739,544 @@ h4,
 .brand-name {
   font-family: inherit;
   letter-spacing: -0.01em;
+}
+
+/* Every glyph comes from the shared family in src/renderer-react/Icons.jsx: one
+   24 grid, one 2 unit stroke, one size ladder. An icon never shrinks in a flex
+   row, which is what used to squash a 16px arrow inside the composer. */
+.zuri-icon {
+  flex: 0 0 auto;
+}
+
+/* A file that came with a turn. A picture is drawn small enough that the thread
+   still reads as a conversation; a PDF is a named row, since a page thumbnail
+   would be another transformation to pay for on every open. */
+.chat-attachment {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 8px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+}
+
+.chat-attachment img {
+  display: block;
+  max-width: 240px;
+  max-height: 240px;
+  width: auto;
+  height: auto;
+  object-fit: cover;
+}
+
+.chat-attachment span {
+  display: block;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.chat-attachment.is-file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.chat-attachment.is-file span {
+  padding: 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+/* The actions menu on a chat row. One control per row instead of four icons, so
+   the title keeps its room; the menu is a plain hairline panel, as the row menu
+   is in ChatGPT, with no shadow or colour of its own. */
+.chat-recent {
+  position: relative;
+}
+
+.chat-row-menu {
+  position: absolute;
+  top: 40px;
+  right: 4px;
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  min-width: 184px;
+  padding: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+
+.chat-row-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+}
+
+.chat-row-menu button:hover {
+  background: var(--nav-hover);
+}
+
+.chat-row-menu button.is-danger {
+  color: var(--danger);
+}
+
+/*
+ * The project list is the same menu in a second view, so it keeps the same width and
+ * scrolls once a person has more projects than fit on a short screen. Without a cap
+ * a long list would run off the bottom of the window with no way to reach the end.
+ */
+.chat-row-menu-projects {
+  max-height: min(320px, 60vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* A project name is the row's content, so it takes the width and the tick sits at
+   the end rather than pushing the name into an ellipsis. */
+.chat-menu-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+/* A line that explains an empty or busy list, rather than an item that can be chosen. */
+.chat-menu-note {
+  margin: 2px 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* A pinned chat says so on the row itself, so the list reads at a glance without
+   opening any menu. */
+.chat-recent-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-recent-title svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+/* A chat row's menu items carry icons, which the shared menu row does not style
+   yet, and the delete item is marked in the danger colour while it is armed. */
+.chat-row-menu .chat-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.chat-row-menu .chat-menu-row:hover {
+  background: var(--nav-hover);
+}
+
+.chat-row-menu .chat-menu-row.is-danger {
+  color: var(--danger);
+}
+
+/*
+ * Projects.
+ *
+ * A project is a place chats live, so the screen is closer to the chat list than
+ * to a report: a grid of folder cards that open, and inside one a stack of short
+ * sections. Nothing here paints a colour of its own. A card is told from the page
+ * by one hairline, and the only filled control is the primary button that is
+ * already shared with the rest of the app.
+ */
+.project-view {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.project-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 92px;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.project-card:hover {
+  border-color: var(--strong);
+  background: var(--surface-secondary);
+}
+
+.project-card-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--surface-tertiary);
+  color: var(--text);
+}
+
+.project-card-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-card-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.project-empty,
+.project-loading {
+  padding: 28px 20px;
+  border: 1px dashed var(--hairline);
+  border-radius: var(--radius-xl);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.project-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+}
+
+.project-form-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.project-form-note,
+.project-section-note,
+.project-danger-note {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.project-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.project-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.project-input,
+.project-textarea {
+  width: 100%;
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-md);
+  background: var(--field-background);
+  color: var(--text);
+  font-size: 14px;
+  /* 16px on a phone stops iOS zooming the page when the field takes focus. */
+  padding: 10px 12px;
+}
+
+.project-input {
+  min-height: var(--control-height);
+}
+
+.project-textarea {
+  min-height: 96px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.project-input:focus-visible,
+.project-textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.project-form-actions,
+.project-head-actions,
+.project-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 10px 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.project-back:hover {
+  background: var(--surface-secondary);
+  color: var(--text);
+}
+
+.project-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.project-instructions {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.project-instructions-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.project-file-list,
+.project-chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.project-file,
+.project-chat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
+.project-file:hover,
+.project-chat:hover {
+  background: var(--surface-secondary);
+}
+
+.project-file-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--surface-tertiary);
+  color: var(--text);
+}
+
+.project-file-name,
+.project-chat-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-file-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.project-file-link:hover {
+  text-decoration: underline;
+}
+
+.project-file-meta,
+.project-chat-date {
+  flex: 0 0 auto;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.project-file-empty,
+.project-chat-empty {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.project-file-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.project-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* Deleting a project is the last thing on the page and the quietest: a plain
+   hairline card, with only the label borrowing the warning colour. A box outlined
+   in red would shout on every visit, including the visits where nothing is being
+   deleted, which is most of them. */
+.project-section.project-danger {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+}
+
+.project-danger .btn {
+  color: var(--danger);
+}
+
+.project-danger .btn:hover {
+  background: var(--surface-secondary);
+}
+
+.project-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* Which project the chat list belongs to, shown above the search field. */
+.chat-project {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 8px 0;
+  padding: 7px 10px;
+  border-radius: 10px;
+  background: var(--surface-tertiary);
+}
+
+.chat-project-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-project-leave {
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.chat-project-leave:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+@media (max-width: 640px) {
+  .project-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* On a phone the file row has four things to fit in 350px, and the name is the
+     only one a person needs to read: it gets its own line, and the size and the
+     delete control sit under it. Truncating a document name to "positio..." while
+     there is room below is worse than using the room. */
+  .project-file {
+    flex-wrap: wrap;
+    row-gap: 2px;
+    padding: 8px;
+  }
+
+  .project-file-name {
+    flex: 1 1 calc(100% - 38px);
+  }
+
+  .project-file-meta {
+    margin-left: 38px;
+  }
+
+  .project-file-actions {
+    margin-left: auto;
+  }
 }

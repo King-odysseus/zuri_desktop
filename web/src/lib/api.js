@@ -196,6 +196,130 @@ export async function signOutRequest() {
   await api('/api/auth/sign-out', { method: 'POST' }).catch(() => undefined);
 }
 
+/*
+ * Projects: a folder a customer puts chats in, with one set of standing
+ * instructions and a few reference files. Everything below is stated once here so
+ * the project screen and the chat screen file a chat the same way.
+ */
+
+/**
+ * This account's projects. The list carries the counts rather than the contents,
+ * because a project screen draws its cards before it reads anything inside one.
+ * @returns {Promise<Array<{ id: string, name: string, instructions: string, fileCount: number, conversationCount: number, createdAt?: string, updatedAt?: string }>>}
+ */
+export async function fetchProjects() {
+  const data = await api('/api/me/projects');
+  return Array.isArray(data?.projects) ? data.projects : [];
+}
+
+/**
+ * One project with everything its screen draws: the project, its files and the
+ * chats filed under it. Each field is defaulted here rather than in the screen, so
+ * a partial answer leaves an empty section instead of crashing the render.
+ * @param {string} id
+ * @returns {Promise<{ project: object, files: Array<object>, conversations: Array<object> }>}
+ */
+export async function fetchProject(id) {
+  const data = await api(`/api/me/projects/${encodeURIComponent(id)}`);
+  return {
+    project: data?.project ?? {},
+    files: Array.isArray(data?.files) ? data.files : [],
+    conversations: Array.isArray(data?.conversations) ? data.conversations : [],
+  };
+}
+
+/**
+ * Start a project. The instructions are optional, because a project can be opened
+ * as a plain folder and explained afterwards.
+ * @param {string} name
+ * @param {string} [instructions]
+ * @returns {Promise<object>}
+ */
+export async function createProject(name, instructions = '') {
+  const text = typeof instructions === 'string' ? instructions.trim() : '';
+  const data = await api('/api/me/projects', {
+    method: 'POST',
+    // An empty instruction block is left out, so a project opened as a plain
+    // folder is stored as one.
+    body: JSON.stringify({ name, ...(text === '' ? {} : { instructions: text }) }),
+  });
+  return data?.project ?? {};
+}
+
+/**
+ * Change a project's name or its instructions. Only the fields that were passed
+ * are sent, so renaming a project never overwrites instructions written elsewhere.
+ * @param {string} id
+ * @param {{ name?: string, instructions?: string }} changes
+ * @returns {Promise<object>}
+ */
+export async function updateProject(id, changes = {}) {
+  const body = {};
+  if (typeof changes.name === 'string') body.name = changes.name;
+  if (typeof changes.instructions === 'string') body.instructions = changes.instructions;
+  const data = await api(`/api/me/projects/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+  return data?.project ?? {};
+}
+
+/** @param {string} id */
+export async function deleteProject(id) {
+  return api(`/api/me/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
+/**
+ * Attach one reference file to a project.
+ *
+ * A project file arrives in one of two shapes, and the screen sends only the one it
+ * has: a link plus its size for a picture or a PDF that was uploaded to Cloudinary,
+ * or the text itself for a small text file, which keeps a note searchable and needs
+ * no CDN. A field with no value is left out rather than sent empty.
+ * @param {string} projectId
+ * @param {{ name: string, kind?: string, bytes?: number, url?: string, content?: string }} file
+ * @returns {Promise<object>}
+ */
+export async function addProjectFile(projectId, file) {
+  const body = { name: file?.name ?? '' };
+  if (typeof file?.kind === 'string' && file.kind !== '') body.kind = file.kind;
+  if (Number.isFinite(file?.bytes) && file.bytes > 0) body.bytes = Math.round(file.bytes);
+  if (typeof file?.url === 'string' && file.url !== '') body.url = file.url;
+  if (typeof file?.content === 'string' && file.content !== '') body.content = file.content;
+  const data = await api(`/api/me/projects/${encodeURIComponent(projectId)}/files`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+  return data?.file ?? {};
+}
+
+/** @param {string} projectId @param {string} fileId */
+export async function deleteProjectFile(projectId, fileId) {
+  return api(
+    `/api/me/projects/${encodeURIComponent(projectId)}/files/${encodeURIComponent(fileId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+/**
+ * File a chat into a project, or take it out again with null.
+ *
+ * The chat is patched rather than the project, so the chat screen and the project
+ * screen move a thread the same way and the project's own counts follow on their
+ * own. An empty string is treated as null, because a screen that holds no project
+ * in a form field should not have to translate that first.
+ * @param {string} id
+ * @param {string | null} projectId
+ * @returns {Promise<object>}
+ */
+export async function setConversationProject(id, projectId) {
+  const data = await api(`/api/me/conversations/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ projectId: projectId == null || projectId === '' ? null : projectId }),
+  });
+  return data?.conversation ?? {};
+}
+
 // Saved conversations and the live chat stream ---------------------------------
 
 /** The model a new chat starts on. The composer's dropdown changes it per message. */
@@ -204,13 +328,23 @@ export const DEFAULT_CHAT_MODEL = 'zuri-flash';
 /**
  * This account's saved conversations, newest first as the server sends them.
  * A query asks the server to match titles and message text without downloading
- * every thread into the browser.
- * @param {string} [query]
- * @returns {Promise<Array<{ id: string, title: string, createdAt?: string, updatedAt?: string }>>}
+ * every thread into the browser, and a project id narrows the same list to one
+ * project's chats, so both filters travel together in one request.
+ * @param {string} [query] A call with no search text, fetchConversations(query = ''), lists every chat.
+ * @param {string} [projectId] Send one project's id to list only its chats.
+ * @returns {Promise<Array<{ id: string, title: string, createdAt?: string, updatedAt?: string, projectId?: string | null }>>}
  */
-export async function fetchConversations(query = '') {
+export async function fetchConversations(query = '', projectId = '') {
   const trimmed = typeof query === 'string' ? query.trim().slice(0, 120) : '';
-  const suffix = trimmed === '' ? '' : `?q=${encodeURIComponent(trimmed)}`;
+  const project = typeof projectId === 'string' ? projectId.trim() : '';
+  // Both filters ride in one request: a project screen asks for that project's
+  // chats, and the search box narrows them without a second round trip.
+  // Each value is encoded on its own, so a title with an ampersand cannot split it.
+  const filters = [];
+  if (trimmed !== '') filters.push(`q=${encodeURIComponent(trimmed)}`);
+  if (project !== '') filters.push(`projectId=${encodeURIComponent(project)}`);
+  const built = filters.join('&');
+  const suffix = built === '' ? '' : `?${built}`;
   const data = await api(`/api/me/conversations${suffix}`);
   return Array.isArray(data?.conversations) ? data.conversations : [];
 }
@@ -235,9 +369,16 @@ export async function fetchConversation(id) {
  * same model it was started with.
  * @param {string} title
  * @param {string} [model]
+ * @param {string} [projectId] Set when the chat is started from inside a project.
  */
-export async function createConversation(title, model) {
-  const data = await api('/api/me/conversations', { method: 'POST', body: JSON.stringify({ title, model }) });
+export async function createConversation(title, model, projectId = '') {
+  const project = typeof projectId === 'string' ? projectId.trim() : '';
+  const data = await api('/api/me/conversations', {
+    method: 'POST',
+    // A chat started outside a project sends no projectId at all, so the server
+    // never has to tell "filed nowhere" apart from "not asked for".
+    body: JSON.stringify({ title, model, ...(project === '' ? {} : { projectId: project }) }),
+  });
   return data?.conversation ?? {};
 }
 
@@ -253,7 +394,13 @@ export async function appendMessage(id, messages) {
   for (const message of messages) {
     last = await api(`/api/me/conversations/${encodeURIComponent(id)}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ role: message.role, content: message.content }),
+      body: JSON.stringify({
+        role: message.role,
+        content: message.content,
+        // Only a turn that carries a file sends one, so an ordinary question stays
+        // the same small request it always was.
+        ...(message.attachment ? { attachment: message.attachment } : {}),
+      }),
     });
   }
   return last;
@@ -300,12 +447,17 @@ async function streamFailure(response) {
  * @param {{
  *   messages: Array<{ role: string, content: string }>,
  *   model?: string,
+ *   projectId?: string,
  *   signal?: AbortSignal,
  *   onDelta?: (text: string) => void,
  * }} input
  * @returns {Promise<{ content: string, model?: string, modelName?: string, usage?: object }>}
  */
-export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, signal, onDelta }) {
+export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, projectId = '', signal, onDelta }) {
+  // A project rides with the question so the server can put that project's own
+  // instructions and reference files in front of it. Outside a project the field
+  // is left out rather than sent empty.
+  const project = typeof projectId === 'string' ? projectId.trim() : '';
   const token = readToken();
   const response = await fetch(`${API_BASE_URL}${CHAT_PATH}`, {
     method: 'POST',
@@ -314,7 +466,7 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, signal,
       accept: 'text/event-stream',
       ...(token ? { authorization: `Bearer ${token}` } : {}),
     },
-    body: JSON.stringify({ messages, model, stream: true }),
+    body: JSON.stringify({ messages, model, stream: true, ...(project === '' ? {} : { projectId: project }) }),
     signal,
   });
 
@@ -385,6 +537,7 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, signal,
 // things a password can do after that. The server names them as one family, so
 // a change of prefix is a change in this one object.
 const AUTH_ROUTES = {
+
   signUp: '/api/auth/sign-up',
   signIn: '/api/auth/sign-in',
   forgotPassword: '/api/auth/forgot-password',
@@ -443,4 +596,62 @@ export async function setPassword(password) {
     method: 'POST',
     body: JSON.stringify({ password }),
   });
+}
+
+/**
+ * Ask the account to sign one upload.
+ *
+ * The bytes never pass through the API: this returns a signature, the folder it
+ * was signed for and the limits to check before trying, and the file then goes
+ * straight from this tab to Cloudinary's CDN.
+ * @returns {Promise<{ cloudName: string, apiKey: string, folder: string, timestamp: number, signature: string, maxBytes: number, allowedTypes: string[] }>}
+ */
+export async function signUpload() {
+  const data = await api('/api/me/conversations/uploads/sign', { method: 'POST' });
+  return data ?? {};
+}
+
+/**
+ * Send one file to Cloudinary with the signature the account issued.
+ *
+ * The file is the form body, so nothing is base64-encoded on the way (which would
+ * inflate a picture by a third), and no API secret is involved: a signature is
+ * good for exactly the folder and moment it was issued for.
+ * @param {File} file
+ * @param {{ cloudName: string, apiKey: string, folder: string, timestamp: number, signature: string }} signed
+ * @returns {Promise<{ url: string, name: string, kind: string, bytes: number }>}
+ */
+export async function uploadAttachment(file, signed) {
+  const body = new FormData();
+  body.append('file', file);
+  body.append('api_key', signed.apiKey);
+  body.append('timestamp', String(signed.timestamp));
+  body.append('folder', signed.folder);
+  body.append('signature', signed.signature);
+  const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(signed.cloudName)}/auto/upload`, {
+    method: 'POST',
+    body,
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => ({}));
+    const error = new Error(detail?.error?.message || 'That file could not be uploaded.');
+    error.status = response.status;
+    throw error;
+  }
+  const result = await response.json();
+  if (typeof result?.secure_url !== 'string') throw new Error('The upload finished without a link to the file.');
+  return { url: result.secure_url, name: file.name, kind: file.type, bytes: file.size };
+}
+
+/**
+ * Move a chat in the list: hold it at the top, or file it out of the way.
+ * @param {string} id
+ * @param {{ pinned?: boolean, archived?: boolean }} flags
+ */
+export async function setConversationFlags(id, flags) {
+  const data = await api(`/api/me/conversations/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify(flags),
+  });
+  return data?.conversation ?? {};
 }

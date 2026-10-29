@@ -9,7 +9,9 @@ import { createRequestLimiter, limitsForPlan, PLAN_LIMITS } from './limits.js';
 import { DEFAULT_MODELS, canUseModel, findModel, imagePriceKobo, imageSupplierCostMicroUsd, isImageModel, limitsForModel, microUsdToKobo, publicImageModel, publicModel, quotaTokens, supplierCostMicroUsd, validateModelInput } from './models.js';
 import { verifyPaystackSignature } from './paystack.js';
 import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './downloads.js';
-import { CONVERSATION_SEARCH_MAX_LENGTH } from './db.js';
+import { CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH } from './db.js';
+import { checkedAttachment, signUpload } from './uploads.js';
+import { FORMATTING_RULES, plainDashes, withFormattingRules } from './text.js';
 
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const ASSETS_DIR = `${PUBLIC_DIR}${path.sep}assets`;
@@ -58,6 +60,136 @@ const MESSAGE_MAX_LENGTH = 100000;
 // oversized message would come back as BODY_TOO_LARGE instead of MESSAGE_TOO_LARGE.
 const MAX_MESSAGE_BODY_BYTES = 1024 * 1024;
 const CONVERSATIONS_PATH = '/api/me/conversations';
+// Projects group chats around one piece of work, with instructions and reference
+// files that apply to every chat inside. The path sits beside conversations
+// because a project is a place chats live, not a separate kind of document.
+const PROJECTS_PATH = '/api/me/projects';
+/** A project name is a heading in a sidebar, so it is trimmed and capped. */
+function projectName(value) {
+  return typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, PROJECT_NAME_MAX_LENGTH) : '';
+}
+
+/** Standing instructions are prose the model reads, so only the length is bounded. */
+function projectInstructions(value) {
+  return typeof value === 'string' ? value.trim().slice(0, PROJECT_INSTRUCTIONS_MAX_LENGTH) : '';
+}
+
+/**
+ * One reference file in a project.
+ *
+ * Two routes, because two kinds of file mean different things. A picture or a PDF
+ * has no useful text, so it carries a Cloudinary link and no content. A small text
+ * file has no useful picture but plenty of words, so its text travels inline and
+ * the prompt can read it. A file never arrives both ways: a link whose text was
+ * also sent would be stored and charged for twice.
+ * @param {unknown} value
+ * @param {string} cloudName
+ * @returns {{ ok: true, file: { name: string, kind: string, bytes: number, url: string | null, content: string } } | { ok: false, message: string }}
+ */
+function checkedProjectFile(value, cloudName) {
+  if (typeof value !== 'object' || value === null) return { ok: false, message: 'A file must be an object.' };
+  const name = (typeof value.name === 'string' ? value.name : '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, 120);
+  if (name === '') return { ok: false, message: 'Give the file a name.' };
+  const content = typeof value.content === 'string' ? value.content : '';
+  if (content.length > PROJECT_FILE_CONTENT_MAX_LENGTH) {
+    return { ok: false, message: 'Keep a file text below ' + PROJECT_FILE_CONTENT_MAX_LENGTH + ' characters, or upload it instead.' };
+  }
+  const bytes = Number(value.bytes);
+  const size = Number.isFinite(bytes) && bytes >= 0 ? Math.round(bytes) : 0;
+  if (content !== '') {
+    return { ok: true, file: { name, kind: 'text/plain', bytes: size, url: null, content } };
+  }
+  const checked = checkedAttachment({ name, kind: value.kind, bytes, url: value.url }, cloudName);
+  if (!checked.ok) return checked;
+  return { ok: true, file: { name, kind: checked.attachment.kind, bytes: checked.attachment.bytes, url: checked.attachment.url, content: '' } };
+}
+
+/**
+ * A project id sent on a conversation is a move within one account, so it is
+ * either an id or the word that means "no project". Null clears it.
+ */
+// A project's files are read into the prompt, so the total is bounded: a project
+// with twenty files must not push every chat inside it over the plan's input
+// allowance. Past this the files are named but not quoted, which is honest about
+// what the model could not see.
+const PROJECT_CONTEXT_MAX_CHARACTERS = 20000;
+
+/**
+ * The system message a chat inside a project is answered with.
+ *
+ * It restates the person's own instructions rather than paraphrasing them, and it
+ * quotes each text file under its own name so a reply can say which file it read.
+ * Files that were uploaded as a picture or a PDF have no text to quote and are
+ * listed by name only, so the model does not pretend to have opened them.
+ * @param {{ name: string, instructions: string, files: Array<{ name: string, content: string }> }} context
+ * @returns {string} the system message, or an empty string when there is nothing to add
+ */
+function projectContextMessage(context) {
+  const sections = [];
+  const instructions = typeof context.instructions === 'string' ? context.instructions.trim() : '';
+  if (instructions !== '') sections.push(instructions);
+
+  const files = Array.isArray(context.files) ? context.files : [];
+  let budget = PROJECT_CONTEXT_MAX_CHARACTERS;
+  const quoted = [];
+  for (const file of files) {
+    const content = typeof file?.content === 'string' ? file.content.trim() : '';
+    if (content === '') continue;
+    if (content.length > budget) {
+      quoted.push(`--- ${file.name} ---\n(too long to include in full)`);
+      budget = 0;
+      continue;
+    }
+    budget -= content.length;
+    quoted.push(`--- ${file.name} ---\n${content}`);
+  }
+  if (quoted.length > 0) sections.push(`Reference files from this project:\n\n${quoted.join('\n\n')}`);
+  if (sections.length === 0) return '';
+
+  const name = typeof context.name === 'string' && context.name !== '' ? context.name : 'this project';
+  return `You are answering inside the project "${name}". The following was set for every chat in it.\n\n${sections.join('\n\n')}`;
+}
+
+/**
+ * The same id, resolved to the project's own context. A project that is missing or
+ * belongs to somebody else contributes nothing, so a chat never fails to answer
+ * because of a stale project id.
+ * @param {object} repository
+ * @param {string} userId
+ * @param {string | null} projectId
+ * @returns {Promise<string>}
+ */
+async function readProjectContext(repository, userId, projectId) {
+  if (projectId === null || typeof repository?.projectContext !== 'function') return '';
+  try {
+    const context = await repository.projectContext(userId, projectId);
+    return context ? projectContextMessage(context) : '';
+  } catch (error) {
+    console.error('[zuri-cloud] project context', error?.message ?? error);
+    return '';
+  }
+}
+
+function projectIdOrNull(value) {
+  if (value === null || value === undefined || value === '') return null;
+  return typeof value === 'string' ? value.trim() : null;
+}
+
+/**
+ * The two caps a project can hit, answered by name so the screen can explain them.
+ * @param {unknown} error
+ * @returns {Response | null}
+ */
+function projectErrorResponse(error) {
+  const code = error?.code;
+  if (code === 'PROJECT_LIMIT') return response(400, { ok: false, error: { code, message: 'This account holds as many projects as it can store. Delete one to start another.' } });
+  if (code === 'PROJECT_FILE_LIMIT') return response(400, { ok: false, error: { code, message: 'This project holds as many files as it can store. Delete one to add another.' } });
+  return null;
+}
+
 
 /** @param {unknown} value @returns {string} */
 function conversationSearch(value) {
@@ -221,6 +353,21 @@ function bearerToken(request) {
   const header = request.headers.get('authorization') ?? '';
   const match = /^Bearer\s+([^\s]+)$/i.exec(header);
   return match?.[1] ?? '';
+}
+
+/**
+ * Hold a supplier's words to the house style before they are read a second time.
+ *
+ * The streamed branch sends the text twice, once as deltas and once as the saved
+ * reply; rewriting in place means both carry the same characters. Tool calls are
+ * left untouched, because those arguments are data rather than prose.
+ * @template {{ content?: unknown }} T
+ * @param {T} result
+ * @returns {T}
+ */
+function plainReply(result) {
+  if (result && typeof result.content === 'string') result.content = plainDashes(result.content);
+  return result;
 }
 
 /** @param {unknown} messages @returns {{ ok: true, data: Array<{ role: string, content: string }>, inputTokens: number } | { ok: false, message: string }} */
@@ -417,7 +564,7 @@ function conversationOrigin(value) {
  * @param {object} body
  * @returns {{ ok: true, role: string, content: string } | { ok: false, code: string, message: string }}
  */
-function checkedMessage(body) {
+function checkedMessage(body, cloudName = '') {
   const role = trimmedText(body?.role);
   if (!MESSAGE_ROLES.has(role)) {
     return { ok: false, code: 'INVALID_MESSAGE', message: 'A message role is user, assistant or system.' };
@@ -428,7 +575,12 @@ function checkedMessage(body) {
   if (content.length > MESSAGE_MAX_LENGTH) {
     return { ok: false, code: 'MESSAGE_TOO_LARGE', message: `A message can be at most ${MESSAGE_MAX_LENGTH} characters.` };
   }
-  return { ok: true, role, content };
+  // One file may ride with a turn. It is checked against this account's own
+  // Cloudinary folder, so a message can never point at somebody else's asset or at
+  // an address chosen to make the reader's browser fetch something.
+  const attachment = checkedAttachment(body?.attachment, cloudName);
+  if (!attachment.ok) return { ok: false, code: 'INVALID_ATTACHMENT', message: attachment.message };
+  return { ok: true, role, content, attachment: attachment.attachment };
 }
 
 /**
@@ -592,6 +744,21 @@ export function createApp(dependencies = {}) {
       try {
         const body = await readJson(request, MAX_CHAT_BODY_BYTES);
         const messages = validateMessages(body.messages);
+        // House style, applied before the allowance is measured so the rule's own
+        // cost is charged like any other input.
+        if (messages.ok) {
+          messages.data = withFormattingRules(messages.data);
+          messages.inputTokens += Math.ceil(FORMATTING_RULES.length / 4);
+          // A chat that lives in a project is answered with that project's standing
+          // instructions and reference files, so the person does not repeat them in
+          // every thread. The extra input is counted before the allowance is checked,
+          // because the supplier charges for it like any other prompt.
+          const projectContext = await readProjectContext(dependencies.repository, session.user.id, projectIdOrNull(body.projectId));
+          if (projectContext !== '') {
+            messages.data = [{ role: 'system', content: projectContext }, ...messages.data];
+            messages.inputTokens += Math.ceil(projectContext.length / 4);
+          }
+        }
         if (!messages.ok) return response(400, { ok: false, error: { code: 'INVALID_MESSAGES', message: messages.message } });
         const offeredTools = validateTools(body.tools);
         if (!offeredTools.ok) return response(400, { ok: false, error: { code: 'INVALID_TOOLS', message: offeredTools.message } });
@@ -714,7 +881,7 @@ export function createApp(dependencies = {}) {
                 requestId,
                 model: zuriModel.code,
                 modelName: zuriModel.name,
-                content: result.content,
+                content: plainDashes(result.content),
                 toolCalls: Array.isArray(result.toolCalls) ? result.toolCalls : [],
                 usage: result.usage,
               },
@@ -755,8 +922,9 @@ export function createApp(dependencies = {}) {
                   supplier: zuriModel.supplier,
                   maxTokens: limits.maxOutputTokens,
                   signal: AbortSignal.timeout(120_000),
-                  onDelta: (text) => send({ type: 'delta', text }),
+                  onDelta: (text) => send({ type: 'delta', text: plainDashes(text) }),
                 });
+                plainReply(result);
                 await commitReply(result);
                 // The supplier's model name stays server-side; customers see the
                 // Zuri name.
@@ -796,7 +964,7 @@ export function createApp(dependencies = {}) {
           const result = await dependencies.chatProvider({ messages: messages.data, model: zuriModel.supplierModel, supplier: zuriModel.supplier, maxTokens: limits.maxOutputTokens, signal: AbortSignal.timeout(120_000) });
           await commitReply(result);
           // The supplier's model name stays server-side; customers see the Zuri name.
-          return response(200, { ok: true, data: { requestId, model: zuriModel.code, modelName: zuriModel.name, content: result.content, usage: result.usage } });
+          return response(200, { ok: true, data: { requestId, model: zuriModel.code, modelName: zuriModel.name, content: plainDashes(result.content), usage: result.usage } });
         } catch (error) {
           if (reservation?.id) await dependencies.repository.releaseUsage(reservation.id, session.user.id).catch((releaseError) => console.error('[zuri-cloud] release usage', releaseError?.message ?? releaseError));
           const mapped = failureFor(error);
@@ -1142,6 +1310,103 @@ export function createApp(dependencies = {}) {
     // also carries the signed-in user's id, and a thread that belongs to somebody else
     // answers exactly like a missing one, so ids cannot be probed from one account to
     // the next.
+    // Projects: a named place that chats, standing instructions and reference
+    // files belong to. The machinery is the same as the history routes beside it,
+    // for the same reason: the owner comes from the token and is named in every
+    // query, so a project id belonging to somebody else answers exactly like a
+    // missing one and cannot be probed from one account to the next.
+    if (url.pathname === PROJECTS_PATH || url.pathname.startsWith(`${PROJECTS_PATH}/`)) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const token = bearerToken(request);
+      const session = await dependencies.auth.authenticate(token);
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (!dependencies.repository?.listProjects) return response(503, { ok: false, error: { code: 'HISTORY_NOT_CONFIGURED', message: 'Projects are not configured yet.' } });
+
+      const userId = session.user.id;
+      const cloudinary = dependencies.cloudinary ?? { cloudName: '', apiKey: '', apiSecret: '' };
+      const cloudName = cloudinary.cloudName ?? '';
+      const [projectId, ...remainder] = url.pathname.slice(PROJECTS_PATH.length).split('/').filter(Boolean);
+      const isFilesPath = remainder.length === 1 && remainder[0] === 'files';
+      const isOneFilePath = remainder.length === 2 && remainder[0] === 'files';
+
+      try {
+        if (!projectId) {
+          if (request.method === 'GET') {
+            return response(200, { ok: true, data: { projects: await dependencies.repository.listProjects(userId) } });
+          }
+          if (request.method === 'POST') {
+            const body = await readJson(request);
+            const name = projectName(body.name);
+            if (name === '') {
+              return response(400, { ok: false, error: { code: 'INVALID_MESSAGE', message: `Give the project a name of 1 to ${PROJECT_NAME_MAX_LENGTH} characters.` } });
+            }
+            const project = await dependencies.repository.createProject({ userId, name, instructions: projectInstructions(body.instructions) });
+            return response(200, { ok: true, data: { project } });
+          }
+          return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST for the project list.' } });
+        }
+
+        if (remainder.length === 0) {
+          if (request.method === 'GET') {
+            const found = await dependencies.repository.getProject(userId, projectId);
+            if (!found) return response(404, { ok: false, error: { code: 'PROJECT_NOT_FOUND', message: 'That project does not exist.' } });
+            // The chats inside travel with the project so one request draws the
+            // whole screen, rather than a second round trip for the same answer.
+            const conversations = dependencies.repository.listConversations
+              ? await dependencies.repository.listConversations(userId, '', false, projectId)
+              : [];
+            return response(200, { ok: true, data: { project: found.project, files: found.files, conversations } });
+          }
+          if (request.method === 'PATCH') {
+            const body = await readJson(request);
+            const changes = {
+              name: body.name === undefined ? null : projectName(body.name),
+              instructions: body.instructions === undefined ? null : projectInstructions(body.instructions),
+            };
+            // A name that was sent but is blank is a refused form, not a rename to
+            // nothing, so it is answered rather than silently ignored.
+            if (changes.name === '') {
+              return response(400, { ok: false, error: { code: 'INVALID_MESSAGE', message: `Give the project a name of 1 to ${PROJECT_NAME_MAX_LENGTH} characters.` } });
+            }
+            const project = await dependencies.repository.updateProject(userId, projectId, changes);
+            if (!project) return response(404, { ok: false, error: { code: 'PROJECT_NOT_FOUND', message: 'That project does not exist.' } });
+            return response(200, { ok: true, data: { project } });
+          }
+          if (request.method === 'DELETE') {
+            const deleted = await dependencies.repository.deleteProject(userId, projectId);
+            if (!deleted) return response(404, { ok: false, error: { code: 'PROJECT_NOT_FOUND', message: 'That project does not exist.' } });
+            return response(200, { ok: true, data: { deleted: true } });
+          }
+          return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET, PATCH or DELETE for a project.' } });
+        }
+
+        if (isFilesPath) {
+          if (request.method !== 'POST') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to add a file.' } });
+          const body = await readJson(request, MAX_MESSAGE_BODY_BYTES);
+          const checked = checkedProjectFile(body, cloudName);
+          if (!checked.ok) return response(400, { ok: false, error: { code: 'INVALID_FILE', message: checked.message } });
+          const file = await dependencies.repository.addProjectFile({ userId, projectId, ...checked.file });
+          if (!file) return response(404, { ok: false, error: { code: 'PROJECT_NOT_FOUND', message: 'That project does not exist.' } });
+          return response(200, { ok: true, data: { file } });
+        }
+
+        if (isOneFilePath) {
+          if (request.method !== 'DELETE') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use DELETE to remove a file.' } });
+          const removed = await dependencies.repository.deleteProjectFile(userId, projectId, remainder[1]);
+          if (!removed) return response(404, { ok: false, error: { code: 'PROJECT_NOT_FOUND', message: 'That project or file does not exist.' } });
+          return response(200, { ok: true, data: { deleted: true } });
+        }
+
+        return response(404, { ok: false, error: { code: 'NOT_FOUND', message: 'That endpoint does not exist.' } });
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        const refused = projectErrorResponse(error);
+        if (refused) return refused;
+        console.error('[zuri-cloud] projects', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'PROJECT_FAILED', message: 'That project could not be saved.' } });
+      }
+    }
+
     if (url.pathname === CONVERSATIONS_PATH || url.pathname.startsWith(`${CONVERSATIONS_PATH}/`)) {
       if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
       const token = bearerToken(request);
@@ -1150,6 +1415,27 @@ export function createApp(dependencies = {}) {
       if (!dependencies.repository?.listConversations) return response(503, { ok: false, error: { code: 'HISTORY_NOT_CONFIGURED', message: 'Chat history is not configured yet.' } });
 
       const userId = session.user.id;
+      // The one place the Cloudinary credentials are read. An installation that has
+      // not set them keeps every other feature and simply reports uploads as
+      // unavailable, which is why this is resolved per request rather than at boot.
+      const cloudinary = dependencies.cloudinary ?? { cloudName: '', apiKey: '', apiSecret: '' };
+      const cloudName = cloudinary.cloudName ?? '';
+
+      /*
+       * Sign one upload. The response is what lets the browser post a file
+       * directly to Cloudinary: a signature, the folder it was signed for, and the
+       * limits to enforce before trying. Deliberately no file bytes pass through
+       * here, so a 10MB photo costs this service a few hundred bytes.
+       */
+      if (url.pathname === `${CONVERSATIONS_PATH}/uploads/sign`) {
+        if (request.method !== 'POST') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to sign an upload.' } });
+        if (cloudName === '' || cloudinary.apiKey === '' || cloudinary.apiSecret === '') {
+          return response(503, { ok: false, error: { code: 'UPLOADS_NOT_CONFIGURED', message: 'Attachments are not switched on for this deployment.' } });
+        }
+        // A signed folder is per account, so the secret is never exposed and an
+        // account cannot write into another one's folder.
+        return response(200, { ok: true, data: signUpload({ cloudName, apiKey: cloudinary.apiKey, apiSecret: cloudinary.apiSecret, userId }) });
+      }
       const [conversationId, ...remainder] = url.pathname.slice(CONVERSATIONS_PATH.length).split('/').filter(Boolean);
       const isMessagesPath = remainder.length === 1 && remainder[0] === 'messages';
       const isOneMessagePath = remainder.length === 2 && remainder[0] === 'messages';
@@ -1159,7 +1445,7 @@ export function createApp(dependencies = {}) {
           if (request.method === 'GET') {
             return response(200, {
               ok: true,
-              data: { conversations: await dependencies.repository.listConversations(userId, conversationSearch(url.searchParams.get('q'))) },
+              data: { conversations: await dependencies.repository.listConversations(userId, conversationSearch(url.searchParams.get('q')), url.searchParams.get('archived') === '1', projectIdOrNull(url.searchParams.get('projectId'))) },
             });
           }
           if (request.method === 'POST') {
@@ -1169,6 +1455,9 @@ export function createApp(dependencies = {}) {
               title: conversationTitle(body.title, CONVERSATION_DEFAULT_TITLE),
               model: conversationModel(body.model),
               origin: conversationOrigin(body.origin),
+              // A chat started from a project lands in it, so the project instructions
+              // and files apply from the first reply.
+              projectId: projectIdOrNull(body.projectId),
             });
             return response(200, { ok: true, data: { conversation } });
           }
@@ -1183,6 +1472,36 @@ export function createApp(dependencies = {}) {
           }
           if (request.method === 'PATCH') {
             const body = await readJson(request);
+            // One handler answers both edits on a chat row, because the row menu
+            // sends whichever changed: a new title, or a new place in the list. A
+            // field that was not sent is left alone rather than reset.
+            const wantsFlags = body.pinned !== undefined || body.archived !== undefined;
+            // A chat is also moved in and out of a project from its own row menu,
+            // so the same handler takes a projectId. null files it back into the
+            // plain history, which is what deleting its project also does.
+            if (body.projectId !== undefined) {
+              if (typeof dependencies.repository.setConversationProject !== 'function') {
+                return response(503, { ok: false, error: { code: 'HISTORY_NOT_CONFIGURED', message: 'Projects are not configured yet.' } });
+              }
+              const conversation = await dependencies.repository.setConversationProject(userId, conversationId, projectIdOrNull(body.projectId));
+              if (!conversation) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation or project does not exist.' } });
+              return response(200, { ok: true, data: { conversation } });
+            }
+            if (wantsFlags) {
+              const flags = {
+                pinned: typeof body.pinned === 'boolean' ? body.pinned : null,
+                archived: typeof body.archived === 'boolean' ? body.archived : null,
+              };
+              if (typeof dependencies.repository.setConversationFlags !== 'function') {
+                return response(503, { ok: false, error: { code: 'HISTORY_NOT_CONFIGURED', message: 'Chat history is not configured yet.' } });
+              }
+              // Pinning something that is filed away would leave it in neither
+              // list, so pinning a chat brings it back out of the archive.
+              if (flags.pinned === true && flags.archived === null) flags.archived = false;
+              const conversation = await dependencies.repository.setConversationFlags(userId, conversationId, flags);
+              if (!conversation) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation does not exist.' } });
+              return response(200, { ok: true, data: { conversation } });
+            }
             // A blank title is refused rather than quietly replaced with a default,
             // because a rename to nothing is almost always an unfinished form.
             const title = conversationTitle(body.title, '');
@@ -1204,9 +1523,9 @@ export function createApp(dependencies = {}) {
         if (isMessagesPath) {
           if (request.method !== 'POST') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to add a message.' } });
           const body = await readJson(request, MAX_MESSAGE_BODY_BYTES);
-          const checked = checkedMessage(body);
+          const checked = checkedMessage(body, cloudName);
           if (!checked.ok) return response(400, { ok: false, error: { code: checked.code, message: checked.message } });
-          const appended = await dependencies.repository.appendMessage({ userId, conversationId, role: checked.role, content: checked.content });
+          const appended = await dependencies.repository.appendMessage({ userId, conversationId, role: checked.role, content: checked.content, attachment: checked.attachment });
           if (!appended) return response(404, { ok: false, error: { code: 'CONVERSATION_NOT_FOUND', message: 'That conversation does not exist.' } });
           return response(200, { ok: true, data: appended });
         }

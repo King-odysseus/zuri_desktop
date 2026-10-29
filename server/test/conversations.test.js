@@ -62,8 +62,8 @@ const listing = recordingPool([{ match: 'FROM conversations c', reply: { rows: [
 const listed = await createRepository(listing.pool).listConversations(USER_A);
 assert.equal(listing.queries.length, 1, 'the list is one query, not one per conversation');
 assert.match(listing.queries[0].text, /WHERE c\.user_id = \$1/);
-assert.match(listing.queries[0].text, /ORDER BY c\.updated_at DESC/);
-assert.deepEqual(listing.queries[0].values, [USER_A, '', CONVERSATION_LIST_LIMIT]);
+assert.match(listing.queries[0].text, /ORDER BY c.pinned DESC, c.updated_at DESC/);
+assert.deepEqual(listing.queries[0].values, [USER_A, '', CONVERSATION_LIST_LIMIT, false, null], 'the archive is excluded unless it is asked for');
 // COUNT is a bigint, which pg hands back as a string: the response must carry a number.
 assert.deepEqual(listed, [{
   id: CONVERSATION_ID,
@@ -71,6 +71,9 @@ assert.deepEqual(listed, [{
   model: 'zuri-flash',
   origin: 'web',
   messageCount: 2,
+  pinned: false,
+  archived: false,
+  projectId: null,
   createdAt: CREATED_AT,
   updatedAt: UPDATED_AT,
 }]);
@@ -80,7 +83,7 @@ const searched = recordingPool([{ match: 'FROM conversations c', reply: { rows: 
 await createRepository(searched.pool).listConversations(USER_A, ' passport ');
 assert.match(searched.queries[0].text, /c\.title ILIKE/);
 assert.match(searched.queries[0].text, /conversation_messages sm/);
-assert.deepEqual(searched.queries[0].values, [USER_A, 'passport', CONVERSATION_LIST_LIMIT]);
+assert.deepEqual(searched.queries[0].values, [USER_A, 'passport', CONVERSATION_LIST_LIMIT, false, null]);
 await createRepository(searched.pool).listConversations(USER_A, 'x'.repeat(CONVERSATION_SEARCH_MAX_LENGTH + 20));
 assert.equal(searched.queries[1].values[1].length, CONVERSATION_SEARCH_MAX_LENGTH);
 console.log('PASS conversation search is owner-scoped, parameterized and capped');
@@ -132,7 +135,7 @@ const reading = recordingPool([
 const read = await createRepository(reading.pool).getConversation(USER_A, CONVERSATION_ID);
 assert.equal(read.conversation.id, CONVERSATION_ID);
 assert.deepEqual(read.messages.map((message) => message.role), ['user', 'assistant']);
-assert.deepEqual(read.messages[0], { id: '44444444-4444-4444-8444-444444444444', role: 'user', content: 'Where do I start?', createdAt: CREATED_AT });
+assert.deepEqual(read.messages[0], { id: '44444444-4444-4444-8444-444444444444', role: 'user', content: 'Where do I start?', attachment: null, createdAt: CREATED_AT });
 assert.match(reading.queries[1].text, /ORDER BY m\.created_at, m\.id/);
 // The messages are read with the owner in the same statement, not just on the row above.
 assert.match(reading.queries[1].text, /WHERE c\.user_id = \$1 AND m\.conversation_id = \$2/);
@@ -160,7 +163,7 @@ assert.deepEqual(writing.queries[1].values, [CONVERSATION_ID, USER_A]);
 assert.match(writing.queries[2].text, /c\.user_id = \$2/);
 assert.deepEqual(writing.queries[2].values, [CONVERSATION_ID, USER_A]);
 const insert = writing.queries.find((entry) => entry.text.startsWith('INSERT INTO conversation_messages'));
-assert.deepEqual(insert.values, [CONVERSATION_ID, 'user', 'And the fee?']);
+assert.deepEqual(insert.values, [CONVERSATION_ID, 'user', 'And the fee?', null], 'a turn with no file stores an explicit null');
 const titleUpdate = writing.queries.find((entry) => entry.text.startsWith('UPDATE conversations SET title'));
 assert.match(titleUpdate.text, /CASE WHEN title = 'New chat' AND \$2 = 'user' THEN LEFT\(TRIM\(\$3\), 60\)/);
 assert.match(titleUpdate.text, /updated_at = NOW\(\)/);
@@ -240,6 +243,8 @@ function createMemoryRepository() {
     model: row.model,
     origin: row.origin,
     messageCount: row.messages.length,
+    pinned: row.pinned === true,
+    archived: row.archived === true,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   });
@@ -249,11 +254,12 @@ function createMemoryRepository() {
   };
   return {
     rows,
-    async listConversations(userId, search = '') {
+    async listConversations(userId, search = '', includeArchived = false) {
       const query = String(search).trim().slice(0, CONVERSATION_SEARCH_MAX_LENGTH).toLowerCase();
       return [...rows.values()]
-        .filter((row) => row.userId === userId && (query === '' || row.title.toLowerCase().includes(query) || row.messages.some((message) => message.content.toLowerCase().includes(query))))
-        .sort((left, right) => right.updatedAt - left.updatedAt)
+        .filter((row) => row.userId === userId && (includeArchived === true || row.archived !== true) && (query === '' || row.title.toLowerCase().includes(query) || row.messages.some((message) => message.content.toLowerCase().includes(query))))
+        // Pinned first, then most recent, which is the order the SQL asks for.
+        .sort((left, right) => Number(right.pinned === true) - Number(left.pinned === true) || right.updatedAt - left.updatedAt)
         .slice(0, CONVERSATION_LIST_LIMIT)
         .map(view);
     },
@@ -272,7 +278,7 @@ function createMemoryRepository() {
       if (!row) return null;
       return { conversation: view(row), messages: row.messages.map((message) => ({ ...message })) };
     },
-    async appendMessage({ userId, conversationId, role, content }) {
+    async appendMessage({ userId, conversationId, role, content, attachment = null }) {
       const row = owned(userId, conversationId);
       if (!row) return null;
       if (row.messages.length >= MESSAGE_LIMIT) {
@@ -281,7 +287,7 @@ function createMemoryRepository() {
         throw error;
       }
       const createdAt = new Date(row.updatedAt.getTime() + 1000);
-      const message = { id: randomUUID(), role, content, createdAt };
+      const message = { id: randomUUID(), role, content, attachment, createdAt };
       row.messages.push(message);
       if (row.title === 'New chat' && role === 'user') row.title = content.trim().slice(0, 60);
       row.updatedAt = createdAt;
@@ -299,6 +305,13 @@ function createMemoryRepository() {
       if (!row) return null;
       row.title = title;
       row.updatedAt = new Date(row.updatedAt.getTime() + 1000);
+      return view(row);
+    },
+    async setConversationFlags(userId, id, { pinned = null, archived = null }) {
+      const row = owned(userId, id);
+      if (!row) return null;
+      if (pinned !== null) row.pinned = pinned;
+      if (archived !== null) row.archived = archived;
       return view(row);
     },
     async deleteConversation(userId, id) {
@@ -367,7 +380,7 @@ assert.equal((await unconfigured(new Request('https://cloud.example.com/api/me/c
 const createdResponse = await call('POST', '/api/me/conversations', { token: tokenA, body: {} });
 assert.equal(createdResponse.status, 200);
 const newConversation = (await createdResponse.json()).data.conversation;
-assert.deepEqual(Object.keys(newConversation).sort(), ['createdAt', 'id', 'messageCount', 'model', 'origin', 'title', 'updatedAt']);
+assert.deepEqual(Object.keys(newConversation).sort(), ['archived', 'createdAt', 'id', 'messageCount', 'model', 'origin', 'pinned', 'title', 'updatedAt']);
 assert.equal(newConversation.title, 'New chat');
 assert.equal(newConversation.model, 'zuri-flash');
 assert.equal(newConversation.origin, 'web');
@@ -394,7 +407,7 @@ const firstTurn = await call('POST', `/api/me/conversations/${threadId}/messages
 assert.equal(firstTurn.status, 200);
 const firstAppend = (await firstTurn.json()).data;
 assert.deepEqual(Object.keys(firstAppend).sort(), ['conversation', 'message']);
-assert.deepEqual(Object.keys(firstAppend.message).sort(), ['content', 'createdAt', 'id', 'role']);
+assert.deepEqual(Object.keys(firstAppend.message).sort(), ['attachment', 'content', 'createdAt', 'id', 'role']);
 assert.equal(firstAppend.message.role, 'user');
 assert.equal(firstAppend.message.content, 'How do I renew my passport?');
 assert.equal(firstAppend.conversation.messageCount, 1);
@@ -553,3 +566,135 @@ assert.equal(preflight.status, 204);
 assert.match(preflight.headers.get('access-control-allow-methods'), /PATCH/);
 assert.match(preflight.headers.get('access-control-allow-methods'), /DELETE/);
 console.log('PASS the browser preflight allows rename and delete');
+
+// ---------------------------------------------------------------------------
+// Attachments: signed on Railway, uploaded to Cloudinary, carried as a URL.
+// ---------------------------------------------------------------------------
+
+const cloudinaryDeps = {
+  auth,
+  repository: createMemoryRepository(),
+  now: fixedNow,
+  cloudinary: { cloudName: 'zuri-test', apiKey: 'public-key', apiSecret: 'secret-value' },
+};
+const cloudinaryApp = createApp(cloudinaryDeps);
+const callCloud = (method, path, { token, body } = {}) => cloudinaryApp(new Request(`https://cloud.example.com${path}`, {
+  method,
+  headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
+  body: body ? JSON.stringify(body) : undefined,
+}));
+
+// An unauthenticated caller gets nothing: a signature is a capability.
+assert.equal((await callCloud('POST', '/api/me/conversations/uploads/sign')).status, 401);
+const signed = await callCloud('POST', '/api/me/conversations/uploads/sign', { token: tokenA });
+assert.equal(signed.status, 200);
+const signedData = (await signed.json()).data;
+assert.equal(signedData.cloudName, 'zuri-test');
+assert.equal(signedData.apiKey, 'public-key', 'the public key is sent so the browser can post');
+assert.equal(signedData.signature.length, 40, 'the signature is a sha1 digest');
+assert.match(signedData.folder, /^zuri\/u\//, 'each account uploads into its own folder');
+assert.equal(JSON.stringify(signedData).includes('secret-value'), false, 'the secret never leaves the server');
+assert.equal(signedData.maxBytes, 10 * 1024 * 1024);
+assert.deepEqual(signedData.allowedTypes.includes('application/pdf'), true);
+
+// The signature is checkable by anyone holding the secret, which is exactly how
+// Cloudinary verifies it. Recomputing it here proves the two halves agree.
+const { uploadSignature, isCloudinaryUrl, checkedAttachment } = await import('../src/uploads.js');
+assert.equal(
+  signedData.signature,
+  uploadSignature({ folder: signedData.folder, timestamp: signedData.timestamp, apiSecret: 'secret-value' }),
+  'the signature is the sorted parameter hash Cloudinary expects',
+);
+
+// An installation without the three values keeps every other feature and says so
+// plainly rather than failing a reply.
+const bare = await call('POST', '/api/me/conversations/uploads/sign', { token: tokenA });
+assert.equal(bare.status, 503);
+assert.equal((await bare.json()).error.code, 'UPLOADS_NOT_CONFIGURED');
+console.log('PASS an upload is signed per account and the secret stays on the server');
+
+// A delivery URL is only accepted from this cloud's own host and folder, so a
+// message cannot be made to point at an address the reader's browser would fetch.
+assert.equal(isCloudinaryUrl('https://res.cloudinary.com/zuri-test/image/upload/a.png', 'zuri-test'), true);
+assert.equal(isCloudinaryUrl('https://res.cloudinary.com/someone-else/image/upload/a.png', 'zuri-test'), false);
+assert.equal(isCloudinaryUrl('https://evil.example.com/zuri-test/a.png', 'zuri-test'), false);
+assert.equal(isCloudinaryUrl('http://res.cloudinary.com/zuri-test/image/upload/a.png', 'zuri-test'), false, 'plain http is refused');
+assert.equal(isCloudinaryUrl('javascript:alert(1)', 'zuri-test'), false);
+assert.equal(isCloudinaryUrl('', 'zuri-test'), false);
+
+const goodAttachment = { url: 'https://res.cloudinary.com/zuri-test/image/upload/v1/zuri/u/user-a/leaf.png', name: 'leaf.png', kind: 'image/png', bytes: 2048 };
+assert.deepEqual(checkedAttachment(goodAttachment, 'zuri-test'), { ok: true, attachment: goodAttachment });
+assert.equal(checkedAttachment({ ...goodAttachment, url: 'https://evil.example.com/x.png' }, 'zuri-test').ok, false);
+assert.equal(checkedAttachment({ ...goodAttachment, kind: 'text/html' }, 'zuri-test').ok, false, 'an html file is refused');
+assert.equal(checkedAttachment({ ...goodAttachment, bytes: 20 * 1024 * 1024 }, 'zuri-test').ok, false, 'an oversized file is refused');
+assert.equal(checkedAttachment({ ...goodAttachment, name: '   ' }, 'zuri-test').ok, false, 'an unnamed file is refused');
+assert.equal(checkedAttachment(null, 'zuri-test').attachment, null, 'no attachment is not an error');
+console.log('PASS an attachment must come from this cloud and be a picture or a pdf');
+
+// A turn carries its file through the route, and the fileThread returns it.
+const fileThread = await callCloud('POST', '/api/me/conversations', { token: tokenA, body: {} });
+const fileThreadId = (await fileThread.json()).data.conversation.id;
+const withFile = await callCloud('POST', `/api/me/conversations/${fileThreadId}/messages`, {
+  token: tokenA,
+  body: { role: 'user', content: 'What is wrong with this leaf?', attachment: goodAttachment },
+});
+assert.equal(withFile.status, 200);
+const stored = (await withFile.json()).data.message;
+assert.deepEqual(stored.attachment, goodAttachment, 'the file travels with the message');
+
+const refused = await callCloud('POST', `/api/me/conversations/${fileThreadId}/messages`, {
+  token: tokenA,
+  body: { role: 'user', content: 'look', attachment: { ...goodAttachment, url: 'https://evil.example.com/x.png' } },
+});
+assert.equal(refused.status, 400);
+assert.equal((await refused.json()).error.code, 'INVALID_ATTACHMENT');
+
+const reopened = await callCloud('GET', `/api/me/conversations/${fileThreadId}`, { token: tokenA });
+assert.deepEqual((await reopened.json()).data.messages.at(-1).attachment, goodAttachment, 'a reopened fileThread still shows its file');
+console.log('PASS a file rides with a turn and comes back with the thread');
+
+// ---------------------------------------------------------------------------
+// Pinning and archiving: where a chat belongs.
+// ---------------------------------------------------------------------------
+
+const flagRepo = createMemoryRepository();
+const flagApp = createApp({ auth, repository: flagRepo, now: fixedNow });
+const callFlag = (method, path, { token, body } = {}) => flagApp(new Request(`https://cloud.example.com${path}`, {
+  method,
+  headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(body ? { 'content-type': 'application/json' } : {}) },
+  body: body ? JSON.stringify(body) : undefined,
+}));
+
+const firstChat = (await (await callFlag('POST', '/api/me/conversations', { token: tokenA, body: {} })).json()).data.conversation;
+await callFlag('POST', '/api/me/conversations', { token: tokenA, body: { title: 'Second chat' } });
+const secondChat = (await (await callFlag('POST', '/api/me/conversations', { token: tokenA, body: { title: 'Second chat' } })).json()).data.conversation;
+
+const flagPinned = await callFlag('PATCH', `/api/me/conversations/${firstChat.id}`, { token: tokenA, body: { pinned: true } });
+assert.equal(flagPinned.status, 200);
+assert.equal((await flagPinned.json()).data.conversation.pinned, true);
+
+// The oldest chat is now firstChat, because pinning outranks recency.
+const flagListed = (await (await callFlag('GET', '/api/me/conversations', { token: tokenA })).json()).data.conversations;
+assert.equal(flagListed[0].id, firstChat.id, 'a pinned chat is held at the top');
+
+// Archiving takes it out of the list but not out of existence.
+const flagArchivedList = await callFlag('PATCH', `/api/me/conversations/${secondChat.id}`, { token: tokenA, body: { archived: true } });
+assert.equal(flagArchivedList.status, 200);
+const afterArchive = (await (await callFlag('GET', '/api/me/conversations', { token: tokenA })).json()).data.conversations;
+assert.equal(afterArchive.some((row) => row.id === secondChat.id), false, 'an archived chat leaves the list');
+const archiveList = (await (await callFlag('GET', '/api/me/conversations?archived=1', { token: tokenA })).json()).data.conversations;
+assert.equal(archiveList.some((row) => row.id === secondChat.id), true, 'the archive can be asked for');
+assert.equal((await callFlag('GET', `/api/me/conversations/${secondChat.id}`, { token: tokenA })).status, 200, 'an archived chat still opens');
+
+// Pinning brings a filed chat back, because a chat cannot be both filed and held.
+await callFlag('PATCH', `/api/me/conversations/${secondChat.id}`, { token: tokenA, body: { pinned: true } });
+const flagRestored = (await (await callFlag('GET', '/api/me/conversations', { token: tokenA })).json()).data.conversations;
+const restoredRow = flagRestored.find((row) => row.id === secondChat.id);
+assert.equal(restoredRow.pinned, true);
+assert.equal(restoredRow.archived, false, 'pinning lifts a chat out of the archive');
+
+// Flags belong to the owner, and a rename still works beside them.
+assert.equal((await callFlag('PATCH', `/api/me/conversations/${firstChat.id}`, { token: tokenB, body: { pinned: true } })).status, 404);
+const flagRenamed = await callFlag('PATCH', `/api/me/conversations/${firstChat.id}`, { token: tokenA, body: { title: 'Leaf question' } });
+assert.equal((await flagRenamed.json()).data.conversation.title, 'Leaf question');
+console.log('PASS a chat can be pinned, archived and brought back');

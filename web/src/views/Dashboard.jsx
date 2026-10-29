@@ -2,7 +2,7 @@ import { useState } from 'react';
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
 import { Button, IconButton } from '../components/ui.jsx';
-import { ChartIcon, CardIcon, CloseIcon, GridIcon, LogoMark, MenuIcon, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, ReceiptIcon, ShieldIcon, SignOutIcon, SunIcon } from '../components/Icons.jsx';
+import { ChartIcon, CardIcon, CloseIcon, FolderIcon, GridIcon, LogoMark, MenuIcon, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, ReceiptIcon, ShieldIcon, SignOutIcon, SunIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
@@ -10,6 +10,7 @@ import OverviewView from './OverviewView.jsx';
 import UsageView from './UsageView.jsx';
 import PlansView from './PlansView.jsx';
 import BillingView from './BillingView.jsx';
+import ProjectsView from './ProjectsView.jsx';
 
 const COLLAPSE_KEY = 'zuri-cloud-nav-collapsed';
 
@@ -25,6 +26,7 @@ function readCollapsed() {
 
 export const NAV_ITEMS = [
   { id: 'chat', label: 'Chat', icon: <MessageIcon /> },
+  { id: 'projects', label: 'Projects', icon: <FolderIcon /> },
   { id: 'overview', label: 'Overview', icon: <GridIcon /> },
   { id: 'usage', label: 'Usage and limits', icon: <ChartIcon /> },
   { id: 'plans', label: 'Plans', icon: <CardIcon /> },
@@ -133,6 +135,9 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
   // The panel can be folded away to its icons and opened again, as the desktop
   // app allows. The choice is kept, so a reload does not undo it.
   const [navCollapsed, setNavCollapsed] = useState(readCollapsed);
+  // Chat shown inside a project keeps that project here rather than in the URL, so
+  // the ordinary Chat entry stays the plain history and needs no extra route.
+  const [chatProject, setChatProject] = useState(null);
   const toggleCollapsed = () => {
     setNavCollapsed((current) => {
       const next = !current;
@@ -144,6 +149,11 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
       return next;
     });
   };
+  const chooseView = (next) => {
+    if (next !== 'chat') setChatProject(null);
+    onViewChange(next);
+  };
+
   const navigation = (
     <SidebarContents
       collapsed={navCollapsed}
@@ -151,7 +161,7 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
       user={user}
       name={name}
       view={view}
-      onViewChange={onViewChange}
+      onViewChange={chooseView}
       onCloseNav={onCloseNav}
       theme={theme}
       onToggleTheme={onToggleTheme}
@@ -176,6 +186,19 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
               onSignIn={onSignIn}
               userName={user.displayName ?? ''}
               navigation={navigation}
+              projectId={chatProject?.id ?? ''}
+              projectName={chatProject?.name ?? ''}
+              onLeaveProject={() => setChatProject(null)}
+            />
+          )}
+          {view === 'projects' && (
+            <ProjectsView
+              onStartChat={(project) => {
+                // A project can arrive as an id or as the object the screen holds, so
+                // both are accepted and the banner still has a name to show.
+                setChatProject(typeof project === 'string' ? { id: project, name: '' } : project);
+                onViewChange('chat');
+              }}
             />
           )}
           {view === 'overview' && (

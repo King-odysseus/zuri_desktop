@@ -61,6 +61,13 @@ export function readConfig(environment = process.env) {
       ? environment.PAYSTACK_ENDPOINT.trim().replace(/\/$/, '')
       : 'https://api.paystack.co',
     paystackCallbackUrl: typeof environment.PAYSTACK_CALLBACK_URL === 'string' ? environment.PAYSTACK_CALLBACK_URL.trim() : '',
+    // Attachments. The server only signs an upload; the bytes go from the browser
+    // straight to Cloudinary, so a transfer never crosses this process. All three
+    // values are needed, and the feature simply reports itself as unavailable when
+    // they are absent rather than failing a reply.
+    cloudinaryCloudName: typeof environment.CLOUDINARY_CLOUD_NAME === 'string' ? environment.CLOUDINARY_CLOUD_NAME.trim() : '',
+    cloudinaryApiKey: typeof environment.CLOUDINARY_API_KEY === 'string' ? environment.CLOUDINARY_API_KEY.trim() : '',
+    cloudinaryApiSecret: typeof environment.CLOUDINARY_API_SECRET === 'string' ? environment.CLOUDINARY_API_SECRET.trim() : '',
     paystackPlanCodes: {
       starter: typeof environment.PAYSTACK_PLAN_STARTER === 'string' ? environment.PAYSTACK_PLAN_STARTER.trim() : '',
       pro: typeof environment.PAYSTACK_PLAN_PRO === 'string' ? environment.PAYSTACK_PLAN_PRO.trim() : '',
