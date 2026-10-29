@@ -1741,6 +1741,23 @@ check('a chat continued in the browser refreshes the desktop without a restart',
   return 'background sync announces, and the open transcript re-reads';
 });
 
+check('a chat started in the browser is taken on, and a delete or clear is not undone', () => {
+  const sync = read('src/main/chat-sync.js');
+  // The sweep is driven by chats.json, so only a list of the account can reach a chat that
+  // has no thread here. Without this call the browser's chats never arrive at all.
+  if (!sync.includes('await adoptConversations(cap, totals)')) throw new Error('the sweep never asks the account what it holds');
+  if (!sync.includes("await call(conversationPath(''))")) throw new Error('the account is never listed');
+  // Deleting is best effort against the account, so the id has to be kept here or the next
+  // sweep adopts the chat straight back.
+  if (!sync.includes('deletedCloudIds')) throw new Error('a deleted chat is not remembered, so the next sweep would adopt it back');
+
+  // Clearing chats empties chats.json, which is where the links live. The cloud ids are
+  // read first so the account copies go too, instead of being adopted back.
+  const main = read('src/main/main.js');
+  if (!main.includes('const cloudIds = (listed?.ok === true ? listed.data : [])')) throw new Error('clearing chats leaves the account copies to be adopted back');
+  return 'the account is listed, and deletes and clears are remembered';
+});
+
 check('the navigation drawer closes on Escape and locks the page behind it', () => {
   const app = read('web/src/App.jsx');
   if (!app.includes("if (event.key === 'Escape') setNavOpen(false);")) throw new Error('Escape does not close the drawer');

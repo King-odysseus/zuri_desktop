@@ -29,8 +29,12 @@ import { DEFAULT_CLOUD_MODEL, zuriModelCode } from './providers/cloud-chat.js';
 import {
   UNTITLED_THREAD,
   appendSyncedMessage,
+  createThread,
+  deleteThread,
   forgetDroppedCloudIds,
   listThreads,
+  readSettings,
+  saveSettings,
   setMessageCloudId,
   setThreadCloudId,
 } from './store.js';
@@ -49,6 +53,14 @@ const NOT_FOUND_CODE = 'CONVERSATION_NOT_FOUND';
 
 /** The code the cloud answers with when one message is not there (already deleted). */
 const MESSAGE_NOT_FOUND_CODE = 'MESSAGE_NOT_FOUND';
+
+/**
+ * How many deleted chat ids settings.json remembers.
+ *
+ * Only ids are kept, newest last. The cap is wide enough for a long stretch of tidying
+ * up and narrow enough that the settings file never grows a history of its own.
+ */
+const FORGOTTEN_CHAT_LIMIT = 200;
 
 /**
  * Codes that mean "nothing to do right now" rather than "the sync is broken". Being
@@ -494,6 +506,118 @@ export function createChatSync({ request, log = defaultLog } = {}) {
   }
 
   /**
+   * The chat ids deleted on this machine, as a set the adoption step can test.
+   * @returns {Promise<Set<string>>}
+   */
+  async function forgottenChatIds() {
+    const settings = await readSettings();
+    if (settings.ok !== true) return new Set();
+    const ids = Array.isArray(settings.data?.deletedCloudIds) ? settings.data.deletedCloudIds : [];
+    return new Set(ids.map(textOf).filter((id) => id !== ''));
+  }
+
+  /**
+   * Remember that a chat was deleted here, so the account cannot hand it back.
+   *
+   * Deleting the cloud copy is best effort and deliberately not awaited by the caller,
+   * so it can fail while travelling or signed out. A chat the person deleted and then
+   * saw come back would be worse than the stray record that failure leaves behind, so
+   * the id is written down whatever the request does.
+   *
+   * @param {string} cloudId
+   * @returns {Promise<object>}
+   */
+  async function rememberForgottenChat(cloudId) {
+    const settings = await readSettings();
+    if (settings.ok !== true) return settings;
+
+    const ids = Array.isArray(settings.data?.deletedCloudIds)
+      ? settings.data.deletedCloudIds.map(textOf).filter((id) => id !== '')
+      : [];
+    if (ids.includes(cloudId)) return { ok: true, data: { remembered: false } };
+
+    const saved = await saveSettings({ deletedCloudIds: [...ids, cloudId].slice(-FORGOTTEN_CHAT_LIMIT) });
+    if (saved.ok !== true) return saved;
+    return { ok: true, data: { remembered: true } };
+  }
+
+  /**
+   * Take on every conversation the account holds that this machine has never seen.
+   *
+   * Everything else in this module is driven by chats.json, which is why a chat started
+   * in a browser used to stay invisible on the desktop for ever: pullThread is aimed at
+   * a thread that already exists, and nothing ever asked the account what it held. A
+   * conversation written in the browser has no such thread, so no amount of pushing or
+   * pulling could reach it. Listing the account and linking the strangers is the whole
+   * recovery; the pull that follows fills each one in, and the id it keeps makes every
+   * later sweep a no-op.
+   *
+   * @param {number} cap Conversations taken on in one run, so a first sync is not a stampede.
+   * @param {{ adopted: number, appended: number, failed: number }} totals Counted into the run report.
+   * @returns {Promise<object>}
+   */
+  async function adoptConversations(cap, totals) {
+    // The collection path, not one conversation: the only call in this module that asks
+    // the account what it holds rather than reading a conversation already linked here.
+    const fetched = await call(conversationPath(''));
+    if (fetched.ok !== true) return fetched;
+
+    const remote = Array.isArray(fetched.data?.conversations) ? fetched.data.conversations : [];
+    if (remote.length === 0) return { ok: true, data: { adopted: 0 } };
+
+    const listed = await listThreads();
+    if (listed.ok !== true) return listed;
+
+    // Every conversation this machine already answers for. Without this, each sweep
+    // would adopt the same cloud conversation again under a fresh local id.
+    const known = new Set();
+    for (const thread of listed.data) {
+      const id = cloudIdOf(thread);
+      if (id !== '') known.add(id);
+    }
+    const forgotten = await forgottenChatIds();
+
+    for (const entry of remote) {
+      if (totals.adopted >= cap) break;
+
+      const cloudId = textOf(entry?.id);
+      if (cloudId === '' || known.has(cloudId) || forgotten.has(cloudId)) continue;
+      // A chat opened in the browser and never typed into has nothing to show, and the
+      // desktop opens an empty thread of its own when that is what the person wants.
+      if (Number(entry?.messageCount ?? 0) === 0) continue;
+
+      const created = await createThread({ title: textOf(entry?.title) });
+      if (created.ok !== true) return created;
+
+      // Linked before the pull: syncThread reads the thread back out of the store, so
+      // the id has to be on disk for it to find the conversation.
+      const linked = await setThreadCloudId(created.data.id, cloudId);
+      if (linked.ok !== true) return linked;
+
+      const pulled = await syncThread(created.data.id);
+      const arrived = pulled.ok === true ? Number(pulled.data?.appended ?? 0) : 0;
+      if (arrived === 0) {
+        // Nothing readable came in, or the account could not be read for this one. An
+        // empty thread would be a row in Recents that says nothing, so it is undone
+        // and the sweep carries on with the next chat instead of leaving a husk.
+        const removed = await deleteThread(created.data.id);
+        if (removed.ok !== true) note(`adopted chat left behind: ${removed.error?.message ?? 'could not be removed'}`);
+        if (pulled.ok !== true) {
+          if (QUIET_CODES.has(pulled.error?.code) === true) return pulled;
+          totals.failed += 1;
+        }
+        continue;
+      }
+
+      known.add(cloudId);
+      totals.adopted += 1;
+      totals.appended += arrived;
+    }
+
+    return { ok: true, data: { adopted: totals.adopted } };
+  }
+
+  /**
    * Catch every stored thread up, a few at a time. Used at launch and after a sign-in,
    * where the person is not waiting for a particular chat.
    * @param {{ limit?: number }} [options]
@@ -502,7 +626,7 @@ export function createChatSync({ request, log = defaultLog } = {}) {
   async function syncAllThreads({ limit = SYNC_THREAD_LIMIT } = {}) {
     return guarded('thread sweep', async () => {
       const cap = Number.isInteger(limit) && limit > 0 ? limit : SYNC_THREAD_LIMIT;
-      if (!(await signedIn())) return { ok: true, data: { threads: 0, pushed: 0, appended: 0, failed: 0, skipped: 'signed-out' } };
+      if (!(await signedIn())) return { ok: true, data: { threads: 0, pushed: 0, appended: 0, failed: 0, adopted: 0, skipped: 'signed-out' } };
 
       const listed = await listThreads();
       if (listed.ok !== true) return listed;
@@ -519,7 +643,7 @@ export function createChatSync({ request, log = defaultLog } = {}) {
         .sort((left, right) => (cloudIdOf(right) === '' ? 0 : 1) - (cloudIdOf(left) === '' ? 0 : 1))
         .slice(0, cap);
 
-      const totals = { threads: 0, pushed: 0, appended: 0, failed: 0 };
+      const totals = { threads: 0, pushed: 0, appended: 0, failed: 0, adopted: 0 };
       // One thread at a time on purpose: this runs behind the window, and sequential
       // calls keep the network and the store writes to a trickle on first launch.
       for (const thread of pending) {
@@ -537,6 +661,20 @@ export function createChatSync({ request, log = defaultLog } = {}) {
         totals.appended += result.data?.appended ?? 0;
       }
 
+      /*
+       * Chats the account holds that this machine has never seen. It runs after the
+       * local sweep, not before, because the sweep above is driven by chats.json: a chat
+       * written in the browser has no thread to walk, so nothing before this point could
+       * ever have reached it. Its turns travel in the same `appended` count, so the
+       * window is told to re-read once for a run that both caught threads up and took
+       * new ones on. An unreadable list costs only the adoption: the threads already
+       * here have been caught up above.
+       */
+      const adopted = await adoptConversations(cap, totals);
+      if (adopted.ok !== true && QUIET_CODES.has(adopted.error?.code) !== true) {
+        note(`conversation list: ${adopted.error?.message ?? 'failed'}`);
+      }
+
       return { ok: true, data: totals };
     });
   }
@@ -551,6 +689,11 @@ export function createChatSync({ request, log = defaultLog } = {}) {
     return guarded('conversation delete', async () => {
       const id = textOf(cloudId);
       if (id === '') return { ok: true, data: { deleted: false } };
+      // Written down before the request, not after: the delete below is best effort and
+      // this call is not awaited, so it may never run at all. If the id were only kept on
+      // success, the next sweep would adopt a chat the person had just deleted.
+      const remembered = await rememberForgottenChat(id);
+      if (remembered.ok !== true) note(`deleted chat not remembered: ${remembered.error?.message ?? 'unknown'}`);
       if (!(await signedIn())) return { ok: true, data: { deleted: false } };
 
       const deleted = await call(conversationPath(id), { method: 'DELETE' });

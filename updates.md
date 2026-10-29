@@ -1,3 +1,14 @@
+## 2026-10-29 - Windows (a chat started in the browser now arrives in the desktop app)
+
+- Chat history was going up to the account but never coming back down as a new chat. Every sync ran from the list of chats already on the machine: it pushed those up and pulled new turns into them. A conversation started in the browser has no local chat to pull into, so no run could ever reach it, and it stayed invisible on the desktop for ever. Only the reverse case worked, which is why a desktop chat showed up on the web.
+- The sweep now ends by asking the account what it holds, and takes on every conversation this machine has never seen: it opens a thread with the browser's title, links it to the conversation, and pulls its turns in. A linked chat is skipped next time, so nothing is adopted twice, and taking a chat on uploads nothing back.
+- A chat opened in the browser and never typed into opens no thread here, because an empty row in Recents would say nothing.
+- Deleting a chat and clearing the list were both the other way round: they empty this machine and leave the account's copy behind, which the new sweep would then hand straight back. The id of a deleted chat is now written down before the best-effort delete goes out, so it is never adopted again, and clearing the list sends the account the ids first for the same reason.
+- The turns brought in are counted in the same figure the window already watches, so Recents and the open chat refresh on their own; nothing new had to be wired for that.
+- Key files: src/main/chat-sync.js, src/main/main.js, scripts/check-chat-sync.mjs, scripts/selftest.js.
+- Other OS action: run "npm run test". No new dependency and no database change. The installed app needs a rebuilt installer to carry it.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (the footer holds the bottom of every page)
 
 - The footer sat directly under the content, so on a page with little on it (a Projects list with nothing in it yet) it floated halfway up the window with a pool of empty colour underneath. The signed-in pages now fill the height the window has left and the footer's own auto margin carries it to the bottom edge; a long page still scrolls, with the footer at the end of it.

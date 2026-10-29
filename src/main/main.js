@@ -1337,8 +1337,29 @@ async function handleSettingsOpenDataFolder() {
 
 /** Remove all stored chat threads after the history page confirms the action. */
 async function handleChatClear() {
+  // Read before the clear, which is what removes the links. The account keeps a copy of
+  // every chat that was ever uploaded, and the sync sweep adopts whatever the account
+  // lists, so a clear that only emptied chats.json would refill itself on the next run.
+  const listed = await listThreads();
+  const cloudIds = (listed?.ok === true ? listed.data : [])
+    .map((thread) => thread?.cloud?.id)
+    .filter((id) => typeof id === 'string' && id !== '');
+
   const result = await clearThreads();
-  if (result?.ok === true) announceState({ area: 'chats' });
+  if (result?.ok === true) {
+    // Best effort, one at a time and not awaited, for the reason the single delete gives:
+    // the chats are already gone from this machine, so a failed cloud delete must not
+    // become an error in front of the person who asked for the clear.
+    if (cloudIds.length > 0) {
+      backgroundSync(
+        (async () => {
+          for (const cloudId of cloudIds) await chatSync.deleteConversation(cloudId);
+          return { ok: true, data: { appended: 0 } };
+        })(),
+      );
+    }
+    announceState({ area: 'chats' });
+  }
   return result;
 }
 

@@ -17,7 +17,7 @@ import path from 'node:path';
 
 import { createChatSync } from '../src/main/chat-sync.js';
 import { readCloudSession, writeCloudSession } from '../src/main/cloud-session.js';
-import { appendMessage, createThread, listThreads, removeTrailingReply, setStoreRoot } from '../src/main/store.js';
+import { appendMessage, createThread, deleteThread, listThreads, removeTrailingReply, setStoreRoot } from '../src/main/store.js';
 
 let failures = 0;
 
@@ -42,6 +42,7 @@ function check(condition, label, detail = '') {
 function fakeAccount() {
   let serial = 0;
   let olderServer = false;
+  let deletesRefused = false;
   const conversations = new Map();
 
   return {
@@ -49,6 +50,10 @@ function fakeAccount() {
     /** True makes the account answer like a server that predates the delete-message route. */
     setOlderServer(value) {
       olderServer = value === true;
+    },
+    /** True makes every delete fail, the way an unreachable account would. */
+    refuseDeletes(value) {
+      deletesRefused = value === true;
     },
     /** @param {string} pathname @param {object} [options] */
     async request(pathname, options = {}) {
@@ -65,6 +70,23 @@ function fakeAccount() {
         const created = { id: `cloud-${serial}`, title: body.title ?? 'New chat', model: body.model, origin: body.origin, messages: [] };
         conversations.set(created.id, created);
         return { ok: true, data: { conversation: created } };
+      }
+
+      // The account's own list, which is what the desktop reads to find the chats it has
+      // never seen. Shaped as the server shapes it: a count of turns, never the turns.
+      if (method === 'GET' && !id) {
+        const rows = [...conversations.values()]
+          .map((row) => ({
+            id: row.id,
+            title: row.title,
+            model: row.model,
+            origin: row.origin,
+            messageCount: row.messages.length,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt,
+          }))
+          .sort((left, right) => String(right.updatedAt).localeCompare(String(left.updatedAt)));
+        return { ok: true, data: { conversations: rows } };
       }
 
       const found = id ? conversations.get(id) : null;
@@ -94,6 +116,7 @@ function fakeAccount() {
       }
 
       if (method === 'DELETE') {
+        if (deletesRefused) return { ok: false, error: { code: 'CLOUD_UNAVAILABLE', message: 'Zuri Cloud cannot be reached.' } };
         conversations.delete(id);
         return { ok: true, data: { deleted: true } };
       }
@@ -108,6 +131,24 @@ function fakeAccount() {
       const message = { id: `msg-${serial}`, role: 'assistant', content, createdAt: new Date().toISOString() };
       found.messages.push(message);
       return message;
+    },
+
+    /**
+     * A whole conversation written in the browser: in the account, unknown to this
+     * machine, which is exactly the chat the desktop used to miss for ever.
+     * @param {string} title
+     * @param {{ role: string, content: string }[]} [turns]
+     */
+    startOnWeb(title, turns = []) {
+      serial += 1;
+      const createdAt = new Date().toISOString();
+      const conversation = { id: `cloud-${serial}`, title, model: 'zuri-flash', origin: 'web', messages: [], createdAt, updatedAt: createdAt };
+      for (const turn of turns) {
+        serial += 1;
+        conversation.messages.push({ id: `msg-${serial}`, role: turn.role, content: turn.content, createdAt: new Date().toISOString() });
+      }
+      conversations.set(conversation.id, conversation);
+      return conversation;
     },
   };
 }
@@ -318,6 +359,68 @@ async function main() {
   const oldCloud = [...account.conversations.values()].find((row) => row.title === 'Old server');
   check(!oldCloud?.messages.some((message) => message.content === 'Cat.'), 'once the server is updated the replaced reply is deleted from the account');
   check(oldLocal?.droppedCloudIds === undefined, 'and then it is forgotten here', JSON.stringify(oldLocal?.droppedCloudIds));
+
+  /*
+   * A chat started in the browser has no thread here, so every pull above had nothing to
+   * aim at: the sweep only ever walked threads chats.json already held. Asking the account
+   * what it lists is the one path that reaches a conversation the desktop has never heard
+   * of. A settling sweep first, so the counts below belong to this chat alone.
+   */
+  await chatSync.syncAllThreads({ limit: 200 });
+
+  const fromBrowser = account.startOnWeb('Trip to Abuja', [
+    { role: 'user', content: 'What should I pack?' },
+    { role: 'assistant', content: 'Light clothes and a rain jacket.' },
+  ]);
+  const sweep = await chatSync.syncAllThreads({ limit: 10 });
+  check(sweep?.ok === true, 'a sweep that finds a chat written in the browser is not a failure', JSON.stringify(sweep?.error ?? null));
+
+  let adoptedLocal = (await storedThreads()).find((thread) => thread?.cloud?.id === fromBrowser.id);
+  check(Boolean(adoptedLocal), 'a conversation started in the browser becomes a thread here');
+  check(adoptedLocal?.title === 'Trip to Abuja', 'the adopted chat keeps the title the browser gave it', String(adoptedLocal?.title));
+  check(adoptedLocal?.messages?.length === 2, 'its turns are pulled with it', `saw ${adoptedLocal?.messages?.length}`);
+  check(
+    (adoptedLocal?.messages ?? []).every((message) => typeof message.cloudId === 'string' && message.cloudId !== ''),
+    'every pulled turn carries the server id, so none is sent back',
+    JSON.stringify(adoptedLocal?.messages?.map((message) => message.cloudId)),
+  );
+  check((sweep?.data?.adopted ?? 0) >= 1, 'the sweep reports the chat it took on, so the list can refresh', `saw ${sweep?.data?.adopted}`);
+  check((sweep?.data?.appended ?? 0) >= 2, 'the turns it brought in are counted, so the open chat refreshes', `saw ${sweep?.data?.appended}`);
+  check(fromBrowser.messages.length === 2, 'taking a chat on never uploads it back', `saw ${fromBrowser.messages.length}`);
+
+  // A second sweep must find nothing new: the link written on adoption is what stops the
+  // same conversation being taken on again under a second local thread.
+  const secondSweep = await chatSync.syncAllThreads({ limit: 10 });
+  const linkedHere = (await storedThreads()).filter((thread) => thread?.cloud?.id === fromBrowser.id);
+  check(secondSweep?.data?.adopted === 0, 'a chat already adopted is not adopted again', `saw ${secondSweep?.data?.adopted}`);
+  check(linkedHere.length === 1, 'the account conversation answers for exactly one local thread', `saw ${linkedHere.length}`);
+
+  // A browser chat opened and never typed into has nothing to show.
+  const emptyWeb = account.startOnWeb('Draft chat', []);
+  const beforeEmpty = (await storedThreads()).length;
+  await chatSync.syncAllThreads({ limit: 10 });
+  const afterEmpty = await storedThreads();
+  check(afterEmpty.length === beforeEmpty, 'a browser chat with nothing in it opens no thread here', `${beforeEmpty} then ${afterEmpty.length}`);
+  check(!afterEmpty.some((thread) => thread?.cloud?.id === emptyWeb.id), 'the empty browser chat stays in the account only');
+
+  /*
+   * Deleting is best effort against the account, so the copy can outlive the local delete.
+   * Without the id being written down first, the next sweep would adopt the chat back and
+   * the person would watch a chat they deleted undelete itself.
+   */
+  adoptedLocal = (await storedThreads()).find((thread) => thread?.cloud?.id === fromBrowser.id);
+  await deleteThread(adoptedLocal.id);
+  account.refuseDeletes(true);
+  const refused = await chatSync.deleteConversation(fromBrowser.id);
+  account.refuseDeletes(false);
+  check(refused?.ok !== true, 'a delete that cannot reach the account reports the failure', JSON.stringify(refused?.error?.code ?? null));
+
+  const afterDeleteSweep = await chatSync.syncAllThreads({ limit: 10 });
+  check(
+    !(await storedThreads()).some((thread) => thread?.cloud?.id === fromBrowser.id),
+    'a chat deleted here is not adopted back while the account still lists it',
+    JSON.stringify(afterDeleteSweep?.data ?? null),
+  );
 
   // The link written above is gone, so the thread is uploaded fresh under a new id;
   // what matters is that the run succeeded and did not keep retrying a dead id.
