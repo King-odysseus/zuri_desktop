@@ -12,7 +12,7 @@ import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './dow
 import { CONVERSATION_SEARCH_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH, REMINDER_REPEATS, REMINDER_TITLE_MAX_LENGTH, STORED_FILE_MAX_BYTES, TASK_DUE_MAX_LENGTH, TASK_NOTES_MAX_LENGTH, TASK_PRIORITIES, TASK_TITLE_MAX_LENGTH } from './db.js';
 import { ALLOWED_UPLOAD_TYPES, checkedAttachment, signUpload } from './uploads.js';
 import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './images.js';
-import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, answerStyleLength } from './text.js';
+import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, withResearchRules, answerStyleLength } from './text.js';
 import { searchWeb } from './tools.js';
 import { splitToolCalls, visiblePrefixLength, visibleText } from './markup.js';
 // The fixed DuckDuckGo search lives in tools.js. This module only decides who may
@@ -953,11 +953,19 @@ export function createApp(dependencies = {}) {
       if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to use chat.' } });
       try {
         const body = await readJson(request, MAX_CHAT_BODY_BYTES);
+        // Validated before the prompt is assembled: whether any tools are offered
+        // decides what the prompt says about searching the web.
+        const offeredTools = validateTools(body.tools);
+        if (!offeredTools.ok) return response(400, { ok: false, error: { code: 'INVALID_TOOLS', message: offeredTools.message } });
         const messages = validateMessages(body.messages);
         // House style, applied before the allowance is measured so the rule's own
         // cost is charged like any other input.
         if (messages.ok) {
           messages.data = withZuriIdentity(withFormattingRules(messages.data));
+          // Only when the tools are actually offered: telling a model it can search
+          // on a request that carries no search tool is how it starts promising
+          // results it cannot fetch.
+          if (offeredTools.data.length > 0) messages.data = withResearchRules(messages.data);
           messages.inputTokens += Math.ceil((FORMATTING_RULES.length + ZURI_IDENTITY.length) / 4);
           // A chat that lives in a project is answered with that project's standing
           // instructions and reference files, so the person does not repeat them in
@@ -970,8 +978,6 @@ export function createApp(dependencies = {}) {
           }
         }
         if (!messages.ok) return response(400, { ok: false, error: { code: 'INVALID_MESSAGES', message: messages.message } });
-        const offeredTools = validateTools(body.tools);
-        if (!offeredTools.ok) return response(400, { ok: false, error: { code: 'INVALID_TOOLS', message: offeredTools.message } });
         const catalogue = await loadModels(dependencies);
         const zuriModel = findModel(catalogue, body.model);
         if (!zuriModel) return response(400, { ok: false, error: { code: 'UNKNOWN_MODEL', message: 'That model is not available.' } });

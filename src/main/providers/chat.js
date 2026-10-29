@@ -612,7 +612,12 @@ function currentTimeContext(now = new Date(), webTools = false) {
   const time = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   const clock = `Current local date and time where the user is: ${date}, ${time} (${Intl.DateTimeFormat().resolvedOptions().timeZone}). Use this whenever the user asks about today, the date, the day or the time.`;
   const web = webTools
-    ? 'You have a web search tool and a page reading tool on this message. Run webSearch for anything current, recent, or after your training data, and webFetch to read a result before you rely on it. Never say you cannot look things up. If a search returns nothing useful, say that plainly instead of guessing.'
+    ? 'You have webSearch and webFetch on this message. Decide for yourself when to search, without waiting to be asked: if the answer depends on something that changes, run webSearch first and answer from what you find.'
+      + ' That includes jobs and vacancies, prices, news, opening hours, travel times, availability, who currently holds a role, and any product, service or place someone might ask about.'
+      + ' Run webFetch to read a result before you rely on it. Never say you cannot look things up, and never tell the person to look it up themselves while you can search for them.'
+      + ' If what they asked is too vague to search well, such as asking for a job with no role or no place, ask one short question and offer a sensible default so a one-word answer is enough. Ask once, then act.'
+      + ' If they already said enough, act: search using the best reading of their words and say in one short line what you searched for.'
+      + ' When you give results, name the few that fit with the site, one line on why each suits them, and a link. Never claim to have searched when you have not. If a search returns nothing useful, say that plainly instead of guessing.'
     : 'You still cannot see live websites or page contents unless a tool gives them to you.';
   return `${clock} ${web}`;
 }

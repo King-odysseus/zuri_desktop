@@ -181,6 +181,20 @@ async function main() {
   // is not loaded by this harness, but a tool that vanishes from the list is a
   // regression the person would feel as Zuri refusing to do something it can do.
   const chatView = await fs.readFile(path.join('web/src/views/ChatView.jsx'), 'utf8');
+  // A tool nobody is told to use goes unused, which is what happened first: the
+  // browser had a search tool and still answered from memory. Both apps have to say
+  // when to reach for it, and the same sentence has to be in both or they answer
+  // differently about the same question.
+  const serverResearch = await fs.readFile(path.join('server/src/text.js'), 'utf8');
+  const desktopChat = await fs.readFile(path.join('src/main/providers/chat.js'), 'utf8');
+  const marker = 'Decide for yourself when to search';
+  check(serverResearch.includes(marker), 'the server prompt says to search without being asked');
+  check(desktopChat.includes(marker), 'the desktop prompt says to search without being asked');
+  check(
+    serverResearch.includes('ask one short question'),
+    'both apps tell the model when to search, and to ask one question when the ask is vague',
+  );
+
   check(chatView.includes('const CREATE_TASK_TOOL'), 'the browser chat offers the task tool');
   check(chatView.includes('const CREATE_REMINDER_TOOL'), 'the browser chat offers the reminder tool');
   check(chatView.includes('const WEB_SEARCH_TOOL'), 'the browser chat offers the search tool');
