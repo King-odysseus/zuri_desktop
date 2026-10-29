@@ -381,6 +381,7 @@ const HANDLERS = new Map([
   ['zuri:files:reveal', handleFilesReveal],
   ['zuri:files:saveAs', handleFilesSaveAs],
   ['zuri:files:choose', handleFilesChoose],
+  ['zuri:files:save-pasted', handleFilesSavePasted],
   ['zuri:files:summarize', handleFilesSummarize],
   ['zuri:images:generate', handleImagesGenerate],
   ['zuri:images:models', handleImagesModels],
@@ -1541,6 +1542,104 @@ async function measureFile(filePath) {
   } catch (error) {
     console.warn('[zuri:files] size', error?.message ?? error);
     return undefined;
+  }
+}
+
+/* ------------------------------------------------------------ pasted images */
+
+// A picture pasted into the composer has no file behind it, so main writes the
+// bytes into a folder of its own. Keeping pasted pictures out of the drawn ones
+// means the Files list stays readable and a screenshot has one obvious home.
+const PASTED_DIR_NAME = 'pasted';
+// A full-screen 4K screenshot is a few megabytes, so this cap is generous while
+// still bounding what a single paste can write to disk.
+const PASTED_IMAGE_MAX_BYTES = 25 * 1024 * 1024;
+const PASTED_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+
+/**
+ * The bytes of a pasted payload, or null when it is not a byte buffer at all.
+ *
+ * The renderer sends a Uint8Array, but structured clone may hand over any typed
+ * array view or a bare ArrayBuffer, so every shape is normalised to one Buffer.
+ * @param {unknown} value
+ * @returns {Buffer | null}
+ */
+function pastedImageBytes(value) {
+  if (value instanceof ArrayBuffer) return Buffer.from(value);
+  if (ArrayBuffer.isView(value)) return Buffer.from(value.buffer, value.byteOffset, value.byteLength);
+  return null;
+}
+
+/**
+ * Whether the bytes carry the signature the extension claims.
+ *
+ * The incoming name means nothing on its own, so the content decides: this is the
+ * check that a pasted .png is a picture and not a renamed archive.
+ * @param {Buffer} bytes
+ * @param {string} extension Lower-case extension including the dot.
+ * @returns {boolean}
+ */
+function looksLikePastedImage(bytes, extension) {
+  const startsWith = (signature) => bytes.length >= signature.length && signature.every((byte, index) => bytes[index] === byte);
+  if (extension === '.png') return startsWith([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  if (extension === '.jpg' || extension === '.jpeg') return startsWith([0xff, 0xd8, 0xff]);
+  if (extension === '.gif') return startsWith([0x47, 0x49, 0x46, 0x38]);
+  if (extension === '.webp') return startsWith([0x52, 0x49, 0x46, 0x46]) && bytes.subarray(8, 12).toString('latin1') === 'WEBP';
+  return false;
+}
+
+/**
+ * A safe name for one pasted picture: the moment it arrived, then a random suffix.
+ *
+ * The suffix keeps two pastes in the same second from overwriting each other. Only
+ * the extension of the name the clipboard gave survives, so no other part of it can
+ * reach a path.
+ * @param {string} extension Lower-case extension including the dot.
+ * @returns {string}
+ */
+function pastedImageName(extension) {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const stamp = [now.getFullYear(), pad(now.getMonth() + 1), pad(now.getDate()), '-', pad(now.getHours()), pad(now.getMinutes()), pad(now.getSeconds())].join('');
+  return `pasted-${stamp}-${randomUUID().slice(0, 8)}${extension}`;
+}
+
+/**
+ * Save a picture pasted into the composer and answer with its workspace path.
+ *
+ * The composer attaches a file by path, and a clipboard picture is bytes rather
+ * than a file on disk, so the bytes are written first. The write goes through the
+ * tool layer's workspace guard like every other write in this file.
+ * @param {{ name?: unknown, bytes?: unknown }} [payload]
+ * @returns {Promise<object>}
+ */
+async function handleFilesSavePasted(payload) {
+  const bytes = pastedImageBytes(payload?.bytes);
+  if (bytes === null || bytes.length === 0) {
+    return { ok: false, error: { code: 'FILES_PASTE_NOT_IMAGE', message: 'That clipboard content is not an image Zuri can attach.' } };
+  }
+  if (bytes.length > PASTED_IMAGE_MAX_BYTES) {
+    return { ok: false, error: { code: 'FILES_PASTE_TOO_LARGE', message: 'That image is larger than 25 MB. Copy a smaller one and paste it again.' } };
+  }
+  // Only the extension is kept, and only to give the file a type; path.basename
+  // removes any directory parts before it is read.
+  const extension = path.extname(path.basename(String(payload?.name ?? ''))).toLowerCase();
+  if (!PASTED_IMAGE_EXTENSIONS.has(extension) || !looksLikePastedImage(bytes, extension)) {
+    return { ok: false, error: { code: 'FILES_PASTE_NOT_IMAGE', message: 'Paste a PNG, JPG, WEBP or GIF image.' } };
+  }
+
+  try {
+    const target = resolveWorkspacePath(`${PASTED_DIR_NAME}/${pastedImageName(extension)}`);
+    // The folder holds nothing on a fresh install, so creating it is part of the
+    // first paste rather than a separate setup step.
+    await mkdir(path.dirname(target), { recursive: true });
+    await writeFile(target, bytes);
+    return { ok: true, data: { path: target, name: path.basename(target), size: bytes.length } };
+  } catch (error) {
+    // A workspace refusal carries a TOOL_ code and is an answer for the view; a
+    // real write error is worth a log line.
+    if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:files] paste', error);
+    return filesFailure(error, 'FILES_PASTE_FAILED');
   }
 }
 

@@ -88,6 +88,9 @@ const CHANNELS = Object.freeze([
   'zuri:files:reveal',
   'zuri:files:saveAs',
   'zuri:files:choose',
+  // A picture pasted into the composer exists only as clipboard bytes, so main
+  // writes it into the workspace before the message can attach it by path.
+  'zuri:files:save-pasted',
   'zuri:files:summarize',
   // The picture ladder the composer menu lists, and one picture drawn with a name
   // from it. Both are ordinary channels, so a typo here would leave the menu

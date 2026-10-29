@@ -1419,6 +1419,28 @@ check('a call written into the reply text is run, not printed', async () => {
 // words behind once the markup is stripped, so the turn now asks once more with no
 // tools. If even that comes back silent, the person is told plainly rather than
 // shown an internal message.
+// A search takes seconds, and a window that says nothing for that long reads as
+// broken. Each tool step announces itself before it runs, in words a person uses.
+check('a step names itself while it runs', async () => {
+  const { statusForTool } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
+  const cases = [
+    ['webSearch', { query: 'project manager jobs in Scotland' }, 'Searching the web for project manager jobs in Scotland'],
+    ['webSearch', {}, 'Searching the web'],
+    ['webFetch', { url: 'https://example.com' }, 'Reading that page'],
+    ['readFile', { path: 'C:\\Users\\me\\notes.txt' }, 'Reading notes.txt'],
+    ['createDocument', { path: 'report.docx' }, 'Writing report.docx'],
+    ['openApp', { app: 'Notepad' }, 'Opening Notepad'],
+    ['somethingNew', {}, 'Working on it'],
+  ];
+  for (const [name, args, expected] of cases) {
+    const said = statusForTool(name, args);
+    if (said !== expected) throw new Error(`${name} said "${said}", expected "${expected}"`);
+    // The renderer appends its own dots, so a status that ends in some would read twice.
+    if (said.endsWith('.') || said.endsWith('...')) throw new Error(`${name} already ends in dots`);
+  }
+  return 'every step has a plain sentence before it starts';
+});
+
 check('a wordless turn is asked again, not answered with an internal error', async () => {
   const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
   const { sendChatMessage } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);

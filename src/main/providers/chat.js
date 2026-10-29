@@ -1237,6 +1237,33 @@ function parseToolInput(json) {
 }
 
 /**
+ * What to say while a step is running, in the words a person would use.
+ *
+ * Said before the step rather than after it. A web search takes several seconds and
+ * a window that shows nothing for that long reads as broken, so the small line under
+ * the reply names the work in progress. The renderer appends its own ellipsis, so
+ * nothing here ends in dots.
+ * @param {string} name The tool the model asked for.
+ * @param {Record<string, unknown>} args Its arguments, for the detail a name alone misses.
+ * @returns {string} An empty string when there is nothing worth saying.
+ */
+export function statusForTool(name, args) {
+  const query = typeof args?.query === 'string' ? args.query.trim() : '';
+  const file = typeof args?.path === 'string' ? args.path.split(/[\\/]/).pop() : '';
+  const app = typeof args?.app === 'string' ? args.app.trim() : '';
+  if (name === 'webSearch') return query === '' ? 'Searching the web' : `Searching the web for ${query.slice(0, 60)}`;
+  if (name === 'webFetch') return 'Reading that page';
+  if (name === 'readFile') return file === '' ? 'Reading the file' : `Reading ${file.slice(0, 60)}`;
+  if (name === 'summarizeDocument') return file === '' ? 'Reading the document' : `Reading ${file.slice(0, 60)}`;
+  if (name === 'writeFile' || name === 'createDocument' || name === 'editDocument') {
+    return file === '' ? 'Writing the file' : `Writing ${file.slice(0, 60)}`;
+  }
+  if (name === 'openUrl') return 'Opening the page';
+  if (name === 'openApp') return app === '' ? 'Opening the app' : `Opening ${app.slice(0, 40)}`;
+  return 'Working on it';
+}
+
+/**
  * Summarize a document's text with the configured provider. Used by the
  * `summarizeDocument` tool through the injected `summarize` dependency, so the
  * tool layer never imports this module (that would be a cycle: this file selects
@@ -1728,6 +1755,8 @@ export async function sendChatMessage(threadId, options = {}) {
       wire.push({ role: 'assistant', content: reached.data.content || '', toolCalls: calls });
       for (const call of calls) {
         const args = parseToolInput(call.arguments);
+        // Announced before the step runs, so the wait has a name while it happens.
+        emit({ threadId, status: statusForTool(call.name, args) });
         const offered = offeredForAccount.some((tool) => tool.name === call.name);
         // The mode and the person decide whether a risky step runs; the registry
         // still refuses it unless `confirmed` is set, so this is the only way in.

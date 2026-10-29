@@ -199,6 +199,29 @@ function isImageName(name) {
   return IMAGE_EXTENSIONS.includes(extension);
 }
 
+// A pasted picture is typed far more reliably than it is named, so the extension
+// main needs to store it comes from the MIME type first, the name second.
+const PASTE_EXTENSION_BY_TYPE = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' };
+
+/**
+ * The first picture a paste carries, or null when the clipboard holds no image.
+ *
+ * One clipboard can offer several items, and a copied screenshot often arrives
+ * beside text, so every item is checked rather than trusting the first.
+ * @param {DataTransfer | null} clipboard
+ * @returns {File | null}
+ */
+function pastedImageFile(clipboard) {
+  const items = clipboard?.items;
+  if (!items) return null;
+  for (const item of Array.from(items)) {
+    if (item?.kind !== 'file' || !String(item.type ?? '').startsWith('image/')) continue;
+    const file = item.getAsFile();
+    if (file) return file;
+  }
+  return null;
+}
+
 function messageKey(message, index) {
   return message?.id ?? `${message?.role ?? 'message'}-${index}`;
 }
@@ -601,6 +624,59 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
       size: picked.data?.size,
     });
     setError('');
+  }
+
+  /**
+   * Attach a picture from the clipboard the way the paperclip attaches a picked
+   * file: main writes the bytes into the workspace and answers with the file it
+   * made, so an attachment keeps one shape whatever the picture came from.
+   * @param {File} file
+   * @returns {Promise<void>}
+   */
+  async function attachPastedImage(file) {
+    if (typeof api?.files?.savePasted !== 'function') {
+      setError('Pasting an image is only available inside the Zuri app.');
+      return;
+    }
+    const fromType = PASTE_EXTENSION_BY_TYPE[String(file.type ?? '').toLowerCase()];
+    const fromName = typeof file.name === 'string' && isImageName(file.name) ? file.name.split('.').pop().toLowerCase() : '';
+    const extension = fromType ?? fromName;
+    if (extension === '') {
+      setError('Paste a PNG, JPG, WEBP or GIF image.');
+      return;
+    }
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      const saved = await api.files.savePasted({ name: `pasted.${extension}`, bytes });
+      if (!saved?.ok || typeof saved.data?.path !== 'string') {
+        setError(saved?.error?.message ?? 'That image could not be attached.');
+        return;
+      }
+      setAttachment({ name: saved.data.name, path: saved.data.path, size: saved.data.size });
+      setError('');
+    } catch (error) {
+      console.warn('[zuri:chat] pasted image', error?.message ?? error);
+      setError('That image could not be read from the clipboard.');
+    }
+  }
+
+  /**
+   * Take a picture pasted into the composer.
+   *
+   * Only a paste that really carries an image is intercepted, so copying and
+   * pasting text keeps the browser's own paste character for character.
+   * @param {import('react').ClipboardEvent<HTMLTextAreaElement>} event
+   */
+  function handleComposerPaste(event) {
+    const file = pastedImageFile(event.clipboardData);
+    if (file === null) return;
+    // The picture replaces the text: without this Chromium inserts the image's
+    // own file name into the message instead.
+    event.preventDefault();
+    // A reply on its way owns the transcript, so nothing is attached until it
+    // lands, which is the rule the paperclip already follows.
+    if (replying) return;
+    void attachPastedImage(file);
   }
 
   async function chooseFolder() {
@@ -1363,6 +1439,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={handleComposerKeyDown}
+              onPaste={handleComposerPaste}
               placeholder="Ask Zuri"
               aria-label="Message Zuri"
               rows={1}
