@@ -93,6 +93,13 @@ const WINDOWS_SHELL_ICON = app.isPackaged ? process.execPath : ICO_ENTRY;
  */
 const STARTUP_SYNC_DELAY_MS = 4000;
 
+/**
+ * Chats one press of Sync looks at. Wider than the startup sweep because the person
+ * is waiting for this run to finish, and narrow enough that a first press on a long
+ * account still answers in a moment.
+ */
+const MANUAL_SYNC_LIMIT = 50;
+
 const CANVAS_DARK = '#040130'; // matches --background in dark mode, so the window does not flash white before first paint
 
 /**
@@ -356,6 +363,7 @@ const HANDLERS = new Map([
   ['zuri:cloud:topup', handleCloudTopup],
   ['zuri:cloud:checkout', handleCloudCheckout],
   ['zuri:cloud:sign-out', handleCloudSignOut],
+  ['zuri:cloud:sync', handleCloudSync],
   ['zuri:tasks:list', handleTasksList],
   ['zuri:tasks:create', handleTasksCreate],
   ['zuri:tasks:update', handleTasksUpdate],
@@ -1248,6 +1256,30 @@ async function handleCloudAccount() {
   if (!limits.ok) return limits;
   if (!billing.ok) return billing;
   return { ok: true, data: { user: account.data?.user, subscription: account.data?.subscription, usage: limits.data?.usage, limits: limits.data?.limits, billing: billing.data } };
+}
+
+/**
+ * Pull the account's chats down on demand, from the button beside Recents.
+ *
+ * The sweep at launch only looks at a handful of threads so a start is never a
+ * stampede; a person who presses Sync is waiting on the answer, so this run walks a
+ * wider list and takes on every conversation the account holds that this machine has
+ * never seen. That is the path a chat written in the browser arrives by, and without
+ * a button it needed a restart. The reply summarises the run so the sidebar can say
+ * what actually happened rather than spinning for no visible reason.
+ * @returns {Promise<object>}
+ */
+async function handleCloudSync() {
+  const result = await chatSync.syncAllThreads({ limit: MANUAL_SYNC_LIMIT });
+  if (result?.ok !== true) return result;
+
+  const appended = Number(result.data?.appended) || 0;
+  const adopted = Number(result.data?.adopted) || 0;
+  // Messages were written into chats.json behind the window's back, so the open list
+  // has to re-read; without this a chat that just arrived stays invisible.
+  if (appended > 0 || adopted > 0) announceState({ area: 'chats' });
+
+  return { ok: true, data: { ...result.data, appended, adopted } };
 }
 
 async function handleCloudUpdateAccount(payload) {

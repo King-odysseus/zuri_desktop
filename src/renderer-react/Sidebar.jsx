@@ -14,14 +14,19 @@ import {
   ImageIcon,
   DeleteIcon,
   ChevronRightIcon,
+  ChevronUpIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   SearchIcon,
   SettingsIcon,
+  ShieldIcon,
+  SignOutIcon,
+  UserIcon,
   SkillsIcon,
   MoonIcon,
   OverlayIcon,
   SunIcon,
+  SyncIcon,
   TaskIcon,
 } from './Icons.jsx';
 import { projectIconFor } from './projectIcons.js';
@@ -48,9 +53,44 @@ export const NAV_ITEMS = [
   { key: 'settings', label: 'Settings', Icon: SettingsIcon },
 ];
 
+// The overlay shortcut the main process registers, named in this machine's keys.
+export const QUICK_ASK_HINT =
+  typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform ?? '') ? 'Cmd Alt Space' : 'Ctrl Alt Space';
+
+/** The round initial shown until Zuri has a picture for the person. */
+function initialFor(name, email) {
+  const source = String(name || email || 'Z').trim();
+  return source.charAt(0).toUpperCase() || 'Z';
+}
+
+/**
+ * One row of the account menu, drawn the way ChatGPT's is: a quiet icon, the word,
+ * and a shortcut or count pushed to the right edge.
+ */
+function AccountMenuRow({ Icon, label, hint, badge, active = false, onPress }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      aria-current={active ? 'page' : undefined}
+      className={`zuri-account-row${active ? ' is-active' : ''}`}
+      onClick={onPress}
+    >
+      <Icon size={16} className="zuri-account-row-icon" />
+      <span className="zuri-account-row-label">{label}</span>
+      {badge}
+      {hint && <span className="zuri-account-row-hint">{hint}</span>}
+    </button>
+  );
+}
+
 // One list, the way ChatGPT's sidebar is: New chat, Projects with their chats,
 // Recents, and a Menu at the bottom that holds every other destination.
 const MENU_ITEMS = NAV_ITEMS.filter(({ key }) => key !== 'chats');
+
+// Settings has its own group at the top of the menu, so the destination list does
+// not repeat it.
+const DESTINATION_ITEMS = MENU_ITEMS.filter(({ key }) => key !== 'settings');
 export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -62,6 +102,30 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   // The bottom menu holds every destination that is not chat, so the list above it stays calm.
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
+
+  // Who is signed in and what plan pays for the answers, for the account button.
+  const [account, setAccount] = useState(null);
+  // The Sync press beside Recents: in flight, and the one line it leaves behind.
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState('');
+
+  useEffect(() => {
+    let active = true;
+    const loadAccount = async () => {
+      const result = await window.zuri?.cloud?.account?.();
+      if (active && result?.ok) setAccount(result.data ?? null);
+    };
+    void loadAccount();
+    // Signing out empties the row; a new name saved in Settings refreshes it.
+    const clearAccount = () => setAccount(null);
+    window.addEventListener('zuri:signed-out', clearAccount);
+    window.addEventListener('zuri:account-changed', loadAccount);
+    return () => {
+      active = false;
+      window.removeEventListener('zuri:signed-out', clearAccount);
+      window.removeEventListener('zuri:account-changed', loadAccount);
+    };
+  }, [refreshKey]);
 
   useEffect(() => {
     if (!menuOpen) return undefined;
@@ -111,6 +175,13 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
       stopListening?.();
     };
   }, [refreshKey]);
+
+  // A sync note is a passing remark, not a label, so it clears itself.
+  useEffect(() => {
+    if (syncNote === '') return undefined;
+    const timer = setTimeout(() => setSyncNote(''), 6000);
+    return () => clearTimeout(timer);
+  }, [syncNote]);
 
   function toggleProject(projectId) {
     setOpenProjectIds((ids) => (ids.includes(projectId) ? ids.filter((id) => id !== projectId) : [...ids, projectId]));
@@ -191,6 +262,56 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
       </div>
     );
   }
+  const accountName = account?.user?.displayName || account?.user?.email || 'Your account';
+  const accountPlan = account?.subscription?.planName || (account ? 'No paid plan' : 'Not signed in');
+  const initials = initialFor(account?.user?.displayName, account?.user?.email);
+
+  /** Settings takes the whole window, so opening it from here also closes this menu. */
+  function openSettings(section) {
+    setMenuOpen(false);
+    onNavigate('settings', section);
+  }
+
+  /**
+   * Pull the account's chats down now.
+   *
+   * Chats are only swept at launch and after signing in, so a chat written in the
+   * browser used to need a restart before this window would list it. The press does
+   * the same work on demand and says what came down; the list itself refreshes from
+   * main's chats change event, not from anything set here.
+   */
+  async function syncChats() {
+    if (syncing) return;
+    setSyncing(true);
+    setSyncNote('');
+    try {
+      const result = await window.zuri?.cloud?.sync?.();
+      if (result?.ok !== true) {
+        setSyncNote(result?.error?.message ?? 'The chats could not be synced.');
+        return;
+      }
+      if (result.data?.skipped === 'signed-out') {
+        setSyncNote('Sign in to sync your chats.');
+        return;
+      }
+      const arrived = Number(result.data?.appended) || 0;
+      const taken = Number(result.data?.adopted) || 0;
+      setSyncNote(arrived === 0
+        ? 'Everything is up to date.'
+        : `${arrived} new message${arrived === 1 ? '' : 's'} came down${taken > 0 ? ` from ${taken} chat${taken === 1 ? '' : 's'} started elsewhere` : ''}.`);
+    } catch (failure) {
+      setSyncNote(failure?.message ?? 'The chats could not be synced.');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function signOut() {
+    setMenuOpen(false);
+    await window.zuri?.cloud?.signOut?.();
+    window.dispatchEvent(new Event('zuri:signed-out'));
+  }
+
   return (
     <div className="flex h-full shrink-0">
       {/* No icon strip: the sidebar is one list, the way ChatGPT's is. When it is folded
@@ -308,18 +429,39 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
 
         <div className="flex items-center justify-between px-5 pb-2 pt-6">
           <p className="text-xs font-medium uppercase tracking-wide text-muted">Recents</p>
-          <Button
-            isIconOnly
-            size="sm"
-            variant="ghost"
-            className="h-8 w-8 rounded-lg text-muted"
-            aria-label="Open chat history"
-            title="Chat history"
-            onPress={() => onNavigate('history')}
-          >
-            <HistoryIcon size={16} />
-          </Button>
+          <div className="flex items-center gap-1">
+            {/* Sync beside the list it fills: a chat started in the browser arrives
+                here without a restart. It spins while the run is out. */}
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 rounded-lg text-muted"
+              aria-label="Sync chats"
+              title="Sync chats"
+              isDisabled={syncing}
+              onPress={() => void syncChats()}
+            >
+              <SyncIcon size={16} className={syncing ? 'animate-spin' : ''} />
+            </Button>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className="h-8 w-8 rounded-lg text-muted"
+              aria-label="Open chat history"
+              title="Chat history"
+              onPress={() => onNavigate('history')}
+            >
+              <HistoryIcon size={16} />
+            </Button>
+          </div>
         </div>
+        {syncNote !== '' && (
+          <p role="status" className="px-5 pb-2 text-xs text-muted">
+            {syncNote}
+          </p>
+        )}
         <div className="zuri-scrollbar-hidden flex-1 overflow-y-auto px-3 text-sm text-muted">
           {threads.length === 0 && <p className="px-2">No conversations yet. Your threads will appear here, newest first.</p>}
           {looseThreads.map(renderThread)}
@@ -327,47 +469,60 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
 
         <div className="relative border-t border-border px-3 py-3" ref={menuRef}>
           {menuOpen && (
-            <div role="menu" aria-label="More of Zuri" className="zuri-sidebar-menu absolute bottom-full left-3 right-3 mb-2 flex max-h-96 flex-col gap-0.5 overflow-y-auto rounded-xl border border-border bg-surface p-1.5 shadow-lg">
-              {MENU_ITEMS.map(({ key, label, Icon }) => (
-                <Button
-                  key={key}
-                  type="button"
-                  variant="ghost"
-                  role="menuitem"
-                  className={`min-h-11 justify-start gap-3 rounded-lg px-3 font-normal ${current === key ? 'zuri-selected-pill' : ''}`}
-                  aria-current={current === key ? 'page' : undefined}
-                  onPress={() => { setMenuOpen(false); onNavigate(key); }}
-                >
-                  <Icon size={16} />
-                  {label}
-                  {key === 'reminders' && dueReminders > 0 && (
-                    <span className="ml-auto min-w-5 rounded-full bg-accent px-1.5 text-center text-[11px] font-semibold leading-5 text-accent-foreground">{dueReminders > 9 ? '9+' : dueReminders}</span>
-                  )}
-                </Button>
-              ))}
-              <Button type="button" variant="ghost" role="menuitem" className="min-h-11 justify-start gap-3 rounded-lg px-3 font-normal" onPress={() => { setMenuOpen(false); void window.zuri?.overlay?.open?.(); }}>
-                <OverlayIcon size={16} />
-                Quick ask
-              </Button>
-              <Button type="button" variant="ghost" role="menuitem" className="min-h-11 justify-start gap-3 rounded-lg px-3 font-normal" onPress={() => { setMenuOpen(false); onToggleTheme(); }}>
-                {theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />}
-                {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-              </Button>
+            <div role="menu" aria-label="Your account" className="zuri-account-menu">
+              <div className="zuri-account-head">
+                <span className="zuri-avatar" aria-hidden="true">{initials}</span>
+                <span className="zuri-account-identity">
+                  <span className="zuri-account-name">{accountName}</span>
+                  <span className="zuri-account-plan">{accountPlan}</span>
+                </span>
+              </div>
+
+              <div className="zuri-account-group">
+                <AccountMenuRow Icon={SettingsIcon} label="Settings" onPress={() => openSettings('general')} />
+                <AccountMenuRow Icon={BellIcon} label="Notifications" onPress={() => openSettings('notifications')} />
+                <AccountMenuRow Icon={UserIcon} label="Profile" onPress={() => openSettings('profile')} />
+                <AccountMenuRow Icon={ShieldIcon} label="Account" onPress={() => openSettings('account')} />
+              </div>
+
+              <div className="zuri-account-group">
+                {DESTINATION_ITEMS.map(({ key, label, Icon }) => (
+                  <AccountMenuRow
+                    key={key}
+                    Icon={Icon}
+                    label={label}
+                    active={current === key}
+                    onPress={() => { setMenuOpen(false); onNavigate(key); }}
+                    badge={key === 'reminders' && dueReminders > 0 ? (
+                      <span className="zuri-account-count">{dueReminders > 9 ? '9+' : dueReminders}</span>
+                    ) : null}
+                  />
+                ))}
+              </div>
+
+              <div className="zuri-account-group">
+                <AccountMenuRow Icon={OverlayIcon} label="Quick ask" hint={QUICK_ASK_HINT} onPress={() => { setMenuOpen(false); void window.zuri?.overlay?.open?.(); }} />
+                <AccountMenuRow Icon={theme === 'dark' ? SunIcon : MoonIcon} label={theme === 'dark' ? 'Light mode' : 'Dark mode'} onPress={() => { setMenuOpen(false); onToggleTheme(); }} />
+                <AccountMenuRow Icon={SignOutIcon} label="Log out" onPress={() => void signOut()} />
+              </div>
             </div>
           )}
-          <Button
+          <button
             type="button"
-            variant="ghost"
-            fullWidth
-            className="min-h-11 justify-start gap-3 rounded-xl px-3 font-normal"
+            className="zuri-account-trigger"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            onPress={() => setMenuOpen((open) => !open)}
+            aria-label={`Account menu for ${accountName}`}
+            onClick={() => setMenuOpen((open) => !open)}
           >
-            <SettingsIcon size={16} />
-            Menu
-            {dueReminders > 0 && <span aria-label={`${dueReminders} reminders due`} className="ml-auto size-2 rounded-full bg-accent" />}
-          </Button>
+            <span className="zuri-avatar" aria-hidden="true">{initials}</span>
+            <span className="zuri-account-identity">
+              <span className="zuri-account-name">{accountName}</span>
+              <span className="zuri-account-plan">{accountPlan}</span>
+            </span>
+            {dueReminders > 0 && <span aria-label={`${dueReminders} reminders due`} className="size-2 shrink-0 rounded-full bg-accent" />}
+            <ChevronUpIcon size={15} className={`zuri-account-chevron${menuOpen ? ' is-open' : ''}`} />
+          </button>
         </div>
       </aside>
     </div>

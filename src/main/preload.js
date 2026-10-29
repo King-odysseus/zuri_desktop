@@ -68,6 +68,7 @@ const CHANNELS = Object.freeze([
   'zuri:cloud:topup',
   'zuri:cloud:checkout',
   'zuri:cloud:sign-out',
+  'zuri:cloud:sync',
   'zuri:tasks:list',
   'zuri:tasks:create',
   'zuri:tasks:update',

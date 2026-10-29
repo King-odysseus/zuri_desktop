@@ -61,6 +61,7 @@ import {
   Pin,
   Plus,
   Receipt,
+  RefreshCw,
   RotateCw,
   Search,
   Settings,
@@ -283,6 +284,7 @@ export const SlashCommandIcon = family(SquareSlash, { name: 'SlashCommandIcon' }
 export const SparkIcon = family(Sparkles, { name: 'SparkIcon' });
 export const StopIcon = StopGlyph;
 export const SunIcon = family(Sun, { name: 'SunIcon' });
+export const SyncIcon = family(RefreshCw, { name: 'SyncIcon' });
 export const TaskIcon = family(ListChecks, { name: 'TaskIcon' });
 export const UserIcon = family(User, { name: 'UserIcon' });
 export const UserPlusIcon = family(UserPlus, { name: 'UserPlusIcon' });
