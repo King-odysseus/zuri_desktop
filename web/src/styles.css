@@ -1322,8 +1322,14 @@ body:has(.app) .app {
 
 /* The content column scrolls, not the window. The navigation and the composer then
    stay where they belong while a long page moves under them, which is what the
-   desktop app does. The chat is excluded because only its transcript scrolls. */
+   desktop app does. The chat is excluded because only its transcript scrolls.
+
+   It is a column as well as a scroller, so the page can grow into the window and
+   the footer can be carried to the bottom edge of a short page instead of sitting
+   halfway up it. */
 .app-main:not(.is-chat) {
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -1360,6 +1366,28 @@ body:has(.app) .app {
    1200px column, while Admin gets enough room for its operational data. */
 .app-content:has(.admin-view) {
   max-width: none;
+}
+
+/*
+ * A page fills the window even when its content does not. This column takes the
+ * height the shell has left over, and the footer's own auto margin is what carries
+ * it down to the bottom edge.
+ *
+ * `flex: 1 0 auto`, not `1 1 auto`: a column allowed to shrink would squeeze the
+ * cards on a long page instead of letting the area scroll, which is what it is for.
+ */
+.app-main:not(.is-chat) .app-content {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+}
+
+/* An auto margin at the top, and padding in place of the old 24px gap: a long page
+   leaves no free space for the margin to take, and the padding is then what keeps
+   the footer off the last card. */
+.app-main:not(.is-chat) .app-foot {
+  margin-top: auto;
+  padding-top: 24px;
 }
 
 /* Views keep the desktop page rhythm: a header, then sections that share one
@@ -2057,6 +2085,22 @@ body:has(.app) .app {
   padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
 }
 
+/*
+ * The card and its one note travel together and take the room above the footer, so
+ * the footer stays at the bottom of the window instead of riding up under a short
+ * form. Centring is left to the wide breakpoint below, where the card already sits
+ * in the middle of the panel; on a phone it starts at the top, as before.
+ */
+.auth-body {
+  display: flex;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
 .auth-card {
   display: flex;
   width: 100%;
@@ -2609,6 +2653,12 @@ a.download-card:hover {
   .auth-panel {
     justify-content: center;
     padding: 48px 24px;
+  }
+
+  /* Beside the picture the form sits in the middle of the panel, and the footer
+     still holds the bottom edge underneath it. */
+  .auth-body {
+    justify-content: center;
   }
 }
 

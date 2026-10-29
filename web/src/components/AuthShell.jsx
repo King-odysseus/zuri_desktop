@@ -52,12 +52,16 @@ export default function AuthShell({ asideTitle, asideCopy, onNavigate, children 
       </aside>
 
       <section className="auth-panel">
-        <div className="auth-card">{children}</div>
+        {/* The card and its note share one growing column, so the footer below them
+            is free to sit at the bottom edge of the window whatever the form length. */}
+        <div className="auth-body">
+          <div className="auth-card">{children}</div>
 
-        <div className="auth-meta">
-          <span>
-            <BrainIcon /> Zuri learns your answer style, not your secrets.
-          </span>
+          <div className="auth-meta">
+            <span>
+              <BrainIcon /> Zuri learns your answer style, not your secrets.
+            </span>
+          </div>
         </div>
         <Footer compact />
       </section>

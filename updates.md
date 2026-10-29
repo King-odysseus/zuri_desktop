@@ -1,3 +1,14 @@
+## 2026-10-29 - Windows (the footer holds the bottom of every page)
+
+- The footer sat directly under the content, so on a page with little on it (a Projects list with nothing in it yet) it floated halfway up the window with a pool of empty colour underneath. The signed-in pages now fill the height the window has left and the footer's own auto margin carries it to the bottom edge; a long page still scrolls, with the footer at the end of it.
+- The card is a column that grows and is never allowed to shrink (`flex: 1 0 auto`). A column allowed to shrink would squeeze the cards on a long page instead of letting the page scroll. Side by side at 1280 the Overview page measures the same height with the column as without it, so nothing is compressed.
+- The account screens (sign in, sign up, forgot password, reset password) had the same fault. The card and its one note now sit inside a growing column, so the footer holds the bottom of the panel: centred under the card on a wide window, at the top of the panel on a phone, and below the form when the form is taller than the window.
+- The chat is deliberately unchanged: it has no footer and keeps its own full-height layout.
+- Checked at 390, 1280 and 1920 wide: all six signed-in pages keep the footer at the bottom of the window with no sideways scroll, the Overview page keeps its natural height, and the chat still fills the window with no footer.
+- Key files: web/src/styles.css, web/src/components/AuthShell.jsx.
+- Other OS action: run "npm run test && npm run web:build". Railway must redeploy to serve the rebuilt web bundle. No new dependency and no database change.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (the Naira picture prices line up, a Lagos dusk behind the form, pictures in the model picker)
 
 - The "Pictures, priced in Naira" cards sat in one narrow column with a wide empty strip beside them. Two different rules in the web stylesheet were both named `.image-grid`: the landing page's three price cards and the saved-picture library. The library rule came later and won, so the price cards were laid out as a shelf of small library tiles. The library is now `.image-library-grid`, and the three price cards take the full width of the page as three equal columns.
