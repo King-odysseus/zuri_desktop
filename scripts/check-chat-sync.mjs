@@ -190,6 +190,8 @@ async function main() {
   const marker = 'Decide for yourself when to search';
   check(serverResearch.includes(marker), 'the server prompt says to search without being asked');
   check(desktopChat.includes(marker), 'the desktop prompt says to search without being asked');
+  check(serverResearch.includes('Interpret obvious spelling mistakes'), 'the server prompt handles obvious typing mistakes');
+  check(desktopChat.includes('Interpret obvious spelling mistakes'), 'the desktop prompt handles obvious typing mistakes');
   check(
     serverResearch.includes('ask one short question'),
     'both apps tell the model when to search, and to ask one question when the ask is vague',
@@ -204,6 +206,7 @@ async function main() {
     chatView.includes('[WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL, CREATE_MEMORY_TOOL]'),
     'the browser chat offers the same tools to a chat model',
   );
+  check(chatView.includes('Your previous response was empty'), 'the browser retries an empty reply');
 
   // The sync refuses to run when nobody is signed in, and a real session is only
   // readable with the app's own encryption, so this runs inside Electron for the

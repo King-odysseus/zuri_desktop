@@ -1651,6 +1651,24 @@ check('a wordless turn is asked again, not answered with an internal error', asy
     if (saved !== answer) throw new Error(`the saved reply was "${saved}"`);
     if (deltas.join('') !== answer) throw new Error(`the chat showed "${deltas.join('')}" but saved "${saved}"`);
 
+    const emptyErrorRequests = [];
+    const recovered = await sendChatMessage(thread.id, {
+      mode: 'ask',
+      cloudReply: async (request) => {
+        emptyErrorRequests.push(request);
+        if (emptyErrorRequests.length === 1) {
+          return { ok: false, error: { code: 'CHAT_EMPTY_REPLY', message: 'Zuri sent an empty reply. Try again.' } };
+        }
+        return { ok: true, data: { content: 'I understood the question and recovered the answer.', modelCode: 'zuri-flash' } };
+      },
+    });
+    if (!recovered.ok) throw new Error(`an empty provider error was not recovered: ${recovered.error?.code}`);
+    if (emptyErrorRequests.length !== 2) throw new Error(`the empty provider error made ${emptyErrorRequests.length} requests`);
+    if (!emptyErrorRequests[1].conversation.system.includes('previous response was empty')) {
+      throw new Error('the empty provider error retry did not carry its recovery instruction');
+    }
+    const beforeQuiet = recovered.data.thread.messages.length;
+
     // A model that stays silent even when asked plainly must not put the store's own
     // wording in front of the person.
     const quiet = await sendChatMessage(thread.id, {
@@ -1662,7 +1680,7 @@ check('a wordless turn is asked again, not answered with an internal error', asy
     if (/non-empty content/.test(quiet.error?.message ?? '')) throw new Error('the store internal message reached the person');
     const after = await store.readStore('chats');
     const kept = after.data.find((entry) => entry.id === thread.id).messages;
-    if (kept.length !== result.data.thread.messages.length) throw new Error('an empty reply was saved to the chat');
+    if (kept.length !== beforeQuiet) throw new Error('an empty reply was saved to the chat');
     return 'one more round with no tools, and a plain message when even that is silent';
   } finally {
     store.setStoreRoot(previousRoot);

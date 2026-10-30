@@ -76,6 +76,7 @@ const HISTORY_LIMIT = 20;
  * is waiting on every one of them.
  */
 const MAX_TOOL_ROUNDS = 3;
+const EMPTY_REPLY_NUDGE = 'Your previous response was empty. Answer the person now in plain words. Interpret obvious typing mistakes from context, and ask one short clarification only if two meanings are genuinely possible. Do not call or describe a tool.';
 
 /**
  * Adding a to-do and setting a reminder ride with every message, the same way they
@@ -1137,6 +1138,7 @@ export default function ChatView({
       const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL, CREATE_MEMORY_TOOL];
       let wire = outgoing;
       let answer = '';
+      let retriedEmpty = false;
       // One round past the cap, with no tools offered, so a model that keeps
       // reaching for the search still ends by answering in words.
       for (let round = 0; round <= MAX_TOOL_ROUNDS; round += 1) {
@@ -1148,30 +1150,38 @@ export default function ChatView({
         // ever see, and the answer comes back empty. Offering them and asking for
         // words gets an answer that uses what the search already found.
         const closing = round === MAX_TOOL_ROUNDS && tools.length > 0;
-        const offerTools = tools.length > 0;
+        const offerTools = tools.length > 0 && !retriedEmpty;
         // Each round paints its own words, so a previous round's sentence does not
         // sit above the search that replaced it.
         reply = '';
         setStreamReply('');
-        const result = await streamChat({
-          messages: closing
-            ? [...wire, { role: 'user', content: 'Answer now in plain words, using what you already have. Do not call another tool.' }]
-            : wire,
-          model,
-          // A chat inside a project names it, so the server adds that project's
-          // instructions and files to the prompt before the question is sent.
-          projectId,
-          tools: offerTools ? tools : [],
-          signal: controller.signal,
-          onDelta: (text) => {
-            if (run !== runRef.current) return;
-            reply += text;
-            setStreamReply(reply);
-            // Words have started arriving, so the search line is no longer the
-            // only thing to say about this round.
-            setToolStatus('');
-          },
-        });
+        let result;
+        try {
+          result = await streamChat({
+            messages: closing
+              ? [...wire, { role: 'user', content: 'Answer now in plain words, using what you already have. Do not call another tool.' }]
+              : wire,
+            model,
+            // A chat inside a project names it, so the server adds that project's
+            // instructions and files to the prompt before the question is sent.
+            projectId,
+            tools: offerTools ? tools : [],
+            signal: controller.signal,
+            onDelta: (text) => {
+              if (run !== runRef.current) return;
+              reply += text;
+              setStreamReply(reply);
+              // Words have started arriving, so the search line is no longer the
+              // only thing to say about this round.
+              setToolStatus('');
+            },
+          });
+        } catch (error) {
+          if (error?.code !== 'CHAT_EMPTY_REPLY' || retriedEmpty) throw error;
+          retriedEmpty = true;
+          wire = [...wire, { role: 'user', content: EMPTY_REPLY_NUDGE }];
+          continue;
+        }
         if (run !== runRef.current) return;
 
         const content = result?.content || reply;
@@ -1179,6 +1189,11 @@ export default function ChatView({
         const reasoningContent = typeof result?.reasoningContent === 'string' ? result.reasoningContent : '';
         // No calls, or a round that was not allowed to call anything: whatever came
         // back is the answer, streamed or handed over in one body.
+        if (calls.length === 0 && content.trim() === '' && !retriedEmpty) {
+          retriedEmpty = true;
+          wire = [...wire, { role: 'user', content: EMPTY_REPLY_NUDGE }];
+          continue;
+        }
         if (calls.length === 0 || !offerTools) {
           answer = content;
           break;

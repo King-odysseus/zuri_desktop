@@ -1313,3 +1313,12 @@
 - Other OS action: deploy the rebuilt web bundle with `npm run cloud:deploy`; Android picks it up on the next `npm run android:build`. No new package was added.
 - Done on: Windows
 
+## 2026-10-30 - Windows (typos are interpreted and empty replies recover)
+
+- Chat prompts now interpret obvious spelling mistakes, missing letters and phonetic typing from context, while asking for clarification when two meanings would change the answer.
+- Desktop and web chats retry one bounded empty reply, including the server's explicit `CHAT_EMPTY_REPLY` response, before showing an error. The recovery instruction is not saved as part of the conversation.
+- Checked: `npm run selftest` passes, `npm run web:build` passes, and `npm run sync:check` passes. `npm run server:test` still fails at its existing dashboard shell assertion because `/` returns 404 in the local test app; the text and chat tests are not reached after that failure.
+- Key files: src/main/providers/chat.js, server/src/text.js, web/src/views/ChatView.jsx, scripts/selftest.js, scripts/check-chat-sync.mjs, server/public/index.html, server/public/assets/index-Df-gONAz.js.
+- Other OS action: run `npm run web:build` before deploying the browser bundle.
+- Done on: Windows
+

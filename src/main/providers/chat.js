@@ -398,6 +398,7 @@ const TOOL_RESULT_LIMIT = 8_000;
  * answer the person was waiting for instead of an error.
  */
 const NO_TOOLS_NUDGE = 'The person is still waiting for an answer to their last message. Reply now in plain words, using what you already know or any results above. Do not call or describe any tool.';
+const EMPTY_REPLY_NUDGE = 'Your previous response was empty. Answer the person now in plain words. Interpret obvious typing mistakes from context, and ask one short clarification only if two meanings are genuinely possible. Do not call or describe a tool.';
 
 /**
  * Channel main pushes token events on. It is a one-way push, not an `invoke`
@@ -483,6 +484,7 @@ const ANSWER_QUALITY_POLICY = [
   'Work out the answer step by step before you write it, and check any figures, code or claims once before sending.',
   'Answer what the person is really trying to achieve, not only the literal words, and mention a better approach when you see one.',
   'If the request is ambiguous in a way that changes the answer, state your assumption or ask one short question.',
+  'Interpret obvious spelling mistakes, missing letters and phonetic typing from context. Do not stop or complain about a typo; answer the likely request. If two readings would change the answer, ask one short clarification.',
   'Give concrete examples, exact commands or working code rather than general advice. Never invent facts, names, links or quotes.',
 ].join(' ');
 
@@ -1531,7 +1533,7 @@ function addinOperationList(host) {
       '{"op":"setFormulas","range":"E3:E26","formulas":[["=C3-D3"],["=C4-D4"]]}         write formulas; each string starts with "="',
       '{"op":"setNumberFormat","range":"F3:F26","format":"0.0%"}                       display format for cells',
       '{"op":"format","range":"A1:F1","bold":true,"fill":"#1F2A44","color":"#FFFFFF","size":12,"wrapText":true,"align":"center"}',
-      '{"op":"columnWidth","range":"A1:F1","width":16}                                width of the columns the range touches',
+      '{"op":"columnWidth","range":"A1:F1","width":16}                                approximate number of characters the columns should fit',
       '{"op":"autofit","range":"A1:F30"}                                             fit columns and rows to their contents',
       '{"op":"addWorksheet","name":"Summary","activate":true}',
       '{"op":"clear","range":"G1:G30"}                                              clears the contents only',
@@ -1539,6 +1541,7 @@ function addinOperationList(host) {
       '{"op":"addChart","range":"A1:B13","chartType":"column","title":"Spend by month","at":"D2"}   draws a chart beside the data',
       '',
       'Excel notes',
+      '- columnWidth uses an approximate character count (0 to 255), not points or pixels. Use autofit when the content should determine the width.',
       '- Any range operation also takes "sheet":"Budget" to work on a sheet other than the active one.',
       '- Formulas use Excel syntax with a leading "=" and comma separators. Escape a double quote inside a formula: "=SUMIF($B$3:$B$26,\\\"Expense\\",$D$3:$D$26)".',
       '- Use $ for a reference that must not move when it is filled down, such as $C$3.',
@@ -1919,6 +1922,21 @@ export async function sendChatMessage(threadId, options = {}) {
     // often there are none. Asking once more with no tools offered is the difference
     // between a reply and a failure.
     const wordless = (value) => typeof value !== 'string' || value.trim() === '';
+    if (!reached.ok && reached.error?.code === 'CHAT_EMPTY_REPLY') {
+      const retry = await options.cloudReply({
+        conversation: { system: `${conversation.system}\n\n${EMPTY_REPLY_NUDGE}`, turns: wire },
+        settings: modelSettings,
+        tools: [],
+        signal: options.signal,
+        emit: (event) => {
+          if (typeof event.delta === 'string') emit({ threadId, delta: event.delta });
+          else emit({ threadId, ...event });
+        },
+      });
+      if (retry.ok !== true) return retry;
+      reached = retry;
+      textSoFar = typeof retry.data?.content === 'string' ? retry.data.content : '';
+    }
     if (reached.ok && wordless(reached.data?.content) && wordless(textSoFar)) {
       let askedAgain = '';
       let shownSoFar = 0;
