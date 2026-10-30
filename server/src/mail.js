@@ -2,7 +2,6 @@ const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 const MAIL_TIMEOUT_MS = 10_000;
 const RESET_SUBJECT = 'Reset your Zuri Cloud password';
 const AUTOMATION_SUBJECT = 'Zuri has something for you';
-const REMINDER_SUBJECT = 'Zuri reminder';
 // A subject carrying the person's own words is the one they recognise in a list of
 // mail, so the prompt leads it. Trimmed, because a subject line is not a paragraph.
 const AUTOMATION_SUBJECT_MAX = 60;
@@ -72,29 +71,13 @@ export function automationResultSubject(prompt) {
   return `Zuri: ${short}`;
 }
 
-/** @param {{ title?: string, dueAt?: string }} reminder @returns {string} */
-export function reminderBody({ title = '', dueAt = '' } = {}) {
-  const name = text(title) || 'A reminder is due';
-  const when = text(dueAt);
-  return [
-    'Hello,',
-    '',
-    name,
-    when === '' ? '' : `Due at: ${when}`,
-    '',
-    'You set this reminder in Zuri.',
-    '',
-    'Zuri Cloud',
-  ].join('\n');
-}
-
 /**
  * Send through Brevo's HTTPS API.
  *
  * A plain fetch keeps this service dependency free, the same way the Paystack
  * client does, and avoids running an SMTP pool inside the web process.
  * @param {{ apiKey?: string, from?: string, fromName?: string, endpoint?: string, fetchImpl?: typeof fetch }} [options]
- * @returns {{ configured: boolean, sendPasswordReset: Function, sendAutomationResult: Function, sendReminder: Function }}
+ * @returns {{ configured: boolean, sendPasswordReset: Function, sendAutomationResult: Function }}
  */
 export function createMailer({ apiKey = '', from = '', fromName = '', endpoint = BREVO_ENDPOINT, fetchImpl = fetch } = {}) {
   const key = text(apiKey);
@@ -150,19 +133,6 @@ export function createMailer({ apiKey = '', from = '', fromName = '', endpoint =
         to,
         subject: automationResultSubject(prompt),
         body: automationResultBody({ prompt, text: answer, failure: why }),
-      });
-    },
-    /**
-     * Reminders are always delivered by email by the cloud sweep. This is the
-     * closed-app path shared by Windows, macOS and Android clients.
-     */
-    async sendReminder({ to, title = '', dueAt = '' } = {}) {
-      if (!configured) return { sent: false, reason: 'not_configured' };
-      if (text(to) === '') return { sent: false, reason: 'no_recipient' };
-      return send({
-        to,
-        subject: REMINDER_SUBJECT,
-        body: reminderBody({ title, dueAt }),
       });
     },
   };

@@ -125,6 +125,20 @@ export async function deleteReminder(id) {
   return data ?? { id };
 }
 
+/** Read the newest durable account notifications after a reconnect. */
+export async function listNotifications(limit = 20) {
+  const data = await api(`/api/notifications?limit=${encodeURIComponent(limit)}`);
+  return {
+    items: Array.isArray(data?.items) ? data.items : [],
+    unread: Number(data?.unread ?? 0),
+  };
+}
+
+/** Clear the account's unread notification badge after the list is opened. */
+export async function markNotificationsRead() {
+  return api('/api/notifications/read', { method: 'POST' });
+}
+
 /*
  * Automations: a saved prompt the server runs on a schedule by itself, with the
  * web search it needs, and reports back. The browser only ever lists, creates,

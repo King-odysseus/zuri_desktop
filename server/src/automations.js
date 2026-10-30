@@ -435,9 +435,19 @@ export function createAutomationScheduler({
       nextRunAt: nextRunAfter(automation.cadence, now()),
     });
 
-    // The email is the part the person actually sees when their computer is off, so
-    // a failure to send is logged rather than thrown: the run itself did happen and
-    // its result is already saved for the screens to show.
+    if (typeof repository.appendNotification === 'function') {
+      await repository.appendNotification({
+        userId: automation.userId,
+        kind: outcome.status === 'ok' ? 'automation' : 'error',
+        title: outcome.status === 'ok' ? 'Automation finished' : 'Automation needs attention',
+        body: outcome.status === 'ok'
+          ? (outcome.text || `Scheduled run completed: ${automation.prompt}`)
+          : (outcome.error || `Scheduled run failed: ${automation.prompt}`),
+      });
+    }
+
+    // Email remains an explicit automation option. A provider failure must not turn
+    // a completed run into a failed run because the in-app event is already saved.
     if (automation.deliverEmail === true && typeof mailer?.sendAutomationResult === 'function') {
       try {
         await mailer.sendAutomationResult({

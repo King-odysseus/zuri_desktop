@@ -16,6 +16,7 @@ import TasksView from './TasksView.jsx';
 import RemindersView from './RemindersView.jsx';
 import AutomationsView from './AutomationsView.jsx';
 import AccountView from './AccountView.jsx';
+import NotificationsView from './NotificationsView.jsx';
 
 const COLLAPSE_KEY = 'zuri-cloud-nav-collapsed';
 
@@ -34,6 +35,7 @@ export const NAV_ITEMS = [
   { id: 'projects', label: 'Projects', icon: <FolderIcon /> },
   { id: 'tasks', label: 'Tasks', icon: <TaskIcon /> },
   { id: 'reminders', label: 'Reminders', icon: <BellIcon /> },
+  { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
   { id: 'automations', label: 'Automations', icon: <AutomationIcon /> },
   { id: 'images', label: 'Images', icon: <ImageIcon /> },
   { id: 'overview', label: 'Overview', icon: <GridIcon /> },
@@ -215,6 +217,7 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           )}
           {view === 'tasks' && <TasksView />}
           {view === 'reminders' && <RemindersView />}
+          {view === 'notifications' && <NotificationsView />}
           {view === 'automations' && <AutomationsView />}
           {view === 'images' && <ImagesView />}
           {view === 'overview' && (

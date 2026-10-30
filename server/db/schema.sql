@@ -445,6 +445,21 @@ CREATE TABLE IF NOT EXISTS reminders (
 CREATE INDEX IF NOT EXISTS reminders_user_done_due_idx
   ON reminders(user_id, done, due_at);
 
+-- In-app notifications are durable account events. A client can be closed when a
+-- reminder or automation finishes, then read the unread row the next time it opens.
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL DEFAULT 'info',
+  title TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  read_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS notifications_user_created_idx
+  ON notifications(user_id, created_at DESC, id);
+
 -- A picture uploaded in the browser chat used to go straight to an outside image host.
 -- On a deployment where that host is not configured the upload failed, so the picture
 -- never appeared and Zuri never saw it. This table is the fallback that keeps a small

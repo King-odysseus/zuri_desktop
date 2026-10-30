@@ -1330,12 +1330,20 @@
 - Other OS action: run `npm run web:build` before deploying the browser bundle.
 - Done on: Windows
 
-## 2026-10-30 - Windows (cloud reminders can email while apps are closed)
+## 2026-10-30 - Windows (cloud reminders use the in-app notification inbox)
 
-- The cloud service now claims due account reminders atomically and sends them through the existing Brevo mailer, so a closed Windows, macOS or Android client does not stop a reminder from being delivered.
-- Unconfigured mail leaves reminders due instead of claiming and losing them.
-- Checked: `npm run server:test` passes, including the new cloud reminder sweep and mail payload checks.
-- Key files: server/src/reminders.js, server/src/db.js, server/src/mail.js, server/src/server.js, server/test/reminders.test.js, server/package.json.
-- Other OS action: run `npm run server:test`; deploy the cloud service with `BREVO_API_KEY`, `MAIL_FROM`, and optional `MAIL_FROM_NAME` before relying on closed-app reminder email.
+- The earlier email-based reminder sweep was replaced by durable unread account notifications. Reminder events are now consumed by the Notifications view after reconnecting.
+- Checked: `npm test` passes.
+- Key files: server/db/schema.sql, server/src/db.js, server/src/reminders.js, web/src/views/NotificationsView.jsx.
+- Other OS action: deploy the cloud service and rebuilt web bundle. Native OS alerts while fully closed still need a push provider.
+- Done on: Windows
+
+## 2026-10-30 - Windows (closed-app reminders become in-app notifications)
+
+- Cloud reminder and automation runs now write durable unread notifications to the account instead of sending reminder email.
+- The web dashboard and Android bundle have a Notifications view that reads the account inbox after reconnecting and marks it read.
+- Checked: `npm run server:test` and `npm run web:build` pass.
+- Key files: server/db/schema.sql, server/src/db.js, server/src/reminders.js, server/src/automations.js, server/src/app.js, web/src/lib/api.js, web/src/views/NotificationsView.jsx, web/src/views/Dashboard.jsx.
+- Other OS action: run `npm run server:test` and deploy the cloud service plus rebuilt web bundle. Native OS alerts while fully closed still need a push provider.
 - Done on: Windows
 

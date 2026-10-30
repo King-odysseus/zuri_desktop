@@ -127,9 +127,7 @@ const automations = repository
       : Promise.resolve(DEFAULT_MODELS.map((model) => ({ ...model })))),
   })
   : null;
-const reminders = repository
-  ? createReminderScheduler({ repository, mailer })
-  : null;
+const reminders = repository ? createReminderScheduler({ repository }) : null;
 
 createServer((request, response) => {
   void serve(request, response);
@@ -149,10 +147,8 @@ createServer((request, response) => {
     automations.start();
     console.log('[zuri-cloud] automation sweep started');
   }
-  if (!reminders) {
-    console.log('[zuri-cloud] reminders are off: there is no database to read them from');
-    return;
+  if (reminders) {
+    reminders.start();
+    console.log('[zuri-cloud] reminder notification sweep started');
   }
-  reminders.start();
-  console.log('[zuri-cloud] reminder sweep started');
 });

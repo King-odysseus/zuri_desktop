@@ -105,6 +105,7 @@ function memoryContent(value) {
 // project or a chat, and the browser, the phone and the app all read the same shapes.
 const TASKS_PATH = '/api/tasks';
 const REMINDERS_PATH = '/api/reminders';
+const NOTIFICATIONS_PATH = '/api/notifications';
 // Automations sit beside them for the same reason, and are the one list this service
 // acts on by itself: a row here is run on a schedule by the server, not by a client.
 const AUTOMATIONS_PATH = '/api/automations';
@@ -1899,6 +1900,22 @@ export function createApp(dependencies = {}) {
     // Neither is plan gated, unlike the chat routes below. Storing "call Greg on Monday"
     // costs nothing to serve, and putting a to-do behind a subscription would only send
     // people back to a notes file.
+    // Notifications are account events written by cloud schedulers and read when a
+    // client reconnects. They are not email and do not require a device to be awake.
+    if (url.pathname === NOTIFICATIONS_PATH || url.pathname === `${NOTIFICATIONS_PATH}/read`) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (dependencies.repository?.listNotifications === undefined) return response(503, { ok: false, error: { code: 'NOTIFICATIONS_NOT_CONFIGURED', message: 'Notifications are not configured yet.' } });
+      if (url.pathname.endsWith('/read')) {
+        if (request.method !== 'POST') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to mark notifications read.' } });
+        return response(200, { ok: true, data: await dependencies.repository.markNotificationsRead(session.user.id) });
+      }
+      if (request.method !== 'GET') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET to read notifications.' } });
+      const limit = Number(url.searchParams.get('limit'));
+      return response(200, { ok: true, data: await dependencies.repository.listNotifications(session.user.id, { limit }) });
+    }
+
     if (url.pathname === TASKS_PATH || url.pathname.startsWith(`${TASKS_PATH}/`)) {
       if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
       const session = await dependencies.auth.authenticate(bearerToken(request));

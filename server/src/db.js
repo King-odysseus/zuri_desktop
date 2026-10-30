@@ -251,8 +251,7 @@ function publicReminder(row) {
 function nextReminderDueAt(reminder, now) {
   if (reminder.repeat === 'interval') {
     const minutes = Number(reminder.interval_minutes);
-    const gap = Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
-    return new Date(now.getTime() + gap * 60_000).toISOString();
+    return new Date(now.getTime() + (Number.isFinite(minutes) && minutes > 0 ? minutes : 60) * 60_000).toISOString();
   }
   if (reminder.repeat === 'daily') {
     const next = new Date(now.getTime());
@@ -260,6 +259,18 @@ function nextReminderDueAt(reminder, now) {
     return next.toISOString();
   }
   return null;
+}
+
+/** @param {object} row @returns {object} */
+function publicNotification(row) {
+  return {
+    id: row.id,
+    kind: String(row.kind ?? 'info'),
+    title: String(row.title ?? ''),
+    body: String(row.body ?? ''),
+    createdAt: instant(row.created_at),
+    read: row.read_at !== null && row.read_at !== undefined,
+  };
 }
 
 /**
@@ -1716,13 +1727,7 @@ export function createRepository(pool) {
       );
       return result.rows.map(publicReminder);
     },
-    /**
-     * Claim due reminders while holding row locks, then advance them before the
-     * transaction ends. This prevents two cloud instances from emailing the same
-     * reminder when a deploy overlaps a scheduled sweep.
-     * @param {{ now: string, limit?: number }} sweep
-     * @returns {Promise<object[]>}
-     */
+    /** Claim due reminders atomically so each becomes one in-app event. */
     async claimDueReminders({ now, limit = 50 }) {
       const capped = Math.min(Math.max(Math.trunc(Number(limit) || 50), 1), 100);
       const current = new Date(now);
@@ -1731,10 +1736,9 @@ export function createRepository(pool) {
       try {
         await client.query('BEGIN');
         const found = await client.query(
-          'SELECT r.id, r.title, r.due_at, r.repeat, r.interval_minutes, r.time_of_day, r.done, r.created_at, u.email ' +
-            'FROM reminders r JOIN users u ON u.id = r.user_id ' +
-            'WHERE r.done = FALSE AND r.due_at <= $1::timestamptz ' +
-            'ORDER BY r.due_at ASC, r.id LIMIT $2::integer FOR UPDATE OF r SKIP LOCKED',
+          'SELECT r.id, r.title, r.due_at, r.repeat, r.interval_minutes, r.time_of_day, r.done, r.created_at, r.user_id ' +
+            'FROM reminders r WHERE r.done = FALSE AND r.due_at <= $1::timestamptz ' +
+            'ORDER BY r.due_at ASC, r.id LIMIT $2::integer FOR UPDATE SKIP LOCKED',
           [current.toISOString(), capped],
         );
         for (const row of found.rows) {
@@ -1745,7 +1749,7 @@ export function createRepository(pool) {
           );
         }
         await client.query('COMMIT');
-        return found.rows.map((row) => ({ ...publicReminder(row), email: String(row.email ?? '') }));
+        return found.rows.map((row) => ({ ...publicReminder(row), userId: row.user_id }));
       } catch (error) {
         await client.query('ROLLBACK').catch(() => undefined);
         throw error;
@@ -1808,6 +1812,31 @@ export function createRepository(pool) {
       if (!isUuid(id)) return 0;
       const result = await pool.query('DELETE FROM reminders WHERE id = $1 AND user_id = $2', [id, userId]);
       return result.rowCount;
+    },
+    /** Store an account event for the next client reconnect. */
+    async appendNotification({ userId, kind = 'info', title, body }) {
+      const result = await pool.query(
+        'INSERT INTO notifications (user_id, kind, title, body) VALUES ($1, $2, $3, $4) RETURNING id, kind, title, body, created_at, read_at',
+        [userId, kind, title, body],
+      );
+      return publicNotification(result.rows[0]);
+    },
+    /** Read newest account events and their unread total in two bounded queries. */
+    async listNotifications(userId, { limit = 20 } = {}) {
+      const capped = Math.min(Math.max(Math.trunc(Number(limit) || 20), 1), 100);
+      const [items, count] = await Promise.all([
+        pool.query(
+          'SELECT id, kind, title, body, created_at, read_at FROM notifications WHERE user_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2',
+          [userId, capped],
+        ),
+        pool.query('SELECT COUNT(*)::int AS unread FROM notifications WHERE user_id = $1 AND read_at IS NULL', [userId]),
+      ]);
+      return { items: items.rows.map(publicNotification), unread: Number(count.rows[0]?.unread ?? 0) };
+    },
+    /** Mark only this account's events as read. */
+    async markNotificationsRead(userId) {
+      await pool.query('UPDATE notifications SET read_at = COALESCE(read_at, NOW()) WHERE user_id = $1 AND read_at IS NULL', [userId]);
+      return { unread: 0 };
     },
     /**
      * The account's automations, newest first.
