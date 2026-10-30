@@ -470,6 +470,15 @@ export async function createMemory(content) {
   return data?.memory ?? {};
 }
 
+/** @param {string} id @param {string} content */
+export async function updateMemory(id, content) {
+  const data = await api(`/api/me/memories/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ content }),
+  });
+  return data?.memory ?? {};
+}
+
 /** @param {string} id */
 export async function deleteMemory(id) {
   return api(`/api/me/memories/${encodeURIComponent(id)}`, { method: 'DELETE' });

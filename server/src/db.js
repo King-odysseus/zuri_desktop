@@ -1571,6 +1571,19 @@ export function createRepository(pool) {
       return publicMemory(row);
     },
     /**
+     * Change one explicit memory only when it belongs to the caller.
+     * @param {{ userId: string, memoryId: string, content: string }} memory
+     * @returns {Promise<object | null>}
+     */
+    async updateMemory({ userId, memoryId, content }) {
+      if (!isUuid(memoryId)) return null;
+      const result = await pool.query(
+        'UPDATE user_memories SET content = $3, updated_at = NOW() WHERE id = $1 AND user_id = $2 RETURNING id, content, created_at, updated_at',
+        [memoryId, userId, content],
+      );
+      return result.rows[0] ? publicMemory(result.rows[0]) : null;
+    },
+    /**
      * Delete one memory only when it belongs to the caller.
      * @param {string} userId
      * @param {string} memoryId

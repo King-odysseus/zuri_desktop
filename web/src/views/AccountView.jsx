@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { DataRow } from '../components/DataRow.jsx';
 import { Button } from '../components/ui.jsx';
-import { createMemory, deleteMemory, listMemories, setPassword, updateAccountName } from '../lib/api.js';
+import { createMemory, deleteMemory, listMemories, setPassword, updateAccountName, updateMemory } from '../lib/api.js';
 import { formatDate } from '../lib/format.js';
 
 /** @param {unknown} value Turns "past_due" into "Past due" for a reading eye. */
@@ -62,6 +62,8 @@ export default function AccountView({ me, onSignOut }) {
   const [memoryStatus, setMemoryStatus] = useState('loading');
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [memoryMessage, setMemoryMessage] = useState(null);
+  const [editingMemoryId, setEditingMemoryId] = useState('');
+  const [editingMemoryText, setEditingMemoryText] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -111,6 +113,26 @@ export default function AccountView({ me, onSignOut }) {
       setMemoryMessage({ text: 'Memory deleted.', ok: true });
     } catch (failure) {
       setMemoryMessage({ text: failure?.message ?? 'That memory could not be deleted.', ok: false });
+    } finally {
+      setMemoryBusy(false);
+    }
+  };
+
+  const saveEditedMemory = async (event) => {
+    event.preventDefault();
+    if (!editingMemoryId || memoryBusy) return;
+    const content = editingMemoryText.trim();
+    if (content === '') return;
+    setMemoryBusy(true);
+    setMemoryMessage(null);
+    try {
+      const saved = await updateMemory(editingMemoryId, content);
+      setMemories((current) => current.map((item) => item.id === saved.id ? saved : item));
+      setEditingMemoryId('');
+      setEditingMemoryText('');
+      setMemoryMessage({ text: 'Memory updated.', ok: true });
+    } catch (failure) {
+      setMemoryMessage({ text: failure?.message ?? 'That memory could not be updated.', ok: false });
     } finally {
       setMemoryBusy(false);
     }
@@ -226,8 +248,23 @@ export default function AccountView({ me, onSignOut }) {
           <ul className="row-list" style={{ marginTop: 12 }}>
             {memories.map((memory) => (
               <li className="data-row" key={memory.id}>
-                <span className="data-row-label">{memory.content}</span>
-                <Button variant="ghost" size="sm" disabled={memoryBusy} onClick={() => void removeMemory(memory)}>Delete</Button>
+                {editingMemoryId === memory.id ? (
+                  <form className="form-stack" onSubmit={saveEditedMemory} style={{ flex: 1 }}>
+                    <textarea value={editingMemoryText} maxLength={500} rows={2} onChange={(event) => setEditingMemoryText(event.target.value)} />
+                    <div className="card-actions">
+                      <Button type="submit" size="sm" disabled={memoryBusy || editingMemoryText.trim() === ''}>Save</Button>
+                      <Button type="button" variant="ghost" size="sm" disabled={memoryBusy} onClick={() => setEditingMemoryId('')}>Cancel</Button>
+                    </div>
+                  </form>
+                ) : (
+                  <>
+                    <span className="data-row-label">{memory.content}</span>
+                    <div className="card-actions">
+                      <Button variant="ghost" size="sm" disabled={memoryBusy} onClick={() => { setEditingMemoryId(memory.id); setEditingMemoryText(memory.content); }}>Edit</Button>
+                      <Button variant="ghost" size="sm" disabled={memoryBusy} onClick={() => void removeMemory(memory)}>Delete</Button>
+                    </div>
+                  </>
+                )}
               </li>
             ))}
           </ul>

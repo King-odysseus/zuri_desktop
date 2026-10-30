@@ -1771,10 +1771,21 @@ export function createApp(dependencies = {}) {
           }
           return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or POST for memories.' } });
         }
-        if (request.method !== 'DELETE') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use DELETE to remove a memory.' } });
-        const deleted = await dependencies.repository.deleteMemory(userId, memoryId);
-        if (!deleted) return response(404, { ok: false, error: { code: 'MEMORY_NOT_FOUND', message: 'That memory does not exist.' } });
-        return response(200, { ok: true, data: { deleted: true } });
+        if (request.method === 'PATCH') {
+          if (typeof dependencies.repository.updateMemory !== 'function') return response(503, { ok: false, error: { code: 'MEMORIES_NOT_CONFIGURED', message: 'Memory editing is not configured yet.' } });
+          const body = await readJson(request);
+          const content = memoryContent(body.content);
+          if (content === '') return response(400, { ok: false, error: { code: 'MEMORY_CONTENT_REQUIRED', message: `Give the memory some text, up to ${MEMORY_CONTENT_MAX_LENGTH} characters.` } });
+          const memory = await dependencies.repository.updateMemory({ userId, memoryId, content });
+          if (!memory) return response(404, { ok: false, error: { code: 'MEMORY_NOT_FOUND', message: 'That memory does not exist.' } });
+          return response(200, { ok: true, data: { memory } });
+        }
+        if (request.method === 'DELETE') {
+          const deleted = await dependencies.repository.deleteMemory(userId, memoryId);
+          if (!deleted) return response(404, { ok: false, error: { code: 'MEMORY_NOT_FOUND', message: 'That memory does not exist.' } });
+          return response(200, { ok: true, data: { deleted: true } });
+        }
+        return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use PATCH or DELETE for a memory.' } });
       } catch (error) {
         if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
         if (error?.code === 'MEMORY_LIMIT') return response(400, { ok: false, error: { code: error.code, message: 'You have reached the memory limit. Delete one before adding another.' } });

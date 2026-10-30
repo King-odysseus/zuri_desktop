@@ -1284,3 +1284,13 @@
 - Other OS action: run npm run test before packaging or deploying the Office pane.
 - Done on: Windows
 
+## 2026-10-30 - Windows (chat can save and edit shared memories)
+
+- Added a cloud `createMemory` chat tool so a person can say "remember this" in the browser, Android bundle, or desktop cloud chat.
+- Added PATCH memory editing and Edit controls beside the existing Delete control on Account.
+- The tool uses the signed account route, so no provider key or memory data is kept in the desktop process.
+- Checked: memory route test, React production build, and the full `npm test` suite. The first full run found the expected tool-sync assertion, which was updated; `npm run sync:check` then passed.
+- Key files: server/src/app.js, server/src/db.js, server/test/memories.test.js, web/src/lib/api.js, web/src/views/AccountView.jsx, web/src/views/ChatView.jsx, src/main/tools/index.js, src/main/providers/chat.js, src/main/main.js, scripts/check-chat-sync.mjs.
+- Other OS action: run `npm test` before deploying the cloud server. No new dependency or database migration is needed.
+- Done on: Windows
+

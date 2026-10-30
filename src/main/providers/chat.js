@@ -181,6 +181,16 @@ const CREATE_REMINDER_TOOL = Object.freeze({
   },
 });
 
+const CREATE_MEMORY_TOOL = Object.freeze({
+  name: 'createMemory',
+  description: 'Save a short fact or preference across the signed-in account\'s chats and devices. Use only when the person clearly asks you to remember it.',
+  parameters: {
+    type: 'object',
+    properties: { content: { type: 'string', description: 'The fact or preference to remember.' } },
+    required: ['content'],
+  },
+});
+
 /**
  * An automation runs a prompt on a schedule with nobody watching, which is a standing
  * commitment rather than a single action. It is therefore gated: offered only in Act and
@@ -256,7 +266,7 @@ const FILE_TOOL_NAMES = new Set(FILE_TOOLS.map((tool) => tool.name));
 // to send Zuri to Greg" by adding it, instead of replying that it has no way to.
 // createReminder joins them: a reminder the person asked for is a row they can edit or
 // delete, and setting one is the only way Zuri can tell them something later.
-const BASE_TOOLS = Object.freeze([DOCUMENT_TOOL, READ_TOOL, SUMMARY_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL]);
+const BASE_TOOLS = Object.freeze([DOCUMENT_TOOL, READ_TOOL, SUMMARY_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_MEMORY_TOOL]);
 
 /**
  * Tools that change or open something outside Zuri. They are only offered in Act and
@@ -1365,6 +1375,7 @@ export function statusForTool(name, args) {
     const title = typeof args?.title === 'string' ? args.title.trim() : '';
     return title === '' ? 'Adding the task' : `Adding the task ${title.slice(0, 60)}`;
   }
+  if (name === 'createMemory') return 'Saving that as a memory';
   return 'Working on it';
 }
 
@@ -1870,7 +1881,7 @@ export async function sendChatMessage(threadId, options = {}) {
           : null;
         let outcome;
         if (decision === null) outcome = failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
-        else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed });
+        else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed, dependencies: options.toolDependencies });
         else outcome = failure('TOOL_DECLINED', decision.reason);
 
         // A created to-do, reminder or automation is worth more than the sentence that

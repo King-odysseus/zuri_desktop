@@ -906,6 +906,21 @@ async function createReminderTool(args) {
 }
 
 /**
+ * Save an explicit account memory. The cloud request is injected by main so the
+ * tool registry remains usable offline in tests and never owns session tokens.
+ */
+async function createMemoryTool(args, context) {
+  const content = typeof args?.content === 'string' ? args.content.trim() : '';
+  if (content === '') throw new ToolError('MEMORY_CONTENT_REQUIRED', 'A memory needs some text to save.');
+  if (typeof context.dependencies.createMemory !== 'function') {
+    throw new ToolError('MEMORY_CLOUD_UNAVAILABLE', 'Saving a memory needs a signed-in Zuri Cloud account.');
+  }
+  const saved = await context.dependencies.createMemory(content);
+  if (!saved?.ok) throw new ToolError(saved?.error?.code ?? 'MEMORY_FAILED', saved?.error?.message ?? 'The memory could not be saved.');
+  return ok(saved.data?.memory ?? saved.data);
+}
+
+/**
  * The cadence arrives flattened as cadenceType plus one matching field, which keeps the
  * tool schema a plain list a model can fill in. It is rebuilt here into the nested shape
  * the store validates, so a half-specified schedule is refused there rather than saved as
@@ -935,6 +950,13 @@ async function createAutomationTool(args) {
  * kept here so the registry stays the one list of tools.
  */
 export const TOOLS = Object.freeze([
+  Object.freeze({
+    name: 'createMemory',
+    label: 'Remember a fact or preference',
+    description: 'Save a short fact or preference across the signed-in account\'s chats and devices.',
+    requiresConfirmation: false,
+    handler: createMemoryTool,
+  }),
   // A to-do the person asked for is reversible: it can be ticked off or deleted on
   // the Tasks page, and it stays inside Zuri. Asking for permission to write down a
   // list item they just asked for would be noise, so this needs no confirmation.

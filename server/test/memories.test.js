@@ -43,6 +43,14 @@ const repository = {
     const { userId: _userId, ...publicMemory } = memory;
     return publicMemory;
   },
+  async updateMemory({ userId, memoryId, content }) {
+    const memory = memories.get(memoryId);
+    if (!memory || memory.userId !== userId) return null;
+    memory.content = content;
+    memory.updatedAt = now();
+    const { userId: _userId, ...publicMemory } = memory;
+    return publicMemory;
+  },
   async deleteMemory(userId, id) {
     const memory = memories.get(id);
     if (!memory || memory.userId !== userId) return false;
@@ -88,6 +96,13 @@ assert.equal(memory.content, 'Prefers short reports.');
 
 const listed = await call('GET', '/api/me/memories', { token: tokenA });
 assert.deepEqual((await listed.json()).data.memories.map((item) => item.content), ['Prefers short reports.']);
+
+const edited = await call('PATCH', `/api/me/memories/${memory.id}`, { token: tokenA, body: { content: 'Prefers concise reports.' } });
+assert.equal(edited.status, 200);
+assert.equal((await edited.json()).data.memory.content, 'Prefers concise reports.');
+
+const foreignEdit = await call('PATCH', `/api/me/memories/${memory.id}`, { token: tokenB, body: { content: 'Not yours.' } });
+assert.equal(foreignEdit.status, 404);
 
 const foreignDelete = await call('DELETE', `/api/me/memories/${memory.id}`, { token: tokenB });
 assert.equal(foreignDelete.status, 404);

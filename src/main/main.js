@@ -742,6 +742,15 @@ function handleChatSend(payload, event) {
     // Every reply in the window goes through the account, so no supplier key is
     // read and a signed-out window is told to sign in instead.
     cloudReply: (request) => cloudChatReply(request),
+    // Memory is an account action, so the tool receives a narrow cloud function
+    // rather than a session token or the general request client.
+    toolDependencies: {
+      createMemory: (content) => cloudFetch('/api/me/memories', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content }),
+      }, true),
+    },
     signal: controller.signal,
     emit: (streamEvent) => {
       // The window can close mid-stream; sending to a destroyed webContents throws.

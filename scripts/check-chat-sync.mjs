@@ -198,9 +198,10 @@ async function main() {
   check(chatView.includes('const CREATE_TASK_TOOL'), 'the browser chat offers the task tool');
   check(chatView.includes('const CREATE_REMINDER_TOOL'), 'the browser chat offers the reminder tool');
   check(chatView.includes('const CREATE_AUTOMATION_TOOL'), 'the browser chat offers the automation tool');
+  check(chatView.includes('const CREATE_MEMORY_TOOL'), 'the browser chat offers the memory tool');
   check(chatView.includes('const WEB_SEARCH_TOOL'), 'the browser chat offers the search tool');
   check(
-    chatView.includes('[WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL]'),
+    chatView.includes('[WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL, CREATE_MEMORY_TOOL]'),
     'the browser chat offers the same tools to a chat model',
   );
 

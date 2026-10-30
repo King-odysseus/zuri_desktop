@@ -21,6 +21,7 @@ import {
   appendMessage,
   createAutomation,
   createConversation,
+  createMemory,
   createReminder,
   createTask,
   deleteConversation,
@@ -95,6 +96,18 @@ const CREATE_TASK_TOOL = {
       priority: { type: 'string', enum: ['low', 'normal', 'high'], description: 'Optional. normal unless they say it is urgent or can wait.' },
     },
     required: ['title'],
+  },
+};
+
+const CREATE_MEMORY_TOOL = {
+  name: 'createMemory',
+  description: 'Save a short fact or preference across the person\'s chats and devices. Use it only when they clearly say remember this, save this for later, or otherwise ask Zuri to remember a fact. Do not save ordinary conversation details.',
+  parameters: {
+    type: 'object',
+    properties: {
+      content: { type: 'string', description: 'The short fact or preference to remember, written plainly.' },
+    },
+    required: ['content'],
   },
 };
 
@@ -483,6 +496,20 @@ function automationScheduleWords(automation) {
 async function runToolCall(call, signal, onStatus, onNotable) {
   const name = typeof call?.name === 'string' ? call.name : '';
   const args = toolArguments(call);
+
+  if (name === CREATE_MEMORY_TOOL.name) {
+    const content = typeof args.content === 'string' ? args.content.trim() : '';
+    if (content === '') return 'A memory needs some text, so nothing was saved. Ask what they want remembered.';
+    onStatus('Saving that as a memory');
+    try {
+      const memory = await createMemory(content);
+      if (signal?.aborted) throw stoppedReply();
+      return `Saved this memory: "${memory?.content ?? content}". They can edit or delete it from Account.`;
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
+      return `The memory was not saved: ${error?.message || 'the account refused it.'}`;
+    }
+  }
 
   // A to-do and a reminder are written straight into the account, so the sentence
   // is said before the request rather than after it, and a refusal is handed back
@@ -1105,7 +1132,7 @@ export default function ChatView({
        * are added to that copy alone, because saveExchange keeps only the question
        * and the final answer.
        */
-      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL];
+      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL, CREATE_MEMORY_TOOL];
       let wire = outgoing;
       let answer = '';
       // One round past the cap, with no tools offered, so a model that keeps
