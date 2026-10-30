@@ -4,7 +4,7 @@ const DEFAULT_PORT = 8080;
  * Read the small set of configuration values the Railway service needs before
  * database and authentication wiring is added.
  * @param {NodeJS.ProcessEnv} [environment]
- * @returns {{ port: number, nodeEnv: string, databaseUrl: string, googleClientId: string, googleClientSecret: string, googleRedirectUri: string, cloudUrl: string, siteUrl: string, adminEmail: string, adminPassword: string, brevoApiKey: string, mailFrom: string, mailFromName: string, deepSeekApiKey: string, deepSeekEndpoint: string, deepSeekModel: string, paystackSecretKey: string, paystackEndpoint: string, paystackCallbackUrl: string, paystackPlanCodes: Record<string, string> }}
+ * @returns {{ port: number, nodeEnv: string, databaseUrl: string, googleClientId: string, googleClientSecret: string, googleRedirectUri: string, cloudUrl: string, siteUrl: string, adminEmail: string, adminPassword: string, brevoApiKey: string, mailFrom: string, mailFromName: string, deepSeekApiKey: string, deepSeekEndpoint: string, deepSeekModel: string, paystackSecretKey: string, paystackEndpoint: string, paystackCallbackUrl: string, paystackPlanCodes: Record<string, string>, vapidSubject: string, vapidPublicKey: string, vapidPrivateKey: string, firebaseProjectId: string, firebaseClientEmail: string, firebasePrivateKey: string, windowsClientId: string, windowsClientSecret: string }}
  */
 export function readConfig(environment = process.env) {
   const parsedPort = Number(environment.PORT ?? DEFAULT_PORT);
@@ -68,6 +68,16 @@ export function readConfig(environment = process.env) {
     cloudinaryCloudName: typeof environment.CLOUDINARY_CLOUD_NAME === 'string' ? environment.CLOUDINARY_CLOUD_NAME.trim() : '',
     cloudinaryApiKey: typeof environment.CLOUDINARY_API_KEY === 'string' ? environment.CLOUDINARY_API_KEY.trim() : '',
     cloudinaryApiSecret: typeof environment.CLOUDINARY_API_SECRET === 'string' ? environment.CLOUDINARY_API_SECRET.trim() : '',
+    // Push credentials are optional. Durable in-app notifications remain the
+    // fallback until a deployment has configured each provider it wants to use.
+    vapidSubject: typeof environment.VAPID_SUBJECT === 'string' ? environment.VAPID_SUBJECT.trim() : '',
+    vapidPublicKey: typeof environment.VAPID_PUBLIC_KEY === 'string' ? environment.VAPID_PUBLIC_KEY.trim() : '',
+    vapidPrivateKey: typeof environment.VAPID_PRIVATE_KEY === 'string' ? environment.VAPID_PRIVATE_KEY.trim() : '',
+    firebaseProjectId: typeof environment.FIREBASE_PROJECT_ID === 'string' ? environment.FIREBASE_PROJECT_ID.trim() : '',
+    firebaseClientEmail: typeof environment.FIREBASE_CLIENT_EMAIL === 'string' ? environment.FIREBASE_CLIENT_EMAIL.trim() : '',
+    firebasePrivateKey: typeof environment.FIREBASE_PRIVATE_KEY === 'string' ? environment.FIREBASE_PRIVATE_KEY : '',
+    windowsClientId: typeof environment.WINDOWS_PUSH_CLIENT_ID === 'string' ? environment.WINDOWS_PUSH_CLIENT_ID.trim() : '',
+    windowsClientSecret: typeof environment.WINDOWS_PUSH_CLIENT_SECRET === 'string' ? environment.WINDOWS_PUSH_CLIENT_SECRET : '',
     paystackPlanCodes: {
       starter: typeof environment.PAYSTACK_PLAN_STARTER === 'string' ? environment.PAYSTACK_PLAN_STARTER.trim() : '',
       pro: typeof environment.PAYSTACK_PLAN_PRO === 'string' ? environment.PAYSTACK_PLAN_PRO.trim() : '',

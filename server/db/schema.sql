@@ -460,6 +460,35 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS notifications_user_created_idx
   ON notifications(user_id, created_at DESC, id);
 
+-- Devices are registered per account so a cloud event can reach a browser,
+-- Android app, or Windows app even when the client process is closed. Tokens are
+-- opaque provider values and are never returned to another account.
+CREATE TABLE IF NOT EXISTS notification_devices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  platform TEXT NOT NULL,
+  token TEXT NOT NULL,
+  endpoint TEXT,
+  p256dh TEXT,
+  auth TEXT,
+  app_version TEXT NOT NULL DEFAULT '',
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(platform, token)
+);
+
+CREATE INDEX IF NOT EXISTS notification_devices_user_enabled_idx
+  ON notification_devices(user_id, enabled);
+
+-- Preferences are account-wide. The clients still keep their local settings for
+-- immediate UI feedback, but this row is the authority used by cloud delivery.
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  preferences JSONB NOT NULL DEFAULT '{}'::jsonb,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- A picture uploaded in the browser chat used to go straight to an outside image host.
 -- On a deployment where that host is not configured the upload failed, so the picture
 -- never appeared and Zuri never saw it. This table is the fallback that keeps a small

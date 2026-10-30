@@ -50,7 +50,7 @@ assert.deepEqual((await plans.json()).data.map((plan) => plan.code), ['starter',
 const publicConfig = await handleRequest(new Request('https://cloud.example.com/api/public-config'), { googleClientId: 'client-id' });
 // The site needs to know a password form exists and where to send reset links,
 // so both travel with the Google client id.
-assert.deepEqual(await publicConfig.json(), { ok: true, data: { googleClientId: 'client-id', passwordSignIn: true, siteUrl: '' } });
+assert.deepEqual(await publicConfig.json(), { ok: true, data: { googleClientId: 'client-id', passwordSignIn: true, siteUrl: '', pushVapidPublicKey: '' } });
 assert.equal((await handleRequest(new Request('https://cloud.example.com/api/unknown'))).status, 404);
 const androidCors = createApp({ corsOrigins: ['https://localhost'] });
 const preflight = await androidCors(new Request('https://cloud.example.com/api/auth/sign-in', {

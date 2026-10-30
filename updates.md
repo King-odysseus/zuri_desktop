@@ -1347,3 +1347,12 @@
 - Other OS action: run `npm run server:test` and deploy the cloud service plus rebuilt web bundle. Native OS alerts while fully closed still need a push provider.
 - Done on: Windows
 
+## 2026-10-30 - Windows (push notification registration and delivery adapters)
+
+- Added authenticated device registration and account-wide notification preferences for web, Android and Windows.
+- Web Push uses VAPID, Android uses the Capacitor push plugin with Firebase delivery, and Windows uses the WNS channel adapter when its app identity credentials are configured. Durable in-app notifications remain the fallback when a provider is off.
+- Checked: `npm run server:test` and `npm run web:build` pass. `npm run android:build` synced the Capacitor plugin and manifest, but the native Gradle step needs a JDK on the build machine.
+- Key files: server/db/schema.sql, server/src/push.js, server/src/app.js, server/src/db.js, web/src/lib/push.js, web/public/push-sw.js, android/app/src/main/AndroidManifest.xml.
+- Other OS action: run `npm install` and `npm run android:build`; configure VAPID, Firebase and WNS deployment secrets without committing them.
+- Done on: Windows
+

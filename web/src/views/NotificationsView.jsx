@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { BellIcon } from '../components/Icons.jsx';
-import { InlineAlert } from '../components/ui.jsx';
+import { Button, InlineAlert } from '../components/ui.jsx';
 import { listNotifications, markNotificationsRead } from '../lib/api.js';
+import { enableWebPush } from '../lib/push.js';
 
 function dateLabel(value) {
   const date = new Date(String(value ?? ''));
@@ -10,6 +11,7 @@ function dateLabel(value) {
 
 export default function NotificationsView() {
   const [state, setState] = useState({ status: 'loading', items: [], error: '' });
+  const [pushState, setPushState] = useState('idle');
 
   useEffect(() => {
     let active = true;
@@ -26,6 +28,17 @@ export default function NotificationsView() {
     return () => { active = false; };
   }, []);
 
+  const enablePush = async () => {
+    setPushState('loading');
+    try {
+      const result = await enableWebPush();
+      setPushState(result.enabled ? 'enabled' : result.reason);
+    } catch (error) {
+      setPushState('error');
+      setState((current) => ({ ...current, error: error?.message || 'Push notifications could not be enabled.' }));
+    }
+  };
+
   return (
     <section className="view">
       <div className="view-heading">
@@ -35,6 +48,11 @@ export default function NotificationsView() {
           <p className="view-subtitle">Updates saved while your apps were closed.</p>
         </div>
         <BellIcon aria-hidden="true" />
+      </div>
+      <div className="view-actions">
+        <Button variant="secondary" size="sm" onClick={enablePush} disabled={pushState === 'loading' || pushState === 'enabled'}>
+          {pushState === 'enabled' ? 'Notifications enabled' : pushState === 'loading' ? 'Enabling...' : 'Enable notifications'}
+        </Button>
       </div>
       {state.status === 'loading' && <p className="project-loading">Loading notifications...</p>}
       {state.status === 'error' && <InlineAlert tone="danger">{state.error}</InlineAlert>}

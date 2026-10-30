@@ -23,16 +23,16 @@
     },
     {
       "text": "Choose push transports and obtain credentials for web, Android, and Windows; defer macOS push",
-      "state": "in_progress"
+      "state": "done"
     },
     {
       "text": "Implement device registration, per-app opt-in settings, and delivery adapters for web, Android, and Windows",
-      "state": "pending"
+      "state": "done"
     },
     {
       "text": "Run verification and document the required push deployment configuration",
-      "state": "pending"
+      "state": "done"
     }
   ],
-  "updatedAt": "2026-10-30T18:25:00.000Z"
+  "updatedAt": "2026-10-30T19:15:00.000Z"
 }

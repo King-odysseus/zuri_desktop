@@ -139,6 +139,37 @@ export async function markNotificationsRead() {
   return api('/api/notifications/read', { method: 'POST' });
 }
 
+/** Read public push configuration without exposing any server credential. */
+export async function fetchPublicConfig() {
+  const response = await fetch(`${API_BASE_URL}/api/public-config`);
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.ok) throw new Error('Push configuration could not be loaded.');
+  return body.data ?? {};
+}
+
+/** @param {object} preferences */
+export async function saveNotificationPreferences(preferences) {
+  const data = await api('/api/me/notifications/preferences', {
+    method: 'PATCH',
+    body: JSON.stringify({ preferences }),
+  });
+  return data?.preferences ?? {};
+}
+
+/** @param {object} device */
+export async function registerNotificationDevice(device) {
+  const data = await api('/api/me/notifications/devices', {
+    method: 'POST',
+    body: JSON.stringify(device),
+  });
+  return data?.device ?? {};
+}
+
+/** @param {string} deviceId */
+export async function removeNotificationDevice(deviceId) {
+  return api(`/api/me/notifications/devices/${encodeURIComponent(deviceId)}`, { method: 'DELETE' });
+}
+
 /*
  * Automations: a saved prompt the server runs on a schedule by itself, with the
  * web search it needs, and reports back. The browser only ever lists, creates,

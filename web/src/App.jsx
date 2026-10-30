@@ -23,6 +23,7 @@ import {
   verifyPayment,
 } from './lib/api.js';
 import { applyTheme, preferredTheme } from './lib/theme.js';
+import { registerNativePush } from './lib/push.js';
 
 const VIEWS = ['chat', 'projects', 'tasks', 'reminders', 'notifications', 'automations', 'images', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
 const CHAT_PATH = '/chat';
@@ -83,6 +84,14 @@ export default function App() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // Android needs the account token before its FCM token can be stored. The
+  // native registration is optional, so a device without Google services still
+  // keeps using the durable in-app notification list.
+  useEffect(() => {
+    if (status !== 'signed-in') return;
+    registerNativePush().catch((error) => console.error('[zuri:push] native registration', error?.message ?? error));
+  }, [status]);
 
   // Escape closes the navigation drawer, the way every side panel on the web does,
   // and the page behind it cannot scroll while it is open.

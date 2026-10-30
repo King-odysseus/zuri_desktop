@@ -16,6 +16,7 @@ import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './ima
 import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, withResearchRules, answerStyleLength } from './text.js';
 import { searchWeb } from './tools.js';
 import { splitToolCalls, visiblePrefixLength, visibleText } from './markup.js';
+import { checkedNotificationDevice, checkedNotificationPreferences } from './push.js';
 // The fixed DuckDuckGo search lives in tools.js. This module only decides who may
 // call it.
 
@@ -106,6 +107,8 @@ function memoryContent(value) {
 const TASKS_PATH = '/api/tasks';
 const REMINDERS_PATH = '/api/reminders';
 const NOTIFICATIONS_PATH = '/api/notifications';
+const NOTIFICATION_DEVICES_PATH = '/api/me/notifications/devices';
+const NOTIFICATION_PREFERENCES_PATH = '/api/me/notifications/preferences';
 // Automations sit beside them for the same reason, and are the one list this service
 // acts on by itself: a row here is run on a schedule by the server, not by a client.
 const AUTOMATIONS_PATH = '/api/automations';
@@ -869,7 +872,7 @@ function conversationErrorResponse(error) {
 
 // The history routes take the owner from the token and name it in the query they run,
 // so an ownership check is never a separate step that a later change can skip.
-/** @param {{ auth?: object, repository?: object, mailer?: object, now?: () => Date, googleClientId?: string, siteUrl?: string, corsOrigins?: string[] }} [dependencies] @returns {(request: Request) => Promise<Response>} */
+/** @param {{ auth?: object, repository?: object, mailer?: object, now?: () => Date, googleClientId?: string, pushVapidPublicKey?: string, siteUrl?: string, corsOrigins?: string[] }} [dependencies] @returns {(request: Request) => Promise<Response>} */
 export function createApp(dependencies = {}) {
   const now = dependencies.now ?? (() => new Date());
   const limiter = dependencies.limiter ?? createRequestLimiter({ now: () => now().getTime() });
@@ -902,6 +905,7 @@ export function createApp(dependencies = {}) {
           googleClientId: typeof dependencies.googleClientId === 'string' ? dependencies.googleClientId : '',
           passwordSignIn: true,
           siteUrl,
+          pushVapidPublicKey: typeof dependencies.pushVapidPublicKey === 'string' ? dependencies.pushVapidPublicKey : '',
         },
       });
     }
@@ -1902,6 +1906,36 @@ export function createApp(dependencies = {}) {
     // people back to a notes file.
     // Notifications are account events written by cloud schedulers and read when a
     // client reconnects. They are not email and do not require a device to be awake.
+    if (url.pathname === NOTIFICATION_PREFERENCES_PATH) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (typeof dependencies.repository?.getNotificationPreferences !== 'function') return response(503, { ok: false, error: { code: 'NOTIFICATIONS_NOT_CONFIGURED', message: 'Notifications are not configured yet.' } });
+      if (request.method === 'GET') return response(200, { ok: true, data: { preferences: await dependencies.repository.getNotificationPreferences(session.user.id) } });
+      if (request.method !== 'PATCH') return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use GET or PATCH for notification preferences.' } });
+      const body = await readJson(request);
+      return response(200, { ok: true, data: { preferences: await dependencies.repository.saveNotificationPreferences(session.user.id, checkedNotificationPreferences(body.preferences)) } });
+    }
+
+    if (url.pathname === NOTIFICATION_DEVICES_PATH || url.pathname.startsWith(`${NOTIFICATION_DEVICES_PATH}/`)) {
+      if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (typeof dependencies.repository?.upsertNotificationDevice !== 'function') return response(503, { ok: false, error: { code: 'NOTIFICATIONS_NOT_CONFIGURED', message: 'Notifications are not configured yet.' } });
+      const remainder = url.pathname.slice(NOTIFICATION_DEVICES_PATH.length).split('/').filter(Boolean);
+      if (request.method === 'POST' && remainder.length === 0) {
+        const checked = checkedNotificationDevice(await readJson(request));
+        if (!checked.ok) return response(400, { ok: false, error: { code: 'NOTIFICATION_DEVICE_INVALID', message: checked.message } });
+        const device = await dependencies.repository.upsertNotificationDevice({ userId: session.user.id, ...checked });
+        return response(200, { ok: true, data: { device } });
+      }
+      if (request.method === 'DELETE' && remainder.length === 1) {
+        const removed = await dependencies.repository.deleteNotificationDevice(session.user.id, remainder[0]);
+        return removed ? response(200, { ok: true, data: { deleted: true } }) : response(404, { ok: false, error: { code: 'NOTIFICATION_DEVICE_NOT_FOUND', message: 'That notification device was not found.' } });
+      }
+      return response(405, { ok: false, error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST or DELETE for notification devices.' } });
+    }
+
     if (url.pathname === NOTIFICATIONS_PATH || url.pathname === `${NOTIFICATIONS_PATH}/read`) {
       if (!dependencies.auth) return response(503, { ok: false, error: { code: 'AUTH_NOT_CONFIGURED', message: 'Authentication is not configured yet.' } });
       const session = await dependencies.auth.authenticate(bearerToken(request));

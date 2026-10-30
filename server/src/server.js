@@ -13,9 +13,12 @@ import { createAutomationScheduler } from './automations.js';
 import { createReminderScheduler } from './reminders.js';
 import { searchWeb } from './tools.js';
 import { DEFAULT_MODELS } from './models.js';
+import { createPushDelivery } from './push.js';
 
 const config = readConfig();
 const pool = config.databaseUrl ? createDatabase(config.databaseUrl, process.env) : null;
+const pushDelivery = createPushDelivery(config);
+console.log(`[zuri-cloud] push adapters: web=${pushDelivery.configured.web ? 'on' : 'off'}, android=${pushDelivery.configured.android ? 'on' : 'off'}, windows=${pushDelivery.configured.windows ? 'on' : 'off'}`);
 if (pool) {
   // Applying the schema here means a fresh Railway Postgres is usable on the first
   // boot without a separate migration step. A failure is logged rather than thrown:
@@ -28,7 +31,7 @@ if (pool) {
     console.error('[zuri-cloud] schema setup failed:', error?.message ?? error);
   }
 }
-const repository = pool ? createRepository(pool) : null;
+const repository = pool ? createRepository(pool, { pushDelivery }) : null;
 // Password accounts need no Google client, so the auth service exists whenever
 // there is a database; Google sign-in is simply unavailable without a client id.
 const auth = repository
@@ -99,6 +102,7 @@ const app = createApp({
   // Capacitor serves the bundled Android dashboard from https://localhost.
   // Keep this list narrow so the API is not opened to arbitrary browser origins.
   corsOrigins: ['https://localhost', 'capacitor://localhost'],
+  pushVapidPublicKey: config.vapidPublicKey,
 });
 
 /**

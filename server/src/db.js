@@ -1,6 +1,7 @@
 import { createRequire } from 'node:module';
 import { QUOTA_WINDOW_HOURS, windowTokensForPlan } from './limits.js';
 import { findTopupPack, TOPUP_VALID_DAYS } from './topups.js';
+import { checkedNotificationPreferences, DEFAULT_NOTIFICATION_PREFERENCES } from './push.js';
 
 /** @param {unknown} value @returns {string} */
 function text(value) {
@@ -343,7 +344,7 @@ export function createDatabase(connectionString, environment = process.env) {
 }
 
 /** @param {import('pg').Pool} pool @returns {object} */
-export function createRepository(pool) {
+export function createRepository(pool, options = {}) {
   /**
    * New accounts need a subscription row so checkout can be started, but the row stays
    * pending until Paystack confirms payment. Pending accounts cannot reserve usage.
@@ -1813,13 +1814,66 @@ export function createRepository(pool) {
       const result = await pool.query('DELETE FROM reminders WHERE id = $1 AND user_id = $2', [id, userId]);
       return result.rowCount;
     },
-    /** Store an account event for the next client reconnect. */
+    /** Store an account event for the next client reconnect and fan it out to enabled devices. */
     async appendNotification({ userId, kind = 'info', title, body }) {
       const result = await pool.query(
         'INSERT INTO notifications (user_id, kind, title, body) VALUES ($1, $2, $3, $4) RETURNING id, kind, title, body, created_at, read_at',
         [userId, kind, title, body],
       );
-      return publicNotification(result.rows[0]);
+      const notification = publicNotification(result.rows[0]);
+      if (typeof options.pushDelivery?.send === 'function') {
+        const preferenceResult = await pool.query('SELECT preferences FROM notification_preferences WHERE user_id = $1', [userId]);
+        const preferences = checkedNotificationPreferences(preferenceResult.rows[0]?.preferences ?? DEFAULT_NOTIFICATION_PREFERENCES);
+        const category = ['reminder', 'automation', 'error'].includes(kind) ? (kind === 'reminder' ? 'reminders' : 'automations') : kind;
+        const delivery = preferences[category] ?? 'push';
+        if (delivery === 'push' || delivery === 'both') {
+          const devices = await pool.query(
+            'SELECT id, platform, token, endpoint, p256dh, auth FROM notification_devices WHERE user_id = $1 AND enabled = TRUE',
+            [userId],
+          );
+          for (const device of devices.rows) {
+            try {
+              const sent = await options.pushDelivery.send(device, notification);
+              if (sent?.reason === 'expired') await pool.query('UPDATE notification_devices SET enabled = FALSE, updated_at = NOW() WHERE id = $1', [device.id]);
+            } catch (error) {
+              console.error('[zuri-cloud] push delivery', error?.message ?? error);
+            }
+          }
+        }
+      }
+      return notification;
+    },
+    /** Read the account-wide delivery preferences used by cloud sends. */
+    async getNotificationPreferences(userId) {
+      const result = await pool.query('SELECT preferences FROM notification_preferences WHERE user_id = $1', [userId]);
+      return checkedNotificationPreferences(result.rows[0]?.preferences ?? DEFAULT_NOTIFICATION_PREFERENCES);
+    },
+    /** Save only supported delivery choices, keeping unknown future keys out of the row. */
+    async saveNotificationPreferences(userId, preferences) {
+      const checked = checkedNotificationPreferences(preferences);
+      const result = await pool.query(
+        'INSERT INTO notification_preferences (user_id, preferences, updated_at) VALUES ($1, $2::jsonb, NOW()) ' +
+          'ON CONFLICT (user_id) DO UPDATE SET preferences = EXCLUDED.preferences, updated_at = NOW() RETURNING preferences',
+        [userId, JSON.stringify(checked)],
+      );
+      return checkedNotificationPreferences(result.rows[0]?.preferences ?? checked);
+    },
+    /** Register or refresh one device without exposing the provider token in responses. */
+    async upsertNotificationDevice({ userId, platform, token, endpoint = '', p256dh = '', auth = '', appVersion = '' }) {
+      const result = await pool.query(
+        'INSERT INTO notification_devices (user_id, platform, token, endpoint, p256dh, auth, app_version, enabled, updated_at) ' +
+          'VALUES ($1, $2, $3, NULLIF($4, \'\'), NULLIF($5, \'\'), NULLIF($6, \'\'), $7, TRUE, NOW()) ' +
+          'ON CONFLICT (platform, token) DO UPDATE SET user_id = EXCLUDED.user_id, endpoint = EXCLUDED.endpoint, p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth, app_version = EXCLUDED.app_version, enabled = TRUE, updated_at = NOW() ' +
+          'RETURNING id, platform, app_version, enabled, created_at, updated_at',
+        [userId, platform, token, endpoint, p256dh, auth, appVersion],
+      );
+      return result.rows[0];
+    },
+    /** Remove only a device owned by the current account. */
+    async deleteNotificationDevice(userId, deviceId) {
+      if (!isUuid(deviceId)) return false;
+      const result = await pool.query('DELETE FROM notification_devices WHERE id = $1 AND user_id = $2', [deviceId, userId]);
+      return result.rowCount > 0;
     },
     /** Read newest account events and their unread total in two bounded queries. */
     async listNotifications(userId, { limit = 20 } = {}) {

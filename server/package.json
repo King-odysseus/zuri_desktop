@@ -7,13 +7,15 @@
   "scripts": {
     "start": "node src/server.js",
     "migrate": "node src/migrate.js",
-    "test": "node test/server.test.js && node test/models.test.js && node test/db.test.js && node test/admin.test.js && node test/admin-users.test.js && node test/conversations.test.js && node test/projects.test.js && node test/memories.test.js && node test/text.test.js && node test/images.test.js && node test/tools.test.js && node test/tasks.test.js && node test/automations.test.js && node test/notifications.test.js && node test/uploads.test.js"
+    "test": "node test/server.test.js && node test/models.test.js && node test/db.test.js && node test/admin.test.js && node test/admin-users.test.js && node test/conversations.test.js && node test/projects.test.js && node test/memories.test.js && node test/text.test.js && node test/images.test.js && node test/tools.test.js && node test/tasks.test.js && node test/automations.test.js && node test/notifications.test.js && node test/push.test.js && node test/uploads.test.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
+    "firebase-admin": "^13.10.0",
     "google-auth-library": "^10.3.0",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "web-push": "^3.6.7"
   }
 }
