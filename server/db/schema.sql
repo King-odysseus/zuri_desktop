@@ -373,6 +373,20 @@ ALTER TABLE conversations ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES pr
 CREATE INDEX IF NOT EXISTS conversations_project_idx
   ON conversations(project_id, updated_at DESC);
 
+-- Explicit user memories are short facts or preferences the customer chooses to
+-- keep across chats. They are separate from conversation text so they can be
+-- reviewed and deleted without searching through old threads.
+CREATE TABLE IF NOT EXISTS user_memories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content TEXT NOT NULL CHECK (char_length(content) BETWEEN 1 AND 500),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS user_memories_user_updated_idx
+  ON user_memories(user_id, updated_at DESC, id);
+
 -- Tasks and reminders mirror the desktop app's own Tasks and Reminders pages, so
 -- one account keeps the same to-do list whether the person is typing in the
 -- browser, on a phone or in the app on the desk. They live here because the list

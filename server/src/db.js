@@ -62,6 +62,8 @@ export const PROJECT_FILE_LIMIT = 20;
 export const PROJECT_NAME_MAX_LENGTH = 60;
 export const PROJECT_INSTRUCTIONS_MAX_LENGTH = 4000;
 export const PROJECT_FILE_CONTENT_MAX_LENGTH = 20000;
+export const MEMORY_LIMIT = 100;
+export const MEMORY_CONTENT_MAX_LENGTH = 500;
 
 // A to-do list is a list, not a filing cabinet, so both caps are roomy enough for a
 // year of ordinary work and small enough that one account cannot fill the database.
@@ -192,6 +194,16 @@ function publicProjectFile(row) {
     url: row.url ?? null,
     contentLength: Number(row.content_length ?? 0),
     createdAt: row.created_at,
+  };
+}
+
+/** @param {object} row @returns {object} */
+function publicMemory(row) {
+  return {
+    id: row.id,
+    content: row.content,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -1525,6 +1537,65 @@ export function createRepository(pool) {
         instructions: project.instructions,
         files: files.rows.map((row) => ({ name: row.name, content: row.content })),
       };
+    },
+    /**
+     * List the short facts this account explicitly chose to remember.
+     * @param {string} userId
+     * @returns {Promise<object[]>}
+     */
+    async listMemories(userId) {
+      const result = await pool.query(
+        'SELECT id, content, created_at, updated_at FROM user_memories WHERE user_id = $1 ORDER BY updated_at DESC, id LIMIT $2',
+        [userId, MEMORY_LIMIT],
+      );
+      return result.rows.map(publicMemory);
+    },
+    /**
+     * Store one explicit memory, enforcing the account cap inside the insert.
+     * @param {{ userId: string, content: string }} memory
+     * @returns {Promise<object>}
+     */
+    async createMemory({ userId, content }) {
+      const result = await pool.query(
+        'INSERT INTO user_memories (user_id, content) ' +
+          'SELECT $1::uuid, $2::text WHERE (SELECT COUNT(*) FROM user_memories WHERE user_id = $1::uuid) < $3::integer ' +
+          'RETURNING id, content, created_at, updated_at',
+        [userId, content, MEMORY_LIMIT],
+      );
+      const row = result.rows[0];
+      if (!row) {
+        const error = new Error('This account already holds as many memories as it can store.');
+        error.code = 'MEMORY_LIMIT';
+        throw error;
+      }
+      return publicMemory(row);
+    },
+    /**
+     * Delete one memory only when it belongs to the caller.
+     * @param {string} userId
+     * @param {string} memoryId
+     * @returns {Promise<boolean>}
+     */
+    async deleteMemory(userId, memoryId) {
+      if (!isUuid(memoryId)) return false;
+      const result = await pool.query(
+        'DELETE FROM user_memories WHERE id = $1 AND user_id = $2 RETURNING id',
+        [memoryId, userId],
+      );
+      return result.rowCount > 0;
+    },
+    /**
+     * Read memories for prompt construction. This is deliberately separate from
+     * listMemories so the prompt path can return only the bounded text it needs.
+     * @param {string} userId
+     * @returns {Promise<Array<{ content: string }>>}
+     */
+    async memoryContext(userId) {
+      const result = await pool.query(
+        'SELECT content FROM user_memories WHERE user_id = $1 ORDER BY updated_at DESC, id LIMIT $2',
+        [userId, MEMORY_LIMIT],
+      );
+      return result.rows.map((row) => ({ content: row.content }));
     },
     /**
      * The account's tasks, open ones first and newest first inside each group.

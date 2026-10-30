@@ -1,3 +1,12 @@
+## 2026-10-30 - Windows (explicit memories are shared across cloud chats)
+
+- Zuri Cloud now stores short, user-managed memories that can be added and deleted from the Account page. Memories are scoped to the signed-in account, capped at 100 entries of 500 characters each, and never exposed across accounts.
+- Cloud chat includes those memories as bounded context while clearly labelling them as context rather than instructions.
+- Checked: `npm test` passes, including the new authenticated memory route and prompt-context regression checks.
+- Key files: server/db/schema.sql, server/src/db.js, server/src/app.js, server/test/memories.test.js, web/src/lib/api.js, web/src/views/AccountView.jsx, web/src/views/Dashboard.jsx.
+- Other OS action: run `npm test`, then run `npm run cloud:deploy` before using memories in the browser or Android build.
+- Done on: Windows
+
 ## 2026-10-29 - Windows (a created task says so in colour, and an Office edit actually lands)
 
 - The Office pane applied a plan once per streamed word when edits were set to Always allow, because the change card is rebuilt on every repaint and each rebuild applied it again. That is why the same refusal appeared twice in a row, and it could apply one plan to a workbook more than once. A plan now runs at most once, and the Apply button is spent once an automatic apply has started.
@@ -11,7 +20,6 @@
 - Key files: src/addin/taskpane.js, src/shared/notableActions.js, src/main/providers/chat.js, src/renderer-react/ChatPanel.jsx, src/renderer-react/app.css, web/src/views/ChatView.jsx, web/src/styles.css, package.json, scripts/selftest.js.
 - Other OS action: npm run cloud:deploy for the browser bundle; npm run dist and reinstall for the desktop.
 - Done on: Windows
-
 ## 2026-10-29 - Windows (Zuri searches on its own, and asks one question when the ask is vague)
 
 - The browser and the phone had a search tool and no instruction to use it, so they answered from memory and hedged about being unable to browse. Both prompts now say to decide for themselves when to search, name the cases that need it (jobs, prices, news, travel, availability), forbid telling the person to look it up themselves, and forbid claiming a search that did not happen.
@@ -1260,3 +1268,19 @@
 - Key files: package.json, package-lock.json, android/app/build.gradle, README.md, updates.md.
 - Other OS action: run "npm run test". No dependency changes.
 - Done on: Windows
+## 2026-10-30 - Windows (repair desktop installer updates)
+
+- Excluded Android build output from desktop packages and added a recovery path for affected older Windows installations that preserves app data.
+- Key files: package.json, scripts/installer.nsh.
+- Other OS action: no dependency changes; run the appropriate build and checks before packaging.
+- Done on: Windows
+
+## 2026-10-30 - Windows (Office plans can see every Excel tab and PowerPoint waits for its shapes)
+
+- The Office pane used to read only the active Excel worksheet, even though its operation format already accepted a sheet name. A workbook-wide bounded context now lists every non-empty sheet, its exact used area, a preview, and existing formulas, so Zuri can produce one plan for Dashboard, Monthly, Transactions and other tabs without guessing what is hidden on another tab.
+- Excel regression coverage now proves that a named-sheet write lands on Monthly while the active sheet remains Dashboard, and the existing width contract remains physical enough for Office.js.
+- PowerPoint multi-slide title and shape edits now load shape names and synchronize before inspecting shapes.items. This removes the batch timing failure that made edits work on some slides but fail on others.
+- Key files: src/addin/taskpane.js, scripts/selftest.js.
+- Other OS action: run npm run test before packaging or deploying the Office pane.
+- Done on: Windows
+

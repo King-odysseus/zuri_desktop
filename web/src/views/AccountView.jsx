@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { DataRow } from '../components/DataRow.jsx';
 import { Button } from '../components/ui.jsx';
-import { setPassword, updateAccountName } from '../lib/api.js';
+import { createMemory, deleteMemory, listMemories, setPassword, updateAccountName } from '../lib/api.js';
 import { formatDate } from '../lib/format.js';
 
 /** @param {unknown} value Turns "past_due" into "Past due" for a reading eye. */
@@ -56,6 +56,65 @@ export default function AccountView({ me, onSignOut }) {
     : hasPassword
       ? 'This account already has a password. Use "Forgot your password?" on the sign-in screen to change it.'
       : 'Password settings are not reported for this account, so there is nothing to set here. Sign in with Google.';
+
+  const [memories, setMemories] = useState([]);
+  const [memoryDraft, setMemoryDraft] = useState('');
+  const [memoryStatus, setMemoryStatus] = useState('loading');
+  const [memoryBusy, setMemoryBusy] = useState(false);
+  const [memoryMessage, setMemoryMessage] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listMemories()
+      .then((items) => {
+        if (!cancelled) {
+          setMemories(items);
+          setMemoryStatus('ready');
+        }
+      })
+      .catch((failure) => {
+        if (!cancelled) {
+          setMemoryStatus('error');
+          setMemoryMessage({ text: failure?.message ?? 'Memories could not be loaded.', ok: false });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const saveMemory = async (event) => {
+    event.preventDefault();
+    const content = memoryDraft.trim();
+    if (content === '' || memoryBusy) return;
+    setMemoryBusy(true);
+    setMemoryMessage(null);
+    try {
+      const memory = await createMemory(content);
+      setMemories((current) => [memory, ...current]);
+      setMemoryDraft('');
+      setMemoryMessage({ text: 'Memory saved.', ok: true });
+    } catch (failure) {
+      setMemoryMessage({ text: failure?.message ?? 'That memory could not be saved.', ok: false });
+    } finally {
+      setMemoryBusy(false);
+    }
+  };
+
+  const removeMemory = async (memory) => {
+    if (!memory?.id || memoryBusy) return;
+    setMemoryBusy(true);
+    setMemoryMessage(null);
+    try {
+      await deleteMemory(memory.id);
+      setMemories((current) => current.filter((item) => item.id !== memory.id));
+      setMemoryMessage({ text: 'Memory deleted.', ok: true });
+    } catch (failure) {
+      setMemoryMessage({ text: failure?.message ?? 'That memory could not be deleted.', ok: false });
+    } finally {
+      setMemoryBusy(false);
+    }
+  };
 
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -140,6 +199,39 @@ export default function AccountView({ me, onSignOut }) {
             </DataRow>
           )}
         </div>
+      </article>
+
+      <article className="card">
+        <p className="stat-label">Saved memories</p>
+        <p className="stat-meta">
+          Short facts and preferences you choose to keep across chats. Zuri uses them as context, and you can remove them at any time.
+        </p>
+        <form className="form-stack" onSubmit={saveMemory} style={{ marginTop: 12 }} noValidate>
+          <label className="field">
+            <span>Add a memory</span>
+            <textarea
+              value={memoryDraft}
+              maxLength={500}
+              rows={3}
+              onChange={(event) => setMemoryDraft(event.target.value)}
+              placeholder="For example: I prefer short, plain-English reports."
+            />
+          </label>
+          <div className="card-actions"><Button type="submit" disabled={memoryBusy || memoryDraft.trim() === ''}>{memoryBusy ? 'Saving...' : 'Save memory'}</Button></div>
+        </form>
+        {memoryMessage && <p className={memoryMessage.ok ? 'form-success' : 'form-error'} role="status">{memoryMessage.text}</p>}
+        {memoryStatus === 'loading' && <p className="stat-meta">Loading memories...</p>}
+        {memoryStatus === 'ready' && memories.length === 0 && <p className="stat-meta">No saved memories yet.</p>}
+        {memories.length > 0 && (
+          <ul className="row-list" style={{ marginTop: 12 }}>
+            {memories.map((memory) => (
+              <li className="data-row" key={memory.id}>
+                <span className="data-row-label">{memory.content}</span>
+                <Button variant="ghost" size="sm" disabled={memoryBusy} onClick={() => void removeMemory(memory)}>Delete</Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </article>
 
       <article className="card">

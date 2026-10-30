@@ -452,6 +452,29 @@ export function updateAccountName(displayName) {
   });
 }
 
+/**
+ * Explicit memories shared by the account's chats on every device.
+ * @returns {Promise<Array<{ id: string, content: string, createdAt?: string, updatedAt?: string }>>}
+ */
+export async function listMemories() {
+  const data = await api('/api/me/memories');
+  return Array.isArray(data?.memories) ? data.memories : [];
+}
+
+/** @param {string} content @returns {Promise<object>} */
+export async function createMemory(content) {
+  const data = await api('/api/me/memories', {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+  return data?.memory ?? {};
+}
+
+/** @param {string} id */
+export async function deleteMemory(id) {
+  return api(`/api/me/memories/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}
+
 /** @returns {Promise<string>} */
 export function loadGoogleScript() {
   return new Promise((resolve, reject) => {

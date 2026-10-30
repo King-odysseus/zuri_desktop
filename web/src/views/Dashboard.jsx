@@ -15,6 +15,7 @@ import ImagesView from './ImagesView.jsx';
 import TasksView from './TasksView.jsx';
 import RemindersView from './RemindersView.jsx';
 import AutomationsView from './AutomationsView.jsx';
+import AccountView from './AccountView.jsx';
 
 const COLLAPSE_KEY = 'zuri-cloud-nav-collapsed';
 
@@ -39,6 +40,7 @@ export const NAV_ITEMS = [
   { id: 'usage', label: 'Usage and limits', icon: <ChartIcon /> },
   { id: 'plans', label: 'Plans', icon: <CardIcon /> },
   { id: 'billing', label: 'Billing', icon: <ReceiptIcon /> },
+  { id: 'account', label: 'Account', icon: <ShieldIcon /> },
 ];
 
 // Shown only to administrators; the server refuses the data to anyone else.
@@ -246,6 +248,7 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           {view === 'billing' && (
             <BillingView me={account.me} billing={account.billing} usage={account.usage} />
           )}
+          {view === 'account' && <AccountView me={account.me} onSignOut={onSignOut} />}
           {view === 'admin' && <AdminView />}
 
           {!isChat && (
