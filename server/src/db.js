@@ -247,6 +247,21 @@ function publicReminder(row) {
   };
 }
 
+/** @param {object} reminder @param {Date} now @returns {string|null} */
+function nextReminderDueAt(reminder, now) {
+  if (reminder.repeat === 'interval') {
+    const minutes = Number(reminder.interval_minutes);
+    const gap = Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
+    return new Date(now.getTime() + gap * 60_000).toISOString();
+  }
+  if (reminder.repeat === 'daily') {
+    const next = new Date(now.getTime());
+    next.setDate(next.getDate() + 1);
+    return next.toISOString();
+  }
+  return null;
+}
+
 /**
  * A timestamptz as an ISO string. The driver hands back a Date for a timestamptz and
  * a string for anything already serialised, and a client reading one of each would
@@ -1700,6 +1715,43 @@ export function createRepository(pool) {
         [userId, REMINDER_LIMIT],
       );
       return result.rows.map(publicReminder);
+    },
+    /**
+     * Claim due reminders while holding row locks, then advance them before the
+     * transaction ends. This prevents two cloud instances from emailing the same
+     * reminder when a deploy overlaps a scheduled sweep.
+     * @param {{ now: string, limit?: number }} sweep
+     * @returns {Promise<object[]>}
+     */
+    async claimDueReminders({ now, limit = 50 }) {
+      const capped = Math.min(Math.max(Math.trunc(Number(limit) || 50), 1), 100);
+      const current = new Date(now);
+      if (Number.isNaN(current.getTime())) return [];
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        const found = await client.query(
+          'SELECT r.id, r.title, r.due_at, r.repeat, r.interval_minutes, r.time_of_day, r.done, r.created_at, u.email ' +
+            'FROM reminders r JOIN users u ON u.id = r.user_id ' +
+            'WHERE r.done = FALSE AND r.due_at <= $1::timestamptz ' +
+            'ORDER BY r.due_at ASC, r.id LIMIT $2::integer FOR UPDATE OF r SKIP LOCKED',
+          [current.toISOString(), capped],
+        );
+        for (const row of found.rows) {
+          const next = nextReminderDueAt(row, current);
+          await client.query(
+            'UPDATE reminders SET due_at = $2::timestamptz, done = $3::boolean WHERE id = $1',
+            [row.id, next, next === null],
+          );
+        }
+        await client.query('COMMIT');
+        return found.rows.map((row) => ({ ...publicReminder(row), email: String(row.email ?? '') }));
+      } catch (error) {
+        await client.query('ROLLBACK').catch(() => undefined);
+        throw error;
+      } finally {
+        client.release();
+      }
     },
     /**
      * Add one reminder.

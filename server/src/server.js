@@ -10,6 +10,7 @@ import { createMailer } from './mail.js';
 import { createPaystackClient } from './paystack.js';
 import { applySchema } from './schema.js';
 import { createAutomationScheduler } from './automations.js';
+import { createReminderScheduler } from './reminders.js';
 import { searchWeb } from './tools.js';
 import { DEFAULT_MODELS } from './models.js';
 
@@ -126,6 +127,9 @@ const automations = repository
       : Promise.resolve(DEFAULT_MODELS.map((model) => ({ ...model })))),
   })
   : null;
+const reminders = repository
+  ? createReminderScheduler({ repository, mailer })
+  : null;
 
 createServer((request, response) => {
   void serve(request, response);
@@ -133,16 +137,22 @@ createServer((request, response) => {
   console.log(`[zuri-cloud] listening on ${config.port}`);
   if (!automations) {
     console.log('[zuri-cloud] automations are off: there is no database to read them from');
+  } else {
+    // A deploy restarts this process, so the cloud sweep is the part that keeps
+    // scheduled work alive while every client is closed.
+    automations
+      .rearm()
+      .then((repaired) => {
+        if (repaired > 0) console.log(`[zuri-cloud] re-armed ${repaired} automation(s) left mid-run by a restart`);
+      })
+      .catch((error) => console.error('[zuri-cloud] automation re-arm failed:', error?.message ?? error));
+    automations.start();
+    console.log('[zuri-cloud] automation sweep started');
+  }
+  if (!reminders) {
+    console.log('[zuri-cloud] reminders are off: there is no database to read them from');
     return;
   }
-  // A deploy restarts this process, which can leave an automation that was mid-run
-  // armed for nothing. Re-arming is the repair, and it runs once at boot.
-  automations
-    .rearm()
-    .then((repaired) => {
-      if (repaired > 0) console.log(`[zuri-cloud] re-armed ${repaired} automation(s) left mid-run by a restart`);
-    })
-    .catch((error) => console.error('[zuri-cloud] automation re-arm failed:', error?.message ?? error));
-  automations.start();
-  console.log('[zuri-cloud] automation sweep started');
+  reminders.start();
+  console.log('[zuri-cloud] reminder sweep started');
 });

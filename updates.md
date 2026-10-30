@@ -1330,3 +1330,12 @@
 - Other OS action: run `npm run web:build` before deploying the browser bundle.
 - Done on: Windows
 
+## 2026-10-30 - Windows (cloud reminders can email while apps are closed)
+
+- The cloud service now claims due account reminders atomically and sends them through the existing Brevo mailer, so a closed Windows, macOS or Android client does not stop a reminder from being delivered.
+- Unconfigured mail leaves reminders due instead of claiming and losing them.
+- Checked: `npm run server:test` passes, including the new cloud reminder sweep and mail payload checks.
+- Key files: server/src/reminders.js, server/src/db.js, server/src/mail.js, server/src/server.js, server/test/reminders.test.js, server/package.json.
+- Other OS action: run `npm run server:test`; deploy the cloud service with `BREVO_API_KEY`, `MAIL_FROM`, and optional `MAIL_FROM_NAME` before relying on closed-app reminder email.
+- Done on: Windows
+
