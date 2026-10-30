@@ -1,3 +1,11 @@
+## 2026-10-30 - Windows (selftest chat checks no longer race their temporary stores)
+
+- The wordless-turn selftest could fail with CHAT_NOT_FOUND because the preceding text-call check was still using the process-wide temporary store when the next check switched it. The checks now wait at that boundary before changing roots.
+- Checked: `node scripts/selftest.js` and `npm test` both pass.
+- Key files: scripts/selftest.js.
+- Other OS action: run `npm test` before using the selftest suite.
+- Done on: Windows
+
 ## 2026-10-30 - Windows (explicit memories are shared across cloud chats)
 
 - Zuri Cloud now stores short, user-managed memories that can be added and deleted from the Account page. Memories are scoped to the signed-in account, capped at 100 entries of 500 characters each, and never exposed across accounts.

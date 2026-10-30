@@ -1611,6 +1611,11 @@ check('a step names itself while it runs', async () => {
   return 'every step has a plain sentence before it starts';
 });
 
+// The chat checks below use the store's process-wide root. Wait for the previous
+// text-call check before switching roots, or its in-flight request can read this
+// check's temporary folder and report CHAT_NOT_FOUND for its own thread.
+await Promise.all(pendingChecks);
+
 check('a wordless turn is asked again, not answered with an internal error', async () => {
   const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
   const { sendChatMessage } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
