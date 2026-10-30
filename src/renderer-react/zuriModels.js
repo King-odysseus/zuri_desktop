@@ -15,12 +15,12 @@
  * selftest checks every row here against resolveChatTarget in chat.js.
  */
 export const ZURI_MODELS = [
-  { provider: 'deepseek', model: 'deepseek-flash', name: 'Zuri Flash', note: 'Cheap and quick for everyday questions.' },
-  { provider: 'moonshot', model: 'kimi-k3', name: 'Zuri Pro', note: 'Balanced, and good with long documents.' },
-  { provider: 'zai', model: 'glm-5.3', name: 'Zuri Max', note: 'Strong general reasoning.' },
-  { provider: 'openai', model: 'gpt-6.1-sol', name: 'Zuri Core', note: 'A current, well-rounded model for careful work.' },
-  { provider: 'anthropic', model: 'claude-sonnet-5-5', name: 'Zuri Reason', note: 'Careful step-by-step analysis.' },
-  { provider: 'anthropic', model: 'claude-opus-5-5', name: 'Zuri Elite', note: 'The deepest answers, and the dearest.' },
+  { provider: 'deepseek', model: 'deepseek-flash', name: 'Zuri Flash', note: 'Cheap and quick for everyday questions.', supportsImages: false },
+  { provider: 'moonshot', model: 'kimi-k3', name: 'Zuri Pro', note: 'Balanced, and good with long documents.', supportsImages: false },
+  { provider: 'zai', model: 'glm-5.3', name: 'Zuri Max', note: 'Strong general reasoning.', supportsImages: false },
+  { provider: 'openai', model: 'gpt-6.1-sol', name: 'Zuri Core', note: 'A current, well-rounded model for careful work.', supportsImages: true },
+  { provider: 'anthropic', model: 'claude-sonnet-5-5', name: 'Zuri Reason', note: 'Careful step-by-step analysis.', supportsImages: true },
+  { provider: 'anthropic', model: 'claude-opus-5-5', name: 'Zuri Elite', note: 'The deepest answers, and the dearest.', supportsImages: true },
 ];
 
 /**
@@ -30,7 +30,7 @@ export const ZURI_MODELS = [
  * id outside this list. Callers fall back to showing the id rather than throwing:
  * a chat must still be answerable after the catalogue changes.
  * @param {unknown} modelId
- * @returns {{ provider: string, model: string, name: string, note: string } | null}
+ * @returns {{ provider: string, model: string, name: string, note: string, supportsImages: boolean } | null}
  */
 export function zuriModelFor(modelId) {
   if (typeof modelId !== 'string' || modelId.trim() === '') return null;

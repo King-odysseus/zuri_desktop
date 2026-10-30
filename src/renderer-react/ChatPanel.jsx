@@ -1126,6 +1126,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     let content = prompt || 'Please analyze the attached file.';
     let image = null;
     const attachedImage = attachment && attachment.kind !== 'folder' && isImageName(attachment.name);
+    if (attachedImage && chatModel !== null && chatModel.supportsImages !== true) {
+      setError('This model cannot read images. Choose Zuri Core, Zuri Reason or Zuri Elite to attach a picture.');
+      setReplying(false);
+      return;
+    }
     if (attachedImage) image = { name: attachment.name, path: attachment.path };
     if (attachment?.kind === 'folder') {
       content = `${content}\n\nAttached folder: ${attachment.name} (${attachment.fileCount} files)\n\n${attachment.text}`;
@@ -1296,7 +1301,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         {!compact && !hasConversation && (
           // One line and the composer below it, the way ChatGPT opens: nothing competes with the box.
           <div className={`mb-8 flex w-full ${contentWidth} flex-col items-center`}>
-            <img src={zuriMarkUrl} alt="" width={52} height={52} className="zuri-chat-mark mb-5" decoding="async" aria-hidden="true" />
+            <span className="zuri-logo-badge mb-5" aria-hidden="true"><img src={zuriMarkUrl} alt="" width={52} height={52} className="zuri-chat-mark" decoding="async" /></span>
           <h1 className="text-center text-3xl font-normal tracking-tight sm:text-4xl">{openingHeading}</h1>
           </div>
         )}
@@ -1306,7 +1311,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             {messages.map((message, index) => (
               message.role === 'user' ? (
                 <div key={messageKey(message, index)} className="flex min-w-0 max-w-[85%] flex-col items-end gap-1 self-end">
-                  <div className="min-w-0 break-words rounded-2xl bg-accent px-4 py-3 text-sm text-accent-foreground">
+                  <div className="zuri-message-user-bubble min-w-0 break-words rounded-2xl px-4 py-3 text-sm">
                     {message.content}
                   </div>
                   {/* People reuse their own wording far more often than they retype
@@ -1343,7 +1348,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   {modelLabels[index] && (
                     <span className="px-1 text-xs text-muted">{zuriModelName(message.model.model)}</span>
                   )}
-                  <div className="min-w-0 break-words rounded-2xl bg-surface-secondary px-4 py-3 text-sm text-foreground">
+                  <div className="zuri-message-assistant-bubble min-w-0 break-words px-4 py-3 text-sm text-foreground">
                     <FormattedMessage content={message.content} onOpenCode={compact ? undefined : openCodeInPanel} />
                   </div>
                   {Array.isArray(message.files) && message.files.map((file) => (
@@ -1618,7 +1623,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                         <span className="flex-1 truncate">{entry.name}</span>
                         {entry.model === chatModelId && <CheckIcon size={15} />}
                       </span>
-                      <span className="text-xs text-muted">{entry.note}</span>
+                      <span className="text-xs text-muted">{entry.note}{entry.supportsImages ? ' Reads images.' : ''}</span>
                     </button>
                   ))}
                   {/* A picture row does not answer with text: it draws what the message box
@@ -1666,7 +1671,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                 <StopIcon size={15} />
               </Button>
             ) : (
-              <Button type="submit" isIconOnly size="sm" variant="primary" className="h-10 w-10 rounded-full bg-accent p-0 text-accent-foreground shadow-md hover:bg-accent/90 disabled:opacity-40" aria-label="Send" isDisabled={draft.trim() === '' && !attachment}>
+              <Button type="submit" isIconOnly size="sm" variant="primary" className="zuri-send-button h-10 w-10 rounded-full p-0 shadow-md disabled:opacity-40" aria-label="Send" isDisabled={draft.trim() === '' && !attachment}>
                 <ArrowUpIcon size={18} />
               </Button>
             )}

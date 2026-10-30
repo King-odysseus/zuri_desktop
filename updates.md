@@ -1356,3 +1356,12 @@
 - Other OS action: run `npm install` and `npm run android:build`; configure VAPID, Firebase and WNS deployment secrets without committing them.
 - Done on: Windows
 
+## 2026-10-30 - Windows (light ChatGPT-style chat presentation)
+
+- Refreshed desktop and web chat surfaces with faded blue prompt bubbles, open assistant replies, softer hover states and a light-blue logo badge.
+- Added model capability metadata so desktop image attachments explain when the selected model cannot read pictures; supported models are labelled in the picker.
+- Checked: `npm run react:build`, `npm run web:build` and the full `npm test` suite.
+- Key files: src/renderer-react/app.css, src/renderer-react/ChatPanel.jsx, src/renderer-react/SignInView.jsx, src/renderer-react/zuriModels.js, web/src/styles.css.
+- Other OS action: run `npm run react:build` and `npm run web:build` before deploying or packaging.
+- Done on: Windows
+

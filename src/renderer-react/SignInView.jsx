@@ -102,7 +102,7 @@ export default function SignInView({ onDone }) {
           className="my-auto w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
           aria-labelledby="signin-title"
         >
-          <img src={zuriMarkUrl} alt="Zuri" width={52} height={52} className="zuri-chat-mark" decoding="async" />
+          <span className="zuri-logo-badge" aria-hidden="true"><img src={zuriMarkUrl} alt="Zuri" width={52} height={52} className="zuri-chat-mark" decoding="async" /></span>
           <h1 id="signin-title" className="mt-5 text-3xl font-medium tracking-tight">
             {resetting ? 'Reset your password' : creating ? 'Create your Zuri account' : 'Sign in to Zuri'}
           </h1>

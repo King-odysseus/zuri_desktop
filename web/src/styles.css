@@ -3408,7 +3408,7 @@ a.download-card:hover {
    sit in a filled box. */
 .chat-bubble-user {
   align-items: flex-end;
-  background: var(--surface-secondary);
+  background: var(--brand-blue-soft);
   color: var(--text);
 }
 
@@ -3528,8 +3528,23 @@ a.download-card:hover {
 }
 
 .chat-turn .chat-bubble-actions button:hover {
-  background: color-mix(in srgb, var(--text) 10%, transparent);
+  background: var(--brand-blue-soft);
   color: var(--text);
+}
+
+/* Keep links and source references quiet until they are needed, using the same
+   faded blue treatment as the prompt bubble and desktop transcript. */
+.chat-answer a {
+  color: var(--brand-blue-ink);
+  text-decoration: none;
+  background: var(--brand-blue-soft);
+  border-radius: 6px;
+  padding-inline: 3px;
+}
+
+.chat-answer a:hover,
+.chat-answer a:focus-visible {
+  background: color-mix(in srgb, var(--brand-blue-soft) 72%, var(--brand-blue) 28%);
 }
 
 /*

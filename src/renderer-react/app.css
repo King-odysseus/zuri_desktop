@@ -67,6 +67,15 @@ img[alt='Zuri'] {
   border-radius: 0.9rem;
 }
 
+/* The source mark is intentionally opaque, so a wrapper cannot recolour its navy
+   tile. A soft blue shadow and border make the same mark feel at home on the light
+   canvas without changing the bundled brand asset. */
+img.zuri-chat-mark,
+img[alt='Zuri'] {
+  border: 4px solid var(--brand-blue-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-blue) 12%, transparent);
+}
+
 h1,
 h2,
 h3,
@@ -525,14 +534,52 @@ button,
 /* New chat is the navy primary control on the light panel and a white one in the
    dark theme, the pair the rest of the dashboard uses. */
 .zuri-sidebar-panel .zuri-new-chat {
-  background: var(--accent) !important;
-  color: var(--accent-foreground) !important;
+  background: var(--brand-blue-soft) !important;
+  color: var(--brand-blue-ink) !important;
+  box-shadow: none !important;
 }
 
 .zuri-sidebar-panel .zuri-new-chat:hover,
 .zuri-sidebar-panel .zuri-new-chat:focus-visible {
-  background: color-mix(in srgb, var(--accent) 86%, var(--foreground)) !important;
-  color: var(--accent-foreground) !important;
+  background: color-mix(in srgb, var(--brand-blue-soft) 72%, var(--brand-blue) 28%) !important;
+  color: var(--brand-blue-ink) !important;
+}
+
+/* ChatGPT-style transcript hierarchy: only the person's prompt is filled, while
+   Zuri's answer sits directly on the page and can breathe between sections. */
+.zuri-message-user-bubble {
+  background: var(--brand-blue-soft) !important;
+  color: var(--foreground) !important;
+}
+
+.zuri-message-assistant-bubble {
+  background: transparent !important;
+  padding-inline: 0 !important;
+}
+
+.zuri-send-button {
+  background: var(--brand-blue-soft) !important;
+  color: var(--brand-blue-ink) !important;
+  box-shadow: none !important;
+}
+
+.zuri-send-button:hover,
+.zuri-send-button:focus-visible {
+  background: color-mix(in srgb, var(--brand-blue-soft) 72%, var(--brand-blue) 28%) !important;
+  color: var(--brand-blue-ink) !important;
+}
+
+.message-body a {
+  color: var(--brand-blue-ink);
+  text-decoration: none;
+  background: var(--brand-blue-soft);
+  border-radius: 0.4rem;
+  padding-inline: 0.2rem;
+}
+
+.message-body a:hover,
+.message-body a:focus-visible {
+  background: color-mix(in srgb, var(--brand-blue-soft) 72%, var(--brand-blue) 28%);
 }
 
 .zuri-sidebar-panel .zuri-selected-pill {
@@ -587,6 +634,15 @@ button,
   width: 3.25rem;
   height: 3.25rem;
   border-radius: 0.9rem;
+}
+
+.zuri-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem;
+  border-radius: 1.15rem;
+  background: var(--brand-blue-soft);
 }
 
 /* Vertical rhythm for a reply. The renderer emits flat blocks (heading, paragraph,

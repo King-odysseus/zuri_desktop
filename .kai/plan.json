@@ -2,49 +2,21 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Audit scheduler, app packaging, and notification capabilities for closed-app delivery",
+      "text": "Inspect project guidance, current renderer, and model capabilities",
       "state": "done"
     },
     {
-      "text": "Use cloud in-app notification records instead of reminder email delivery",
+      "text": "Implement light ChatGPT-style presentation and capability-aware images across interfaces",
       "state": "done"
     },
     {
-      "text": "Implement cloud reminder scheduling, notification records, and focused tests",
+      "text": "Run tests and rebuild the Windows installer",
       "state": "done"
     },
     {
-      "text": "Run verification and document the reconnect behavior",
-      "state": "done"
-    },
-    {
-      "text": "Inspect per-app notification preferences and available desktop, macOS, Android, and web push bridges",
-      "state": "done"
-    },
-    {
-      "text": "Choose push transports and obtain credentials for web, Android, and Windows; defer macOS push",
-      "state": "done"
-    },
-    {
-      "text": "Implement device registration, per-app opt-in settings, and delivery adapters for web, Android, and Windows",
-      "state": "done"
-    },
-    {
-      "text": "Run verification and document the required push deployment configuration",
-      "state": "done"
-    },
-    {
-      "text": "Build the Windows NSIS installer for local testing",
-      "state": "done"
-    },
-    {
-      "text": "Install the generated Windows package and verify the installed app launches",
-      "state": "done"
-    },
-    {
-      "text": "Report the installer path and any local prerequisites",
+      "text": "Install the rebuilt app locally and verify launch",
       "state": "done"
     }
   ],
-  "updatedAt": "2026-10-30T19:45:00.000Z"
+  "updatedAt": "2026-10-30T22:23:35.396Z"
 }
