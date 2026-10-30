@@ -1365,3 +1365,11 @@
 - Other OS action: run `npm run react:build` and `npm run web:build` before deploying or packaging.
 - Done on: Windows
 
+## 2026-10-30 - Windows (blue chat logo tile)
+
+- Recolored the rounded square behind the white Zuri chat mark to the brand blue while preserving the original mark shape.
+- Checked: `npm run react:build`, `npm run smoke`, `npm run selftest` and `npm run dist` pass.
+- Key files: src/renderer-react/assets/zuri-logo.png.
+- Other OS action: run `npm run react:build` before packaging or deploying.
+- Done on: Windows
+
