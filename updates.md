@@ -1373,3 +1373,11 @@
 - Other OS action: run `npm run react:build` before packaging or deploying.
 - Done on: Windows
 
+## 2026-10-30 - Windows (reference sign-in layout)
+
+- Matched the desktop sign-in screen to the cloud reference with the shared photo hero, trust chips, account tabs, compact form card and footer. Narrow desktop windows collapse to the same card-first mobile layout.
+- Checked: `npm run react:build`, `npm run web:build`, `npm run smoke`, `npm run selftest` and `npm run dist` pass.
+- Key files: src/renderer-react/SignInView.jsx, src/renderer-react/CloudAuthForm.jsx, src/renderer-react/app.css, src/renderer-react/assets/auth-team.jpg.
+- Other OS action: run `npm run react:build` before packaging or deploying.
+- Done on: Windows
+

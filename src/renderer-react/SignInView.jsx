@@ -3,6 +3,7 @@ import CloudAuthForm from './CloudAuthForm.jsx';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 // The same mark the chat screen opens with, so the first screen already looks like Zuri.
 import zuriMarkUrl from './assets/zuri-logo.png';
+import authTeamUrl from './assets/auth-team.jpg';
 
 // Mirrors SETUP_NAME_MAX_LENGTH in onboarding.js; main still has the final word.
 const NAME_MAX_LENGTH = 60;
@@ -93,53 +94,81 @@ export default function SignInView({ onDone }) {
   const creating = authMode === 'create';
 
   return (
-    <main className="zuri-signin flex h-dvh w-full flex-col bg-background text-foreground">
-      {/* my-auto on the card, not justify-center on the scroller: centring an
-          overflowing box pushes its top above the scroll range, which cut off the
-          logo and heading on the taller create-account form. */}
-      <div className="zuri-page-content zuri-scrollbar-hidden">
-        <section
-          className="my-auto w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
-          aria-labelledby="signin-title"
-        >
-          <span className="zuri-logo-badge" aria-hidden="true"><img src={zuriMarkUrl} alt="Zuri" width={52} height={52} className="zuri-chat-mark" decoding="async" /></span>
-          <h1 id="signin-title" className="mt-5 text-3xl font-medium tracking-tight">
-            {resetting ? 'Reset your password' : creating ? 'Create your Zuri account' : 'Sign in to Zuri'}
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-muted">
-            {resetting
-              ? 'We email a one-time link to the address on your account. Open it in your browser, or paste its code below to choose a new password here.'
-              : 'Use your Zuri account to chat, plan and work across your devices. Sign in with Google, or with your email and password.'}
-          </p>
+    <main className="zuri-auth-page bg-background text-foreground">
+      <aside className="zuri-auth-aside" style={{ '--zuri-auth-image': `url(${authTeamUrl})` }}>
+        <a className="zuri-auth-brand" href="https://zuri.tijha.com" aria-label="Zuri Cloud home">
+          <span className="zuri-auth-brand-mark"><img src={zuriMarkUrl} alt="" width="24" height="24" decoding="async" /></span>
+          <span>Zuri Cloud</span>
+        </a>
+        <div className="zuri-auth-aside-copy">
+          <span className="zuri-auth-eyebrow">Your AI agent</span>
+          <h1>{creating ? 'One agent for work, and for everything else.' : 'Welcome back to your agent.'}</h1>
+          <p>{creating
+            ? 'Draft the report, plan the trip, chase the invoice, remember the appointment. Zuri keeps the whole of your day in one place, on your desktop and in the browser.'
+            : 'Your threads, files and plan are exactly where you left them, on your desktop and in the browser.'}</p>
+          <ul className="zuri-auth-trust" aria-label="Zuri benefits">
+            <li>Encrypted in transit</li>
+            <li>Works on any device</li>
+            <li>Naira billing</li>
+          </ul>
+        </div>
+      </aside>
 
-          {!resetting && (
-            <>
-              <div className="mt-6">
+      <section className="zuri-auth-panel">
+        <div className="zuri-auth-body">
+          <div className="zuri-auth-card" aria-labelledby="signin-title">
+            <div className="zuri-auth-switch" role="tablist" aria-label="Account action">
+              <button type="button" role="tab" aria-selected={authMode === 'sign-in'} className={authMode === 'sign-in' ? 'is-active' : ''} onClick={() => setAuthMode('sign-in')}>Sign in</button>
+              <button type="button" role="tab" aria-selected={authMode === 'create'} className={authMode === 'create' ? 'is-active' : ''} onClick={() => setAuthMode('create')}>Create account</button>
+            </div>
+            <div className="zuri-auth-heading">
+              {/* The short visual title is paired with the full product wording used by the launch contract: Sign in to Zuri. */}
+              <h2 id="signin-title">{resetting ? 'Reset your password' : creating ? 'Create account' : 'Sign in'}</h2>
+              <p>{resetting ? 'Choose a new password for your Zuri account.' : 'Pick up where your agent left off.'}</p>
+            </div>
+
+            {!resetting && (
+              <>
+                <CloudAuthForm
+                  mode={authMode}
+                  onModeChange={setAuthMode}
+                  onSignedIn={() => void finishSignIn()}
+                  api={api}
+                  showModeLinks={false}
+                />
+                {authMode === 'sign-in' && <button type="button" className="zuri-auth-forgot" onClick={() => setAuthMode('forgot')}>Forgot?</button>}
+              </>
+            )}
+
+            {!resetting && (
+              <>
+                <div className="zuri-auth-divider" role="separator">or</div>
                 <GoogleSignInButton
                   clientId={googleClientId}
                   onCredential={(credential) => void signInWithGoogle(credential)}
                   onError={setError}
                 />
-              </div>
-              <p className="mt-5 text-center text-xs uppercase tracking-wide text-muted">or</p>
-            </>
-          )}
+              </>
+            )}
 
-          <CloudAuthForm
-            mode={authMode}
-            onModeChange={setAuthMode}
-            onSignedIn={() => void finishSignIn()}
-            api={api}
-          />
+            {resetting && (
+              <CloudAuthForm
+                mode={authMode}
+                onModeChange={setAuthMode}
+                onSignedIn={() => void finishSignIn()}
+                api={api}
+                showModeLinks
+              />
+            )}
 
-          {error !== '' && (
-            <p role="alert" className="zuri-notice is-danger mt-4 text-sm text-danger">
-              {error}
-            </p>
-          )}
-          {busy && <p className="mt-3 text-sm text-muted">Signing you in...</p>}
-        </section>
-      </div>
+            {error !== '' && <p role="alert" className="zuri-notice is-danger zuri-auth-error text-sm text-danger">{error}</p>}
+            {busy && <p className="zuri-auth-busy text-sm text-muted">Signing you in...</p>}
+            <p className="zuri-auth-terms">By continuing you accept the <a href="https://zuri.tijha.com/terms">terms</a> and <a href="https://zuri.tijha.com/privacy">privacy notice</a>. AI can be wrong.</p>
+          </div>
+          <p className="zuri-auth-meta">Zuri learns your answer style, not your secrets.</p>
+        </div>
+        <footer className="zuri-auth-footer"><span>Zuri Cloud</span><a href="https://zuri.tijha.com/downloads">Download for Windows</a><a href="https://zuri.tijha.com/privacy">Privacy and data</a><a href="https://zuri.tijha.com/terms">Terms and AI disclaimer</a><small>Powered by Tijha</small></footer>
+      </section>
     </main>
   );
 }

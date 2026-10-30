@@ -32,7 +32,7 @@ const SUBMIT_LABELS = {
  *   api?: object,
  * }} props
  */
-export default function CloudAuthForm({ mode = 'sign-in', onModeChange, onSignedIn, api }) {
+export default function CloudAuthForm({ mode = 'sign-in', onModeChange, onSignedIn, api, showModeLinks = true }) {
   const bridge = api ?? (typeof window !== 'undefined' ? window.zuri : undefined);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -162,12 +162,14 @@ export default function CloudAuthForm({ mode = 'sign-in', onModeChange, onSigned
       <Button type="submit" variant="primary" fullWidth isDisabled={busy}>
         {busy ? 'Working...' : (SUBMIT_LABELS[mode] ?? SUBMIT_LABELS['sign-in'])}
       </Button>
-      <div className="flex flex-wrap gap-2">
-        {mode !== 'sign-in' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('sign-in')}>Sign in instead</Button>}
-        {mode !== 'create' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('create')}>Create an account</Button>}
-        {mode !== 'forgot' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('forgot')}>Forgot password</Button>}
-        {mode === 'forgot' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('reset')}>I have a reset code</Button>}
-      </div>
+      {showModeLinks && (
+        <div className="flex flex-wrap gap-2">
+          {mode !== 'sign-in' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('sign-in')}>Sign in instead</Button>}
+          {mode !== 'create' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('create')}>Create an account</Button>}
+          {mode !== 'forgot' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('forgot')}>Forgot password</Button>}
+          {mode === 'forgot' && <Button type="button" variant="ghost" onPress={() => onModeChange?.('reset')}>I have a reset code</Button>}
+        </div>
+      )}
     </form>
   );
 }
