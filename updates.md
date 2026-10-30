@@ -1294,3 +1294,13 @@
 - Other OS action: run `npm test` before deploying the cloud server. No new dependency or database migration is needed.
 - Done on: Windows
 
+## 2026-10-30 - Windows (guarded incognito chats and local Markdown export)
+
+- Web and Android chats can start an incognito conversation. They do not create or update an account conversation, and the transcript is discarded with the page.
+- Desktop incognito turns are marked device-only, so the existing cloud sync excludes them. Turning the mode on starts a fresh local chat to avoid mixing private and saved turns.
+- Both chat surfaces can export the visible transcript as a local Markdown file. No server storage or new provider request is used.
+- Checked: React production build and desktop self-test pass.
+- Key files: web/src/views/ChatView.jsx, src/renderer-react/ChatPanel.jsx, updates.md.
+- Other OS action: run `npm test`; no new dependency, server route, or database migration is needed.
+- Done on: Windows
+

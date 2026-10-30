@@ -479,6 +479,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [answerLength, setAnswerLength] = useState('balanced');
   // On by default for current answers, then remembered when the person changes it.
   const [webSearch, setWebSearch] = useState(readWebSearchPreference);
+  const [incognito, setIncognito] = useState(false);
   // The model chip. `pickedModelId` is what the person chose in this chat and wins
   // over the last reply's model; '' means nothing was picked here, which leaves the
   // model chosen in Settings in charge.
@@ -988,7 +989,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           role: 'user',
           content,
           ...(image ? { images: [image] } : {}),
-          ...(localOnly ? { localOnly: true } : {}),
+          ...((localOnly || incognito) ? { localOnly: true } : {}),
         },
       });
       if (!appended?.ok) {
@@ -1146,7 +1147,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
     // Any attachment makes the whole turn device-only, whatever kind it is: the text
     // above now holds the file's own wording, and the answer will quote it back.
-    await runTurn(content, prompt || attachment?.name || 'New chat', image, attachment !== null);
+    await runTurn(content, prompt || attachment?.name || 'New chat', image, attachment !== null || incognito);
   }
 
   /**
@@ -1202,6 +1203,22 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setStyleOffer(null);
   }
 
+  function exportChat() {
+    if (messages.length === 0) return;
+    const text = messages
+      .map((message) => `${message.role === 'assistant' ? 'Zuri' : 'You'}:\n${String(message.content ?? '').trim()}`)
+      .join('\n\n');
+    const blob = new Blob([`# Zuri chat\n\n${text}\n`], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'zuri-chat.md';
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
   // Only the newest answer carries the rewrite row: on every answer it would turn
   // the transcript into a wall of buttons.
   const lastAnswerIndex = useMemo(() => {
@@ -1250,16 +1267,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         </Button>
       )}
       {!compact && onNewChat && (
-        <Button
-          isIconOnly
-          variant="ghost"
-          className="zuri-chat-float zuri-chat-float-right"
-          aria-label="New chat"
-          title="New chat"
-          onPress={onNewChat}
-        >
-          <NewChatIcon size={19} />
-        </Button>
+        <div className="zuri-chat-float zuri-chat-float-right flex gap-1">
+          {hasConversation && <Button isIconOnly variant="ghost" aria-label="Export chat" title="Export chat" onPress={exportChat}><DownloadIcon size={19} /></Button>}
+          <Button isIconOnly variant="ghost" aria-label="New chat" title="New chat" onPress={onNewChat}><NewChatIcon size={19} /></Button>
+        </div>
       )}
       {/* The card is a frameless window, so this strip is its title bar: the CSS
           app-region drag moves the whole popup around the screen, and the buttons
@@ -1422,6 +1433,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
         <div className={`w-full ${contentWidth} ${compact ? 'zuri-overlay-composer-wrap' : ''}`}>
           {error !== '' && <p role="alert" className="mb-2 text-sm text-danger">{error}</p>}
+          {incognito && <p role="status" className="mb-2 text-sm text-muted">Incognito chat: this conversation stays on this device and is not synced.</p>}
           {approval !== null && <ApprovalCard approval={approval} onAnswer={answerApproval} />}
           {styleOffer !== null && (
             <div role="status" className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-border bg-surface px-3 py-2 text-sm">
@@ -1467,6 +1479,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                       <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => setMenuView('commands')}>
                         <SlashCommandIcon size={16} />
                         <span>Slash commands</span>
+                      </button>
+                      <button type="button" role="menuitemcheckbox" aria-checked={incognito} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => { if (!incognito) onNewChat?.(); setIncognito((current) => !current); }}>
+                        <span className="flex-1">Incognito chat</span>
+                        {incognito && <CheckIcon size={16} />}
                       </button>
                     </>
                   ) : menuView === 'image' ? (

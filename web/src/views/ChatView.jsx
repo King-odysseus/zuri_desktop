@@ -692,6 +692,7 @@ export default function ChatView({
   const [copiedIndex, setCopiedIndex] = useState(-1);
   const [copyNote, setCopyNote] = useState('');
   const [shareNote, setShareNote] = useState('');
+  const [incognito, setIncognito] = useState(false);
 
   const messagesRef = useRef(null);
   const draftRef = useRef(null);
@@ -967,7 +968,8 @@ export default function ChatView({
    * on the first send, so opening a chat and changing your mind saves nothing.
    */
   const saveExchange = useCallback(
-    async (conversationId, question, answer, run, attachment = null) => {
+    async (conversationId, question, answer, run, attachment = null, privateChat = false) => {
+      if (privateChat) return;
       const title = titleFromQuestion(question);
       try {
         let id = conversationId;
@@ -1117,7 +1119,7 @@ export default function ChatView({
             picture: `data:${made.mime};base64,${made.imageBase64}`,
           }],
         }));
-        await saveExchange(conversationId, said, note, run, null);
+        await saveExchange(conversationId, said, note, run, null, incognito);
         return;
       }
 
@@ -1220,7 +1222,7 @@ export default function ChatView({
         messages: [...previous.messages, { role: 'assistant', content: answer }],
       }));
       setStreamReply('');
-      await saveExchange(conversationId, said, answer, run, storedAttachment);
+      await saveExchange(conversationId, said, answer, run, storedAttachment, incognito);
     } catch (error) {
       if (run !== runRef.current) return;
       // Stop, or a dropped connection, keeps what already arrived on screen: it
@@ -1416,6 +1418,23 @@ export default function ChatView({
     const copied = await copyText(content);
     setShareNote(copied ? 'Sharing is not available here, so the message was copied.' : 'This message could not be shared.');
   }, []);
+
+  const exportChat = useCallback(() => {
+    if (thread.messages.length === 0) return;
+    const title = String(thread.title || 'Zuri chat').trim() || 'Zuri chat';
+    const text = thread.messages
+      .map((message) => `${message.role === 'assistant' ? 'Zuri' : 'You'}:\n${String(message.content ?? '').trim()}`)
+      .join('\n\n');
+    const blob = new Blob([`# ${title}\n\n${text}\n`], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').slice(0, 80) || 'zuri-chat'}.md`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, [thread.messages, thread.title]);
 
   const showThread = Boolean(openId || composing);
   // Which pane a phone shows. An open chat always wins, so picking a conversation
@@ -1929,6 +1948,7 @@ export default function ChatView({
           {threadError && !sessionExpired && <InlineAlert tone="danger">{threadError.message}</InlineAlert>}
           {streamError && <InlineAlert tone="danger">{streamError.message}</InlineAlert>}
           {saveWarning !== '' && <p className="chat-note">{saveWarning}</p>}
+          {incognito && <p className="chat-note">Incognito chat: this conversation is not saved to your account.</p>}
           {copyNote !== '' && <p className="chat-note is-error">{copyNote}</p>}
           {shareNote !== '' && <p className="chat-note">{shareNote}</p>}
           {attachNote !== '' && <p className="chat-note is-error">{attachNote}</p>}
@@ -2014,6 +2034,16 @@ export default function ChatView({
                       <MenuItem onSelect={() => setMenuView('commands')}>
                         <CommandIcon size={16} aria-hidden="true" />
                         <span>Slash commands</span>
+                      </MenuItem>
+                      <MenuItem onSelect={() => pickMenuItem(() => {
+                        if (!incognito) startNewChat();
+                        setIncognito((current) => !current);
+                      })}>
+                        <span className="flex-1">{incognito ? 'Turn off incognito chat' : 'Start incognito chat'}</span>
+                        {incognito && <CheckIcon size={16} aria-hidden="true" />}
+                      </MenuItem>
+                      <MenuItem disabled={thread.messages.length === 0} onSelect={() => pickMenuItem(exportChat)}>
+                        <span>Export chat</span>
                       </MenuItem>
                     </>
                   ) : menuView === 'length' ? (
