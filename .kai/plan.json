@@ -2,21 +2,21 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Inspect project guidance, current renderer, and model capabilities",
+      "text": "Inspect the current logo asset and consuming styles",
       "state": "done"
     },
     {
-      "text": "Implement light ChatGPT-style presentation and capability-aware images across interfaces",
+      "text": "Recolor the logo tile behind the white chat mark to blue",
       "state": "done"
     },
     {
-      "text": "Run tests and rebuild the Windows installer",
+      "text": "Rebuild, test, package, and reinstall the Windows app",
       "state": "done"
     },
     {
-      "text": "Install the rebuilt app locally and verify launch",
+      "text": "Verify the installed launch screen and push the change",
       "state": "done"
     }
   ],
-  "updatedAt": "2026-10-30T22:23:35.396Z"
+  "updatedAt": "2026-10-30T22:33:51.807Z"
 }
