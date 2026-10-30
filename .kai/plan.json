@@ -22,11 +22,11 @@
       "state": "done"
     },
     {
-      "text": "Choose push transports and obtain credentials for web, Android, Windows, and macOS",
-      "state": "blocked"
+      "text": "Choose push transports and obtain credentials for web, Android, and Windows; defer macOS push",
+      "state": "in_progress"
     },
     {
-      "text": "Implement device registration, per-app opt-in settings, delivery adapters, and focused closed-app tests",
+      "text": "Implement device registration, per-app opt-in settings, and delivery adapters for web, Android, and Windows",
       "state": "pending"
     },
     {
