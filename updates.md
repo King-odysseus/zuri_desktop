@@ -1304,3 +1304,12 @@
 - Other OS action: run `npm test`; no new dependency, server route, or database migration is needed.
 - Done on: Windows
 
+## 2026-10-30 - Windows (project PDFs become bounded searchable context)
+
+- Project files now extract selectable PDF text in the shared web project screen, which is also the Android bundle. OCR is deliberately off, extraction stops after 15 seconds, and stored context is capped at 20,000 characters so a PDF cannot turn every later chat into an unbounded request.
+- Pictures still use the existing upload path. Empty, scanned, encrypted or malformed PDFs are refused with a plain message instead of being uploaded without usable context.
+- Checked: `npm run web:build` passes. The build keeps the PDF parser in a lazy chunk, so normal chat loading does not pay its size.
+- Key files: web/src/views/ProjectsView.jsx, server/public/index.html, server/public/assets/.
+- Other OS action: deploy the rebuilt web bundle with `npm run cloud:deploy`; Android picks it up on the next `npm run android:build`. No new package was added.
+- Done on: Windows
+

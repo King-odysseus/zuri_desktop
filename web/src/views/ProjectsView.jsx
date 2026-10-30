@@ -39,10 +39,32 @@ const UPLOAD_TYPES = /^(image\/(png|jpeg|webp|gif)|application\/pdf)$/;
 /** A file this small and this plain is kept as text, which stays searchable. */
 const TEXT_FILE_NAME = /\.(txt|md|csv|json)$/i;
 
-/** A picture or a PDF has no useful text, so its bytes go to the CDN instead. */
+/** A picture has no useful text, so its bytes go to the CDN instead. */
 function isTextFile(file) {
   const type = typeof file?.type === 'string' ? file.type : '';
   return type.startsWith('text/') || TEXT_FILE_NAME.test(file?.name ?? '');
+}
+
+/**
+ * Extract a bounded amount of selectable PDF text in the browser. OCR stays off:
+ * scanned PDFs are intentionally refused because OCR would add provider/runtime
+ * cost and can make a phone work for an unbounded amount of time.
+ */
+async function extractPdfText(file) {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 15_000);
+  try {
+    const { parseOffice } = await import('officeparser');
+    const ast = await parseOffice(file, {
+      fileType: 'pdf',
+      ocr: false,
+      abortSignal: controller.signal,
+    });
+    const text = typeof ast?.toText === 'function' ? ast.toText() : '';
+    return typeof text === 'string' ? text.trim().slice(0, TEXT_MAX_CHARACTERS) : '';
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 /** "12 KB", "1.4 MB", or the character count of a text file the project holds. */
@@ -230,9 +252,10 @@ export default function ProjectsView({ onStartChat }) {
   /**
    * Add one file to the open project.
    *
-   * Two routes, as in the chat composer: a picture or a PDF is uploaded to
-   * Cloudinary and the project keeps its link, while a small text file is read here
-   * and its words are stored, which keeps a note searchable and needs no CDN.
+   * Two routes, as in the chat composer: a picture is uploaded to Cloudinary,
+   * while text and selectable PDF files are read here and their bounded words are
+   * stored. A PDF is kept as text rather than as a link so every client can use the
+   * same project context without downloading or re-parsing it on every question.
    */
   const chooseFile = useCallback(
     async (event) => {
@@ -257,6 +280,33 @@ export default function ProjectsView({ onStartChat }) {
           }
         } catch (error) {
           setFileNote(error?.message || 'That file could not be added. Try again.');
+        } finally {
+          setFileBusy(false);
+        }
+        return;
+      }
+
+      if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
+        if (file.size > UPLOAD_MAX_BYTES) {
+          setFileNote('That file is over 10MB. Try a smaller one.');
+          return;
+        }
+        setFileBusy(true);
+        try {
+          const content = await extractPdfText(file);
+          if (content === '') {
+            setFileNote('That PDF has no selectable text. Scanned PDFs are not supported yet.');
+            return;
+          }
+          await addProjectFile(id, { name: file.name, kind: 'application/pdf', bytes: file.size, content });
+          await loadProject(id);
+          setFileNote(content.length >= TEXT_MAX_CHARACTERS
+            ? `Only the first ${TEXT_MAX_CHARACTERS.toLocaleString('en-NG')} characters of that PDF were kept.`
+            : 'PDF text extracted and added to the project.');
+        } catch (error) {
+          setFileNote(error?.name === 'AbortError'
+            ? 'That PDF took too long to read. Try a smaller or simpler file.'
+            : 'That PDF could not be read. It may be encrypted or malformed.');
         } finally {
           setFileBusy(false);
         }
