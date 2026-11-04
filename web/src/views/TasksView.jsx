@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Chip, IconButton, InlineAlert, Input, Select } from '../components/ui.jsx';
+import { Button, Chip, DateField, IconButton, InlineAlert, Input, Select } from '../components/ui.jsx';
 import { CheckIcon, DeleteIcon, PlusIcon, TaskIcon } from '../components/Icons.jsx';
 import { createTask, deleteTask, listTasks, updateTask } from '../lib/api.js';
 
@@ -198,13 +198,11 @@ export default function TasksView() {
             />
           </div>
           <div className="project-field">
-            <label className="project-field-label" htmlFor="task-new-due">
+            <span className="project-field-label" id="task-new-due-label">
               Due (optional)
-            </label>
-            <Input
-              id="task-new-due"
-              className="project-input"
-              type="date"
+            </span>
+            <DateField
+              aria-labelledby="task-new-due-label"
               value={due}
               onChange={(event) => setDue(event.target.value)}
             />

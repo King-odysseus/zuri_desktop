@@ -6,9 +6,9 @@ import { fetchDownloads, recommendedPlatform } from '../lib/downloads.js';
  * sidebar. Renders nothing until an installer is known to exist, so neither
  * place ever shows a link that cannot download anything.
  *
- * @param {{ className?: string }} props
+ * @param {{ className?: string, icon?: import('react').ReactNode }} props
  */
-export default function DownloadLink({ className = 'foot-download' }) {
+export default function DownloadLink({ className = 'foot-download', icon = null }) {
   const [file, setFile] = useState(null);
 
   useEffect(() => {
@@ -26,6 +26,7 @@ export default function DownloadLink({ className = 'foot-download' }) {
   if (!file) return null;
   return (
     <a className={className} href={file.url} download={file.name}>
+      {icon}
       Download for {file.label}
     </a>
   );

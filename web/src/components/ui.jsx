@@ -1,18 +1,24 @@
 import { Children } from 'react';
+import { CalendarDate, Time } from '@internationalized/date';
 import {
   Alert,
   Button as HeroButton,
+  Calendar,
   Card as HeroCard,
   Checkbox as HeroCheckbox,
   Chip as HeroChip,
+  DateField as HeroDateField,
+  DatePicker,
   Input as HeroInput,
   Label,
   ListBox,
+  NumberField as HeroNumberField,
   ProgressBar,
   Radio as HeroRadio,
   RadioGroup as HeroRadioGroup,
   Select as HeroSelect,
   TextArea,
+  TimeField as HeroTimeField,
 } from '@heroui/react';
 
 /**
@@ -162,6 +168,161 @@ export function Textarea({ className = '', disabled, isDisabled, readOnly, isRea
       isReadOnly={isReadOnly ?? readOnly}
       {...props}
     />
+  );
+}
+
+/*
+ * Days, clocks and numbers arrive from the API as plain strings: a task's day is
+ * '2026-11-02', a reminder is '2026-11-02T09:30', a minute count is '15'. The
+ * readers below keep that contract, so a page never converts by hand.
+ */
+function dayValue(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(value ?? '').trim());
+  if (!match) return null;
+  return new CalendarDate(Number(match[1]), Number(match[2]), Number(match[3]));
+}
+
+function clockValue(value) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? '').trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return new Time(hour, minute);
+}
+
+/** A Time keeps seconds; the app stores hours and minutes only. */
+function clockString(time) {
+  if (!time) return '';
+  return `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`;
+}
+
+/**
+ * A day, picked from HeroUI's calendar in a popover. The segmented field and the
+ * calendar are HeroUI's own composition, so the popover wears the page's theme
+ * instead of the browser's native picker, which ignores the dark palette.
+ */
+export function DateField({ label, value, onChange, className = '', disabled, isDisabled, ...props }) {
+  return (
+    <DatePicker
+      value={dayValue(value)}
+      onChange={(next) => onChange?.({ target: { value: next ? next.toString() : '' } })}
+      isDisabled={isDisabled ?? disabled}
+      className={className}
+      {...props}
+    >
+      {label && <Label>{label}</Label>}
+      <HeroDateField.Group>
+        <HeroDateField.Input>
+          {(segment) => <HeroDateField.Segment segment={segment} />}
+        </HeroDateField.Input>
+        <HeroDateField.Suffix>
+          <DatePicker.Trigger>
+            <DatePicker.TriggerIndicator />
+          </DatePicker.Trigger>
+        </HeroDateField.Suffix>
+      </HeroDateField.Group>
+      <DatePicker.Popover>
+        <Calendar aria-label="Choose a date">
+          <Calendar.Header>
+            <Calendar.YearPickerTrigger>
+              <Calendar.YearPickerTriggerHeading />
+              <Calendar.YearPickerTriggerIndicator />
+            </Calendar.YearPickerTrigger>
+            <Calendar.NavButton slot="previous" />
+            <Calendar.NavButton slot="next" />
+          </Calendar.Header>
+          <Calendar.Grid>
+            <Calendar.GridHeader>
+              {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+            </Calendar.GridHeader>
+            <Calendar.GridBody>{(date) => <Calendar.Cell date={date} />}</Calendar.GridBody>
+          </Calendar.Grid>
+        </Calendar>
+      </DatePicker.Popover>
+    </DatePicker>
+  );
+}
+
+/** A clock of day, as HeroUI's segmented hour and minute field. */
+export function TimeField({ label, value, onChange, className = '', disabled, isDisabled, ...props }) {
+  return (
+    <HeroTimeField
+      value={clockValue(value)}
+      onChange={(next) => onChange?.({ target: { value: clockString(next) } })}
+      isDisabled={isDisabled ?? disabled}
+      className={className}
+      {...props}
+    >
+      {label && <Label>{label}</Label>}
+      <HeroTimeField.Group>
+        <HeroTimeField.Input>
+          {(segment) => <HeroTimeField.Segment segment={segment} />}
+        </HeroTimeField.Input>
+      </HeroTimeField.Group>
+    </HeroTimeField>
+  );
+}
+
+/**
+ * A moment: a day and a clock side by side, kept as the local string the server
+ * already stores ('2026-11-02T09:30'). HeroUI has no single control for both, so
+ * this is its DatePicker and TimeField, each with its own accessible name.
+ */
+export function DateTimeField({ value, onChange, className = '', dateLabel = 'Date', timeLabel = 'Time', disabled, isDisabled }) {
+  const stored = String(value ?? '');
+  const day = stored.slice(0, 10);
+  const clock = stored.slice(11, 16);
+  // Either half alone is still worth keeping: a person picks the day first.
+  const emit = (nextDay, nextClock) =>
+    onChange?.({ target: { value: nextDay || nextClock ? `${nextDay}T${nextClock}` : '' } });
+  return (
+    <div className={`date-time-field ${className}`.trim()}>
+      <DateField
+        aria-label={dateLabel}
+        value={day}
+        onChange={(event) => emit(event.target.value, clock)}
+        isDisabled={isDisabled ?? disabled}
+      />
+      <TimeField
+        aria-label={timeLabel}
+        value={clock}
+        onChange={(event) => emit(day, event.target.value)}
+        isDisabled={isDisabled ?? disabled}
+      />
+    </div>
+  );
+}
+
+/**
+ * Numbers: prices, weights, minute counts. HeroUI's NumberField owns the stepper
+ * buttons and the parsing, and the page keeps handing it the string it already
+ * holds in state.
+ *
+ * The format allows six decimals and no thousands groups, so a supplier price of
+ * 0.001 a picture survives a re-render instead of being rounded to a default.
+ */
+export function NumberField({ label, value, onChange, min, max, step, placeholder, className = '', disabled, isDisabled, formatOptions, ...props }) {
+  const numeric = value === '' || value === null || value === undefined ? Number.NaN : Number(value);
+  return (
+    <HeroNumberField
+      value={Number.isFinite(numeric) ? numeric : Number.NaN}
+      onChange={(next) => onChange?.({ target: { value: Number.isFinite(next) ? String(next) : '' } })}
+      minValue={min === undefined ? undefined : Number(min)}
+      maxValue={max === undefined ? undefined : Number(max)}
+      step={step === undefined ? undefined : Number(step)}
+      formatOptions={formatOptions ?? { useGrouping: false, maximumFractionDigits: 6 }}
+      isDisabled={isDisabled ?? disabled}
+      className={className}
+      {...props}
+    >
+      {label && <Label>{label}</Label>}
+      <HeroNumberField.Group>
+        <HeroNumberField.DecrementButton />
+        <HeroNumberField.Input placeholder={placeholder} />
+        <HeroNumberField.IncrementButton />
+      </HeroNumberField.Group>
+    </HeroNumberField>
   );
 }
 

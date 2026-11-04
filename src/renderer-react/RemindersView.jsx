@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Chip, DateField, Input } from './ui.jsx';
+import { Button, Chip, DateField, Input, NumberField, TimeField } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 
 const REPEAT_OPTIONS = [
@@ -200,17 +200,15 @@ export default function RemindersView() {
               onChange={(date) => setWhen(combineDateTime(date, when.slice(11, 16)))}
               className="min-w-0"
             />
-            <Input
-              type="time"
+            <TimeField
               label="Time"
               value={when.slice(11, 16)}
-              onChange={(event) => setWhen(combineDateTime(when.slice(0, 10), event.target.value))}
+              onChange={(time) => setWhen(combineDateTime(when.slice(0, 10), time))}
               className="w-full"
             />
             <SelectField label="How often" value={repeat} options={REPEAT_OPTIONS} onChange={setRepeat} />
             {repeat === 'interval' && (
-              <Input
-                type="number"
+              <NumberField
                 min="1"
                 step="1"
                 value={intervalMinutes}

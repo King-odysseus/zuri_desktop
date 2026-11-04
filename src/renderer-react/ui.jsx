@@ -1,5 +1,5 @@
 import { forwardRef, useId, Children } from 'react';
-import { CalendarDate } from '@internationalized/date';
+import { CalendarDate, Time } from '@internationalized/date';
 import {
   Button as HeroButton,
   Calendar,
@@ -10,11 +10,13 @@ import {
   Input as HeroInput,
   Label,
   ListBox,
+  NumberField as HeroNumberField,
   Select as HeroSelect,
   Radio as HeroRadio,
   RadioGroup as HeroRadioGroup,
   TextArea,
   TextField,
+  TimeField as HeroTimeField,
 } from '@heroui/react';
 
 /*
@@ -123,6 +125,25 @@ function localDateValue(value) {
   return value.toString();
 }
 
+/*
+ * Times are stored as 'HH:MM', never as a Time, so these two keep that contract
+ * and the pages go on passing strings.
+ */
+function timeValue(value) {
+  const match = /^(\d{1,2}):(\d{2})/.exec(String(value ?? '').trim());
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return new Time(hour, minute);
+}
+
+// Time keeps seconds; the app stores hours and minutes only.
+function timeString(time) {
+  if (!time) return '';
+  return `${String(time.hour).padStart(2, '0')}:${String(time.minute).padStart(2, '0')}`;
+}
+
 // The visible label belongs to DatePicker itself so React Aria wires it to the
 // segmented date input; the popover calendar is HeroUI's own composition.
 export function DateField({ label, value, onChange, className = '', ...props }) {
@@ -165,6 +186,54 @@ export function DateField({ label, value, onChange, className = '', ...props }) 
         </Calendar>
       </DatePicker.Popover>
     </DatePicker>
+  );
+}
+
+export function TimeField({ label, value, onChange, className = '', isDisabled = false, disabled, ...props }) {
+  return (
+    <HeroTimeField
+      value={timeValue(value)}
+      onChange={(next) => onChange?.(timeString(next))}
+      isDisabled={isDisabled || Boolean(disabled)}
+      className={className}
+      {...props}
+    >
+      {label && <Label>{label}</Label>}
+      <HeroTimeField.Group>
+        <HeroTimeField.Input>
+          {(segment) => <HeroTimeField.Segment segment={segment} />}
+        </HeroTimeField.Input>
+      </HeroTimeField.Group>
+    </HeroTimeField>
+  );
+}
+
+/*
+ * Numbers: minute counts and prices. HeroUI's NumberField owns the stepper
+ * buttons and the parsing, and the page keeps handing it the string it holds.
+ * Six decimals and no thousands groups, so 0.001 survives a re-render.
+ */
+export function NumberField({ label, value, onChange, min, max, step, placeholder, className = '', isDisabled = false, disabled, formatOptions, ...props }) {
+  const numeric = value === '' || value === null || value === undefined ? Number.NaN : Number(value);
+  return (
+    <HeroNumberField
+      value={Number.isFinite(numeric) ? numeric : Number.NaN}
+      onChange={(next) => onChange?.({ target: { value: Number.isFinite(next) ? String(next) : '' } })}
+      minValue={min === undefined ? undefined : Number(min)}
+      maxValue={max === undefined ? undefined : Number(max)}
+      step={step === undefined ? undefined : Number(step)}
+      formatOptions={formatOptions ?? { useGrouping: false, maximumFractionDigits: 6 }}
+      isDisabled={isDisabled || Boolean(disabled)}
+      className={className}
+      {...props}
+    >
+      {label && <Label>{label}</Label>}
+      <HeroNumberField.Group>
+        <HeroNumberField.DecrementButton />
+        <HeroNumberField.Input placeholder={placeholder} />
+        <HeroNumberField.IncrementButton />
+      </HeroNumberField.Group>
+    </HeroNumberField>
   );
 }
 

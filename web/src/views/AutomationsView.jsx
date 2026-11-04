@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Chip, IconButton, InlineAlert, Input, Select, Textarea } from '../components/ui.jsx';
+import { Button, Checkbox, Chip, DateTimeField, IconButton, InlineAlert, Input, NumberField, Select, Textarea, TimeField } from '../components/ui.jsx';
 import { AutomationIcon, DeleteIcon, PlusIcon } from '../components/Icons.jsx';
 // The schedule sentence is the one the chat card uses, read back out of the card
 // rather than written again here, so "Every day at 07:00" cannot come to mean two
@@ -326,13 +326,11 @@ export default function AutomationsView() {
 
           {cadenceType === 'daily' && (
             <div className="project-field">
-              <label className="project-field-label" htmlFor="automation-new-time">
+              <span className="project-field-label">
                 Time of day
-              </label>
-              <Input
-                id="automation-new-time"
-                className="project-input"
-                type="time"
+              </span>
+              <TimeField
+                aria-label="Time of day"
                 value={timeOfDay}
                 onChange={(event) => setTimeOfDay(event.target.value)}
               />
@@ -341,13 +339,11 @@ export default function AutomationsView() {
 
           {cadenceType === 'interval' && (
             <div className="project-field">
-              <label className="project-field-label" htmlFor="automation-new-interval">
+              <span className="project-field-label">
                 Minutes apart
-              </label>
-              <Input
-                id="automation-new-interval"
-                className="project-input"
-                type="number"
+              </span>
+              <NumberField
+                aria-label="Minutes apart"
                 min="1"
                 max={INTERVAL_MAX_MINUTES}
                 step="1"
@@ -359,13 +355,10 @@ export default function AutomationsView() {
 
           {cadenceType === 'once' && (
             <div className="project-field">
-              <label className="project-field-label" htmlFor="automation-new-at">
+              <span className="project-field-label">
                 Date and time
-              </label>
-              <Input
-                id="automation-new-at"
-                className="project-input"
-                type="datetime-local"
+              </span>
+              <DateTimeField
                 value={runAt}
                 onChange={(event) => setRunAt(event.target.value)}
               />
@@ -475,7 +468,7 @@ export default function AutomationsView() {
                       </Button>
                       <IconButton
                         label={`Delete ${name}`}
-                        tone="danger"
+                        className="row-delete"
                         size="sm"
                         isDisabled={busyId === automation.id}
                         onClick={() => {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, IconButton, InlineAlert, Input, Select } from '../components/ui.jsx';
+import { Button, DateTimeField, IconButton, InlineAlert, Input, NumberField, Select } from '../components/ui.jsx';
 import { BellIcon, CheckIcon, DeleteIcon, PlusIcon } from '../components/Icons.jsx';
 import { createReminder, deleteReminder, listReminders, updateReminder } from '../lib/api.js';
 
@@ -238,13 +238,10 @@ export default function RemindersView() {
             />
           </div>
           <div className="project-field">
-            <label className="project-field-label" htmlFor="reminder-new-due">
+            <span className="project-field-label">
               When
-            </label>
-            <Input
-              id="reminder-new-due"
-              className="project-input"
-              type="datetime-local"
+            </span>
+            <DateTimeField
               value={dueAt}
               onChange={(event) => setDueAt(event.target.value)}
             />
@@ -270,13 +267,11 @@ export default function RemindersView() {
 
         {repeat === 'interval' && (
           <div className="project-field reminder-interval-field">
-            <label className="project-field-label" htmlFor="reminder-new-interval">
+            <span className="project-field-label">
               Minutes apart
-            </label>
-            <Input
-              id="reminder-new-interval"
-              className="project-input"
-              type="number"
+            </span>
+            <NumberField
+              aria-label="Minutes apart"
               min="1"
               max={INTERVAL_MAX_MINUTES}
               step="1"

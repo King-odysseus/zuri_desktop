@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Chip, DateField, Input, Textarea } from './ui.jsx';
+import { Button, Checkbox, Chip, DateField, Input, NumberField, Textarea, TimeField } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 
 const MODES = [
@@ -278,11 +278,11 @@ export default function AutomationsView() {
               {cadenceType === 'once' && (
                 <>
                   <DateField label="Date" value={onceAt.slice(0, 10)} onChange={(date) => setOnceAt(`${date}T${onceAt.slice(11, 16)}`)} />
-                  <Input type="time" label="Time" value={onceAt.slice(11, 16)} onChange={(event) => setOnceAt(`${onceAt.slice(0, 10)}T${event.target.value}`)} />
+                  <TimeField label="Time" value={onceAt.slice(11, 16)} onChange={(time) => setOnceAt(`${onceAt.slice(0, 10)}T${time}`)} />
                 </>
               )}
-              {cadenceType === 'interval' && <Input type="number" min="1" step="1" label="Minutes between runs" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} />}
-              {cadenceType === 'daily' && <Input type="time" label="Time of day" value={timeOfDay} onChange={(event) => setTimeOfDay(event.target.value)} />}
+              {cadenceType === 'interval' && <NumberField min="1" step="1" label="Minutes between runs" value={intervalMinutes} onChange={(event) => setIntervalMinutes(event.target.value)} />}
+              {cadenceType === 'daily' && <TimeField label="Time of day" value={timeOfDay} onChange={setTimeOfDay} />}
               <SelectField label="Agent" value={agentId} options={[{ value: '', label: 'Whoever is active' }, ...agents.map((agent) => ({ value: agent.id, label: agent.name }))]} onChange={setAgentId} />
             </div>
             <div className="mt-4">
