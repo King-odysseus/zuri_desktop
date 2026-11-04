@@ -44,7 +44,9 @@
     autofit: 'excel',
     addWorksheet: 'excel',
     clear: 'excel',
+    deleteRange: 'excel',
     createTable: 'excel',
+    designTable: 'excel',
     addChart: 'excel',
     fillFormula: 'excel',
     borders: 'excel',
@@ -61,6 +63,8 @@
     applyStyle: 'word',
     replaceAll: 'word',
     insertTable: 'word',
+    deleteSelection: 'word',
+    designWordTable: 'word',
     insertFormatted: 'word',
     setSelectedText: 'powerpoint',
     addSlide: 'powerpoint',
@@ -68,6 +72,8 @@
     setShapeText: 'powerpoint',
     addTextBox: 'powerpoint',
     addTable: 'powerpoint',
+    deleteSelectedObject: 'powerpoint',
+    deleteSlide: 'powerpoint',
     styleShape: 'powerpoint',
   };
 
@@ -304,6 +310,30 @@
         return { ok: true, operation: { op: name, sheet: sheet, range: range.text, name: tableName, hasHeaders: raw.hasHeaders !== false, style: tableStyle } };
       }
 
+      if (name === 'deleteRange') {
+        var shift = text(raw.shift, 10).trim().toLowerCase() || 'up';
+        if (['up', 'left', 'none'].indexOf(shift) === -1) return fail('"shift" must be up, left or none.');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, shift: shift } };
+      }
+
+      if (name === 'designTable') {
+        var designTableName = text(raw.table, 255).trim();
+        if (designTableName === '') return fail('"designTable" needs the table name from the sheet map.');
+        if (!TABLE_NAME.test(designTableName)) return fail('"table" is not a valid Excel table name.');
+        var designStyle = raw.style === undefined ? '' : text(raw.style, 40).trim();
+        if (designStyle !== '' && !TABLE_STYLE.test(designStyle)) return fail('"style" must be a built-in table style such as "TableStyleMedium2".');
+        var design = { op: name, sheet: sheet, table: designTableName, style: designStyle };
+        var hasTableSetting = designStyle !== '';
+        for (var tableFlag of ['showHeaders', 'showTotals', 'showBandedRows', 'showFilterButton']) {
+          if (raw[tableFlag] !== undefined) {
+            design[tableFlag] = raw[tableFlag] === true;
+            hasTableSetting = true;
+          }
+        }
+        if (!hasTableSetting) return fail('"designTable" needs a style or a table display setting.');
+        return { ok: true, operation: design };
+      }
+
       if (name === 'fillFormula') {
         var formula = text(raw.formula, 2000).trim();
         if (formula.charAt(0) !== '=' || formula.length < 2) return fail('"fillFormula" needs one formula starting with "=", written for the first cell of the range.');
@@ -451,6 +481,16 @@
         return { ok: true, operation: { op: name, where: formattedWhere, markdown: markdown } };
       }
 
+      if (name === 'deleteSelection') {
+        return { ok: true, operation: { op: name } };
+      }
+
+      if (name === 'designWordTable') {
+        var wordStyle = text(raw.style, 80).trim();
+        if (wordStyle === '') return fail('"designWordTable" needs a Word table style such as "Table Grid".');
+        return { ok: true, operation: { op: name, style: wordStyle, autofit: raw.autofit !== false } };
+      }
+
       // insertTable
       var rows = normaliseGrid(raw.rows, 'value');
       if (rows === null || rows.length > 50 || rows[0].length > 12) return fail('"insertTable" needs up to 50 rows of up to 12 cells.');
@@ -500,7 +540,35 @@
         if (!Number.isFinite(extent) || extent < 0 || extent > 2000) return fail('"' + edge + '" must be between 0 and 2000 points.');
         table[edge] = extent;
       }
+      for (var tableColour of ['headerFill', 'headerColor', 'bodyFill', 'bodyColor']) {
+        if (raw[tableColour] === undefined) continue;
+        if (typeof raw[tableColour] !== 'string' || !COLOUR.test(raw[tableColour])) return fail('"' + tableColour + '" must be a colour like #1F2A44.');
+        table[tableColour] = raw[tableColour].toUpperCase();
+      }
+      if (raw.borderColor !== undefined) {
+        if (typeof raw.borderColor !== 'string' || !COLOUR.test(raw.borderColor)) return fail('"borderColor" must be a colour like #BFC5D2.');
+        table.borderColor = raw.borderColor.toUpperCase();
+      }
+      if (raw.borderWeight !== undefined) {
+        var borderWeight = Number(raw.borderWeight);
+        if (!Number.isFinite(borderWeight) || borderWeight < 1 || borderWeight > 10) return fail('"borderWeight" must be between 1 and 10 points.');
+        table.borderWeight = borderWeight;
+      }
+      if (raw.size !== undefined) {
+        var tableSize = Number(raw.size);
+        if (!Number.isFinite(tableSize) || tableSize < 8 || tableSize > 48) return fail('"size" must be a table font size between 8 and 48.');
+        table.size = tableSize;
+      }
       return { ok: true, operation: table };
+    }
+
+    if (name === 'deleteSelectedObject') {
+      return { ok: true, operation: { op: name, slide: slide } };
+    }
+
+    if (name === 'deleteSlide') {
+      if (slide < 1) return fail('"deleteSlide" needs a slide number starting at 1.');
+      return { ok: true, operation: { op: name, slide: slide } };
     }
 
     if (name === 'styleShape') {
@@ -655,8 +723,12 @@
         return 'Add a sheet called ' + operation.name;
       case 'clear':
         return 'Clear the contents of ' + where;
+      case 'deleteRange':
+        return 'Delete ' + where + ' and shift the remaining cells ' + operation.shift;
       case 'createTable':
         return 'Turn ' + where + ' into a table' + (operation.name ? ' called ' + operation.name : '');
+      case 'designTable':
+        return 'Design the Excel table ' + operation.table;
       case 'fillFormula':
         return 'Fill ' + where + ' with ' + operation.formula;
       case 'borders':
@@ -693,10 +765,18 @@
         return 'Replace every "' + operation.find + '" with "' + operation.replace + '"';
       case 'insertTable':
         return 'Insert a ' + operation.grid.length + ' by ' + operation.grid[0].length + ' table';
+      case 'deleteSelection':
+        return 'Delete the selected Word content';
+      case 'designWordTable':
+        return 'Design the selected Word table as ' + operation.style;
       case 'insertFormatted':
         return 'Add formatted text (headings, lists, tables) at the ' + whereInWord(operation.where);
       case 'addTable':
         return 'Add a ' + operation.grid.length + ' by ' + operation.grid[0].length + ' table on slide ' + operation.slide;
+      case 'deleteSelectedObject':
+        return 'Delete the selected PowerPoint object';
+      case 'deleteSlide':
+        return 'Delete slide ' + operation.slide;
       case 'styleShape':
         return 'Restyle "' + operation.shape + '" on slide ' + operation.slide;
       case 'setSelectedText':

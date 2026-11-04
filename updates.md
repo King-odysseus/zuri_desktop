@@ -1,3 +1,12 @@
+## 2026-11-04 - Windows (Office add-in deletion and table design)
+
+- The Office add-in can now delete the selected content in Word, the selected range or its contents in Excel, and the selected shape or slide in PowerPoint.
+- Excel existing tables can be restyled with a built-in table style and display settings. Word tables can use a portable built-in style and autofit to the window. New PowerPoint tables accept designed header and body fills, font colours, font size and borders; PowerPoint does not expose a supported API for restyling existing table cells after creation.
+- Added host-specific operation validation, handlers and executable self-test coverage for all three Office hosts.
+- Key files: src/addin/ops.js, src/addin/taskpane.js, src/main/providers/chat.js, scripts/selftest.js.
+- Other OS action: rebuild and reinstall the desktop app before testing the updated add-in in Office.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (Excel selections identify cells and tables)
 
 - Excel context now treats selection as optional, so selecting a chart or other non-cell object does not discard the workbook-wide read on older Office builds.

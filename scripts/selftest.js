@@ -995,12 +995,25 @@ check('Excel add-in applies values, formulas and formatting through the Office b
   const end = source.indexOf('  function applyWord(operations) {', start);
   if (start < 0 || end < 0) throw new Error('Excel applier not found');
   const ranges = new Map();
+  const tables = new Map();
   const makeSheet = (name) => ({
     name,
     getRange(address) {
       const key = `${name}!${address}`;
-      if (!ranges.has(key)) ranges.set(key, { format: { font: {}, fill: {} } });
+      if (!ranges.has(key)) {
+        ranges.set(key, {
+          format: { font: {}, fill: {} },
+          clear(kind) { this.cleared = kind; },
+          delete(shift) { this.deleted = shift; },
+        });
+      }
       return ranges.get(key);
+    },
+    tables: {
+      getItem(tableName) {
+        if (!tables.has(tableName)) tables.set(tableName, { name: tableName });
+        return tables.get(tableName);
+      },
     },
   });
   const sheets = new Map([['Dashboard', makeSheet('Dashboard')], ['Monthly', makeSheet('Monthly')]]);
@@ -1035,6 +1048,8 @@ check('Excel add-in applies values, formulas and formatting through the Office b
     { op: 'setNumberFormat', sheet: 'Dashboard', range: 'B1', format: '0.00', rangeRows: 1, rangeColumns: 1 },
     { op: 'columnWidth', sheet: 'Dashboard', range: 'C1', width: 14 },
     { op: 'columnWidth', sheet: 'Dashboard', range: 'D1', width: 0 },
+    { op: 'deleteRange', sheet: 'Dashboard', range: 'E2:E2', shift: 'up' },
+    { op: 'designTable', sheet: 'Dashboard', table: 'BudgetTable', style: 'TableStyleMedium2', showTotals: true, showBandedRows: true },
     { op: 'setValues', sheet: 'Monthly', range: 'A1', grid: [['September']], rangeRows: 1, rangeColumns: 1 },
   ];
   await sandbox.applyExcel(operations);
@@ -1044,6 +1059,8 @@ check('Excel add-in applies values, formulas and formatting through the Office b
   if (ranges.get('Dashboard!B1').numberFormat[0][0] !== '0.00') throw new Error('number format not applied');
   if (ranges.get('Dashboard!C1').format.columnWidth < 70) throw new Error('a 14-character column would be too narrow');
   if (ranges.get('Dashboard!D1').format.columnWidth !== 0) throw new Error('zero column width was not preserved');
+  if (ranges.get('Dashboard!E2:E2').deleted !== 'Up') throw new Error('Excel range deletion did not shift cells up');
+  if (tables.get('BudgetTable').style !== 'TableStyleMedium2' || tables.get('BudgetTable').showTotals !== true || tables.get('BudgetTable').showBandedRows !== true) throw new Error('Excel table design was not applied');
   if (ranges.get('Monthly!A1').values[0][0] !== 'September') throw new Error('named sheet value was written to the active sheet');
   return 'single-argument batch, named-sheet values, formulas and formatting';
 });
@@ -1054,6 +1071,7 @@ check('Word and PowerPoint add-in edits use portable, single-argument Office bat
 
   const paragraphs = [];
   const replacements = [];
+  let wordDeleted = false;
   const body = {
     insertParagraph(text) {
       const paragraph = { text, styleBuiltIn: '' };
@@ -1071,8 +1089,18 @@ check('Word and PowerPoint add-in edits use portable, single-argument Office bat
   };
   const selection = {
     styleBuiltIn: '',
+    allowAutoFit: false,
+    isNullObject: false,
+    parentTableOrNullObject: {
+      isNullObject: false,
+      styleBuiltIn: '',
+      autoFit: '',
+      load() {},
+      autoFitBehavior(value) { this.autoFit = value; },
+    },
     insertText() {},
     insertParagraph() {},
+    delete() { wordDeleted = true; },
   };
   const wordContext = {
     document: { body, getSelection: () => selection },
@@ -1095,15 +1123,25 @@ check('Word and PowerPoint add-in edits use portable, single-argument Office bat
   await wordSandbox.applyWord([
     { op: 'insertParagraphs', paragraphs: [{ text: 'Heading', style: 'Heading 1' }] },
     { op: 'replaceAll', find: 'old', replace: 'new' },
+    { op: 'deleteSelection' },
+    { op: 'designWordTable', style: 'Table Grid', autofit: true },
   ]);
   if (paragraphs[0]?.styleBuiltIn !== 'Heading1') throw new Error('Word heading was not assigned through styleBuiltIn');
   if (replacements[0] !== 'new') throw new Error('Word replace-all did not update a match');
+  if (!wordDeleted) throw new Error('Word selection deletion did not run');
+  if (selection.parentTableOrNullObject.styleBuiltIn !== 'TableGrid' || selection.parentTableOrNullObject.autoFit !== 'Window') throw new Error('Word table design was not applied');
 
   const font = {};
-  const titlePlaceholder = { name: 'Title 4', fill: { setSolidColor() {} }, textFrame: { textRange: { font } } };
-  const slide = { shapes: { items: [titlePlaceholder], load() {} } };
+  let selectedDeleted = false;
+  let slideDeleted = false;
+  const titlePlaceholder = { name: 'Title 4', fill: { setSolidColor() {} }, delete() { selectedDeleted = true; }, textFrame: { textRange: { font } } };
+  const tableShape = { name: 'Table 1', fill: { setSolidColor(color) { this.color = color; } }, delete() { selectedDeleted = true; }, textFrame: { textRange: { font: {} } } };
+  const slide = { delete() { slideDeleted = true; }, shapes: { items: [titlePlaceholder, tableShape], load() {} } };
   const powerPointContext = {
-    presentation: { slides: { getItemAt: () => slide, add: () => slide } },
+    presentation: {
+      slides: { getItemAt: () => slide, add: () => slide },
+      getSelectedShapes: () => ({ items: [tableShape], load() {} }),
+    },
     sync: async () => {},
   };
   const powerPointSandbox = {
@@ -1122,9 +1160,17 @@ check('Word and PowerPoint add-in edits use portable, single-argument Office bat
   const placeTableStart = source.indexOf('  function placeTable(', powerPointStart);
   if (placeTableStart < 0) throw new Error('PowerPoint applier not found');
   vm.runInContext(source.slice(powerPointStart, placeTableStart), powerPointSandbox);
-  await powerPointSandbox.applyPowerPoint([{ op: 'styleShape', slide: 5, shape: 'Title 1', color: '#123456', size: 30, bold: true }]);
+  await powerPointSandbox.applyPowerPoint([
+    { op: 'styleShape', slide: 5, shape: 'Title 1', color: '#123456', size: 30, bold: true },
+    { op: 'deleteSelectedObject', slide: 5 },
+    { op: 'deleteSlide', slide: 5 },
+  ]);
   if (font.color !== '#123456' || font.size !== 30 || font.bold !== true) {
     throw new Error('PowerPoint title fallback did not style the available title placeholder');
+  }
+  if (!selectedDeleted || !slideDeleted) throw new Error('PowerPoint deletion did not run for the selected object and slide');
+  for (const required of ['headerFill', 'headerColor', 'bodyFill', 'bodyColor', 'borderColor', 'uniformCellProperties']) {
+    if (!source.includes(required)) throw new Error(`PowerPoint table design is missing ${required}`);
   }
   for (const required of [
     'parentTableOrNullObject',

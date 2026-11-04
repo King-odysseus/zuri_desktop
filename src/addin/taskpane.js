@@ -1338,6 +1338,16 @@
           continue;
         }
 
+        if (operation.op === 'designTable') {
+          var namedTable = sheet.tables.getItem(operation.table);
+          if (operation.style) namedTable.style = operation.style;
+          ['showHeaders', 'showTotals', 'showBandedRows', 'showFilterButton'].forEach(function (flag) {
+            if (operation[flag] !== undefined) namedTable[flag] = operation[flag];
+          });
+          applied.push(operation);
+          continue;
+        }
+
         var range = sheet.getRange(operation.range);
 
         if (operation.op === 'setValues' || operation.op === 'setFormulas') {
@@ -1375,6 +1385,9 @@
           range.format.autofitRows();
         } else if (operation.op === 'clear') {
           range.clear('Contents');
+        } else if (operation.op === 'deleteRange') {
+          if (operation.shift === 'none') range.clear('All');
+          else range.delete(operation.shift === 'left' ? 'Left' : 'Up');
         } else if (operation.op === 'createTable') {
           var table = context.workbook.tables.add(range, operation.hasHeaders !== false);
           if (operation.name) table.name = operation.name;
@@ -1438,6 +1451,7 @@
     return Word.run(function (context) {
       var applied = [];
       var searches = [];
+      var tableDesigns = [];
       var body = context.document.body;
       var selection = context.document.getSelection();
 
@@ -1479,6 +1493,14 @@
                 : 'End';
           var formattedAnchor = formattedWhere === 'After' || formattedWhere === 'Replace' ? selection : body;
           formattedAnchor.insertHtml(ZuriOps.markdownToHtml(operation.markdown), formattedWhere);
+        } else if (operation.op === 'deleteSelection') {
+          if (typeof selection.delete === 'function') selection.delete();
+          else selection.insertText('', 'Replace');
+        } else if (operation.op === 'designWordTable') {
+          if (!selection.parentTableOrNullObject) throw new Error('Select a Word table before asking Zuri to design it.');
+          var designTable = selection.parentTableOrNullObject;
+          designTable.load('isNullObject');
+          tableDesigns.push({ table: designTable, operation: operation });
         }
         applied.push(operation);
       }
@@ -1486,6 +1508,16 @@
       searches.forEach(function (entry) { entry.found.load('items'); });
 
       return context.sync().then(function () {
+        tableDesigns.forEach(function (entry) {
+          if (entry.table.isNullObject) throw new Error('Select a Word table before asking Zuri to design it.');
+          entry.table.styleBuiltIn = wordTableStyle(entry.operation.style);
+          if (entry.operation.autofit !== undefined && typeof entry.table.autoFitBehavior === 'function') {
+            entry.table.autoFitBehavior(entry.operation.autofit ? 'Window' : 'FixedSize');
+          }
+        });
+        if (tableDesigns.length > 0) return context.sync();
+        return null;
+      }).then(function () {
         searches.forEach(function (entry) {
           entry.found.items.forEach(function (range) { range.insertText(entry.replace, 'Replace'); });
         });
@@ -1525,6 +1557,25 @@
       listparagraph: 'ListParagraph',
     }[key];
     if (builtIn) paragraph.styleBuiltIn = builtIn;
+  }
+
+  function wordTableStyle(requestedStyle) {
+    var key = String(requestedStyle || '').trim().toLowerCase().replace(/[ _-]+/g, '');
+    var builtIn = {
+      tablegrid: 'TableGrid',
+      plaintable1: 'PlainTable1',
+      plaintable2: 'PlainTable2',
+      plaintable3: 'PlainTable3',
+      lightshading: 'LightShading',
+      lightgrid: 'LightGrid',
+      lightlist: 'LightList',
+      mediumshading1accent1: 'MediumShading1Accent1',
+      mediumshading2accent1: 'MediumShading2Accent1',
+      mediumlist1accent1: 'MediumList1Accent1',
+      mediumlist2accent1: 'MediumList2Accent1',
+    }[key];
+    if (!builtIn) throw new Error('Word does not recognise the table style "' + requestedStyle + '".');
+    return builtIn;
   }
 
   function applyPowerPoint(operations) {
@@ -1595,6 +1646,17 @@
             var slide = slides.add();
             if (operation.title) placeBox(slide, operation.title, 36, 28, 560, 60, 26, true);
             if (operation.body) placeBox(slide, operation.body, 36, 104, 560, 260, 16, false);
+            return;
+          }
+          if (operation.op === 'deleteSlide') {
+            slideAt(operation.slide).delete();
+            return;
+          }
+          if (operation.op === 'deleteSelectedObject') {
+            if (selectedShape === null || typeof selectedShape.delete !== 'function') {
+              throw new Error('Select a PowerPoint shape or table before asking Zuri to delete it.');
+            }
+            selectedShape.delete();
             return;
           }
           var target = slideAt(operation.slide || 1);
@@ -1684,11 +1746,25 @@
       placeBox(slide, operation.grid.map(function (row) { return row.join('\t'); }).join('\n'), left, top, width, height, 14, false);
       return;
     }
+    var uniform = { font: { size: operation.size || 14 } };
+    if (operation.borderColor) {
+      var border = { color: operation.borderColor, weight: operation.borderWeight || 1 };
+      uniform.borders = { top: border, bottom: border, left: border, right: border };
+    }
     var header = operation.grid[0].map(function () {
-      return { fill: { color: '#1F2A44' }, font: { bold: true, color: '#FFFFFF' } };
+      return {
+        fill: { color: operation.headerFill || '#1F2A44' },
+        font: { bold: true, color: operation.headerColor || '#FFFFFF' },
+      };
     });
     var cells = operation.grid.map(function (_row, rowIndex) {
-      return rowIndex === 0 ? header : operation.grid[0].map(function () { return {}; });
+      if (rowIndex === 0) return header;
+      return operation.grid[0].map(function () {
+        var cell = {};
+        if (operation.bodyFill) cell.fill = { color: operation.bodyFill };
+        if (operation.bodyColor) cell.font = { color: operation.bodyColor };
+        return cell;
+      });
     });
     slide.shapes.addTable(operation.grid.length, operation.grid[0].length, {
       values: operation.grid,
@@ -1696,7 +1772,7 @@
       top: top,
       width: width,
       height: height,
-      uniformCellProperties: { font: { size: 14 } },
+      uniformCellProperties: uniform,
       specificCellProperties: cells,
     });
   }
