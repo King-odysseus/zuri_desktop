@@ -26,7 +26,7 @@ import path from 'node:path';
 import { DEFAULT_PROVIDER, PROVIDERS, getKey } from '../secrets.js';
 import { replyThroughAccount } from './cloud-chat.js';
 import { appendMessage, findAgent, readStore, removeTrailingReply } from '../store.js';
-import { agentAllowedTools, runTool, TOOLS } from '../tools/index.js';
+import { agentAllowedTools, listMcpTools, runTool, TOOLS } from '../tools/index.js';
 // The row that names what was just created is described once, in the module both the
 // desktop window and the browser chat read, so the two can never word it differently.
 import { describeNotable, notableKindFor } from '../../shared/notableActions.js';
@@ -293,9 +293,9 @@ export function normaliseChatMode(value) {
  * @param {boolean} webSearch Whether the person switched web search on for this message.
  * @returns {object[]}
  */
-export function toolsForMode(mode, webSearch) {
+export function toolsForMode(mode, webSearch, mcpTools = []) {
   const base = webSearch === true ? ALL_CHAT_TOOLS : BASE_TOOLS;
-  return normaliseChatMode(mode) === 'ask' ? [...base] : [...base, ...GATED_TOOLS];
+  return normaliseChatMode(mode) === 'ask' ? [...base] : [...base, ...GATED_TOOLS, ...mcpTools];
 }
 
 /**
@@ -337,8 +337,8 @@ export function describeToolCall(name, args) {
  * @param {{ name: string, args: Record<string, any>, mode: string, requestApproval?: Function }} call
  * @returns {Promise<{ run: boolean, confirmed: boolean, reason?: string }>}
  */
-export async function approveToolCall({ name, args, mode, requestApproval }) {
-  const tool = TOOLS.find((entry) => entry.name === name);
+export async function approveToolCall({ name, args, mode, requestApproval, mcpTools = [] }) {
+  const tool = TOOLS.find((entry) => entry.name === name) ?? mcpTools.find((entry) => entry.name === name);
   if (!tool?.requiresConfirmation) return { run: true, confirmed: false };
 
   const chosenMode = normaliseChatMode(mode);
@@ -1823,7 +1823,8 @@ export async function sendChatMessage(threadId, options = {}) {
     // server only ever forwards the definitions and returns the request.
     const allowedForAccount = agentAllowedTools(settings, options.agentId);
     const disabledTools = new Set(Array.isArray(settings?.disabledTools) ? settings.disabledTools : []);
-    const offeredForAccount = toolsForMode(mode, options.webSearch)
+    const mcpTools = await listMcpTools(settings);
+    const offeredForAccount = toolsForMode(mode, options.webSearch, mcpTools)
       .filter((tool) => !disabledTools.has(tool.name))
       .filter((tool) => allowedForAccount === null || allowedForAccount.includes(tool.name));
 
@@ -1894,11 +1895,11 @@ export async function sendChatMessage(threadId, options = {}) {
         // The mode and the person decide whether a risky step runs; the registry
         // still refuses it unless `confirmed` is set, so this is the only way in.
         const decision = offered
-          ? await approveToolCall({ name: call.name, args, mode, requestApproval: options.requestApproval })
+          ? await approveToolCall({ name: call.name, args, mode, requestApproval: options.requestApproval, mcpTools })
           : null;
         let outcome;
         if (decision === null) outcome = failure('TOOL_UNKNOWN', `${call.name} is not available in chat.`);
-        else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed, dependencies: options.toolDependencies });
+        else if (decision.run) outcome = await runTool(call.name, args, { allowedTools: allowedForAccount, confirmed: decision.confirmed, dependencies: options.toolDependencies, settings, mcpTools });
         else outcome = failure('TOOL_DECLINED', decision.reason);
 
         // A created to-do, reminder or automation is worth more than the sentence that

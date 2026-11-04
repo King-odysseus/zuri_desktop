@@ -28,6 +28,7 @@ import { createRequire } from 'node:module';
 import { readStore, findAgent, createTask, createReminder, createAutomation } from '../store.js';
 import { OFFICE_KINDS, OfficeError, buildOfficeFile, reviewOfficeContent } from '../office.js';
 import { describeWorkbook, editOfficeFile } from '../office-edit.js';
+import { callMcpTool, listMcpTools as discoverMcpTools } from '../mcp/client.js';
 
 const WORKSPACE_DIR_NAME = 'workspace';
 const WORKSPACE_LIST_LIMIT = 500;
@@ -1229,7 +1230,7 @@ export function getTool(name) {
  */
 export function listTools(options = {}) {
   const allowed = Array.isArray(options.allowedTools) ? options.allowedTools : null;
-  return TOOLS.filter((tool) => allowed === null || allowed.includes(tool.name)).map((tool) => ({
+  return [...TOOLS, ...connectorTools].filter((tool) => allowed === null || allowed.includes(tool.name)).map((tool) => ({
     name: tool.name,
     description: tool.description,
     requiresConfirmation: tool.requiresConfirmation,
@@ -1243,7 +1244,16 @@ export function listTools(options = {}) {
  * @returns {{ name: string, label: string, description: string }[]}
  */
 export function toolCatalogue() {
-  return TOOLS.map((tool) => ({ name: tool.name, label: tool.label, description: tool.description }));
+  return [...TOOLS, ...connectorTools].map((tool) => ({ name: tool.name, label: tool.label ?? tool.name, description: tool.description }));
+}
+
+/** Return enabled connector tools without exposing a handler to the renderer. */
+export async function listMcpTools(settings) {
+  return (await discoverMcpTools(settings)).map((tool) => ({ name: tool.name, label: tool.label, description: tool.description, requiresConfirmation: true }));
+}
+
+function mcpToolFor(name, descriptors = []) {
+  return descriptors.find((tool) => tool.name === name) ?? null;
 }
 
 /**
@@ -1292,8 +1302,25 @@ export async function runTool(name, args = {}, options = {}) {
   }
 
   const tool = getTool(name);
+  const mcpTool = mcpToolFor(name, options.mcpTools);
+  if (!tool && mcpTool) {
+    if (Array.isArray(options.allowedTools) && !options.allowedTools.includes(mcpTool.name)) {
+      return failure('TOOL_NOT_ALLOWED', `${mcpTool.name} is not in this agent's allowed tools.`);
+    }
+    if (options.confirmed !== true) return failure('TOOL_CONFIRMATION_REQUIRED', `${name} changes things outside Zuri, so it needs confirmation first.`);
+    try {
+      const settings = await settingsLoader(options)();
+      const server = Array.isArray(settings?.mcpServers) ? settings.mcpServers.find((entry) => entry.id === mcpTool.mcpServerId && entry.enabled === true) : null;
+      if (!server) return failure('MCP_SERVER_DISABLED', 'That MCP server is disabled or no longer configured.');
+      const result = await callMcpTool(server, mcpTool.mcpToolName, args);
+      return ok({ server: mcpTool.mcpServerId, tool: mcpTool.mcpToolName, result });
+    } catch (error) {
+      console.warn(`[zuri:mcp] ${mcpTool.mcpServerId}: ${error.message}`);
+      return failure('MCP_TOOL_FAILED', error.message);
+    }
+  }
   if (!tool) {
-    return failure('TOOL_UNKNOWN', `"${String(name)}" is not a Zuri tool. The tools are: ${TOOL_NAMES.join(', ')}.`);
+    return failure('TOOL_UNKNOWN', `"${String(name)}" is not a Zuri tool. The tools are: ${allToolNames().join(', ')}.`);
   }
 
   if (Array.isArray(options.allowedTools) && !options.allowedTools.includes(tool.name)) {

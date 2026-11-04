@@ -20,6 +20,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
+import { validateMcpServerConfig } from './mcp/client.js';
 
 const STORE_DIR_NAME = 'zuri';
 const WRITE_RETRY_DELAY_MS = 250;
@@ -71,6 +72,9 @@ export const DEFAULT_DATA = Object.freeze({
     answerDetail: 'standard',
     answerLayout: 'auto',
     customInstructions: '',
+    // MCP servers are explicit user integrations. Disabled by default so adding a
+    // connector never grants a model access until the person enables it.
+    mcpServers: Object.freeze([]),
   }),
 });
 
@@ -324,6 +328,14 @@ export async function saveSettings(patch, options = {}) {
   if (Object.hasOwn(patch, 'disabledTools') && (!Array.isArray(patch.disabledTools) || patch.disabledTools.some((tool) => typeof tool !== 'string'))) {
     return failure('SETTINGS_INVALID_PLUGINS', 'disabledTools must be a list of tool names');
   }
+  if (Object.hasOwn(patch, 'mcpServers')) {
+    if (!Array.isArray(patch.mcpServers) || patch.mcpServers.length > 50) return failure('SETTINGS_INVALID_MCP', 'mcpServers must be a list of at most 50 servers');
+    for (const server of patch.mcpServers) {
+      const error = validateMcpServerConfig(server);
+      if (error) return failure('SETTINGS_INVALID_MCP', error);
+      if (typeof server.enabled !== 'boolean') return failure('SETTINGS_INVALID_MCP', 'each MCP server needs an enabled flag');
+    }
+  }
 
   // Standing instructions come from a text box and ride in every request, so the
   // stored copy is trimmed and capped here rather than trusted as sent.
@@ -331,6 +343,15 @@ export async function saveSettings(patch, options = {}) {
     ...patch,
     ...(Object.hasOwn(patch, 'customInstructions') ? { customInstructions: patch.customInstructions.trim().slice(0, CUSTOM_INSTRUCTIONS_MAX_LENGTH) } : {}),
     ...(Object.hasOwn(patch, 'disabledTools') ? { disabledTools: [...new Set(patch.disabledTools.map((tool) => tool.trim()).filter(Boolean))].slice(0, 100) } : {}),
+    ...(Object.hasOwn(patch, 'mcpServers') ? { mcpServers: patch.mcpServers.map((server) => ({
+      id: server.id.trim(),
+      name: server.name.trim(),
+      command: server.command.trim(),
+      args: Array.isArray(server.args) ? server.args.map((arg) => arg.trim()).filter(Boolean).slice(0, 40) : [],
+      cwd: typeof server.cwd === 'string' ? server.cwd.trim() : '',
+      env: server.env && typeof server.env === 'object' ? Object.fromEntries(Object.entries(server.env).map(([key, value]) => [key, String(value)])) : {},
+      enabled: server.enabled === true,
+    })) } : {}),
   };
 
   return withSettingsLock(async () => {

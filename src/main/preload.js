@@ -112,6 +112,10 @@ const CHANNELS = Object.freeze([
   // confirmed flag in its payload, so the renderer cannot start one on its own.
   'zuri:tools:run',
   'zuri:tools:cancel',
+  'zuri:mcp:list',
+  'zuri:mcp:save',
+  'zuri:mcp:remove',
+  'zuri:mcp:test',
   // The quick-ask card is opened from the main window, and closed or handed back to
   // the main window from the card itself.
   'zuri:overlay:open',

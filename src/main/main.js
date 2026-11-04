@@ -70,6 +70,7 @@ import {
   updateTask,
 } from './store.js';
 import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, resolveWorkspacePath, runTool, toolCatalogue } from './tools/index.js';
+import { publicMcpServer, testMcpServer } from './mcp/client.js';
 
 // ESM main process (package.json sets "type": "module"), so __dirname is built here.
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -393,6 +394,10 @@ const HANDLERS = new Map([
   ['zuri:tools:list', handleToolsList],
   ['zuri:tools:run', handleToolsRun],
   ['zuri:tools:cancel', handleToolsCancel],
+  ['zuri:mcp:list', handleMcpList],
+  ['zuri:mcp:save', handleMcpSave],
+  ['zuri:mcp:remove', handleMcpRemove],
+  ['zuri:mcp:test', handleMcpTest],
   ['zuri:overlay:open', handleOverlayOpen],
   ['zuri:overlay:hide', handleOverlayHide],
   ['zuri:overlay:open-main', handleOverlayOpenMain],
@@ -497,6 +502,52 @@ function handleToolsRun(payload) {
  */
 function handleToolsCancel(payload) {
   return cancelToolStep(payload?.id);
+}
+
+async function handleMcpList() {
+  const settings = await readSettings();
+  if (!settings.ok) return settings;
+  return { ok: true, data: Array.isArray(settings.data.mcpServers) ? settings.data.mcpServers.map(publicMcpServer) : [] };
+}
+
+async function handleMcpSave(payload) {
+  const settings = await readSettings();
+  if (!settings.ok) return settings;
+  const server = payload?.server && typeof payload.server === 'object' ? { ...payload.server } : null;
+  if (!server) return { ok: false, error: { code: 'MCP_SERVER_REQUIRED', message: 'An MCP server configuration is required.' } };
+  const current = Array.isArray(settings.data.mcpServers) ? settings.data.mcpServers : [];
+  const existing = current.find((entry) => entry.id === server.id);
+  // The list endpoint masks environment values. Preserve those values when the
+  // renderer saves an enable toggle or a test result from that public copy.
+  if (existing && server.env && typeof server.env === 'object') {
+    server.env = Object.fromEntries(Object.entries(server.env).map(([key, value]) => [key, value === '[stored]' ? existing.env?.[key] ?? '' : value]));
+  }
+  const next = current.some((entry) => entry.id === server.id)
+    ? current.map((entry) => (entry.id === server.id ? server : entry))
+    : [...current, server];
+  const saved = await saveSettings({ mcpServers: next });
+  if (!saved.ok) return saved;
+  return { ok: true, data: publicMcpServer(server) };
+}
+
+async function handleMcpRemove(payload) {
+  const id = typeof payload?.id === 'string' ? payload.id.trim() : '';
+  if (id === '') return { ok: false, error: { code: 'MCP_SERVER_ID_REQUIRED', message: 'An MCP server id is required.' } };
+  const settings = await readSettings();
+  if (!settings.ok) return settings;
+  const next = (Array.isArray(settings.data.mcpServers) ? settings.data.mcpServers : []).filter((entry) => entry.id !== id);
+  const saved = await saveSettings({ mcpServers: next });
+  return saved.ok ? { ok: true, data: { id } } : saved;
+}
+
+async function handleMcpTest(payload) {
+  const server = payload?.server && typeof payload.server === 'object' ? payload.server : null;
+  if (!server) return { ok: false, error: { code: 'MCP_SERVER_REQUIRED', message: 'An MCP server configuration is required.' } };
+  try {
+    return { ok: true, data: await testMcpServer(server) };
+  } catch (error) {
+    return { ok: false, error: { code: 'MCP_TEST_FAILED', message: error.message } };
+  }
 }
 
 /**

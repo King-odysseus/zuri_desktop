@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox } from './ui.jsx';
+import { Button, Checkbox, Input, Textarea } from './ui.jsx';
 import { GridIcon, LockIcon, SkillsIcon } from './Icons.jsx';
 
 const PREVIEW_TOOLS = [
@@ -25,21 +25,26 @@ export default function PluginsView({ onNavigate = () => {} }) {
   const settingsApi = typeof window !== 'undefined' ? window.zuri?.settings : undefined;
   const toolsApi = typeof window !== 'undefined' ? window.zuri?.tools : undefined;
   const skillsApi = typeof window !== 'undefined' ? window.zuri?.skills : undefined;
+  const mcpApi = typeof window !== 'undefined' ? window.zuri?.mcp : undefined;
   const [tools, setTools] = useState(PREVIEW_TOOLS);
   const [skills, setSkills] = useState([]);
   const [disabledTools, setDisabledTools] = useState([]);
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
+  const [servers, setServers] = useState([]);
+  const [serverForm, setServerForm] = useState({ id: '', name: '', command: '', args: '', cwd: '', env: '', enabled: false });
+  const [serverBusy, setServerBusy] = useState(false);
 
   async function load() {
     if (typeof settingsApi?.get !== 'function') {
       setStatus('ready');
       return;
     }
-    const [settings, listedTools, listedSkills] = await Promise.all([
+    const [settings, listedTools, listedSkills, listedServers] = await Promise.all([
       settingsApi.get(),
       toolsApi?.list?.(),
       skillsApi?.list?.(),
+      mcpApi?.list?.(),
     ]);
     if (!settings?.ok) {
       setStatus('error');
@@ -49,7 +54,61 @@ export default function PluginsView({ onNavigate = () => {} }) {
     setDisabledTools(Array.isArray(settings.data?.disabledTools) ? settings.data.disabledTools : []);
     if (listedTools?.ok) setTools(safeTools(listedTools.data));
     if (listedSkills?.ok && Array.isArray(listedSkills.data)) setSkills(listedSkills.data);
+    if (listedServers?.ok && Array.isArray(listedServers.data)) setServers(listedServers.data);
     setStatus('ready');
+  }
+
+  function clearServerForm() {
+    setServerForm({ id: '', name: '', command: '', args: '', cwd: '', env: '', enabled: false });
+  }
+
+  async function saveServer(event) {
+    event.preventDefault();
+    setServerBusy(true);
+    try {
+      let env = {};
+      if (serverForm.env.trim() !== '') {
+        env = JSON.parse(serverForm.env);
+        if (env === null || typeof env !== 'object' || Array.isArray(env)) throw new Error('Environment must be a JSON object.');
+      }
+      const result = await mcpApi?.save?.({ server: {
+        id: serverForm.id.trim() || `server-${Date.now().toString(36)}`,
+        name: serverForm.name,
+        command: serverForm.command,
+        args: serverForm.args.split(/\s+/).filter(Boolean),
+        cwd: serverForm.cwd,
+        env,
+        enabled: serverForm.enabled,
+      } });
+      if (!result?.ok) throw new Error(result?.error?.message ?? 'The connector could not be saved.');
+      setMessage('MCP connector saved.');
+      clearServerForm();
+      await load();
+    } catch (error) {
+      setMessage(error.message);
+    } finally {
+      setServerBusy(false);
+    }
+  }
+
+  async function testServer(server) {
+    setServerBusy(true);
+    const result = await mcpApi?.test?.({ server });
+    setMessage(result?.ok ? `${server.name} found ${result.data.tools.length} tool${result.data.tools.length === 1 ? '' : 's'}.` : (result?.error?.message ?? 'The connector test failed.'));
+    setServerBusy(false);
+  }
+
+  async function toggleServer(server, enabled) {
+    const result = await mcpApi?.save?.({ server: { ...server, enabled } });
+    if (!result?.ok) setMessage(result?.error?.message ?? 'The connector could not be changed.');
+    else await load();
+  }
+
+  async function removeServer(id) {
+    if (!window.confirm('Remove this MCP connector?')) return;
+    const result = await mcpApi?.remove?.({ id });
+    if (!result?.ok) setMessage(result?.error?.message ?? 'The connector could not be removed.');
+    else { setMessage('MCP connector removed.'); await load(); }
   }
 
   useEffect(() => { void load(); }, []);
@@ -127,12 +186,30 @@ export default function PluginsView({ onNavigate = () => {} }) {
           </section>
 
           <section className="zuri-plugin-section" aria-labelledby="connectors-heading">
-            <div className="flex items-start gap-3 px-4 py-4">
+            <div className="flex items-start gap-3 px-4 pt-4">
               <LockIcon size={20} className="mt-0.5 text-accent" />
               <div>
                 <h2 id="connectors-heading">Connectors</h2>
-                <p className="mt-1 text-sm text-muted">MCP connectors are planned next. They will add outside services such as Drive or GitHub without letting Zuri run unknown code inside your computer.</p>
+                <p className="mt-1 text-sm text-muted">Connect local MCP servers such as Drive or GitHub. Every discovered tool asks for approval before it runs.</p>
               </div>
+            </div>
+            <div className="px-4 pb-4 pt-3">
+              {servers.length > 0 && <ul className="flex flex-col divide-y divide-border rounded-xl border border-border">
+                {servers.map((server) => <li key={server.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
+                  <div className="min-w-0 flex-1"><h3 className="font-medium">{server.name}</h3><p className="truncate text-xs text-muted">{server.command} {server.args?.join(' ')}</p></div>
+                  <Checkbox isSelected={server.enabled === true} onChange={(checked) => void toggleServer(server, checked)} aria-label={`${server.enabled ? 'Disable' : 'Enable'} ${server.name}`}>{server.enabled ? 'On' : 'Off'}</Checkbox>
+                  <Button size="sm" variant="secondary" isDisabled={serverBusy} onPress={() => void testServer(server)}>Test</Button>
+                  <Button size="sm" variant="ghost" onPress={() => void removeServer(server.id)}>Remove</Button>
+                </li>)}
+              </ul>}
+              <form className="mt-4 grid gap-3" onSubmit={saveServer}>
+                <div className="grid gap-3 sm:grid-cols-2"><Input label="Name" value={serverForm.name} onChange={(event) => setServerForm((current) => ({ ...current, name: event.target.value }))} required placeholder="Local tools" /><Input label="Command" value={serverForm.command} onChange={(event) => setServerForm((current) => ({ ...current, command: event.target.value }))} required placeholder="npx" /></div>
+                <Input label="Arguments, separated by spaces" value={serverForm.args} onChange={(event) => setServerForm((current) => ({ ...current, args: event.target.value }))} placeholder="-y @modelcontextprotocol/server-filesystem C:\\Work" />
+                <Input label="Working folder, optional" value={serverForm.cwd} onChange={(event) => setServerForm((current) => ({ ...current, cwd: event.target.value }))} placeholder="C:\\Work" />
+                <Textarea label="Environment JSON, optional" rows={2} value={serverForm.env} onChange={(event) => setServerForm((current) => ({ ...current, env: event.target.value }))} placeholder={'{"API_TOKEN":"value"}'} />
+                <label className="flex min-h-11 items-center gap-2 text-sm"><Checkbox isSelected={serverForm.enabled} onChange={(checked) => setServerForm((current) => ({ ...current, enabled: checked }))}>Enable after saving</Checkbox></label>
+                <div><Button type="submit" isDisabled={serverBusy || serverForm.name.trim() === '' || serverForm.command.trim() === ''}>{serverBusy ? 'Saving...' : 'Add connector'}</Button></div>
+              </form>
             </div>
           </section>
         </div>

@@ -1381,3 +1381,11 @@
 - Other OS action: run `npm run react:build` before packaging or deploying.
 - Done on: Windows
 
+## 2026-11-04 - Windows (MCP connector support)
+
+- Added validated MCP server settings, a bounded non-shell stdio client, tool discovery and approval-gated tool calls. Plugins can add, enable, test and remove local connectors; discovered names are scoped to their server.
+- Checked: `npm test` passes, including a fake-server handshake, discovery, call and approval regression check.
+- Key files: src/main/mcp/client.js, src/main/store.js, src/main/tools/index.js, src/main/providers/chat.js, src/main/main.js, src/renderer-react/PluginsView.jsx, scripts/selftest.js.
+- Other OS action: run `npm test` before using the MCP connector UI. No new dependency was added.
+- Done on: Windows
+

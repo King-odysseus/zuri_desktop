@@ -2,29 +2,41 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Read project specifications and inspect existing tool, skill, settings, and navigation code",
+      "text": "Read the tool registry, chat tool dispatch, settings store, and Plugins wiring",
       "state": "done"
     },
     {
-      "text": "Add a persisted Plugins model and safe enable or disable controls for built-in tools and skills",
+      "text": "Add MCP server settings with validation and safe defaults",
       "state": "done"
     },
     {
-      "text": "Add the Plugins view and navigation entry with phone and desktop layouts",
+      "text": "Build the MCP stdio client with handshake, discovery, calls, timeouts, and shutdown",
       "state": "done"
     },
     {
-      "text": "Run npm test and focused checks, then review the diff for security and scope",
+      "text": "Expose enabled MCP tools to chat through approval-gated dispatch",
       "state": "done"
     },
     {
-      "text": "Deploy the current web build",
+      "text": "Add connector management to the Plugins page",
       "state": "done"
     },
     {
-      "text": "Build and install the Windows app for manual testing",
+      "text": "Add fake-server coverage and run the full npm test",
+      "state": "done"
+    },
+    {
+      "text": "Commit and push the completed MCP integration",
+      "state": "done"
+    },
+    {
+      "text": "Redeploy the web control styling after the dropdown and calendar polish",
+      "state": "done"
+    },
+    {
+      "text": "Move account cards to the bottom of desktop and web navigation",
       "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T02:05:00.000Z"
+  "updatedAt": "2026-11-04T03:05:00.000Z"
 }

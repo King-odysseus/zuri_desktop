@@ -376,6 +376,28 @@ check('answer style choices are validated and stored trimmed', async () => {
   return 'unknown values refused, defaults filled in';
 });
 
+check('MCP settings and stdio tools are validated and approval gated', async () => {
+  const mcp = await import(pathToFileURL(path.join(root, 'src/main/mcp/client.js')).href);
+  const fake = [
+    "const readline=require('readline');",
+    "const rl=readline.createInterface({input:process.stdin});",
+    "rl.on('line',line=>{const m=JSON.parse(line); if(m.id&&m.method==='initialize') process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{protocolVersion:'2024-11-05',capabilities:{},serverInfo:{name:'fake'}}})+'\\n');",
+    "else if(m.id&&m.method==='tools/list') process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{tools:[{name:'echo',description:'Echo text',inputSchema:{type:'object',properties:{text:{type:'string'}},required:['text']}}]}})+'\\n');",
+    "else if(m.id&&m.method==='tools/call') process.stdout.write(JSON.stringify({jsonrpc:'2.0',id:m.id,result:{content:[{type:'text',text:m.params.arguments.text}]}})+'\\n');});",
+  ].join('');
+  const server = { id: 'fake-server', name: 'Fake server', command: process.execPath, args: ['-e', fake], enabled: true };
+  const settings = await saveSettings({ mcpServers: [server] });
+  if (!settings.ok) throw new Error(settings.error.message);
+  const tools = await mcp.listMcpTools(settings.data);
+  if (tools.length !== 1 || tools[0].name !== 'mcp__fake-server__echo') throw new Error('MCP tool discovery failed');
+  const { runTool } = await import(pathToFileURL(path.join(root, 'src/main/tools/index.js')).href);
+  const refused = await runTool(tools[0].name, { text: 'hello' }, { settings: settings.data, mcpTools: tools });
+  if (refused.error?.code !== 'TOOL_CONFIRMATION_REQUIRED') throw new Error('MCP tool was not approval gated');
+  const result = await runTool(tools[0].name, { text: 'hello' }, { settings: settings.data, mcpTools: tools, confirmed: true });
+  if (!result.ok || result.data.result?.content?.[0]?.text !== 'hello') throw new Error('MCP tool call failed');
+  return 'settings, handshake, discovery, call and approval gate';
+});
+
 // First run is a sign-in, not a developer setup screen. The card has to offer the
 // Zuri account and must not ask for a provider key; a key belongs in Settings, for
 // the person who would rather pay a provider directly.
