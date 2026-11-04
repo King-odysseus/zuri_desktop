@@ -475,6 +475,7 @@
       selection.load('text');
       var selectedTable = null;
       var selectedTableRange = null;
+      var documentTables = null;
       // Selection text is empty for a cursor inside a table, and selecting the
       // table itself does not tell the model which cells it can safely change.
       // Word 1.3 exposes the containing table without throwing outside one.
@@ -486,10 +487,31 @@
           selectedTableRange.load('text');
         }
       }
+      // Whole-table selections are not consistently exposed as a range's parent
+      // table across Word desktop builds, so keep a bounded document-level fallback.
+      try {
+        if (supported('WordApi', '1.3') && body.tables) {
+          documentTables = body.tables;
+          documentTables.load('items');
+        }
+      } catch (error) {
+        documentTables = null;
+      }
       var properties = context.document.properties;
       properties.load('title');
 
       return context.sync().then(function () {
+        var tableReads = [];
+        if (documentTables && Array.isArray(documentTables.items)) {
+          documentTables.items.slice(0, 20).forEach(function (table) {
+            table.load('rowCount,columnCount');
+            var range = typeof table.getRange === 'function' ? table.getRange() : null;
+            if (range) range.load('text');
+            tableReads.push({ table: table, range: range });
+          });
+        }
+
+        return context.sync().then(function () {
         var lines = [];
         var title = (properties.title || '').trim();
         if (title !== '') lines.push('Document title: ' + title + '.');
@@ -519,11 +541,27 @@
         if (shown === 0) lines.push('The document is empty.');
 
         var selected = (selection.text || '').trim();
+        var table = selectedTable && selectedTable.isNullObject !== true ? selectedTable : null;
+        var tableRange = selectedTableRange;
+        if (table === null && selected !== '' && tableReads.length > 0) {
+          var wanted = selected.replace(/\s+/g, ' ').trim();
+          var matched = tableReads.find(function (entry) {
+            if (!entry.range || !Array.isArray(entry.range.text)) return false;
+            var candidate = entry.range.text.map(function (row) {
+              return (Array.isArray(row) ? row : [row]).join(' ');
+            }).join(' ').replace(/\s+/g, ' ').trim();
+            return candidate !== '' && (candidate === wanted || candidate.indexOf(wanted) !== -1 || wanted.indexOf(candidate) !== -1);
+          });
+          if (matched) {
+            table = matched.table;
+            tableRange = matched.range;
+          }
+        }
         if (selected !== '') lines.push('', 'Selected text:', truncate(selected, 4000));
-        if (selectedTable && selectedTable.isNullObject !== true) {
-          lines.push('', 'Selected table: ' + selectedTable.rowCount + ' rows by ' + selectedTable.columnCount + ' columns.');
-          if (selectedTableRange && Array.isArray(selectedTableRange.text)) {
-            var tableRows = selectedTableRange.text.map(function (row) {
+        if (table !== null) {
+          lines.push('', 'Selected table: ' + table.rowCount + ' rows by ' + table.columnCount + ' columns.');
+          if (tableRange && Array.isArray(tableRange.text)) {
+            var tableRows = tableRange.text.map(function (row) {
               return (Array.isArray(row) ? row : [row]).map(function (cell) {
                 return String(cell === undefined || cell === null ? '' : cell).replace(/\t/g, ' ').replace(/\r?\n/g, ' / ');
               }).join('\t');
@@ -533,15 +571,22 @@
         }
 
         return { label: 'Word ' + (title || 'document') + ' ' + paragraphs.items.length + ' paragraphs', text: lines.join('\n') };
+        });
       });
     });
   }
 
   function readPowerPoint() {
     var selected = new Promise(function (resolve) {
-      Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, function (result) {
-        resolve(result.status === Office.AsyncResultStatus.Succeeded ? String(result.value || '') : '');
-      });
+      try {
+        Office.context.document.getSelectedDataAsync(Office.CoercionType.Text, function (result) {
+          resolve(result && result.status === Office.AsyncResultStatus.Succeeded ? String(result.value || '') : '');
+        });
+      } catch (error) {
+        // Some PowerPoint builds throw for a non-text selection instead of returning
+        // a failed async result. Shape and slide metadata can still be read below.
+        resolve('');
+      }
     });
 
     return selected.then(function (selectedText) {

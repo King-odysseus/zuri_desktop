@@ -1,3 +1,12 @@
+## 2026-11-04 - Windows (selection reads fall back across Office builds)
+
+- The first selection-aware build still left some real Office sessions without a target. Word can expose a whole-table selection as a plain range, and PowerPoint can throw while asking for selected text when the selection is a shape or slide.
+- Word now enumerates up to 20 document tables and matches the selected text against their bounded cell contents when the parent-table property is empty. PowerPoint text coercion is now guarded, so a non-text selection continues into slide and shape metadata instead of setting the pane to "The file could not be read".
+- Added self-test assertions for the table fallback and guarded selection probe.
+- Key files: src/addin/taskpane.js, scripts/selftest.js.
+- Other OS action: rebuild and reinstall the desktop app before testing the updated pane in Office.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (Office edits now follow selected slides, shapes and tables)
 
 - The Office pane used selected text as its only selection signal. Selecting a PowerPoint shape, slide, or table can have no text, so the model could not identify the target and the read could fall back to the generic file error. Word table selections had the same blind spot because only selection text was loaded.

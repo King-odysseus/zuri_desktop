@@ -1128,8 +1128,11 @@ check('Word and PowerPoint add-in edits use portable, single-argument Office bat
   }
   for (const required of [
     'parentTableOrNullObject',
+    'documentTables',
+    'tableReads',
     'getSelectedSlides',
     'getSelectedShapes',
+    'getSelectedDataAsync',
     'Selected table:',
     'Selected shape:',
     'selectedShapeRequested',
