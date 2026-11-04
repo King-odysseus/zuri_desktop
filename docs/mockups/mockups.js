@@ -1,5 +1,5 @@
 const root = document.documentElement;
-const SCREENS = ['home', 'dashboard', 'chat', 'tasks', 'settings'];
+const SCREENS = ['home', 'dashboard', 'chat', 'conversation', 'tasks', 'settings'];
 
 // The same destinations as src/renderer-react/Sidebar.jsx, plus the proposed Dashboard at the top.
 const NAV_ITEMS = [
@@ -98,11 +98,24 @@ document.addEventListener('click', (event) => {
   paintThemeButtons();
 });
 
-document.querySelector('[data-composer]')?.addEventListener('submit', (event) => {
+document.querySelectorAll('[data-composer]').forEach((form) => form.addEventListener('submit', (event) => {
   event.preventDefault();
-  const note = document.querySelector('[data-note]');
+  const note = form.parentElement.querySelector('[data-note]');
   if (note) note.textContent = 'Zuri is ready for that. This is a mockup, so nothing was sent.';
-});
+}));
+
+// The jump arrow shows only while the reader is scrolled away from the newest message.
+const thread = document.querySelector('[data-thread]');
+const jump = document.querySelector('[data-jump]');
+function paintJump() {
+  const away = thread.scrollHeight - thread.scrollTop - thread.clientHeight > 80;
+  jump.classList.toggle('hidden', !away);
+}
+if (thread && jump) {
+  thread.addEventListener('scroll', paintJump);
+  jump.addEventListener('click', () => thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' }));
+  new ResizeObserver(paintJump).observe(thread);
+}
 
 document.querySelectorAll('[data-toggle]').forEach((chip) => {
   chip.addEventListener('click', () => {

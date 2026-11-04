@@ -1014,6 +1014,21 @@ export async function searchWeb(query) {
   return Array.isArray(data?.results) ? data.results : [];
 }
 
+/**
+ * Build a Word, Excel or PowerPoint file on the server. The browser and the phone
+ * cannot build one themselves, so the content goes up and the finished file comes
+ * back once, as base64 in the reply; nothing is kept on the server.
+ * @param {{ kind: string, fileName?: string, content: unknown }} input
+ * @returns {Promise<{ kind: string, name: string, mime: string, bytes: number, base64: string, warnings: string[] }>}
+ */
+export async function createDocumentFile({ kind, fileName, content }) {
+  const data = await api('/api/tools/create-document', {
+    method: 'POST',
+    body: JSON.stringify({ kind, fileName, content }),
+  });
+  return { ...data, warnings: Array.isArray(data?.warnings) ? data.warnings : [] };
+}
+
 // Every password route in one place: signing up, signing in, and the three
 // things a password can do after that. The server names them as one family, so
 // a change of prefix is a change in this one object.

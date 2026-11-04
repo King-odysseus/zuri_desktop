@@ -30,6 +30,7 @@ const CHANNELS = Object.freeze([
   'zuri:chats:create',
   'zuri:chats:delete',
   'zuri:chats:rename',
+  'zuri:chats:flags',
   'zuri:chats:move',
   'zuri:projects:list',
   'zuri:projects:create',

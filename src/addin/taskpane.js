@@ -218,8 +218,126 @@
     });
   }
 
-  /** A1:F30 plus the grid, written out cell by cell so nothing has to be counted. */
+  /** Read every worksheet once, so a plan can safely format a workbook rather than only the active tab. */
   function readExcel() {
+    return Excel.run(function (context) {
+      var activeSheet = context.workbook.worksheets.getActiveWorksheet();
+      activeSheet.load('name');
+      var selection = context.workbook.getSelectedRange();
+      selection.load(['address', 'text']);
+      var sheets = context.workbook.worksheets.load('items/name');
+      // Named ranges need ExcelApi 1.4; an older Excel simply reports none.
+      var workbookNames = supported('ExcelApi', '1.4') ? context.workbook.names.load('items/name,items/formula') : null;
+
+      return context.sync().then(function () {
+        var sheetReads = sheets.items.map(function (sheet) {
+          var used = sheet.getUsedRangeOrNullObject(true);
+          used.load(['address', 'rowCount', 'columnCount', 'isNullObject']);
+          var tables = sheet.tables.load('items/name');
+          return { sheet: sheet, used: used, tables: tables };
+        });
+
+        return context.sync().then(function () {
+          sheetReads.forEach(function (entry) {
+            if (entry.used.isNullObject) return;
+            entry.rows = Math.min(entry.used.rowCount, SHEET_ROWS);
+            entry.columns = Math.min(entry.used.columnCount, SHEET_COLUMNS);
+            entry.grid = entry.used.getCell(0, 0).getResizedRange(entry.rows - 1, entry.columns - 1);
+            entry.grid.load(['address', 'text', 'formulas', 'numberFormat']);
+            // Ten tables a sheet is more than a model can use, and keeps the request small.
+            entry.tableRanges = entry.tables.items.slice(0, 10).map(function (table) {
+              var tableRange = table.getRange();
+              tableRange.load('address');
+              return { name: table.name, range: tableRange };
+            });
+          });
+
+          return context.sync().then(function () {
+            var lines = [
+              'Workbook sheets: ' + sheets.items.map(function (item) { return item.name; }).join(', ') + '.',
+              'Active sheet: "' + activeSheet.name + '".',
+              'The workbook context below includes every non-empty sheet. Use the exact sheet name before the ! in a change range.',
+            ];
+            if (workbookNames !== null && workbookNames.items.length > 0) {
+              lines.push('Named ranges: ' + workbookNames.items.slice(0, 30).map(function (item) { return item.name + ' ' + item.formula; }).join('; ') + '.');
+            }
+            var usedCharacters = lines.join('\\n').length;
+            var shownSheets = 0;
+
+            sheetReads.forEach(function (entry) {
+              if (entry.used.isNullObject || usedCharacters >= CONTEXT_CHARACTER_LIMIT) return;
+              var shown = entry.grid.address.split('!').pop();
+              var startRef = /^([A-Z]+)(\\d+)$/.exec(shown.split(':')[0]);
+              var startColumn = startRef ? columnNumber(startRef[1]) : 1;
+              var startRow = startRef ? Number(startRef[2]) : 1;
+              var section = [
+                '',
+                'Sheet "' + entry.sheet.name + '" used area ' + entry.used.address.split('!').pop() + ', preview ' + shown + ': ' + entry.rows + ' rows, ' + entry.columns + ' columns.',
+                'Columns are tab-separated and each row starts with its row number.',
+              ];
+              var header = [''];
+              for (var c = 0; c < entry.columns; c += 1) header.push('[' + columnName(startColumn + c) + ']');
+              section.push(header.join('\\t'));
+              for (var r = 0; r < entry.rows; r += 1) {
+                var cells = entry.grid.text[r] || [];
+                var row = [String(startRow + r)];
+                for (var col = 0; col < entry.columns; col += 1) {
+                  var value = cells[col] === undefined || cells[col] === null ? '' : String(cells[col]);
+                  row.push(value.replace(/\\t/g, ' ').replace(/\\r?\\n/g, ' / '));
+                }
+                section.push(row.join('\\t'));
+              }
+              var formulas = [];
+              for (var fr = 0; fr < entry.rows && formulas.length < MAX_FORMULA_LINES; fr += 1) {
+                var formulaRow = entry.grid.formulas[fr] || [];
+                for (var fc = 0; fc < entry.columns && formulas.length < MAX_FORMULA_LINES; fc += 1) {
+                  var formula = formulaRow[fc];
+                  if (typeof formula !== 'string' || formula.charAt(0) !== '=') continue;
+                  formulas.push(columnName(startColumn + fc) + (startRow + fr) + ' = ' + formula);
+                }
+              }
+              if (formulas.length > 0) section.push('', 'Existing formulas:', formulas.join('\\n'));
+              // The first data row shows how each column is already formatted, so new rows can match it.
+              var formatRow = entry.rows > 1 ? 1 : 0;
+              var formats = [];
+              for (var nc = 0; nc < entry.columns; nc += 1) {
+                var code = (entry.grid.numberFormat[formatRow] || [])[nc];
+                if (typeof code === 'string' && code !== '' && code !== 'General') formats.push('[' + columnName(startColumn + nc) + '] ' + code);
+              }
+              if (formats.length > 0) section.push('', 'Number formats on row ' + (startRow + formatRow) + ': ' + formats.join(', '));
+              if (entry.tableRanges.length > 0) {
+                section.push('', 'Excel tables on this sheet: ' + entry.tableRanges.map(function (table) { return table.name + ' ' + table.range.address.split('!').pop(); }).join(', ') + '.');
+              }
+
+              var candidate = section.join('\\n');
+              if (usedCharacters + candidate.length > CONTEXT_CHARACTER_LIMIT) {
+                var remaining = CONTEXT_CHARACTER_LIMIT - usedCharacters;
+                candidate = remaining > 120 ? candidate.slice(0, remaining - 90) + '\\n...the rest of the workbook was left out to keep the request small.' : '';
+              }
+              if (candidate !== '') {
+                lines.push(candidate);
+                usedCharacters += candidate.length;
+                shownSheets += 1;
+              }
+            });
+
+            if (shownSheets === 0) lines.push('All workbook sheets are empty.');
+            var selected = selection.address.split('!').pop();
+            var selectedText = (selection.text || []).map(function (row) {
+              return (Array.isArray(row) ? row : [row]).join('\\t');
+            }).join('\\n').trim();
+            if (selectedText !== '') lines.push('', 'Selected cells (' + selected + '):', truncate(selectedText, 2000));
+            return { label: state.host + ' workbook, ' + sheets.items.length + ' sheets', text: lines.join('\\n') };
+          });
+        });
+      });
+    }).catch(function (error) {
+      throw new Error(officeMessage(error, 'Excel did not return the workbook contents.'));
+    });
+  }
+
+  /** A1:F30 plus the grid, written out cell by cell so nothing has to be counted. */
+  function readExcelActiveLegacy() {
     return Excel.run(function (context) {
       var sheet = context.workbook.worksheets.getActiveWorksheet();
       sheet.load('name');
@@ -956,6 +1074,32 @@
     scatter: 'XYScatter',
   };
 
+  /** Attach one conditional-format rule to a range; the colour scale runs white to the plan's colour. */
+  function applyConditionalFormat(range, operation) {
+    if (operation.rule === 'colorScale') {
+      var scale = range.conditionalFormats.add(Excel.ConditionalFormatType.colorScale);
+      scale.colorScale.criteria = {
+        minimum: { formula: null, type: Excel.ConditionalFormatColorCriterionType.lowestValue, color: '#FFFFFF' },
+        maximum: { formula: null, type: Excel.ConditionalFormatColorCriterionType.highestValue, color: operation.color },
+      };
+      return;
+    }
+    if (operation.rule === 'dataBar') {
+      var bar = range.conditionalFormats.add(Excel.ConditionalFormatType.dataBar);
+      bar.dataBar.positiveFormat.fillColor = operation.color;
+      bar.dataBar.positiveFormat.gradientFill = false;
+      return;
+    }
+    var operators = { greaterThan: 'GreaterThan', lessThan: 'LessThan', equal: 'EqualTo', between: 'Between', negative: 'LessThan' };
+    var cellRule = range.conditionalFormats.add(Excel.ConditionalFormatType.cellValue);
+    var rule = { formula1: operation.rule === 'negative' ? '0' : String(operation.value), operator: operators[operation.rule] };
+    if (operation.rule === 'between') rule.formula2 = String(operation.value2);
+    cellRule.cellValue.rule = rule;
+    // Dark text keeps the flagged value readable whatever fill colour the plan chose.
+    cellRule.cellValue.format.fill.color = operation.color;
+    cellRule.cellValue.format.font.color = '#111827';
+  }
+
   function applyExcel(operations) {
     return Excel.run(function (context) {
       var applied = [];
@@ -972,6 +1116,17 @@
         if (operation.op === 'addWorksheet') {
           var added = context.workbook.worksheets.add(operation.name);
           if (operation.activate) added.activate();
+          applied.push(operation);
+          continue;
+        }
+
+        if (operation.op === 'freezePanes') {
+          // ExcelApi 1.7. freezeAt takes the top-left block that stays put; unfreeze when both are zero.
+          if (!supported('ExcelApi', '1.7')) throw new Error('this version of Excel cannot freeze panes.');
+          if (operation.rows === 0 && operation.columns === 0) sheet.freezePanes.unfreeze();
+          else if (operation.columns === 0) sheet.freezePanes.freezeRows(operation.rows);
+          else if (operation.rows === 0) sheet.freezePanes.freezeColumns(operation.columns);
+          else sheet.freezePanes.freezeAt(sheet.getRangeByIndexes(0, 0, operation.rows, operation.columns));
           applied.push(operation);
           continue;
         }
@@ -1005,10 +1160,9 @@
             range.format.horizontalAlignment = alignments[operation.align] || 'General';
           }
         } else if (operation.op === 'columnWidth') {
-          // Set on the range itself: this is the documented way to size the columns a
-          // range touches, and it skips getEntireColumn(), one more host call that can
-          // fail on its own and leave the width unchanged.
-          range.format.columnWidth = operation.width;
+          // Plans use Excel's familiar character-width scale; Office.js expects a
+          // physical width. Approximate the default font's 7-pixel digits plus padding.
+          range.format.columnWidth = operation.width === 0 ? 0 : (operation.width * 7 + 5) * 0.75;
         } else if (operation.op === 'autofit') {
           range.format.autofitColumns();
           range.format.autofitRows();
@@ -1017,6 +1171,46 @@
         } else if (operation.op === 'createTable') {
           var table = context.workbook.tables.add(range, operation.hasHeaders !== false);
           if (operation.name) table.name = operation.name;
+          if (operation.style) table.style = operation.style;
+        } else if (operation.op === 'fillFormula') {
+          // Write the formula in the first cell, then fill it across the range so the
+          // references shift row by row the way a person's own fill-down would.
+          if (!supported('ExcelApi', '1.9')) throw new Error('this version of Excel cannot fill a formula down; use setFormulas with one formula per cell.');
+          var firstCell = range.getCell(0, 0);
+          firstCell.formulas = [[operation.formula]];
+          firstCell.autoFill(range, 'FillDefault');
+        } else if (operation.op === 'borders') {
+          var edges = ['EdgeTop', 'EdgeBottom', 'EdgeLeft', 'EdgeRight'];
+          // Inside borders only exist for a range of more than one row or column.
+          if (operation.rangeRows > 1) edges.push('InsideHorizontal');
+          if (operation.rangeColumns > 1) edges.push('InsideVertical');
+          edges.forEach(function (edgeName) {
+            var border = range.format.borders.getItem(edgeName);
+            if (operation.style === 'none') {
+              border.style = 'None';
+              return;
+            }
+            border.style = 'Continuous';
+            border.weight = operation.style === 'medium' ? 'Medium' : 'Thin';
+            border.color = operation.color;
+          });
+        } else if (operation.op === 'merge') {
+          range.merge(operation.across);
+        } else if (operation.op === 'rowHeight') {
+          range.format.rowHeight = operation.height;
+        } else if (operation.op === 'conditionalFormat') {
+          // ExcelApi 1.6.
+          if (!supported('ExcelApi', '1.6')) throw new Error('this version of Excel cannot add conditional formats.');
+          applyConditionalFormat(range, operation);
+        } else if (operation.op === 'dataValidation') {
+          // ExcelApi 1.8.
+          if (!supported('ExcelApi', '1.8')) throw new Error('this version of Excel cannot add drop-down lists.');
+          range.dataValidation.clear();
+          range.dataValidation.rule = { list: { inCellDropDown: true, source: operation.list.join(',') } };
+        } else if (operation.op === 'sort') {
+          range.sort.apply([{ key: operation.column - 1, ascending: operation.ascending }], false, operation.hasHeaders);
+        } else if (operation.op === 'namedRange') {
+          context.workbook.names.add(operation.name, range);
         } else if (operation.op === 'addChart') {
           var chart = sheet.charts.add(CHART_KINDS[operation.chartType] || 'ColumnClustered', range, 'Auto');
           if (operation.title) chart.title.text = operation.title;
@@ -1028,7 +1222,7 @@
       return context.sync().then(function () {
         return applied.map(function (operation) { return ZuriOps.describeOperation(operation); });
       });
-    }, function (error) {
+    }).catch(function (error) {
       throw new Error(officeMessage(error, 'Excel would not accept that change.'));
     });
   }
@@ -1069,6 +1263,15 @@
           var tableWhere = operation.where === 'start' ? 'Start' : operation.where === 'afterSelection' ? 'After' : 'End';
           var tableAnchor = tableWhere === 'After' ? selection : body;
           tableAnchor.insertTable(operation.grid.length, operation.grid[0].length, tableWhere, operation.grid);
+        } else if (operation.op === 'insertFormatted') {
+          // HTML is the one route that gives real headings, lists and tables in a single
+          // call; the converter escapes every character it was not told to keep.
+          var formattedWhere = operation.where === 'start' ? 'Start'
+            : operation.where === 'afterSelection' ? 'After'
+              : operation.where === 'replaceSelection' ? 'Replace'
+                : 'End';
+          var formattedAnchor = formattedWhere === 'After' || formattedWhere === 'Replace' ? selection : body;
+          formattedAnchor.insertHtml(ZuriOps.markdownToHtml(operation.markdown), formattedWhere);
         }
         applied.push(operation);
       }
@@ -1083,7 +1286,7 @@
           return applied.map(function (operation) { return ZuriOps.describeOperation(operation); });
         });
       });
-    }, function (error) {
+    }).catch(function (error) {
       throw new Error(officeMessage(error, 'Word would not accept that change.'));
     });
   }
@@ -1158,7 +1361,20 @@
           return slide;
         }
 
+        // Shape collections must be loaded and synchronized before their items are
+        // inspected. Without this boundary, multi-slide plans work intermittently
+        // because Office has not populated shapes.items yet.
+        var shapeCollections = {};
         rest.forEach(function (operation) {
+          if (operation.op !== 'setSlideTitle' && operation.op !== 'setShapeText' && operation.op !== 'styleShape') return;
+          var number = operation.slide || 1;
+          if (shapeCollections[number]) return;
+          shapeCollections[number] = slideAt(number).shapes;
+          shapeCollections[number].load('items/name');
+        });
+
+        return context.sync().then(function () {
+          rest.forEach(function (operation) {
           if (operation.op === 'addSlide') {
             var slide = slides.add();
             if (operation.title) placeBox(slide, operation.title, 36, 28, 560, 60, 26, true);
@@ -1167,16 +1383,14 @@
           }
           var target = slideAt(operation.slide || 1);
           if (operation.op === 'setSlideTitle') {
-            var titleShapes = target.shapes;
-            titleShapes.load('items/name');
+            var titleShapes = shapeCollections[operation.slide || 1] || target.shapes;
             var title = titleShapes.items.filter(function (shape) { return /^title/i.test(shape.name); })[0];
             if (title) title.textFrame.textRange.text = operation.title;
             else placeBox(target, operation.title, 36, 28, 560, 60, 26, true);
             return;
           }
           if (operation.op === 'setShapeText') {
-            var shapes = target.shapes;
-            shapes.load('items/name');
+            var shapes = shapeCollections[operation.slide || 1] || target.shapes;
             var match = null;
             for (var s = 0; s < shapes.items.length; s += 1) {
               var shape = shapes.items[s];
@@ -1192,14 +1406,69 @@
           if (operation.op === 'addTextBox') {
             placeBox(target, operation.text, operation.left === undefined ? 40 : operation.left, operation.top === undefined ? 120 : operation.top, operation.width === undefined ? 540 : operation.width, operation.height === undefined ? 120 : operation.height, operation.size || 16, operation.bold === true);
           }
-        });
+          if (operation.op === 'addTable') {
+            placeTable(target, operation);
+          }
+          if (operation.op === 'styleShape') {
+            var styleShapes = shapeCollections[operation.slide || 1] || target.shapes;
+            var styleTarget = null;
+            for (var t = 0; t < styleShapes.items.length; t += 1) {
+              var candidate = styleShapes.items[t];
+              if (candidate.name === operation.shape) { styleTarget = candidate; break; }
+              if (styleTarget === null && candidate.name.toLowerCase().indexOf(operation.shape.toLowerCase()) !== -1) styleTarget = candidate;
+            }
+            if (styleTarget === null) throw new Error('Slide ' + (operation.slide || 1) + ' has no shape called "' + operation.shape + '".');
+            if (operation.fill !== undefined) styleTarget.fill.setSolidColor(operation.fill);
+            var styledFont = styleTarget.textFrame.textRange.font;
+            if (operation.color !== undefined) styledFont.color = operation.color;
+            if (operation.size !== undefined) styledFont.size = operation.size;
+            if (operation.bold !== undefined) styledFont.bold = operation.bold;
+          }
+          });
 
-        return context.sync().then(function () {
+          return context.sync();
+        }).then(function () {
           return applied.concat(rest).map(function (operation) { return ZuriOps.describeOperation(operation); });
         });
-      }, function (error) {
+      }).catch(function (error) {
         throw new Error(officeMessage(error, 'PowerPoint would not accept that change.'));
       });
+    });
+  }
+
+  /**
+   * A native table needs PowerPoint API 1.8. Older builds get the same rows as tabbed
+   * text in a box, which is readable and editable, instead of the whole plan failing.
+   */
+  function placeTable(slide, operation) {
+    var left = operation.left === undefined ? 40 : operation.left;
+    var top = operation.top === undefined ? 120 : operation.top;
+    var width = operation.width === undefined ? 640 : operation.width;
+    var height = operation.height === undefined ? 40 * operation.grid.length : operation.height;
+    var supported = false;
+    try {
+      supported = Office.context.requirements.isSetSupported('PowerPointApi', '1.8') && typeof slide.shapes.addTable === 'function';
+    } catch (error) {
+      supported = false;
+    }
+    if (!supported) {
+      placeBox(slide, operation.grid.map(function (row) { return row.join('\t'); }).join('\n'), left, top, width, height, 14, false);
+      return;
+    }
+    var header = operation.grid[0].map(function () {
+      return { fill: { color: '#1F2A44' }, font: { bold: true, color: '#FFFFFF' } };
+    });
+    var cells = operation.grid.map(function (_row, rowIndex) {
+      return rowIndex === 0 ? header : operation.grid[0].map(function () { return {}; });
+    });
+    slide.shapes.addTable(operation.grid.length, operation.grid[0].length, {
+      values: operation.grid,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      uniformCellProperties: { font: { size: 14 } },
+      specificCellProperties: cells,
     });
   }
 

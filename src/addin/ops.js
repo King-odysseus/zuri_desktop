@@ -31,6 +31,8 @@
   var SHEET_NAME = /^[^\[\]:*?/\\]{1,31}$/;
   var ALIGNMENTS = ['left', 'center', 'right', 'general'];
   var CHART_TYPES = ['column', 'bar', 'line', 'pie', 'area', 'scatter'];
+  var TABLE_STYLE = /^TableStyle(Light|Medium|Dark)[0-9]{1,2}$/;
+  var CONDITIONAL_RULES = ['colorScale', 'dataBar', 'greaterThan', 'lessThan', 'equal', 'between', 'negative'];
 
   /** Every operation the pane can carry out, and the host it belongs to. */
   var OPERATIONS = {
@@ -44,17 +46,29 @@
     clear: 'excel',
     createTable: 'excel',
     addChart: 'excel',
+    fillFormula: 'excel',
+    borders: 'excel',
+    freezePanes: 'excel',
+    merge: 'excel',
+    rowHeight: 'excel',
+    conditionalFormat: 'excel',
+    dataValidation: 'excel',
+    sort: 'excel',
+    namedRange: 'excel',
     replaceSelection: 'word',
     insertAfterSelection: 'word',
     insertParagraphs: 'word',
     applyStyle: 'word',
     replaceAll: 'word',
     insertTable: 'word',
+    insertFormatted: 'word',
     setSelectedText: 'powerpoint',
     addSlide: 'powerpoint',
     setSlideTitle: 'powerpoint',
     setShapeText: 'powerpoint',
     addTextBox: 'powerpoint',
+    addTable: 'powerpoint',
+    styleShape: 'powerpoint',
   };
 
   function isOpsLang(lang) {
@@ -201,8 +215,9 @@
     var host = OPERATIONS[name];
 
     if (host === 'excel') {
-      var range = name === 'addWorksheet' ? null : normaliseRange(raw.range);
-      if (name !== 'addWorksheet' && range === null) return fail('"' + name + '" needs a cell range such as "D3:D26".');
+      var needsRange = name !== 'addWorksheet' && name !== 'freezePanes';
+      var range = needsRange ? normaliseRange(raw.range) : null;
+      if (needsRange && range === null) return fail('"' + name + '" needs a cell range such as "D3:D26".');
       var sheet = raw.sheet === undefined || raw.sheet === null ? '' : text(raw.sheet, 31);
       if (sheet !== '' && !SHEET_NAME.test(sheet)) return fail('"' + sheet + '" is not a sheet name.');
 
@@ -284,7 +299,87 @@
       if (name === 'createTable') {
         var tableName = raw.name === undefined ? '' : text(raw.name, 255).trim();
         if (tableName !== '' && !TABLE_NAME.test(tableName)) return fail('"' + tableName + '" is not a valid table name.');
-        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, name: tableName, hasHeaders: raw.hasHeaders !== false } };
+        var tableStyle = raw.style === undefined ? '' : text(raw.style, 40).trim();
+        if (tableStyle !== '' && !TABLE_STYLE.test(tableStyle)) return fail('"style" must be a built-in table style such as "TableStyleMedium2".');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, name: tableName, hasHeaders: raw.hasHeaders !== false, style: tableStyle } };
+      }
+
+      if (name === 'fillFormula') {
+        var formula = text(raw.formula, 2000).trim();
+        if (formula.charAt(0) !== '=' || formula.length < 2) return fail('"fillFormula" needs one formula starting with "=", written for the first cell of the range.');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, formula: formula } };
+      }
+
+      if (name === 'borders') {
+        var borderStyle = text(raw.style, 10).trim().toLowerCase() || 'thin';
+        if (['thin', 'medium', 'none'].indexOf(borderStyle) === -1) return fail('"style" must be thin, medium or none.');
+        var borderColour = raw.color === undefined ? '#BFC5D2' : raw.color;
+        if (typeof borderColour !== 'string' || !COLOUR.test(borderColour)) return fail('"color" must be a colour like "#BFC5D2".');
+        return {
+          ok: true,
+          operation: {
+            op: name, sheet: sheet, range: range.text, style: borderStyle, color: borderColour.toUpperCase(),
+            rangeRows: range.end.row - range.start.row + 1, rangeColumns: range.end.column - range.start.column + 1,
+          },
+        };
+      }
+
+      if (name === 'freezePanes') {
+        var frozenRows = raw.rows === undefined ? 0 : Number(raw.rows);
+        var frozenColumns = raw.columns === undefined ? 0 : Number(raw.columns);
+        if (!Number.isInteger(frozenRows) || frozenRows < 0 || frozenRows > 100) return fail('"rows" must be a whole number from 0 to 100.');
+        if (!Number.isInteger(frozenColumns) || frozenColumns < 0 || frozenColumns > 50) return fail('"columns" must be a whole number from 0 to 50.');
+        return { ok: true, operation: { op: name, sheet: sheet, rows: frozenRows, columns: frozenColumns } };
+      }
+
+      if (name === 'merge') {
+        if (range.text.indexOf(':') === -1) return fail('"merge" needs a range of more than one cell.');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, across: raw.across === true } };
+      }
+
+      if (name === 'rowHeight') {
+        var height = Number(raw.height);
+        if (!Number.isFinite(height) || height < 0 || height > 409) return fail('"height" must be between 0 and 409 points.');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, height: height } };
+      }
+
+      if (name === 'conditionalFormat') {
+        var rule = text(raw.rule, 20).trim();
+        if (CONDITIONAL_RULES.indexOf(rule) === -1) return fail('"rule" must be one of ' + CONDITIONAL_RULES.join(', ') + '.');
+        var ruleColour = raw.color === undefined ? '#4F86C6' : raw.color;
+        if (typeof ruleColour !== 'string' || !COLOUR.test(ruleColour)) return fail('"color" must be a colour like "#4F86C6".');
+        var ruleValue = raw.value === undefined ? null : Number(raw.value);
+        var ruleValueTwo = raw.value2 === undefined ? null : Number(raw.value2);
+        var needsValue = ['greaterThan', 'lessThan', 'equal', 'between'].indexOf(rule) !== -1;
+        if (needsValue && (ruleValue === null || !Number.isFinite(ruleValue))) return fail('"' + rule + '" needs a number in "value".');
+        if (rule === 'between' && (ruleValueTwo === null || !Number.isFinite(ruleValueTwo))) return fail('"between" needs numbers in "value" and "value2".');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, rule: rule, value: ruleValue, value2: ruleValueTwo, color: ruleColour.toUpperCase() } };
+      }
+
+      if (name === 'dataValidation') {
+        var options = Array.isArray(raw.list) ? raw.list : [];
+        var cleanOptions = [];
+        for (var o = 0; o < options.length; o += 1) {
+          if (typeof options[o] !== 'string' && typeof options[o] !== 'number') return fail('"list" must hold text or numbers.');
+          var option = String(options[o]).replace(/,/g, ' ').trim();
+          if (option !== '') cleanOptions.push(option);
+        }
+        // Excel refuses an inline list longer than 255 characters.
+        if (cleanOptions.length === 0 || cleanOptions.length > 50 || cleanOptions.join(',').length > 255) return fail('"list" needs 1 to 50 short options, 255 characters in all.');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, list: cleanOptions } };
+      }
+
+      if (name === 'sort') {
+        var sortWidth = range.end.column - range.start.column + 1;
+        var sortColumn = raw.column === undefined ? 1 : Number(raw.column);
+        if (!Number.isInteger(sortColumn) || sortColumn < 1 || sortColumn > sortWidth) return fail('"column" must count from 1 within the range, up to ' + sortWidth + '.');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, column: sortColumn, ascending: raw.ascending !== false, hasHeaders: raw.hasHeaders !== false } };
+      }
+
+      if (name === 'namedRange') {
+        var rangeName = text(raw.name, 80).trim();
+        if (!/^[A-Za-z_][A-Za-z0-9_.]{0,79}$/.test(rangeName) || /^[A-Za-z]{1,3}[0-9]{1,7}$/.test(rangeName)) return fail('"' + rangeName + '" is not a valid name; use letters, digits and underscores, and not a cell address.');
+        return { ok: true, operation: { op: name, sheet: sheet, range: range.text, name: rangeName } };
       }
 
       if (name === 'addChart') {
@@ -346,6 +441,16 @@
         return { ok: true, operation: { op: name, find: find, replace: text(raw.replace, 200), matchCase: raw.matchCase === true } };
       }
 
+      if (name === 'insertFormatted') {
+        var markdown = text(raw.markdown);
+        if (markdown.trim() === '') return fail('"insertFormatted" needs markdown to write.');
+        var formattedWhere = text(raw.where, 20).trim() || 'end';
+        if (['start', 'end', 'afterSelection', 'replaceSelection'].indexOf(formattedWhere) === -1) {
+          return fail('"where" must be start, end, afterSelection or replaceSelection.');
+        }
+        return { ok: true, operation: { op: name, where: formattedWhere, markdown: markdown } };
+      }
+
       // insertTable
       var rows = normaliseGrid(raw.rows, 'value');
       if (rows === null || rows.length > 50 || rows[0].length > 12) return fail('"insertTable" needs up to 50 rows of up to 12 cells.');
@@ -383,6 +488,39 @@
       if (shapeName === '' && shapeText.trim() === '') return fail('"setShapeText" needs the shape name and the text.');
       if (shapeText.trim() === '') return fail('"setShapeText" needs the text to put in the shape.');
       return { ok: true, operation: { op: name, slide: slide, shape: shapeName, text: shapeText } };
+    }
+
+    if (name === 'addTable') {
+      var tableGrid = normaliseGrid(raw.rows, 'value');
+      if (tableGrid === null || tableGrid.length > 20 || tableGrid[0].length > 8) return fail('"addTable" needs up to 20 rows of up to 8 cells.');
+      var table = { op: name, slide: slide, grid: tableGrid.map(function (row) { return row.map(function (cell) { return String(cell); }); }) };
+      for (var edge of ['left', 'top', 'width', 'height']) {
+        if (raw[edge] === undefined) continue;
+        var extent = Number(raw[edge]);
+        if (!Number.isFinite(extent) || extent < 0 || extent > 2000) return fail('"' + edge + '" must be between 0 and 2000 points.');
+        table[edge] = extent;
+      }
+      return { ok: true, operation: table };
+    }
+
+    if (name === 'styleShape') {
+      var styled = { op: name, slide: slide, shape: text(raw.shape, 120).trim() };
+      if (styled.shape === '') return fail('"styleShape" needs the name of the shape.');
+      for (var colourKey of ['fill', 'color']) {
+        if (raw[colourKey] === undefined) continue;
+        if (typeof raw[colourKey] !== 'string' || !COLOUR.test(raw[colourKey])) return fail('"' + colourKey + '" must be a colour like #1F2A44.');
+        styled[colourKey] = raw[colourKey];
+      }
+      if (raw.size !== undefined) {
+        var styledSize = Number(raw.size);
+        if (!Number.isFinite(styledSize) || styledSize < 6 || styledSize > 200) return fail('"size" must be a font size between 6 and 200.');
+        styled.size = styledSize;
+      }
+      if (raw.bold !== undefined) styled.bold = raw.bold === true;
+      if (styled.fill === undefined && styled.color === undefined && styled.size === undefined && styled.bold === undefined) {
+        return fail('"styleShape" needs at least one of fill, color, size or bold.');
+      }
+      return { ok: true, operation: styled };
     }
 
     // addTextBox
@@ -510,7 +648,7 @@
         return 'Make ' + where + ' ' + words.join(', ');
       }
       case 'columnWidth':
-        return 'Set the column width of ' + where + ' to ' + operation.width;
+        return 'Set the column width of ' + where + ' to about ' + operation.width + ' characters';
       case 'autofit':
         return 'Fit the columns and rows of ' + where + ' to their contents';
       case 'addWorksheet':
@@ -519,6 +657,26 @@
         return 'Clear the contents of ' + where;
       case 'createTable':
         return 'Turn ' + where + ' into a table' + (operation.name ? ' called ' + operation.name : '');
+      case 'fillFormula':
+        return 'Fill ' + where + ' with ' + operation.formula;
+      case 'borders':
+        return operation.style === 'none' ? 'Remove the borders from ' + where : 'Draw ' + operation.style + ' borders on ' + where;
+      case 'freezePanes':
+        return operation.rows === 0 && operation.columns === 0
+          ? 'Unfreeze the panes'
+          : 'Freeze ' + [operation.rows > 0 ? plural(operation.rows, 'row', 'rows') : '', operation.columns > 0 ? plural(operation.columns, 'column', 'columns') : ''].filter(Boolean).join(' and ');
+      case 'merge':
+        return 'Merge the cells of ' + where;
+      case 'rowHeight':
+        return 'Set the row height of ' + where + ' to ' + operation.height + ' points';
+      case 'conditionalFormat':
+        return 'Colour ' + where + ' by rule: ' + operation.rule;
+      case 'dataValidation':
+        return 'Add a drop-down to ' + where + ' with ' + plural(operation.list.length, 'option', 'options');
+      case 'sort':
+        return 'Sort ' + where + ' by column ' + operation.column + (operation.ascending ? ' ascending' : ' descending');
+      case 'namedRange':
+        return 'Name ' + where + ' "' + operation.name + '"';
       case 'addChart':
         return 'Draw a ' + operation.chartType + ' chart of ' + where
           + (operation.title ? ' titled "' + operation.title + '"' : '')
@@ -535,6 +693,12 @@
         return 'Replace every "' + operation.find + '" with "' + operation.replace + '"';
       case 'insertTable':
         return 'Insert a ' + operation.grid.length + ' by ' + operation.grid[0].length + ' table';
+      case 'insertFormatted':
+        return 'Add formatted text (headings, lists, tables) at the ' + whereInWord(operation.where);
+      case 'addTable':
+        return 'Add a ' + operation.grid.length + ' by ' + operation.grid[0].length + ' table on slide ' + operation.slide;
+      case 'styleShape':
+        return 'Restyle "' + operation.shape + '" on slide ' + operation.slide;
       case 'setSelectedText':
         return 'Replace the selected text';
       case 'addSlide':
@@ -589,9 +753,110 @@
     return seen;
   }
 
+  function escapeHtml(value) {
+    return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  /** Bold, italic, code and http(s) links; every other character is escaped, so model text can never inject markup. */
+  function inlineHtml(value) {
+    var out = '';
+    var last = 0;
+    var pattern = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|\*[^*\s][^*]*\*)/g;
+    var match;
+    while ((match = pattern.exec(value)) !== null) {
+      out += escapeHtml(value.slice(last, match.index));
+      var token = match[0];
+      if (token.indexOf('**') === 0) out += '<strong>' + escapeHtml(token.slice(2, -2)) + '</strong>';
+      else if (token.charAt(0) === '`') out += '<code>' + escapeHtml(token.slice(1, -1)) + '</code>';
+      else if (token.charAt(0) === '[') {
+        var link = /^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/.exec(token);
+        out += link ? '<a href="' + escapeHtml(link[2]) + '">' + escapeHtml(link[1]) + '</a>' : escapeHtml(token);
+      } else out += '<em>' + escapeHtml(token.slice(1, -1)) + '</em>';
+      last = match.index + token.length;
+    }
+    return out + escapeHtml(value.slice(last));
+  }
+
+  /**
+   * Markdown a model writes (headings, lists, quotes, tables, rules) as HTML that Word's
+   * insertHtml turns into real styled paragraphs. Without it, "## Title" lands in the
+   * document as those literal characters.
+   * @param {string} markdown
+   * @returns {string}
+   */
+  function markdownToHtml(markdown) {
+    var lines = String(markdown || '').replace(/\r\n?/g, '\n').split('\n');
+    var html = '';
+    var index = 0;
+    var tableSeparator = /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/;
+    function cells(line) {
+      return line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(function (cell) { return cell.trim(); });
+    }
+    while (index < lines.length) {
+      var line = lines[index];
+      var trimmed = line.trim();
+      if (trimmed === '') { index += 1; continue; }
+
+      var heading = /^(#{1,6})\s+(.+)$/.exec(trimmed);
+      if (heading) {
+        var level = Math.min(heading[1].length, 3);
+        html += '<h' + level + '>' + inlineHtml(heading[2]) + '</h' + level + '>';
+        index += 1;
+        continue;
+      }
+      if (/^([-*_])(\s*\1){2,}$/.test(trimmed)) { html += '<hr>'; index += 1; continue; }
+
+      if (trimmed.charAt(0) === '|' && index + 1 < lines.length && tableSeparator.test(lines[index + 1].trim())) {
+        var head = cells(trimmed);
+        html += '<table border="1" cellspacing="0" cellpadding="4"><tr>' + head.map(function (cell) { return '<th>' + inlineHtml(cell) + '</th>'; }).join('') + '</tr>';
+        index += 2;
+        while (index < lines.length && lines[index].trim().charAt(0) === '|') {
+          var row = cells(lines[index]);
+          html += '<tr>' + head.map(function (_cell, column) { return '<td>' + inlineHtml(row[column] || '') + '</td>'; }).join('') + '</tr>';
+          index += 1;
+        }
+        html += '</table>';
+        continue;
+      }
+
+      if (/^>\s?/.test(trimmed)) {
+        var quoted = [];
+        while (index < lines.length && /^>\s?/.test(lines[index].trim())) { quoted.push(lines[index].trim().replace(/^>\s?/, '')); index += 1; }
+        html += '<blockquote>' + inlineHtml(quoted.join(' ')) + '</blockquote>';
+        continue;
+      }
+
+      var bullet = /^[-*+]\s+(.+)$/.exec(trimmed);
+      var numbered = /^\d+[.)]\s+(.+)$/.exec(trimmed);
+      if (bullet || numbered) {
+        var tag = bullet ? 'ul' : 'ol';
+        var items = '';
+        while (index < lines.length) {
+          var current = lines[index].trim();
+          var next = tag === 'ul' ? /^[-*+]\s+(.+)$/.exec(current) : /^\d+[.)]\s+(.+)$/.exec(current);
+          if (!next) break;
+          items += '<li>' + inlineHtml(next[1]) + '</li>';
+          index += 1;
+        }
+        html += '<' + tag + '>' + items + '</' + tag + '>';
+        continue;
+      }
+
+      var paragraph = [];
+      while (index < lines.length && lines[index].trim() !== '' && !/^(#{1,6}\s|>|[-*+]\s|\d+[.)]\s|\|)/.test(lines[index].trim())) {
+        paragraph.push(lines[index].trim());
+        index += 1;
+      }
+      if (paragraph.length === 0) { paragraph.push(trimmed); index += 1; }
+      html += '<p>' + inlineHtml(paragraph.join(' ')) + '</p>';
+    }
+    return html;
+  }
+
   return {
     MAX_OPERATIONS: MAX_OPERATIONS,
     OPERATIONS: OPERATIONS,
+    markdownToHtml: markdownToHtml,
     splitReply: splitReply,
     parseBlock: parseBlock,
     validateOperation: validateOperation,

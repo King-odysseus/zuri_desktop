@@ -929,6 +929,99 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
   assert.equal(pausedBody.error.retryAfterSeconds, 1234);
 }
 
+// A reply must never reach a person blank, whichever app asked. When the model comes
+// back with no words (nothing, or a request for a tool this call never offered) the
+// server asks once more with no tools, charges both asks as one reply, and falls back
+// to a plain sentence if even that is silent.
+{
+  const person = await auth.signInWithGoogle('credential');
+  const markup = '<tool_call>{"name": "webSearch", "arguments": {"query": "kenya vat"}}</tool_call>';
+  const build = (script, charged, released = []) => {
+    const asked = [];
+    const app = createApp({
+      auth,
+      repository: {
+        ...repository,
+        async reserveUsage() { return { id: 'reservation-empty', reservedTokens: 9000 }; },
+        async commitUsage(entry) { charged.push(entry); },
+        async releaseUsage(id) { released.push(id); },
+      },
+      now: fixedNow,
+      chatProvider: async (request) => {
+        asked.push(request);
+        const next = script[Math.min(asked.length - 1, script.length - 1)];
+        if (next instanceof Error) throw next;
+        for (const piece of next.pieces ?? []) request.onDelta?.(piece);
+        return { model: request.model, content: next.content, usage: next.usage ?? { inputTokens: 10, outputTokens: 2 } };
+      },
+    });
+    return { app, asked };
+  };
+  const send = (app, extra = {}) => app(new Request('https://cloud.example.com/api/chat', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${person.token}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: 'zuri-flash', messages: [{ role: 'user', content: 'what vat do shops charge in kenya' }], ...extra }),
+  }));
+
+  // 1. Markup for a tool nobody offered, then words: the second ask is the answer.
+  const chargedA = [];
+  const a = build([{ content: markup }, { content: 'Kenya charges 16 percent VAT on most goods.', pieces: ['Kenya charges ', '16 percent VAT on most goods.'] }], chargedA);
+  const recovered = await doneFrame(await send(a.app, { stream: true }));
+  assert.equal(recovered.content, 'Kenya charges 16 percent VAT on most goods.');
+  assert.equal(a.asked.length, 2, 'the model is asked exactly once more');
+  assert.equal((a.asked[1].tools ?? []).length, 0, 'the second ask offers no tools');
+  assert.match(a.asked[1].messages.at(-1).content, /no words in it/, 'the second ask says what went wrong');
+  assert.equal(chargedA.length, 1, 'two asks are one charge');
+  assert.equal(chargedA[0].inputTokens, 20);
+  assert.equal(chargedA[0].outputTokens, 4);
+
+  // 2. An empty-stream error from the supplier is the same problem, not a failure.
+  const incomplete = Object.assign(new Error('The AI provider returned an incomplete response.'), { code: 'PROVIDER_RESPONSE_INVALID' });
+  const chargedB = [];
+  const b = build([incomplete, { content: 'Here is the answer.' }], chargedB);
+  const viaError = await send(b.app);
+  assert.equal(viaError.status, 200);
+  assert.equal((await viaError.json()).data.content, 'Here is the answer.');
+  assert.equal(chargedB.length, 1);
+
+  // 3. Silent twice: a plain sentence, never a blank, and the person is still charged
+  // only for what the supplier reported.
+  const chargedC = [];
+  const c = build([{ content: markup }, { content: markup }], chargedC);
+  const fallback = await doneFrame(await send(c.app, { stream: true }));
+  assert.match(fallback.content, /could not put an answer together/);
+  assert.notEqual(fallback.content.trim(), '');
+  assert.equal(c.asked.length, 2, 'the server stops after one retry');
+  assert.equal(chargedC.length, 1);
+
+  // 4. A real supplier failure is still a failure, with the reservation given back.
+  const released = [];
+  const down = Object.assign(new Error('The AI provider rejected the request.'), { code: 'PROVIDER_REQUEST_FAILED' });
+  const d = build([down], [], released);
+  const refused = await send(d.app);
+  assert.equal(refused.status, 502);
+  assert.equal(d.asked.length, 1, 'a real failure is not retried as if it were silence');
+  assert.deepEqual(released, ['reservation-empty']);
+
+  // 5. A call to a tool that WAS offered is an answer, not silence: no second ask.
+  const e = build([{ content: '' }], []);
+  e.app = createApp({
+    auth,
+    repository: { ...repository, async reserveUsage() { return { id: 'r', reservedTokens: 9000 }; }, async commitUsage() {}, async releaseUsage() {} },
+    now: fixedNow,
+    chatProvider: async (request) => {
+      e.asked.push(request);
+      return { model: request.model, content: '', toolCalls: [{ id: 'call_1', name: 'readFile', arguments: '{}' }], usage: { inputTokens: 5, outputTokens: 1 } };
+    },
+  });
+  const toolRound = await doneFrame(await send(e.app, {
+    stream: true,
+    tools: [{ name: 'readFile', description: 'Read a file.', parameters: { type: 'object', properties: {} } }],
+  }));
+  assert.equal(toolRound.toolCalls.length, 1);
+  assert.equal(e.asked.length, 1, 'an offered tool call needs no retry');
+}
+
 // Act mode tools run on the persons own computer, so the account route cannot
 // run them: it forwards the definitions, returns the call, and charges for the round.
 // What it must never do is run anything itself, or let a caller name a tool it never
@@ -992,6 +1085,9 @@ assert.equal((await app(new Request('https://cloud.example.com/downloads/missing
     body: JSON.stringify({
       model: 'zuri-flash',
       stream: true,
+      // The loop offers its tools on every round, and a call to a tool that was not
+      // offered would count as a silent reply and be asked again.
+      tools,
       messages: [
         { role: 'user', content: 'Read my notes' },
         {

@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import BottomBar, { BOTTOM_BAR_SPACE } from '../components/BottomBar.jsx';
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
 import { Button, IconButton } from '../components/ui.jsx';
-import { AutomationIcon, BellIcon, ChartIcon, CardIcon, CloseIcon, FolderIcon, GridIcon, ImageIcon, LogoMark, MenuIcon, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, ReceiptIcon, ShieldIcon, SignOutIcon, SunIcon, TaskIcon } from '../components/Icons.jsx';
+import { AutomationIcon, BellIcon, ChevronUpIcon, FolderIcon, ImageIcon, LockIcon, LogoMark, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SettingsIcon, ShieldIcon, SignOutIcon, SunIcon, TaskIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
-import { initialsFor } from '../lib/format.js';
+import { initialsFor, planLabel } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
 import OverviewView from './OverviewView.jsx';
 import UsageView from './UsageView.jsx';
@@ -17,6 +18,7 @@ import RemindersView from './RemindersView.jsx';
 import AutomationsView from './AutomationsView.jsx';
 import AccountView from './AccountView.jsx';
 import NotificationsView from './NotificationsView.jsx';
+import SettingsView from './SettingsView.jsx';
 
 const COLLAPSE_KEY = 'zuri-cloud-nav-collapsed';
 
@@ -38,21 +40,18 @@ export const NAV_ITEMS = [
   { id: 'notifications', label: 'Notifications', icon: <BellIcon /> },
   { id: 'automations', label: 'Automations', icon: <AutomationIcon /> },
   { id: 'images', label: 'Images', icon: <ImageIcon /> },
-  { id: 'overview', label: 'Overview', icon: <GridIcon /> },
-  { id: 'usage', label: 'Usage and limits', icon: <ChartIcon /> },
-  { id: 'plans', label: 'Plans', icon: <CardIcon /> },
-  { id: 'billing', label: 'Billing', icon: <ReceiptIcon /> },
-  { id: 'account', label: 'Account', icon: <ShieldIcon /> },
 ];
 
-// Shown only to administrators; the server refuses the data to anyone else.
-const ADMIN_ITEM = { id: 'admin', label: 'Admin', icon: <ShieldIcon /> };
+// The sections of the admin report, scrolled to by id; the ids live in AdminView.
+const ADMIN_SECTIONS = [
+  { id: 'admin-stats', label: 'Stats' },
+  { id: 'admin-people', label: 'People' },
+  { id: 'admin-models', label: 'Models' },
+  { id: 'admin-plans', label: 'Plans' },
+];
 
-function NavList({ view, onViewChange, isAdmin }) {
-  // Keep a deep-linked /admin view visible while it loads. The API remains the
-  // authority, so a non-admin still receives the normal server refusal.
-  const items = isAdmin || view === 'admin' ? [...NAV_ITEMS, ADMIN_ITEM] : NAV_ITEMS;
-  return items.map((item) => (
+function NavList({ view, onViewChange }) {
+  return NAV_ITEMS.map((item) => (
     <button
       key={item.id}
       type="button"
@@ -67,85 +66,204 @@ function NavList({ view, onViewChange, isAdmin }) {
 }
 
 /**
- * The navigation panel: the brand, the account, the destinations, the download
- * link and the account actions.
- *
- * The chat renders this inside its own list column, so a chat has one sidebar
- * holding both the destinations and the conversations, the way the desktop app
- * does. Every other page renders it as the docked sidebar, or the drawer on a
- * phone.
+ * The account button at the foot of the sidebar and the small menu it opens.
+ * The admin entry is cosmetic: the server still refuses admin data to anyone else.
  */
-function SidebarContents({ user, name, view, onViewChange, onCloseNav, theme, onToggleTheme, onSignOut, collapsed = false, onToggleCollapsed = () => {}, withAccount = true }) {
+function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState({ left: 0, bottom: 0 });
+  const wrapRef = useRef(null);
+  const toggleRef = useRef(null);
+  const menuRef = useRef(null);
+  const isAdmin = user.isAdmin === true;
+
+  // Fixed rather than absolute: a collapsed or scrolling sidebar would clip the menu.
+  useLayoutEffect(() => {
+    if (!open || !toggleRef.current) return;
+    const rect = toggleRef.current.getBoundingClientRect();
+    setPosition({ left: Math.max(8, rect.left), bottom: window.innerHeight - rect.top + 8 });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    menuRef.current?.querySelector('[role="menuitem"]')?.focus();
+    const onPointerDown = (event) => {
+      if (!wrapRef.current?.contains(event.target)) setOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      toggleRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const choose = (action) => {
+    setOpen(false);
+    action();
+  };
+  const row = 'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm hover:bg-black/5';
+
   return (
-    <>
-      {/* The shell has no top bar, so the app is named here, as the desktop app's
-          panel names it. On a phone this row also carries the way out of the drawer. */}
-      <div className="sidebar-brand">
-        <span className="brand-mark">
-          <LogoMark size={20} />
-        </span>
-        <span className="brand-name">Zuri Cloud</span>
-        <span className="sidebar-brand-actions">
-          <IconButton
-            size="sm"
-            className="sidebar-collapse"
-            label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-            title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-            aria-expanded={!collapsed}
-            onClick={onToggleCollapsed}
-          >
-            {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
-          </IconButton>
-          <IconButton
-            size="sm"
-            label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-            onClick={onToggleTheme}
-          >
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-          </IconButton>
-          <IconButton label="Close navigation" size="sm" className="sidebar-brand-close" onClick={onCloseNav}>
-            <CloseIcon />
-          </IconButton>
-        </span>
-      </div>
-      {withAccount && (
-        <div className="account-card">
-          <span className="avatar">{initialsFor(user.displayName, user.email)}</span>
-          <span style={{ minWidth: 0 }}>
-            <span className="account-name" style={{ display: 'block' }}>
-              {name}
-            </span>
-            <span className="account-email" style={{ display: 'block' }}>
-              {user.email ?? ''}
-            </span>
-          </span>
+    <div className="sidebar-account relative mt-auto" ref={wrapRef}>
+      {open && (
+        <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Account"
+          className="fixed z-[80] w-60 rounded-2xl bg-white p-1.5 text-ink shadow-[0_10px_32px_rgba(13,27,58,0.18)]"
+          style={{ left: position.left, bottom: position.bottom }}
+        >
+          {isAdmin && !inAdmin && (
+            <button type="button" role="menuitem" className={`${row} bg-bronze-soft font-medium text-bronze-ink`} onClick={() => choose(() => onViewChange('admin'))}>
+              <ShieldIcon />
+              <span>Switch to admin view</span>
+            </button>
+          )}
+          <button type="button" role="menuitem" className={row} onClick={() => choose(() => onViewChange('settings'))}>
+            <SettingsIcon />
+            <span>Settings</span>
+          </button>
+          <div role="none" onClick={() => setOpen(false)}>
+            <DownloadLink className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-black/5" />
+          </div>
+          <button type="button" role="menuitem" className={row} onClick={() => choose(onSignOut)}>
+            <SignOutIcon />
+            <span>Sign out</span>
+          </button>
         </div>
       )}
-      <nav className="nav" aria-label="Dashboard sections">
-        <NavList view={view} onViewChange={onViewChange} isAdmin={user.isAdmin === true} />
-      </nav>
-      <p className="stat-meta sidebar-note">Signed in to Zuri Cloud.</p>
-      <DownloadLink className="sidebar-download" />
-      {/* At the foot, because leaving the account is not part of the workspace. */}
-      <div className="sidebar-foot">
-        <Button variant="ghost" size="sm" onClick={onSignOut}>
-          <SignOutIcon />
-          <span>Sign out</span>
-        </Button>
-      </div>
-    </>
+      <button
+        ref={toggleRef}
+        type="button"
+        className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-2 text-left hover:bg-black/5"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        <span className="avatar">{initialsFor(user.displayName, user.email)}</span>
+        <span className="min-w-0 flex-1 [.is-collapsed_&]:hidden">
+          <span className="account-name block truncate">{name}</span>
+          <span className="account-email block truncate">{planText}</span>
+        </span>
+        <ChevronUpIcon className="[.is-collapsed_&]:hidden" />
+      </button>
+    </div>
+  );
+}
+
+/** The brand row: name, collapse toggle and theme toggle. Shared by both sidebars. */
+function BrandRow({ collapsed, onToggleCollapsed, theme, onToggleTheme, badge = null }) {
+  return (
+    <div className="sidebar-brand">
+      <span className="brand-mark">
+        <LogoMark size={20} />
+      </span>
+      <span className="brand-name">Zuri Cloud</span>
+      {badge}
+      <span className="sidebar-brand-actions">
+        <IconButton
+          size="sm"
+          className="sidebar-collapse"
+          label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          title={collapsed ? 'Expand navigation' : 'Collapse navigation'}
+          aria-expanded={!collapsed}
+          onClick={onToggleCollapsed}
+        >
+          {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
+        </IconButton>
+        <IconButton
+          size="sm"
+          label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          onClick={onToggleTheme}
+        >
+          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+        </IconButton>
+      </span>
+    </div>
   );
 }
 
 /**
- * Signed-in shell. The navigation is a sidebar on a wide screen and a drawer behind a
- * floating button below 900px, so no bottom bar covers the chat composer. The chat
- * carries the navigation itself, which is why the docked sidebar is skipped there.
+ * The user navigation panel: the brand, the destinations and the account button.
+ *
+ * The chat renders this inside its own list column, so a chat has one sidebar
+ * holding both the destinations and the conversations, the way the desktop app
+ * does. Every other page renders it as the docked sidebar.
  */
-export default function Dashboard({ account, plans, view, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn, onSignOut, theme, onToggleTheme, navOpen, onOpenNav, onCloseNav }) {
+function SidebarContents({ user, name, planText, view, onViewChange, theme, onToggleTheme, onSignOut, collapsed = false, onToggleCollapsed = () => {} }) {
+  return (
+    <>
+      <BrandRow collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} theme={theme} onToggleTheme={onToggleTheme} />
+      <nav className="nav" aria-label="Dashboard sections">
+        <NavList view={view} onViewChange={onViewChange} />
+      </nav>
+      <AccountMenu user={user} name={name} planText={planText} inAdmin={false} onViewChange={onViewChange} onSignOut={onSignOut} />
+    </>
+  );
+}
+
+/** The admin sidebar: an Admin badge, the way back to the user view and the report sections. */
+function AdminSidebarContents({ user, name, planText, onViewChange, theme, onToggleTheme, onSignOut, collapsed, onToggleCollapsed }) {
+  const jump = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return (
+    <>
+      <BrandRow
+        collapsed={collapsed}
+        onToggleCollapsed={onToggleCollapsed}
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        badge={<span className="rounded-full bg-bronze-soft px-2 py-0.5 text-xs font-semibold text-bronze-ink">Admin</span>}
+      />
+      <Button variant="secondary" block onClick={() => onViewChange('chat')}>
+        <MessageIcon />
+        <span>Switch to user view</span>
+      </Button>
+      <nav className="nav" aria-label="Admin sections">
+        {ADMIN_SECTIONS.map((item) => (
+          <button key={item.id} type="button" className="nav-item" onClick={() => jump(item.id)}>
+            <ShieldIcon />
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+      <AccountMenu user={user} name={name} planText={planText} inAdmin onViewChange={onViewChange} onSignOut={onSignOut} />
+    </>
+  );
+}
+
+/** What a non-admin sees at an admin address. The server refuses the data regardless. */
+function NoAccess({ onViewChange }) {
+  return (
+    <section className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center" aria-labelledby="no-access-title">
+      <span className="grid size-14 place-items-center rounded-full bg-bronze-soft text-bronze-ink">
+        <LockIcon />
+      </span>
+      <h1 id="no-access-title" className="font-display text-2xl font-extrabold">This area is for admins</h1>
+      <p className="max-w-sm text-muted">Your account does not have admin access, so this page is hidden. Ask an owner to give you access.</p>
+      <Button onClick={() => onViewChange('chat')}>Back to chat</Button>
+    </section>
+  );
+}
+
+/**
+ * Signed-in shell. The navigation is a sidebar on a wide screen and a bottom tab bar
+ * below 900px. The chat carries the navigation itself, which is why the docked sidebar
+ * is skipped there. Admins get a separate frame with its own sidebar.
+ */
+export default function Dashboard({ account, plans, view, settingsTab, busy, topups, busyTopup, onViewChange, onChoose, onTopUp, onSignIn, onSignOut, theme, onToggleTheme }) {
   const user = account.me?.user ?? {};
   const name = user.displayName || user.email || 'Zuri user';
+  const isAdmin = user.isAdmin === true;
+  const planCode = account.me?.subscription?.planCode;
+  const planText = isAdmin ? 'Admin' : planCode ? planLabel(planCode, plans) : 'No plan';
   const isChat = view === 'chat';
+  const inAdminFrame = view === 'admin' && isAdmin;
   // The panel can be folded away to its icons and opened again, as the desktop
   // app allows. The choice is kept, so a reload does not undo it.
   const [navCollapsed, setNavCollapsed] = useState(readCollapsed);
@@ -168,31 +286,74 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
     onViewChange(next);
   };
 
-  const navigation = (
-    <SidebarContents
-      collapsed={navCollapsed}
-      onToggleCollapsed={toggleCollapsed}
-      user={user}
-      name={name}
-      view={view}
-      onViewChange={chooseView}
-      onCloseNav={onCloseNav}
-      theme={theme}
-      onToggleTheme={onToggleTheme}
-      onSignOut={onSignOut}
-    />
-  );
+  const sidebarProps = {
+    collapsed: navCollapsed,
+    onToggleCollapsed: toggleCollapsed,
+    user,
+    name,
+    planText,
+    onViewChange: chooseView,
+    theme,
+    onToggleTheme,
+    onSignOut,
+  };
+  const navigation = <SidebarContents {...sidebarProps} view={view} />;
+
+  const settingsPanels = {
+    overview: <OverviewView me={account.me} usage={account.usage} onViewChange={onViewChange} />,
+    usage: (
+      <UsageView
+        usage={account.usage}
+        limits={account.limits}
+        topups={topups}
+        busyTopup={busyTopup}
+        onTopUp={onTopUp}
+      />
+    ),
+    plans: (
+      <PlansView
+        plans={plans}
+        // Pending Starter is only a checkout placeholder. Keep the
+        // Starter action visible so a new account can activate it.
+        currentPlan={account.me?.subscription?.status === 'pending'
+          ? null
+          : account.me?.subscription?.planCode ?? null}
+        busy={busy}
+        onChoose={onChoose}
+        onSignIn={onSignIn}
+        // An administrator never checks out: their plan, and every account's,
+        // is set on the Admin tab's People list at no cost.
+        admin={isAdmin}
+      />
+    ),
+    billing: <BillingView me={account.me} billing={account.billing} usage={account.usage} />,
+    account: <AccountView me={account.me} onSignOut={onSignOut} />,
+  };
+
+  // Phones get a bottom tab bar instead of a drawer; it renders itself only below 900px.
+  const barItems = inAdminFrame
+    ? [
+        { id: 'admin', label: 'Admin', icon: <ShieldIcon /> },
+        { id: 'chat', label: 'User view', icon: <MessageIcon /> },
+      ]
+    : [
+        { id: 'chat', label: 'Chat', icon: <MessageIcon /> },
+        { id: 'tasks', label: 'Tasks', icon: <TaskIcon /> },
+        { id: 'projects', label: 'Projects', icon: <FolderIcon /> },
+        { id: 'settings', label: 'Settings', icon: <SettingsIcon /> },
+        ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: <ShieldIcon /> }] : []),
+      ];
 
   return (
     <div className="app">
       {!isChat && (
-        <aside className={`sidebar${navOpen ? ' is-open' : ''}${navCollapsed ? ' is-collapsed' : ''}`} aria-label="Dashboard navigation">
-          {navigation}
+        <aside className={`sidebar${navCollapsed ? ' is-collapsed' : ''}`} aria-label={inAdminFrame ? 'Admin navigation' : 'Dashboard navigation'}>
+          {inAdminFrame ? <AdminSidebarContents {...sidebarProps} /> : navigation}
         </aside>
       )}
 
       <main className={`app-main${isChat ? ' is-chat' : ''}`}>
-        <div className="app-content">
+        <div className={`app-content${isChat ? '' : ` ${BOTTOM_BAR_SPACE}`}`}>
           {isChat && (
             <ChatView
               navCollapsed={navCollapsed}
@@ -220,39 +381,9 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
           {view === 'notifications' && <NotificationsView />}
           {view === 'automations' && <AutomationsView />}
           {view === 'images' && <ImagesView />}
-          {view === 'overview' && (
-            <OverviewView me={account.me} usage={account.usage} onViewChange={onViewChange} />
-          )}
-          {view === 'usage' && (
-            <UsageView
-              usage={account.usage}
-              limits={account.limits}
-              topups={topups}
-              busyTopup={busyTopup}
-              onTopUp={onTopUp}
-            />
-          )}
-          {view === 'plans' && (
-            <PlansView
-              plans={plans}
-              // Pending Starter is only a checkout placeholder. Keep the
-              // Starter action visible so a new account can activate it.
-              currentPlan={account.me?.subscription?.status === 'pending'
-                ? null
-                : account.me?.subscription?.planCode ?? null}
-              busy={busy}
-              onChoose={onChoose}
-              onSignIn={onSignIn}
-              // An administrator never checks out: their plan, and every account's,
-              // is set on the Admin tab's People list at no cost.
-              admin={user.isAdmin === true}
-            />
-          )}
-          {view === 'billing' && (
-            <BillingView me={account.me} billing={account.billing} usage={account.usage} />
-          )}
-          {view === 'account' && <AccountView me={account.me} onSignOut={onSignOut} />}
-          {view === 'admin' && <AdminView />}
+          {view === 'settings' && <SettingsView tab={settingsTab} onTabChange={onViewChange} panels={settingsPanels} />}
+          {/* A non-admin never mounts AdminView, so the admin API is not even called. */}
+          {view === 'admin' && (isAdmin ? <AdminView /> : <NoAccess onViewChange={chooseView} />)}
 
           {!isChat && (
             <div className="app-foot">
@@ -262,25 +393,7 @@ export default function Dashboard({ account, plans, view, busy, topups, busyTopu
         </div>
       </main>
 
-      {/* Below the sidebar breakpoint the navigation is a drawer opened by this floating
-          button. The chat draws its own controls, and the drawer is not used there
-          because its list column already carries the navigation. */}
-      {!isChat && !navOpen && (
-        <IconButton
-          className="nav-fab"
-          label="Open navigation"
-          aria-expanded="false"
-          onClick={onOpenNav}
-        >
-          <MenuIcon />
-        </IconButton>
-      )}
-
-      {/* A tap outside the drawer closes it. The scrim is hidden once the sidebar is
-          docked at the wide breakpoint. */}
-      {!isChat && navOpen && (
-        <button type="button" className="nav-scrim" aria-label="Close navigation" onClick={onCloseNav} />
-      )}
+      <BottomBar items={barItems} view={view} onViewChange={chooseView} />
     </div>
   );
 }

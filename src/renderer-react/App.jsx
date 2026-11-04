@@ -190,7 +190,7 @@ export default function App() {
       {route !== 'settings' && (
         <Sidebar current={route} onNavigate={navigate} onNewChat={startNewChat} onSelectThread={openThread} onEditProject={editProject} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
       )}
-      {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} onNewChat={startNewChat} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} openingKind={chatSessionKey % 2 === 0 ? 'greeting' : 'question'} />}
+      {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} onNewChat={startNewChat} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} />}
       {route === 'new-project' && <NewProjectView key={editingProject?.id ?? 'new'} project={editingProject} onCreated={() => { setEditingProject(null); refreshChats(); setRoute('chats'); }} />}
       {route === 'skills' && <SkillsView />}
       {route === 'agents' && <AgentsView />}

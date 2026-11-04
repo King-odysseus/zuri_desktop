@@ -2,21 +2,21 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Inspect current desktop and mobile sign-in components and styles",
+      "text": "Inspect the previously failing self-test assertions and current worktree",
       "state": "done"
     },
     {
-      "text": "Implement the split hero and sign-in card layout across desktop and mobile",
+      "text": "Confirm the drawer, Flowbite shell, and admin-route fixes without changing unrelated work",
       "state": "done"
     },
     {
-      "text": "Build and run targeted checks",
+      "text": "Run the full npm test gate and review the result",
       "state": "done"
     },
     {
-      "text": "Verify desktop and mobile screens, then commit and push",
-      "state": "active"
+      "text": "Summarize verification and any remaining blockers",
+      "state": "done"
     }
   ],
-  "updatedAt": "2026-10-30T22:40:41.637Z"
+  "updatedAt": "2026-11-04T01:20:00.000Z"
 }

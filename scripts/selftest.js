@@ -145,6 +145,28 @@ check('the sidebar refreshes after chat history changes', () => {
   return 'Recents follows clear and delete events';
 });
 
+check('the sidebar can be dragged to a width that is kept, and long titles end in an ellipsis', () => {
+  const sidebar = read('src/renderer-react/Sidebar.jsx');
+  const css = read('src/renderer-react/app.css');
+  for (const required of ['role="separator"', 'aria-label="Resize sidebar"', 'onPointerDown={beginResize}', 'onKeyDown={resizeFromKeyboard}', 'onDoubleClick={resetWidth}', 'setPointerCapture', "'zuri.sidebarWidth'", 'style={{ width: collapsed ? 0 : width }}', 'className="zuri-thread-title"']) {
+    if (!sidebar.includes(required)) throw new Error(`the sidebar is missing ${required}`);
+  }
+  // A fixed w-72 would make the drag do nothing.
+  if (/className=\{`zuri-sidebar-panel[^`]*w-72/.test(sidebar)) throw new Error('the panel still has a fixed width');
+  const limits = /SIDEBAR_MIN_WIDTH = (\d+);\s*export const SIDEBAR_MAX_WIDTH = (\d+)/.exec(sidebar);
+  if (!limits || Number(limits[1]) < 160 || Number(limits[2]) > 600 || Number(limits[1]) >= Number(limits[2])) {
+    throw new Error('the width limits are missing or unreasonable');
+  }
+  const title = /\.zuri-sidebar-panel \.zuri-thread-title\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+  for (const declaration of ['overflow: hidden', 'text-overflow: ellipsis', 'white-space: nowrap']) {
+    if (!title.includes(declaration)) throw new Error(`the title rule lacks ${declaration}`);
+  }
+  if (!/\.zuri-sidebar-panel \.zuri-button > span\s*\{[^}]*min-width: 0/.test(css)) {
+    throw new Error('the button label wrapper can still stop a title from shrinking');
+  }
+  return 'resizable between its limits, width remembered, titles clipped with an ellipsis';
+});
+
 check('saved chats can be renamed without losing the continue action', () => {
   const history = read('src/renderer-react/HistoryView.jsx');
   const main = read('src/main/main.js');
@@ -155,6 +177,41 @@ check('saved chats can be renamed without losing the continue action', () => {
   if (!main.includes("['zuri:chats:rename', handleChatRename]")) throw new Error('main rename handler is missing');
   if (!preload.includes("'zuri:chats:rename'")) throw new Error('preload rename channel is missing');
   return 'rename is validated in the store and exposed through the guarded bridge';
+});
+
+check('the window offers pin and archive for a saved chat', () => {
+  const main = read('src/main/main.js');
+  const preload = read('src/main/preload.js');
+  if (!main.includes("['zuri:chats:flags', handleChatFlags]")) throw new Error('main flags handler is missing');
+  if (!preload.includes("'zuri:chats:flags'")) throw new Error('preload flags channel is missing');
+  for (const required of ['chats?.flags?.', 'thread.archived !== true', 'Archive "']) {
+    if (!read('src/renderer-react/Sidebar.jsx').includes(required)) throw new Error(`the sidebar is missing ${required}`);
+  }
+  if (!read('src/renderer-react/HistoryView.jsx').includes('Restore ')) throw new Error('an archived chat cannot be restored');
+  return 'sidebar and history carry the controls, main and preload carry the channel';
+});
+
+check('a reply is spoken as words, not as markdown symbols', async () => {
+  const { speakableText, speechChunks, speechAvailable } = await import(pathToFileURL(path.join(root, 'src/shared/speech.js')).href);
+  const said = speakableText('## Rates\n\n**Registered** shops charge [KRA](https://kra.go.ke) 16%.\n\n```js\nconst x = 1;\n```\n\n- first\n- second [1]');
+  for (const forbidden of ['#', '**', 'http', 'const x', '[1]', '```']) {
+    if (said.includes(forbidden)) throw new Error(`the spoken text still has "${forbidden}": ${said}`);
+  }
+  for (const wanted of ['Rates', 'Registered', 'KRA', 'first', 'second']) {
+    if (!said.includes(wanted)) throw new Error(`the spoken text lost "${wanted}": ${said}`);
+  }
+  if (speakableText(undefined) !== '') throw new Error('a missing reply was not empty');
+
+  const long = `${'This is a sentence. '.repeat(40)}${'word '.repeat(150)}`;
+  const chunks = speechChunks(long);
+  if (chunks.length < 2) throw new Error('a long reply was not split');
+  if (chunks.some((chunk) => chunk.length > 460)) throw new Error('a chunk is too long for the voice engine');
+  // Node has no speech engine; the button must stay hidden rather than fail.
+  if (speechAvailable() !== false) throw new Error('speech was reported available without an engine');
+  for (const file of ['src/renderer-react/ChatPanel.jsx', 'web/src/views/ChatView.jsx']) {
+    if (!read(file).includes('speechAvailable()')) throw new Error(`${file} does not offer read aloud`);
+  }
+  return 'markdown stripped, long replies split, button only where a voice exists';
 });
 
 // A prompt is worth copying as much as a reply, so the user branch keeps its own copy button.
@@ -599,6 +656,517 @@ for (const [kind, content] of Object.entries(OFFICE_SAMPLES)) {
     // Every Office file is a ZIP, which always starts with "PK".
     if (fs.readFileSync(result.data.path).subarray(0, 2).toString() !== 'PK') throw new Error('not a ZIP container');
     return result.data.name;
+  });
+}
+
+// Styled output: the builders must turn inline marks into real formatting, apply a
+// theme, and keep text inside the slide, not just emit a valid ZIP.
+{
+  const { buildOfficeFile, fitText, inlineRuns } = await import(pathToFileURL(path.join(root, 'src/main/office.js')).href);
+  const JSZip = (await import('jszip')).default;
+  const part = async (buffer, name) => (await JSZip.loadAsync(buffer)).file(name).async('string');
+
+  check('inline bold, italic and links become runs, never literal asterisks', () => {
+    const runs = inlineRuns('Up **12%** and *steady*, see [site](https://zuri.app)');
+    if (!runs.some((run) => run.bold && run.text === '12%')) throw new Error('bold was not read');
+    if (!runs.some((run) => run.italic && run.text === 'steady')) throw new Error('italic was not read');
+    if (!runs.some((run) => run.link === 'https://zuri.app')) throw new Error('the link was not read');
+    if (runs.map((run) => run.text).join('').includes('*')) throw new Error('an asterisk is left in the text');
+    return 'bold, italic and link read as runs';
+  });
+
+  const richDocx = await buildOfficeFile('docx', {
+    title: 'Report', theme: 'corporate', coverPage: true,
+    sections: [{ heading: 'Summary', paragraphs: ['Grew **12%**'], callout: 'Key point', numbered: ['a', 'b'], table: { rows: [['Item', 'Cost'], ['Rent', '1,200']] } }],
+  });
+  check('a Word file carries theme styles, page numbers, a real table and no stray markup', async () => {
+    const body = await part(richDocx, 'word/document.xml');
+    const styles = await part(richDocx, 'word/styles.xml');
+    if (body.includes('**')) throw new Error('literal asterisks reached the document');
+    if (!body.includes('<w:tbl>') || !body.includes('w:tblHeader')) throw new Error('the table has no header row');
+    if (!styles.includes('1F2A44')) throw new Error('the corporate theme colour is not in the styles');
+    const footer = Object.keys((await JSZip.loadAsync(richDocx)).files).find((name) => /word\/footer\d*\.xml$/.test(name));
+    if (!footer || !(await part(richDocx, footer)).includes('PAGE')) throw new Error('there is no page number field');
+    return 'theme, header row, page field';
+  });
+
+  const richXlsx = await buildOfficeFile('xlsx', {
+    sheets: [{ name: 'Budget', columns: ['Item', { header: 'Cost', type: 'currency' }, 'Due'], rows: [['Rent', 100, '2026-10-01'], ['Power', 250.5, '2026-10-02']], totals: true }],
+  });
+  check('an Excel sheet gets a header fill, number formats, a filter and a SUM total', async () => {
+    const sheet = await part(richXlsx, 'xl/worksheets/sheet1.xml');
+    const styles = await part(richXlsx, 'xl/styles.xml');
+    if (!sheet.includes('autoFilter') && !(await part(richXlsx, 'xl/tables/table1.xml')).includes('autoFilter')) throw new Error('no filter on the header row');
+    if (!sheet.includes('<f>SUM(B2:B3)</f>')) throw new Error('the total row has no SUM formula');
+    if (!styles.includes('#,##0.00') || !styles.includes('dd mmm yyyy')) throw new Error('number and date formats are missing');
+    if (!styles.includes('FF0D1B3A')) throw new Error('the header fill colour is missing');
+    return 'filter, SUM total, formats, fill';
+  });
+
+  const fitted = fitText(Array.from({ length: 12 }, () => 'A bullet with plenty of words in it to take up room on the slide, enough to need more space'), 11.7, 5, 24, 14);
+  check('too much slide text shrinks, then carries on to another slide', () => {
+    if (fitted.fontSize < 14) throw new Error('text shrank below the readable minimum');
+    if (fitText(['Short'], 11.7, 5).fontSize !== 24) throw new Error('short text should keep the full size');
+    const huge = fitText(Array.from({ length: 40 }, () => 'A bullet with plenty of words in it to take up room on the slide'), 11.7, 5, 24, 14);
+    if (huge.chunks.length < 2) throw new Error('forty bullets were squeezed onto one slide');
+    return `${huge.chunks.length} slides for 40 bullets`;
+  });
+
+  const richPptx = await buildOfficeFile('pptx', {
+    title: 'Deck', theme: 'bold',
+    slides: [
+      { title: 'Agenda', bullets: ['One **bold**', 'Two'] },
+      { title: 'Compare', left: { heading: 'Before', bullets: ['a'] }, right: { heading: 'After', bullets: ['b'] } },
+      { title: 'Growth', stat: '+42%', caption: 'year on year' },
+      { title: 'Sales', chart: { type: 'bar', labels: ['Q1', 'Q2'], series: [{ name: 'Rev', values: [10, 20] }] } },
+      { title: 'Costs', table: { rows: [['A', 'B'], ['1', '2']] } },
+    ],
+  });
+  check('a PowerPoint deck uses varied layouts, a native chart and slide numbers', async () => {
+    const zip = await JSZip.loadAsync(richPptx);
+    const slides = Object.keys(zip.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name));
+    if (slides.length !== 6) throw new Error(`expected 6 slides, got ${slides.length}`);
+    if (!Object.keys(zip.files).some((name) => name.startsWith('ppt/charts/chart'))) throw new Error('the chart is not a native chart');
+    const first = await part(richPptx, 'ppt/slides/slide2.xml');
+    if (first.includes('**')) throw new Error('literal asterisks reached a slide');
+    if (!first.includes('<a:b') && !first.includes(' b="1"')) throw new Error('bold was not applied');
+    const masters = await Promise.all(Object.keys(zip.files).filter((name) => /slideMasters\/slideMaster\d+\.xml$/.test(name)).map((name) => part(richPptx, name)));
+    if (!masters.some((xml) => xml.includes('sldNum'))) throw new Error('no slide number placeholder');
+    return '6 slides, native chart, slide numbers';
+  });
+
+  const { reviewOfficeContent } = await import(pathToFileURL(path.join(root, 'src/main/office.js')).href);
+  const { editOfficeFile } = await import(pathToFileURL(path.join(root, 'src/main/office-edit.js')).href);
+
+  check('a file with weak content is reviewed, and the warnings reach the model', () => {
+    const slides = reviewOfficeContent('pptx', { title: 'D', slides: [{ title: 'Empty' }, { title: 'Busy', bullets: ['a', 'b', 'c', 'd', 'e', 'f', 'g'] }, { title: 'Money', bullets: ['Sales grew 12% to $5m'] }] });
+    for (const expected of [/nothing under it/, /7 bullets/, /no chart, table or big-number/]) {
+      if (!slides.some((warning) => expected.test(warning))) throw new Error('missing a warning for ' + expected);
+    }
+    const sheet = reviewOfficeContent('xlsx', { sheets: [{ name: 'S', columns: ['Item', 'Cost'], rows: [['Rent', '1,200'], ['Power', '300']] }] });
+    if (!sheet.some((warning) => /numbers written as text/.test(warning))) throw new Error('text numbers were not flagged');
+    const typed = reviewOfficeContent('xlsx', { sheets: [{ name: 'S', columns: ['Item', { header: 'Cost', type: 'currency' }], rows: [['Rent', 1200]] }] });
+    if (typed.length > 0) throw new Error('a clean sheet was flagged: ' + typed.join(' '));
+    const doc = reviewOfficeContent('docx', { title: 'T', sections: [{ paragraphs: ['word '.repeat(200)] }] });
+    if (!doc.some((warning) => /180 words/.test(warning)) || !doc.some((warning) => /no heading/.test(warning))) throw new Error('a wall of text was not flagged');
+    if (!read('src/main/tools/index.js').includes('warnings: reviewOfficeContent(kind, content)')) throw new Error('the tool result does not carry the warnings');
+    if (!read('src/shared/documentTool.js').includes('If the result lists warnings')) throw new Error('the model is not told to act on warnings');
+    return 'slides, sheets and documents reviewed; warnings sent back in the tool result';
+  });
+
+  const chartedXlsx = await buildOfficeFile('xlsx', {
+    sheets: [{ name: 'Budget', columns: ['Item', { header: 'Cost', type: 'currency' }], rows: [['Rent', 100], ['Power', 250], ['Water', -20]], scale: ['Cost'], highlight: [{ column: 'Cost', rule: 'negative', color: 'amber' }], chart: { type: 'bar', title: 'Cost', categories: 'Item', values: ['Cost'] } }],
+  });
+  check('an Excel sheet can carry a native chart and live conditional formatting', async () => {
+    const zip = await JSZip.loadAsync(chartedXlsx);
+    const names = Object.keys(zip.files);
+    for (const required of ['xl/charts/chart1.xml', 'xl/drawings/drawing1.xml', 'xl/worksheets/_rels/sheet1.xml.rels']) {
+      if (!names.includes(required)) throw new Error('missing ' + required);
+    }
+    const sheet = await part(chartedXlsx, 'xl/worksheets/sheet1.xml');
+    if (!sheet.includes('<drawing r:id=') || !sheet.includes('colorScale') || !sheet.includes('cellIs')) throw new Error('the sheet does not reference its chart and rules');
+    if (!(await part(chartedXlsx, '[Content_Types].xml')).includes('drawingml.chart+xml')) throw new Error('the chart has no content type');
+    const chart = await part(chartedXlsx, 'xl/charts/chart1.xml');
+    if (!chart.includes("'Budget'!$B$2:$B$4") || !chart.includes('<c:v>Rent</c:v>')) throw new Error('the chart does not point at the data');
+    return 'chart, drawing, relationship, colour scale and highlight rule';
+  });
+
+  const editable = await buildOfficeFile('docx', { title: 'T', sections: [{ heading: 'Summary', paragraphs: ['Revenue grew **12%** this quarter', 'Second paragraph'], table: { rows: [['Item', 'Cost'], ['Rent', '100']] } }] });
+  check('editing a Word file keeps the formatting around the words that change', async () => {
+    const result = await editOfficeFile('docx', editable, [{ find: '12%', replace: '15%' }, { find: 'Revenue grew', replace: 'Sales rose' }]);
+    const xml = await part(result.buffer, 'word/document.xml');
+    const run = xml.match(/<w:r>(?:(?!<\/w:r>)[\s\S])*?15%[\s\S]*?<\/w:r>/)?.[0] ?? '';
+    if (!run.includes('<w:b')) throw new Error('the bold run lost its bold');
+    if (!xml.includes('Sales rose') || xml.includes('Revenue grew')) throw new Error('the plain words were not replaced');
+    if (result.applied !== 2) throw new Error('expected 2 replacements, got ' + result.applied);
+    return 'bold run survives a replacement inside it and one beside it';
+  });
+
+  check('a paragraph or table row can be added in the style of its neighbour', async () => {
+    const result = await editOfficeFile('docx', editable, [{ insertAfter: 'Second paragraph', text: 'Inserted line' }, { tableRowAfter: 'Rent', cells: ['Power', '300'] }, { insertAfter: 'text that is not there', text: 'x' }]);
+    const xml = await part(result.buffer, 'word/document.xml');
+    if (!xml.includes('Inserted line')) throw new Error('the paragraph was not added');
+    if ((xml.match(/<w:tr[ >]/g) || []).length !== 3 || !xml.includes('Power')) throw new Error('the row was not added');
+    if (result.applied !== 2 || result.notFound.length !== 1) throw new Error('a missing anchor was not reported');
+    const deck = await buildOfficeFile('pptx', { title: 'D', slides: [{ title: 'One', bullets: ['First', 'Second'] }, { title: 'Costs', table: { rows: [['A', 'B'], ['x', '1']] } }] });
+    const edited = await editOfficeFile('pptx', deck, [{ insertAfter: 'Second', text: 'Third' }, { tableRowAfter: 'x', cells: ['y', '2'] }]);
+    const slides = await JSZip.loadAsync(edited.buffer);
+    let all = '';
+    for (const name of Object.keys(slides.files).filter((entry) => /^ppt\/slides\/slide\d+\.xml$/.test(entry))) all += await slides.file(name).async('string');
+    if (!all.includes('Third') || !all.includes('>y<')) throw new Error('the slide edits did not land');
+    return 'Word paragraph and row, PowerPoint bullet and row';
+  });
+
+  check('Excel cells can be formatted by range, and a bad range is refused', async () => {
+    const book = await buildOfficeFile('xlsx', { sheets: [{ name: 'S', columns: ['A', 'B'], rows: [[1, 2], [3, 4]] }] });
+    const result = await editOfficeFile('xlsx', book, [{ sheet: 'S', range: 'A2:B3', format: { bold: true, fill: '#FFEEDD', numberFormat: '0.0' } }]);
+    if (result.applied !== 1) throw new Error('the format was not applied');
+    const styles = await part(result.buffer, 'xl/styles.xml');
+    if (!styles.includes('FFFFEEDD') || !styles.includes('0.0')) throw new Error('the fill and number format are missing');
+    let refused = false;
+    try {
+      await editOfficeFile('xlsx', book, [{ range: 'not-a-range', format: { bold: true } }]);
+    } catch (error) {
+      refused = /cell range/.test(error.message);
+    }
+    if (!refused) throw new Error('a bad range was accepted');
+    return 'fill, bold and number format applied; bad range refused';
+  });
+
+  check('the Excel pane can fill formulas, draw borders, freeze, merge, sort, name, validate and flag cells', async () => {
+    const vm = await import('node:vm');
+    const sandbox = { module: { exports: {} } };
+    vm.createContext(sandbox);
+    vm.runInContext(read('src/addin/ops.js'), sandbox);
+    const ops = sandbox.ZuriOps;
+    const good = [
+      { op: 'fillFormula', range: 'E3:E26', formula: '=C3-D3' },
+      { op: 'borders', range: 'A1:F30', style: 'thin' },
+      { op: 'freezePanes', rows: 1, columns: 0 },
+      { op: 'merge', range: 'A1:F1' },
+      { op: 'rowHeight', range: 'A1', height: 28 },
+      { op: 'conditionalFormat', range: 'F3:F26', rule: 'between', value: 1, value2: 9, color: '#F8D7DA' },
+      { op: 'conditionalFormat', range: 'F3:F26', rule: 'dataBar' },
+      { op: 'dataValidation', range: 'C3:C26', list: ['Open', 'Done'] },
+      { op: 'sort', range: 'A2:F30', column: 3, ascending: false },
+      { op: 'namedRange', range: 'D3:D26', name: 'Revenue' },
+      { op: 'createTable', range: 'A1:F30', name: 'Budget', style: 'TableStyleMedium2' },
+    ];
+    for (const entry of good) {
+      const outcome = ops.validateOperation(entry);
+      if (!outcome.ok) throw new Error(`${entry.op} was refused: ${outcome.error}`);
+      if (!ops.describeOperation(outcome.operation) || ops.describeOperation(outcome.operation) === 'Change') throw new Error(`${entry.op} has no readable summary`);
+    }
+    const bad = [
+      { op: 'fillFormula', range: 'E3:E26', formula: 'C3-D3' },
+      { op: 'borders', range: 'A1:F30', style: 'dotted' },
+      { op: 'freezePanes', rows: -1 },
+      { op: 'merge', range: 'A1' },
+      { op: 'rowHeight', range: 'A1', height: 900 },
+      { op: 'conditionalFormat', range: 'F3', rule: 'greaterThan' },
+      { op: 'dataValidation', range: 'C3', list: [] },
+      { op: 'sort', range: 'A2:C30', column: 4 },
+      { op: 'namedRange', range: 'D3:D26', name: 'A1' },
+      { op: 'createTable', range: 'A1:F30', style: 'Fancy' },
+    ];
+    for (const entry of bad) {
+      if (ops.validateOperation(entry).ok) throw new Error(`${entry.op} accepted bad input`);
+    }
+    const pane = read('src/addin/taskpane.js');
+    for (const gate of ["supported('ExcelApi', '1.9')", "supported('ExcelApi', '1.8')", "supported('ExcelApi', '1.6')", "supported('ExcelApi', '1.7')"]) {
+      if (!pane.includes(gate)) throw new Error(`the pane does not check ${gate}`);
+    }
+    return `${good.length} new operations accepted and described, ${bad.length} bad ones refused, API versions checked`;
+  });
+
+  check('the Office pane can write formatted text, real tables and styled shapes', async () => {
+    const vm = await import('node:vm');
+    const sandbox = { module: { exports: {} } };
+    vm.createContext(sandbox);
+    vm.runInContext(read('src/addin/ops.js'), sandbox);
+    const ops = sandbox.ZuriOps;
+    const html = ops.markdownToHtml('## Findings\n\n- **Revenue** up *12%*\n- <script>alert(1)</script>\n\n| Region | Sales |\n| --- | --- |\n| Lagos | 1200 |\n\n[bad](javascript:alert(1))');
+    for (const wanted of ['<h2>Findings</h2>', '<strong>Revenue</strong>', '<em>12%</em>', '<table', '<th>Region</th>', '<td>1200</td>']) {
+      if (!html.includes(wanted)) throw new Error('the converter lost ' + wanted);
+    }
+    if (html.includes('<script') || html.includes('href="javascript')) throw new Error('model text reached the document as markup');
+    for (const good of [{ op: 'insertFormatted', markdown: '# Hi' }, { op: 'addTable', slide: 2, rows: [['A', 'B'], ['1', '2']] }, { op: 'styleShape', slide: 2, shape: 'Title 1', fill: '#1F2A44' }]) {
+      if (!ops.validateOperation(good).ok) throw new Error(good.op + ' was refused');
+    }
+    for (const bad of [{ op: 'insertFormatted', markdown: '  ' }, { op: 'styleShape', slide: 1, shape: 'T', fill: 'navy' }, { op: 'styleShape', slide: 1, shape: 'T' }, { op: 'addTable', slide: 1, rows: [] }]) {
+      if (ops.validateOperation(bad).ok) throw new Error(bad.op + ' accepted bad input');
+    }
+    const pane = read('src/addin/taskpane.js');
+    for (const needed of ['insertHtml(ZuriOps.markdownToHtml', "isSetSupported('PowerPointApi', '1.8')", 'styleTarget.fill.setSolidColor']) {
+      if (!pane.includes(needed)) throw new Error('the pane is missing ' + needed);
+    }
+    return 'markdown escaped into HTML, three operations validated, pane handlers present';
+  });
+
+  check('the browser and phone can make files through the server', () => {
+    const route = read('server/src/app.js');
+    for (const needed of ["'/api/tools/create-document'", 'MAX_DOCUMENT_BODY_BYTES', 'hasPaidSubscription(session)', 'DOCUMENT_REQUEST_LIMITS']) {
+      if (!route.includes(needed)) throw new Error('the server route is missing ' + needed);
+    }
+    const serverPackage = JSON.parse(read('server/package.json'));
+    for (const dependency of ['docx', 'exceljs', 'pptxgenjs', 'jszip']) {
+      if (!serverPackage.dependencies?.[dependency]) throw new Error('the server image would not have ' + dependency);
+    }
+    if (!read('scripts/deploy-cloud.mjs').includes("'office.js'")) throw new Error('the deploy does not ship the builders');
+    if (!read('server/src/server.js').includes('loadOfficeBuilder')) throw new Error('the server never loads the builders');
+    const chat = read('web/src/views/ChatView.jsx');
+    for (const needed of ["from '../../../src/shared/documentTool.js'", 'createDocumentFile(', 'saveGeneratedFile(card.file)']) {
+      if (!chat.includes(needed)) throw new Error('the web chat is missing ' + needed);
+    }
+    if (!read('src/main/providers/chat.js').includes("from '../../shared/documentTool.js'")) throw new Error('the desktop no longer shares the tool definition');
+    return 'route, dependencies, deploy copy, web tool and download card';
+  });
+
+  // A real 40 by 20 PNG, built from its parts, so picture checks use bytes a reader would accept.
+  const zlib = await import('node:zlib');
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc32 = (buffer) => { let value = 0xffffffff; for (const byte of buffer) value = crcTable[(value ^ byte) & 255] ^ (value >>> 8); return (value ^ 0xffffffff) >>> 0; };
+  const pngChunk = (type, data) => { const length = Buffer.alloc(4); length.writeUInt32BE(data.length); const body = Buffer.concat([Buffer.from(type), data]); const sum = Buffer.alloc(4); sum.writeUInt32BE(crc32(body)); return Buffer.concat([length, body, sum]); };
+  const header = Buffer.alloc(13); header.writeUInt32BE(40, 0); header.writeUInt32BE(20, 4); header[8] = 8; header[9] = 2;
+  const pixels = Buffer.concat(Array.from({ length: 20 }, () => Buffer.concat([Buffer.from([0]), Buffer.alloc(120, 0xc8)])));
+  const samplePng = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), pngChunk('IHDR', header), pngChunk('IDAT', zlib.deflateSync(pixels)), pngChunk('IEND', Buffer.alloc(0))]);
+  const sampleUri = 'data:image/png;base64,' + samplePng.toString('base64');
+  const { parseImage } = await import(pathToFileURL(path.join(root, 'src/main/office.js')).href);
+
+  check('the app brand is the default look, and a request can bring its own colours and font', async () => {
+    const fill = async (content) => part(await buildOfficeFile('xlsx', { ...content, sheets: [{ name: 'S', columns: ['A'], rows: [['x']] }] }), 'xl/styles.xml');
+    if (!(await fill({})).includes('FF0D1B3A')) throw new Error('the default is not the app navy');
+    const branded = await fill({ brand: { primary: '#7A1F3D', font: 'Arial' } });
+    if (!branded.includes('FF7A1F3D') || !branded.includes('Arial')) throw new Error('the brand colour and font were not used');
+    const careless = await fill({ brand: { primary: 'red; drop table', accent: '<x>', font: '<script>' } });
+    if (careless.includes('script') || careless.includes('drop table') || !careless.includes('FF0D1B3A')) throw new Error('an unsafe brand was not ignored');
+    return 'navy by default, brand applied, unsafe values ignored';
+  });
+
+  check('a complex Excel dashboard is light, monochrome and spaced for people to read', async () => {
+    const dashboard = await buildOfficeFile('xlsx', {
+      dashboard: true,
+      sheets: [
+        {
+          name: 'Overview',
+          title: 'Business performance',
+          subtitle: 'A light, focused view of the measures that need attention',
+          kpis: [
+            { label: 'Revenue', value: 125000, change: '+12% vs plan', format: '$#,##0' },
+            { label: 'Profit', value: 71000, change: '+18% vs plan', format: '$#,##0' },
+            { label: 'Margin', value: 0.568, change: '+3.1 pts', format: '0.0%' },
+            { label: 'Orders', value: 4782, change: '+15% vs plan', format: '#,##0' },
+          ],
+          columns: [{ header: 'Metric' }, { header: 'Value', type: 'currency' }, { header: 'Change', type: 'percent' }],
+          rows: [['Revenue', 125000, 0.12], ['Cost', 54000, -0.04], ['Profit', '=B2-B3', 0.18]],
+          totals: true,
+          charts: [
+            { type: 'bar', title: 'Performance overview', categories: 'Metric', values: ['Value'] },
+            { type: 'line', title: 'Change by measure', categories: 'Metric', values: ['Change'] },
+            { type: 'pie', title: 'Share of value', categories: 'Metric', values: ['Value'] },
+          ],
+        },
+        {
+          name: 'Details',
+          columns: [{ header: 'Month' }, { header: 'Revenue', type: 'currency' }, { header: 'Status' }],
+          rows: [['January', 20000, 'On track'], ['February', 23000, 'On track']],
+          dropdowns: [{ column: 'Status', options: ['On track', 'At risk'] }],
+          highlight: [{ column: 'Revenue', rule: 'negative', color: 'amber' }],
+        },
+      ],
+    });
+    const styles = await part(dashboard, 'xl/styles.xml');
+    const overview = await part(dashboard, 'xl/worksheets/sheet1.xml');
+    const chart = await part(dashboard, 'xl/charts/chart1.xml');
+    const drawing = await part(dashboard, 'xl/drawings/drawing1.xml');
+    if (!styles.includes('FF4F86C6') || !styles.includes('FFEAF3FC')) throw new Error('the dashboard is missing the light blue palette');
+    if (styles.includes('FFEA580C') || styles.includes('FFF59E0B') || styles.includes('FF8B5CF6')) throw new Error('the dashboard contains a second accent colour');
+    if (!overview.includes('showGridLines="0"') || !overview.includes('ht="32"') || !overview.includes('ht="27"')) throw new Error('dashboard rows or canvas are not spaced for readability');
+    if (!overview.includes('mergeCell ref="A1:L2"') || !overview.includes('mergeCell ref="A5:B5"')) throw new Error('the title band or KPI cards are missing');
+    if ((drawing.match(/<xdr:twoCellAnchor>/g) ?? []).length !== 3) throw new Error('the complex dashboard does not have three chart panels');
+    if (!chart.includes('srgbClr val="4F86C6"') && !chart.includes('srgbClr val="39608F"')) throw new Error('dashboard chart is missing the single-hue palette');
+    if (chart.includes('srgbClr val="F59E0B"') || chart.includes('srgbClr val="8B5CF6"')) throw new Error('dashboard chart uses an unrelated hue');
+    const warnings = reviewOfficeContent('xlsx', { dashboard: true, sheets: [{ name: 'Summary', columns: ['Metric'], rows: [['Revenue']] }] });
+    for (const expected of [/no title/i, /3 to 6 KPI/i, /at least one chart/i, /separate sheet/i]) {
+      if (!warnings.some((warning) => expected.test(warning))) throw new Error(`dashboard review missed ${expected}`);
+    }
+    return 'title, KPI cards, three native charts, hidden gridlines, light single-hue palette and spaced detail';
+  });
+
+  check('an Excel column can offer a drop-down list and a name a formula can use', async () => {
+    const book = await buildOfficeFile('xlsx', { sheets: [{ name: 'Tasks', columns: ['Task', 'Status', { header: 'Cost', type: 'currency' }], rows: [['A', 'Open', 10], ['B', 'Done', 20]], dropdowns: [{ column: 'Status', options: ['Open', 'In progress', 'Done'] }, { column: 'Nope', options: ['x'] }], names: [{ name: 'Costs', column: 'Cost' }, { name: 'A1', column: 'Cost' }] }] });
+    const sheet = await part(book, 'xl/worksheets/sheet1.xml');
+    if (!sheet.includes('type="list"') || !sheet.includes('Open,In progress,Done')) throw new Error('the drop-down is missing');
+    const workbook = await part(book, 'xl/workbook.xml');
+    if (!/definedName name="Costs"[^>]*>'?Tasks'?!\$C\$2:\$C\$3/.test(workbook)) throw new Error('the named range is missing');
+    if (workbook.includes('name="A1"')) throw new Error('a name that looks like a cell was accepted');
+    return 'list validation and a named range, bad rules skipped';
+  });
+
+  check('Excel formulas are written safely: row token, newer functions prefixed, recalculated on open, readable on light brands', async () => {
+    const book = await buildOfficeFile('xlsx', { brand: { primary: 'FFD700' }, sheets: [{ name: 'Sales', columns: ['Qty', 'Price', { header: 'Total', type: 'number' }, 'Lookup'], rows: [[2, 3, '=A{row}*B{row}', '=XLOOKUP(A{row},A:A,B:B)'], [4, 5, '=A{row}*B{row}', '=SUM("XLOOKUP(")']] }] });
+    const sheet = await part(book, 'xl/worksheets/sheet1.xml');
+    if (!sheet.includes('<f>A2*B2</f>') || !sheet.includes('<f>A3*B3</f>')) throw new Error('{row} was not replaced with the real row');
+    if (!sheet.includes('_xlfn.XLOOKUP(A2,A:A,B:B)')) throw new Error('a newer function was not prefixed');
+    if (sheet.includes('_xlfn.XLOOKUP(&quot;') || !sheet.includes('&quot;XLOOKUP(&quot;')) throw new Error('text inside quotes was rewritten');
+    if (!(await part(book, 'xl/workbook.xml')).includes('fullCalcOnLoad="1"')) throw new Error('the workbook does not recalculate on open');
+    if (!(await part(book, 'xl/styles.xml')).includes('FF111827')) throw new Error('header text on a light brand colour is not dark');
+    return 'row token, _xlfn prefixes, recalculation on open and dark text on a light brand colour';
+  });
+
+  check('the review reads Excel formulas for mistakes before the file is built', () => {
+    const sheets = [{ name: 'Sales', columns: ['Qty', { header: 'Total', formula: '=[@Qty]*[@Price]' }], rows: [[1, '=SUM(Nope!A1:A3)'], [2, '=SUM((A2:A3)'], [3, '=FILTER(A:A,A:A>1)']] }, { name: 'Other', columns: ['A'], rows: [[1]] }];
+    const warnings = reviewOfficeContent('xlsx', { sheets });
+    for (const expected of [/not in the workbook/i, /brackets/i, /\[@Price\]/, /spill/i]) {
+      if (!warnings.some((warning) => expected.test(warning))) throw new Error(`the review missed ${expected}`);
+    }
+    const clean = reviewOfficeContent('xlsx', { sheets: [{ name: 'Sales', columns: ['Qty', 'Price', { header: 'Total', type: 'number', formula: '=[@Qty]*[@Price]' }], rows: [[1, 2, '=SUM(Other!A1:A3)']] }, { name: 'Other', columns: ['A'], rows: [[1]] }] });
+    if (clean.some((warning) => /formula|bracket|sheet called/i.test(warning))) throw new Error(`a correct formula was flagged: ${clean.join(' | ')}`);
+    const dashboard = reviewOfficeContent('xlsx', { dashboard: true, sheets: [{ name: 'Summary', title: 'T', kpis: [{ label: 'a', value: 1 }, { label: 'b', value: 2 }, { label: 'c', value: 3 }], charts: [{ type: 'bar', categories: 'Item', values: ['Cost'] }], columns: ['Item', 'Cost', 'Share'], rows: [['A', 10, '=B2/SUM(B2:B9)']] }, { name: 'Data', columns: ['x'], rows: [[1]] }] });
+    if (!dashboard.some((warning) => /low row number/i.test(warning))) throw new Error('a hand-typed row number on a dashboard was not flagged');
+    return 'unknown sheet, unclosed brackets, missing [@column], spill functions and low dashboard rows are named; correct formulas pass';
+  });
+
+  check('the Excel pane reads number formats, tables and named ranges', () => {
+    const pane = read('src/addin/taskpane.js');
+    for (const wanted of ['Number formats on row', 'Excel tables on this sheet', 'Named ranges: ', "supported('ExcelApi', '1.4')"]) {
+      if (!pane.includes(wanted)) throw new Error(`the workbook read is missing "${wanted}"`);
+    }
+    return 'formats of the first data row, table ranges and named ranges are sent with the sheet';
+  });
+
+  check('Excel data becomes a real Table with calculated columns; sheets that cannot be one stay plain', async () => {
+    const book = await buildOfficeFile('xlsx', { sheets: [
+      { name: 'Sales', columns: ['Qty', 'Price', { header: 'Total', type: 'number', formula: '=[@Qty]*[@Price]' }], rows: [[2, 3], [4, 5]], chart: { type: 'bar', categories: 'Qty', values: ['Total'] } },
+      { name: 'Dup', columns: ['a', 'a'], rows: [[1, 2]] },
+    ] });
+    const files = Object.keys((await JSZip.loadAsync(book)).files);
+    if (!files.includes('xl/tables/table1.xml') || files.includes('xl/tables/table2.xml')) throw new Error('only the sheet with unique headers should be a Table');
+    const table = await part(book, 'xl/tables/table1.xml');
+    if (!/name="Sales_Table"[^>]*ref="A1:C3"/.test(table)) throw new Error('the Table has the wrong name or range');
+    const sheet = await part(book, 'xl/worksheets/sheet1.xml');
+    if (!sheet.includes('<f>Sales_Table[[#This Row],[Qty]]*Sales_Table[[#This Row],[Price]]</f>')) throw new Error('the calculated column was not filled with stored structured references');
+    if (!sheet.includes('<tablePart ') || !sheet.includes('<drawing ') || sheet.indexOf('<drawing ') > sheet.indexOf('<tableParts')) throw new Error('the chart and Table parts are out of order');
+    if ((await part(book, 'xl/worksheets/sheet2.xml')).includes('<tablePart ')) throw new Error('a sheet with repeated headers became a Table');
+    if (!table.includes('<calculatedColumnFormula>Sales_Table[[#This Row],[Qty]]*Sales_Table[[#This Row],[Price]]</calculatedColumnFormula>')) throw new Error('the formula column is not marked as calculated, so new rows would stay empty');
+    if ((table.match(/<calculatedColumnFormula>/g) ?? []).length !== 1 || !/<tableColumn [^>]*name="Qty"[^>]*\/>/.test(table)) throw new Error('only the formula column should be calculated');
+    return 'Table with a calculated column, chart alongside, repeated headers kept plain';
+  });
+
+  check('Excel charts: stacked, area, doughnut and combo draw with the right parts and a formatted value axis', async () => {
+    const base = { name: 'Sales', columns: ['Month', { header: 'Revenue', type: 'currency' }, { header: 'Margin', type: 'percent' }], rows: [['Jan', 100, 0.2], ['Feb', 150, 0.3]] };
+    const chartFor = async (chart) => part(await buildOfficeFile('xlsx', { sheets: [{ ...base, chart }] }), 'xl/charts/chart1.xml');
+    const stacked = await chartFor({ type: 'stacked', categories: 'Month', values: ['Revenue', 'Margin'] });
+    if (!stacked.includes('<c:grouping val="stacked"/>') || !stacked.includes('<c:overlap val="100"/>')) throw new Error('the stacked chart is not stacked');
+    if (!stacked.includes('&quot;₦&quot;#,##0.00') ) throw new Error('the value axis does not use the currency format');
+    const area = await chartFor({ type: 'area', categories: 'Month', values: ['Revenue'] });
+    if (!area.includes('<c:areaChart>') || area.includes('invertIfNegative')) throw new Error('the area chart is wrong');
+    const doughnut = await chartFor({ type: 'doughnut', categories: 'Month', values: ['Revenue', 'Margin'], labels: true });
+    if (!doughnut.includes('<c:doughnutChart>') || !doughnut.includes('<c:holeSize') || !doughnut.includes('<c:showVal val="1"/>')) throw new Error('the doughnut chart is wrong');
+    if ((doughnut.match(/<c:ser>/g) ?? []).length !== 1) throw new Error('a doughnut should draw one series');
+    const combo = await chartFor({ type: 'combo', categories: 'Month', values: ['Revenue', 'Margin'] });
+    if (!combo.includes('<c:barChart>') || !combo.includes('<c:lineChart>') || !combo.includes('<c:axId val="444"/>') || !combo.includes('<c:crosses val="max"/>')) throw new Error('the combo chart has no second scale');
+    const alone = await chartFor({ type: 'combo', categories: 'Month', values: ['Revenue'] });
+    if (alone.includes('<c:lineChart>')) throw new Error('a combo chart with one series should fall back to columns');
+    const pie = await chartFor({ type: 'pie', categories: 'Month', values: ['Revenue'] });
+    if (!pie.includes('<c:pieChart>')) throw new Error('the pie chart broke');
+    return 'stacked, area, doughnut, combo (with fallback) and pie, axis in the column format, optional value labels';
+  });
+
+  check('Excel templates: input cells, accounting formats, data bars and blank rows that keep their formulas', async () => {
+    const book = await buildOfficeFile('xlsx', { sheets: [{
+      name: 'Invoice', blankRows: 3, totals: true, dataBars: ['Amount'],
+      columns: ['Item', { header: 'Qty', type: 'integer', role: 'input' }, { header: 'Price', type: 'accounting', role: 'input' }, { header: 'Amount', type: 'thousands', formula: '=[@Qty]*[@Price]' }],
+      rows: [['Pens', 2, 150]],
+      chart: { type: 'bar', categories: 'Item', values: ['Amount'] },
+    }] });
+    const sheet = await part(book, 'xl/worksheets/sheet1.xml');
+    const formulas = sheet.match(/<f>Invoice_Table\[\[#This Row\],\[Qty\]\]\*Invoice_Table\[\[#This Row\],\[Price\]\]<\/f>/g) ?? [];
+    if (formulas.length !== 4) throw new Error(`expected the formula on 1 data row and 3 blank rows, found ${formulas.length}`);
+    if (!/ref="A1:D5"/.test(await part(book, 'xl/tables/table1.xml'))) throw new Error('the Table does not cover the blank rows');
+    if (!sheet.includes('<f>SUM(D2:D5)</f>')) throw new Error('the total does not cover the blank rows');
+    if (!sheet.includes('dataBar')) throw new Error('the data bar is missing');
+    const styles = await part(book, 'xl/styles.xml');
+    if (!styles.includes('FF1F4FD8') || !styles.includes('FFFFF8E1')) throw new Error('input cells are not blue on a pale wash');
+    if (!styles.includes('#,##0,&quot;K&quot;') || !styles.includes(';(')) throw new Error('thousands or accounting format is missing');
+    const chart = await part(book, 'xl/charts/chart1.xml');
+    if (!chart.includes('$A$2:$A$2')) throw new Error('the chart should cover only the real rows, not the blank ones');
+    return 'input styling, accounting and thousands formats, data bars, blank rows with live formulas';
+  });
+
+  check('pictures are checked before they reach a file, and appear in Word and PowerPoint', async () => {
+    const image = parseImage(sampleUri);
+    if (image.width !== 40 || image.height !== 20) throw new Error('the picture size was not read');
+    for (const bad of ['data:image/png;base64,AAAA', 'data:text/html;base64,AAAA', 'https://example.com/a.png', '']) {
+      let refused = false;
+      try { parseImage(bad); } catch { refused = true; }
+      if (!refused) throw new Error('a bad picture was accepted: ' + bad.slice(0, 30));
+    }
+    const doc = await buildOfficeFile('docx', { title: 'T', sections: [{ heading: 'P', image: { data: sampleUri, caption: 'Figure 1: test' } }] });
+    const media = Object.keys((await JSZip.loadAsync(doc)).files).filter((name) => /^word\/media\/.+\.png$/.test(name));
+    if (media.length !== 1 || !(await part(doc, 'word/document.xml')).includes('Figure 1: test')) throw new Error('the Word picture or its caption is missing');
+    const deck = await buildOfficeFile('pptx', { title: 'D', slides: [{ title: 'P', image: { data: sampleUri }, bullets: ['one'] }] });
+    if (!Object.keys((await JSZip.loadAsync(deck)).files).some((name) => /^ppt\/media\/.+/.test(name) && !name.endsWith('/'))) throw new Error('the slide picture is missing');
+    return 'real PNG read, four bad inputs refused, picture and caption in Word, picture on a slide';
+  });
+
+  check('a process slide is drawn from shapes and arrows, not a picture', async () => {
+    const deck = await buildOfficeFile('pptx', { title: 'D', slides: [{ title: 'Steps', steps: [{ title: 'Plan', text: 'a' }, { title: 'Build', text: 'b' }, { title: 'Ship', text: 'c' }] }] });
+    const slide = await part(deck, 'ppt/slides/slide2.xml');
+    if ((slide.match(/rightArrow/g) || []).length !== 2) throw new Error('expected two arrows between three steps');
+    if (!slide.includes('Plan') || !slide.includes('Ship')) throw new Error('the step text is missing');
+    let refused = false;
+    try { await buildOfficeFile('pptx', { slides: [{ title: 'Empty', steps: [{ text: 'no title' }] }] }); } catch { refused = true; }
+    if (!refused) throw new Error('a process with no titled step was built');
+    return 'three boxes, two arrows, text kept; an empty process refused';
+  });
+
+  check('a Word contents list links to real bookmarks and needs no update prompt', async () => {
+    const doc = await buildOfficeFile('docx', { title: 'R', toc: true, sections: [{ heading: 'One', paragraphs: ['a'] }, { blocks: [{ type: 'heading', text: 'Two', level: 2 }] }] });
+    const body = await part(doc, 'word/document.xml');
+    if ((body.match(/w:anchor="zuri-heading-\d"/g) || []).length !== 2) throw new Error('the contents lines do not link to headings');
+    if ((body.match(/<w:bookmarkStart[^>]*zuri-heading/g) || []).length !== 2) throw new Error('the headings carry no bookmarks');
+    if (body.includes('TOC \\') || (await part(doc, 'word/settings.xml')).includes('updateFields')) throw new Error('the file would ask Word to update fields');
+    return 'two links, two bookmarks, no field';
+  });
+
+  check('the desktop tool turns a workspace picture path into a picture, and refuses anything outside', async () => {
+    fs.writeFileSync(path.join(officeWorkspace, 'logo.png'), samplePng);
+    const made = await runTool('createDocument', { kind: 'docx', fileName: 'with-picture', content: { title: 'T', sections: [{ heading: 'P', image: { path: 'logo.png' } }] } });
+    if (!made.ok) throw new Error(made.error.message);
+    const media = Object.keys((await JSZip.loadAsync(fs.readFileSync(made.data.path))).files).filter((name) => /^word\/media\/.+\.png$/.test(name));
+    if (media.length !== 1) throw new Error('the workspace picture did not reach the file');
+    const outside = await runTool('createDocument', { kind: 'docx', content: { title: 'T', sections: [{ image: { path: '..\\..\\secret.png' } }] } });
+    if (outside.ok) throw new Error('a path outside the workspace was read');
+    const wrongType = await runTool('createDocument', { kind: 'docx', content: { title: 'T', sections: [{ image: 'logo.txt' }] } });
+    if (wrongType.ok) throw new Error('a non-picture file was accepted');
+    return 'path read inside the workspace, outside and wrong-type refused';
+  });
+
+  check('the web chat keeps a chat\'s files on the device and offers the share sheet on Android', () => {
+    const store = read('web/src/lib/fileStore.js');
+    for (const needed of ['export async function listFiles', 'export async function saveFiles', 'export async function deleteFiles', 'FILES_PER_CHAT']) {
+      if (!store.includes(needed)) throw new Error('the file store is missing ' + needed);
+    }
+    const chat = read('web/src/views/ChatView.jsx');
+    for (const needed of ['saveFiles(id, files)', 'listFiles(id)', 'void deleteFiles(id)', 'navigator.share({ files: [shared]', 'pendingFilesRef']) {
+      if (!chat.includes(needed)) throw new Error('the web chat is missing ' + needed);
+    }
+    // A private chat returns from saveExchange before anything is written.
+    const saver = chat.slice(chat.indexOf('const saveExchange'), chat.indexOf('const send = useCallback'));
+    if (saver.indexOf('if (privateChat) return;') < 0 || saver.indexOf('if (privateChat) return;') > saver.indexOf('saveFiles(id, files)')) throw new Error('a private chat could write files');
+    return 'store, restore on open, delete with the chat, share sheet, private chats excluded';
+  });
+
+  check('chat tables and the render script follow the house rules', () => {
+    const renderer = read('src/renderer-react/FormattedMessage.jsx');
+    if (/border border-border|border-t border-border|border-b border-border/.test(renderer)) throw new Error('a thin border is back on a table or code block');
+    const render = read('scripts/render-office.mjs');
+    if (!render.includes('--convert-to') || !read('package.json').includes('"office:render"')) throw new Error('the render script is not wired');
+    return 'no hairline borders; render script present';
+  });
+
+  check('nothing is drawn with a coloured bar down its left edge', async () => {
+    // A bar down one side is the look people read as machine-made, so notices, banners,
+    // cards, quotes and Word callouts are told apart by their fill alone.
+    for (const stylesheet of ['web/src/styles.css', 'src/renderer-react/app.css']) {
+      const css = read(stylesheet);
+      const offenders = css.match(/border-left(-color)?:(?!\s*0\b)[^;]+;|box-shadow:\s*inset\s+\d+px\s+0\s+0/g);
+      if (offenders) throw new Error(stylesheet + ' draws a left-edge bar: ' + offenders[0]);
+    }
+    const builder = read('src/main/office.js');
+    if (/left:\s*\{\s*style:\s*BorderStyle\.SINGLE/.test(builder)) throw new Error('a Word callout or quote has a left border again');
+    const doc = await buildOfficeFile('docx', { title: 'T', sections: [{ heading: 'H', callout: 'Note', quote: 'Said' }] });
+    const body = await part(doc, 'word/document.xml');
+    if (/<w:left [^>]*w:val="single"/.test(body)) throw new Error('the Word file carries a left border');
+    return 'both stylesheets and the Word builders have no left-edge bar';
+  });
+
+  check('the old simple content shapes still build', async () => {
+    for (const kind of Object.keys(OFFICE_SAMPLES)) {
+      if ((await buildOfficeFile(kind, OFFICE_SAMPLES[kind])).subarray(0, 2).toString() !== 'PK') throw new Error(`${kind} no longer builds`);
+    }
+    return 'docx, xlsx, pptx';
   });
 }
 
@@ -1616,6 +2184,40 @@ check('a step names itself while it runs', async () => {
 // check's temporary folder and report CHAT_NOT_FOUND for its own thread.
 await Promise.all(pendingChecks);
 
+check('pinning and archiving a chat is saved without moving it in time', async () => {
+  const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  // Its own folder through the `root` option, not setStoreRoot: the chat checks around
+  // this one share the process-wide folder and run at the same time.
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-flags-'));
+  const where = { root: scratch };
+  try {
+    const thread = (await store.createThread({ title: 'Tax question' }, where)).data;
+    const before = thread.updatedAt;
+
+    const none = await store.setThreadFlags(thread.id, {}, where);
+    if (none.ok) throw new Error('a request with no flag was accepted');
+    const missing = await store.setThreadFlags('nope', { pinned: true }, where);
+    if (missing.ok || missing.error.code !== 'CHAT_NOT_FOUND') throw new Error('an unknown chat was not refused');
+
+    const archived = (await store.setThreadFlags(thread.id, { archived: true }, where)).data;
+    if (archived.archived !== true) throw new Error('archive did not stick');
+    if (archived.updatedAt !== before) throw new Error('archiving changed the date the list is ordered by');
+
+    const pinned = (await store.setThreadFlags(thread.id, { pinned: true }, where)).data;
+    if (pinned.pinned !== true || pinned.archived !== false) throw new Error('pinning an archived chat did not bring it back');
+
+    const kept = (await store.listThreads(where)).data.find((entry) => entry.id === thread.id);
+    if (kept.pinned !== true) throw new Error('the pin was not saved to disk');
+    return 'flags saved, date untouched, pin lifts an archive';
+  } finally {
+    try {
+      fs.rmSync(scratch, { recursive: true, force: true });
+    } catch {
+      // Windows can keep a handle on the store file; the folder is under %TEMP%, so leaving it is safe.
+    }
+  }
+});
+
 check('a wordless turn is asked again, not answered with an internal error', async () => {
   const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
   const { sendChatMessage } = await import(pathToFileURL(path.join(root, 'src/main/providers/chat.js')).href);
@@ -1686,7 +2288,22 @@ check('a wordless turn is asked again, not answered with an internal error', asy
     const after = await store.readStore('chats');
     const kept = after.data.find((entry) => entry.id === thread.id).messages;
     if (kept.length !== beforeQuiet) throw new Error('an empty reply was saved to the chat');
-    return 'one more round with no tools, and a plain message when even that is silent';
+
+    // A model that writes a tool request twice running is asked a last time with a
+    // flat history and a firmer order, and that answer is the one saved.
+    const lastChance = [];
+    const stubborn = await sendChatMessage(thread.id, {
+      mode: 'ask',
+      cloudReply: async (request) => {
+        lastChance.push(request.conversation.system);
+        const content = lastChance.length < 3 ? markup : 'Registered businesses usually charge a lower rate; check the KRA site for current figures.';
+        return { ok: true, data: { content, modelCode: 'zuri-flash' } };
+      },
+    });
+    if (!stubborn.ok) throw new Error(`the last attempt did not recover: ${stubborn.error?.code}`);
+    if (lastChance.length !== 3) throw new Error(`the model was asked ${lastChance.length} times, expected three`);
+    if (!lastChance[2].includes('You have no tools')) throw new Error('the last attempt did not carry the firmer order');
+    return 'one more round with no tools, a firmer last round, and a plain message when all are silent';
   } finally {
     store.setStoreRoot(previousRoot);
     // Windows keeps a handle on the store file, so this scratch folder can survive the
@@ -1847,6 +2464,20 @@ check("a reply's headings keep more air above them than between two paragraphs",
   return 'wide gap above a heading, tight gap below, in both stylesheets';
 });
 
+check('replies draw quotes, rules, nested lists and strikethrough instead of showing raw markers', () => {
+  const renderer = read('src/renderer-react/FormattedMessage.jsx');
+  // A reply with "> text" once showed the arrow itself, because only code, tables,
+  // headings and flat lists were understood.
+  for (const needle of ['<blockquote', 'message-rule', 'renderListItems', '<del ', '#{1,6}']) {
+    if (!renderer.includes(needle)) throw new Error(`the reply renderer lost ${needle}`);
+  }
+  if (renderer.includes('list-inside')) throw new Error('wrapped list lines hang back under the bullet again');
+  for (const file of ['src/renderer-react/app.css', 'web/src/styles.css']) {
+    if (!read(file).includes('.message-quote')) throw new Error(`${file} has no style for a quoted passage`);
+  }
+  return 'quote, rule, nested list and strikethrough are drawn in both stylesheets';
+});
+
 check("both the person's prompts and Zuri's replies carry a copy action", () => {
   const source = read('web/src/views/ChatView.jsx');
   const copyAt = source.indexOf('className="chat-copy"');
@@ -1860,31 +2491,28 @@ check("both the person's prompts and Zuri's replies carry a copy action", () => 
   return 'one copy path for prompts and replies';
 });
 
-check('the signed-in shell has no bottom tab bar', () => {
-  for (const file of ['web/src/views/Dashboard.jsx', 'web/src/styles.css']) {
-    if (/\btabbar\b/.test(read(file))) throw new Error(file + ' still draws a bottom bar');
-  }
-  const views = fs.readdirSync(path.join(root, 'web/src/views'));
-  if (views.some((name) => /tabbar/i.test(name))) throw new Error('a tab bar component remains');
-  return 'navigation is a sidebar, not a bottom bar';
+check('the signed-in shell keeps a bottom tab bar on phones', () => {
+  const dashboard = read('web/src/views/Dashboard.jsx');
+  const bar = read('web/src/components/BottomBar.jsx');
+  if (!dashboard.includes("import BottomBar, { BOTTOM_BAR_SPACE }")) throw new Error('the shell does not use the bottom bar');
+  if (!dashboard.includes('<BottomBar ')) throw new Error('the bottom bar is never rendered');
+  if (!bar.includes('min-[900px]:hidden')) throw new Error('the bar stays on screen beside the docked sidebar');
+  if (!bar.includes('env(safe-area-inset-bottom)')) throw new Error('the bar ignores the phone safe area');
+  if (!bar.includes('fixed inset-x-0 bottom-0')) throw new Error('the bar does not stay at the bottom');
+  if (!bar.includes('min-h-[44px]')) throw new Error('the bar tap targets are under 44px');
+  return 'a fixed tab bar below 900px, padded for the safe area, with 44px targets';
 });
 
-check('a phone reaches the navigation through a drawer with a floating button and a scrim', () => {
+check('on a phone the content and the chat composer clear the bottom tab bar', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
   const styles = read('web/src/styles.css');
-  for (const required of ['sidebar${navOpen ? ', 'className="nav-scrim"', 'onClick={onCloseNav}', 'className="nav-fab"']) {
-    if (!dashboard.includes(required)) throw new Error('the shell is missing ' + required);
+  if (!dashboard.includes('BOTTOM_BAR_SPACE')) throw new Error('page content is not padded above the bar');
+  if (/className="nav-fab"|className="nav-scrim"/.test(dashboard)) throw new Error('the old drawer button or scrim is still drawn');
+  const phone = styles.slice(styles.indexOf('@media (max-width: 899px)'));
+  if (!/\.app-main\.is-chat \{[^}]*padding-bottom: calc\(4rem \+ env\(safe-area-inset-bottom\)\)/.test(phone)) {
+    throw new Error('the chat composer sits under the bottom bar');
   }
-  // The button floats over the page: it is not a bar row, and it is round.
-  if (!/\.nav-fab \{[^}]*position: fixed;/.test(styles)) throw new Error('the menu button does not float');
-  if (!/\.nav-fab \{[^}]*border-radius: 999px;/.test(styles)) throw new Error('the floating button is not round');
-  // The closed drawer must be off-screen, and the open one must actually slide in.
-  if (!/\.sidebar \{[^}]*transform: translateX\(-100%\);/.test(styles)) {
-    throw new Error('the closed drawer still sits on the page');
-  }
-  if (!/\.sidebar\.is-open \{[^}]*transform: none;/.test(styles)) throw new Error('the drawer does not slide in');
-  if (!/\.nav-scrim \{[^}]*position: fixed;/.test(styles)) throw new Error('the scrim does not cover the page');
-  return 'floating button, slide-in sidebar and a scrim that closes it';
+  return 'content and the chat composer both reserve the bar height plus the safe area';
 });
 
 check('the chat takes the whole window and only the transcript scrolls', () => {
@@ -2043,12 +2671,12 @@ check('a chat started in the browser is taken on, and a delete or clear is not u
   return 'the account is listed, and deletes and clears are remembered';
 });
 
-check('the navigation drawer closes on Escape and locks the page behind it', () => {
-  const app = read('web/src/App.jsx');
-  if (!app.includes("if (event.key === 'Escape') setNavOpen(false);")) throw new Error('Escape does not close the drawer');
-  if (!app.includes("document.body.style.overflow = 'hidden'")) throw new Error('the page scrolls behind the open drawer');
-  if (!app.includes('document.body.style.overflow = previousOverflow')) throw new Error('the scroll lock is never released');
-  return 'Escape closes, the page behind is locked, and the lock is restored';
+check('the account menu closes on Escape and names itself for screen readers', () => {
+  const dashboard = read('web/src/views/Dashboard.jsx');
+  if (!dashboard.includes("event.key !== 'Escape'")) throw new Error('Escape does not close the account menu');
+  if (!dashboard.includes('role="menu"')) throw new Error('the account menu has no menu role');
+  if (!dashboard.includes('aria-haspopup')) throw new Error('the account button does not announce a popup');
+  return 'Escape closes the menu and it is announced as a menu';
 });
 
 check('the web chat is built from Flowbite components and one icon family', () => {
@@ -2075,8 +2703,9 @@ check('the web chat is built from Flowbite components and one icon family', () =
     const raw = (source.match(/<button[\s>]/g) ?? []).length;
     // The chat keeps three plain buttons: a conversation row is a list row with two
     // controls beside it, the model chip is a text trigger for its list, and the
-    // rewrite row is a set of text chips. The shell keeps two. The rest are components.
-    const allowed = name === 'chat' ? 3 : 2;
+    // rewrite row is a set of text chips. The shell keeps six: a sidebar row, the account
+    // button with its three menu rows, and the admin section jump. The rest are components.
+    const allowed = name === 'chat' ? 3 : 6;
     if (raw > allowed) throw new Error(`${name} still draws ${raw} raw buttons`);
   }
 
@@ -2199,11 +2828,13 @@ check('the Office pane shows thinking before the first streamed token', () => {
   return 'the pane shows Thinking... immediately and keeps a live cursor while text streams';
 });
 
-check('the admin route is reachable before the server checks the account', () => {
+check('the admin area is for admins, with a switch to the user view and back', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
   const admin = read('web/src/views/AdminView.jsx');
-  if (!dashboard.includes("{view === 'admin' && <AdminView />}") ) throw new Error('the admin view is still hidden behind client-side state');
-  if (!dashboard.includes("isAdmin || view === 'admin'")) throw new Error('a deep-linked admin view cannot show its navigation');
+  if (!dashboard.includes("view === 'admin' && (isAdmin ? <AdminView /> : <NoAccess")) throw new Error('the admin view is not gated by the account');
+  if (!dashboard.includes('This area is for admins')) throw new Error('a non-admin who opens /admin gets no explanation');
+  if (!dashboard.includes('Switch to user view')) throw new Error('admins have no way back to the user view');
+  if (!dashboard.includes('Switch to admin view')) throw new Error('admins have no way into the admin view');
   if (!admin.includes('Your sign-in has expired')) throw new Error('expired admin sessions have no recovery message');
   if (!admin.includes('This account is not marked as a Zuri administrator')) throw new Error('non-admin refusals have no recovery message');
   return 'the API remains authoritative, with a visible recovery path';
@@ -2278,6 +2909,84 @@ check('a change block is checked before it can reach a file', async () => {
   if (exact.ok !== true || exact.operations[0].rangeRows !== 2 || exact.operations[0].rangeColumns !== 2) throw new Error('a valid grid did not retain the range shape');
 
   return `${Object.keys(ops.OPERATIONS).length} operations, bad input refused with a reason`;
+});
+
+check('Excel add-in applies values, formulas and formatting through the Office batch API', async () => {
+  const vm = await import('node:vm');
+  const source = read('src/addin/taskpane.js');
+  const start = source.indexOf('  function applyExcel(operations) {');
+  const end = source.indexOf('  function applyWord(operations) {', start);
+  if (start < 0 || end < 0) throw new Error('Excel applier not found');
+  const ranges = new Map();
+  const makeSheet = (name) => ({
+    name,
+    getRange(address) {
+      const key = `${name}!${address}`;
+      if (!ranges.has(key)) ranges.set(key, { format: { font: {}, fill: {} } });
+      return ranges.get(key);
+    },
+  });
+  const sheets = new Map([['Dashboard', makeSheet('Dashboard')], ['Monthly', makeSheet('Monthly')]]);
+  const sheet = sheets.get('Dashboard');
+  const context = {
+    workbook: {
+      worksheets: {
+        getActiveWorksheet: () => sheet,
+        getItem: (name) => {
+          if (!sheets.has(name)) throw new Error(`There is no sheet called "${name}".`);
+          return sheets.get(name);
+        },
+      },
+    },
+    sync: async () => {},
+  };
+  const sandbox = {
+    Excel: { run(...args) {
+      if (args.length !== 1 || typeof args[0] !== 'function') throw new Error('Invalid Office batch arguments');
+      return Promise.resolve().then(() => args[0](context));
+    } },
+    hostFor: () => 'excel',
+    ZuriOps: { describeOperation: (operation) => operation.op },
+    officeMessage: (error, fallback) => error?.message || fallback,
+  };
+  vm.createContext(sandbox);
+  vm.runInContext(source.slice(start, end), sandbox);
+  const operations = [
+    { op: 'setValues', sheet: 'Dashboard', range: 'A1', grid: [['Budget']], rangeRows: 1, rangeColumns: 1 },
+    { op: 'setFormulas', sheet: 'Dashboard', range: 'B1', grid: [['=1+2']], rangeRows: 1, rangeColumns: 1 },
+    { op: 'format', sheet: 'Dashboard', range: 'A1', bold: true, fill: '#1F2A44' },
+    { op: 'setNumberFormat', sheet: 'Dashboard', range: 'B1', format: '0.00', rangeRows: 1, rangeColumns: 1 },
+    { op: 'columnWidth', sheet: 'Dashboard', range: 'C1', width: 14 },
+    { op: 'columnWidth', sheet: 'Dashboard', range: 'D1', width: 0 },
+    { op: 'setValues', sheet: 'Monthly', range: 'A1', grid: [['September']], rangeRows: 1, rangeColumns: 1 },
+  ];
+  await sandbox.applyExcel(operations);
+  if (ranges.get('Dashboard!A1').values[0][0] !== 'Budget') throw new Error('value not written');
+  if (ranges.get('Dashboard!B1').formulas[0][0] !== '=1+2') throw new Error('formula not written');
+  if (!ranges.get('Dashboard!A1').format.font.bold || ranges.get('Dashboard!A1').format.fill.color !== '#1F2A44') throw new Error('formatting not applied');
+  if (ranges.get('Dashboard!B1').numberFormat[0][0] !== '0.00') throw new Error('number format not applied');
+  if (ranges.get('Dashboard!C1').format.columnWidth < 70) throw new Error('a 14-character column would be too narrow');
+  if (ranges.get('Dashboard!D1').format.columnWidth !== 0) throw new Error('zero column width was not preserved');
+  if (ranges.get('Monthly!A1').values[0][0] !== 'September') throw new Error('named sheet value was written to the active sheet');
+  return 'single-argument batch, named-sheet values, formulas and formatting';
+});
+
+check('Excel context gives multi-tab plans the workbook map they need', () => {
+  const source = read('src/addin/taskpane.js');
+  const readStart = source.indexOf('  function readExcel() {');
+  const legacyStart = source.indexOf('  function readExcelActiveLegacy() {', readStart);
+  if (readStart < 0 || legacyStart < 0) throw new Error('workbook-wide Excel reader is missing');
+  const reader = source.slice(readStart, legacyStart);
+  for (const required of [
+    'worksheets.load(\'items/name\')',
+    'sheets.items.map(function (sheet)',
+    'getUsedRangeOrNullObject(true)',
+    'every non-empty sheet',
+    'exact sheet name before the !',
+  ]) {
+    if (!reader.includes(required)) throw new Error(`the workbook reader is missing ${required}`);
+  }
+  return 'all non-empty worksheets are described with exact names and bounded previews';
 });
 
 check('every operation Zuri can be asked for has a handler', async () => {

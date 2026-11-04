@@ -30,6 +30,7 @@ import { agentAllowedTools, runTool, TOOLS } from '../tools/index.js';
 // The row that names what was just created is described once, in the module both the
 // desktop window and the browser chat read, so the two can never word it differently.
 import { describeNotable, notableKindFor } from '../../shared/notableActions.js';
+import { DOCUMENT_TOOL } from '../../shared/documentTool.js';
 
 /**
  * Tools the model may call on its own in chat, only when the person has switched web
@@ -57,37 +58,12 @@ const CHAT_TOOLS = Object.freeze([
   },
 ]);
 
-/**
- * Offered on every message (not only with web search on) because it costs nothing
- * unless the person asks for a file, and it only ever adds a new file to the workspace.
- */
-const DOCUMENT_TOOL = Object.freeze({
-  name: 'createDocument',
-  description:
-    'Create a downloadable Word (docx), Excel (xlsx) or PowerPoint (pptx) file when the person asks for a document, spreadsheet, deck or slides. ' +
-    'Write the full content into the call; never ask them to copy text into Office themselves. After it succeeds, tell them the file is ready in one short sentence.',
-  parameters: {
-    type: 'object',
-    properties: {
-      kind: { type: 'string', enum: ['docx', 'xlsx', 'pptx'], description: 'docx = Word, xlsx = Excel, pptx = PowerPoint.' },
-      fileName: { type: 'string', description: 'Short file name without extension.' },
-      content: {
-        type: 'object',
-        description:
-          'docx: { title, sections: [{ heading, paragraphs: [text], bullets: [text], table: { rows: [[cell]] } }] }. ' +
-          'xlsx: { sheets: [{ name, columns: [header], rows: [[value]] }] }; numbers stay numbers and a text value starting with "=" is a formula such as "=SUM(B2:B9)". ' +
-          'pptx: { title, subtitle, slides: [{ title, bullets: [text], notes }] }.',
-      },
-    },
-    required: ['kind', 'content'],
-  },
-});
-
 const EDIT_TOOL = Object.freeze({
   name: 'editDocument',
   description:
     'Change an attached Word, Excel or PowerPoint file. Pass the file path shown after "Attached file" and a list of edits; the result is a new copy and the original stays untouched. ' +
-    'docx/pptx edits: { find, replace } with the exact existing text. xlsx edits: { sheet, cell, value } (a value starting with "=" is a formula), { sheet, appendRow: [values] } or { find, replace }. ' +
+    'docx/pptx edits: { find, replace } with the exact existing text (formatting around the words is kept), { insertAfter: "text in a paragraph", text: "new paragraph" } to add a paragraph in the same style, or { tableRowAfter: "text in a row", cells: [values] } to add a table row. ' +
+    'xlsx edits: { sheet, cell, value } (a value starting with "=" is a formula), { sheet, appendRow: [values] }, { sheet, range: "A1:C1", format: { bold, italic, color: "#hex", fill: "#hex", numberFormat, align, wrap } } or { find, replace }. ' +
     'Only use it when the person asks to change the file; otherwise just answer.',
   parameters: {
     type: 'object',
@@ -398,6 +374,25 @@ const TOOL_RESULT_LIMIT = 8_000;
  * answer the person was waiting for instead of an error.
  */
 const NO_TOOLS_NUDGE = 'The person is still waiting for an answer to their last message. Reply now in plain words, using what you already know or any results above. Do not call or describe any tool.';
+const FLAT_REPLY_NUDGE = 'You have no tools and cannot search the web or open anything in this reply. Do not write a tool request in any form. Answer the last message from what you know, say plainly which figures may be out of date, and suggest checking the official source for current numbers.';
+/**
+ * The conversation with tool turns turned into plain ones, so a model shown no tools
+ * is not looking at a history full of calls it believes it may keep making. A tool
+ * result stays as a quoted note, so a search that did run still informs the answer.
+ * @param {Array<{ role?: string, content?: unknown, toolCalls?: unknown }>} turns
+ */
+function flattenToolTurns(turns) {
+  return turns.flatMap((turn) => {
+    if (turn.role === 'tool') {
+      return typeof turn.content === 'string' && turn.content !== ''
+        ? [{ role: 'assistant', content: `Result already fetched: ${turn.content}`.slice(0, TOOL_RESULT_LIMIT) }]
+        : [];
+    }
+    if (turn.toolCalls) return turn.content ? [{ role: turn.role, content: turn.content }] : [];
+    return [turn];
+  });
+}
+
 const EMPTY_REPLY_NUDGE = 'Your previous response was empty. Answer the person now in plain words. Interpret obvious typing mistakes from context, and ask one short clarification only if two meanings are genuinely possible. Do not call or describe a tool.';
 
 /**
@@ -1537,7 +1532,16 @@ function addinOperationList(host) {
       '{"op":"autofit","range":"A1:F30"}                                             fit columns and rows to their contents',
       '{"op":"addWorksheet","name":"Summary","activate":true}',
       '{"op":"clear","range":"G1:G30"}                                              clears the contents only',
-      '{"op":"createTable","range":"A1:F30","name":"BudgetTable","hasHeaders":true}',
+      '{"op":"createTable","range":"A1:F30","name":"BudgetTable","hasHeaders":true,"style":"TableStyleMedium2"}   a real Excel table; style is optional',
+      '{"op":"fillFormula","range":"E3:E26","formula":"=C3-D3"}                      one formula for the first cell, filled down with references shifting per row',
+      '{"op":"borders","range":"A1:F30","style":"thin","color":"#BFC5D2"}            style is thin, medium or none',
+      '{"op":"freezePanes","rows":1,"columns":0}                                     keeps the header row in view; 0 and 0 unfreezes',
+      '{"op":"merge","range":"A1:F1","across":false}                                 merges a title across columns',
+      '{"op":"rowHeight","range":"A1:A1","height":28}                                points, 0 to 409',
+      '{"op":"conditionalFormat","range":"F3:F26","rule":"greaterThan","value":1000,"color":"#F8D7DA"}   rule: colorScale, dataBar, greaterThan, lessThan, equal, between (add value2), negative',
+      '{"op":"dataValidation","range":"C3:C26","list":["Open","In progress","Done"]}   a drop-down of fixed choices',
+      '{"op":"sort","range":"A2:F30","column":3,"ascending":false,"hasHeaders":false}   column counts from 1 inside the range',
+      '{"op":"namedRange","range":"D3:D26","name":"Revenue"}                         lets formulas read =SUM(Revenue)',
       '{"op":"addChart","range":"A1:B13","chartType":"column","title":"Spend by month","at":"D2"}   draws a chart beside the data',
       '',
       'Excel notes',
@@ -1545,6 +1549,9 @@ function addinOperationList(host) {
       '- Any range operation also takes "sheet":"Budget" to work on a sheet other than the active one.',
       '- Formulas use Excel syntax with a leading "=" and comma separators. Escape a double quote inside a formula: "=SUMIF($B$3:$B$26,\\\"Expense\\",$D$3:$D$26)".',
       '- Use $ for a reference that must not move when it is filled down, such as $C$3.',
+      '- To fill a column of formulas, use one fillFormula for the first cell instead of listing every row. Newer functions (XLOOKUP, FILTER, LET, SORT, UNIQUE, TEXTJOIN, IFS) work in current Excel; use INDEX/MATCH if the person may have an older version.',
+      '- A good sheet has: a styled header row (format + freezePanes), number formats on money, dates and percentages, borders or a table style, a total row built from SUM or SUBTOTAL, and no typed-in number where a formula can calculate it.',
+      '- Colour with restraint: one brand colour for headers, pale tints for banding, and red or green only to flag meaning (over budget, on target).',
       '- A percentage, a date or money is a number format, not text: write the number and set the format.',
       '- chartType is one of column, bar, line, pie, area or scatter. Label the columns the chart is drawn from, or the chart has no names.',
       '- Leave "at" out and the chart lands two columns right of the data. Give one cell such as "H2" to put it somewhere else.',
@@ -1559,8 +1566,11 @@ function addinOperationList(host) {
       '{"op":"setShapeText","slide":3,"shape":"Title 1","text":"What changed this quarter"}',
       '{"op":"addTextBox","slide":3,"text":"...","left":40,"top":120,"width":540,"height":120,"size":18,"bold":true}',
       '{"op":"setSelectedText","text":"..."}                                        replaces the text the person selected',
+      '{"op":"addTable","slide":3,"rows":[["Region","Sales"],["Lagos","1200"]],"left":40,"top":120,"width":640}   a real table; the first row becomes the header',
+      '{"op":"styleShape","slide":3,"shape":"Title 1","fill":"#1F2A44","color":"#FFFFFF","size":28,"bold":true}   colour and font of one shape',
       '',
       'PowerPoint notes',
+      '- Use addTable for anything with rows and columns, not a text box with tabs. Up to 20 rows and 8 columns.',
       '- Slides number from 1, the way the thumbnail pane counts them.',
       '- Positions and sizes are in points. A 16:9 slide is 960 by 540, so keep text between 36 and 920 across and 24 and 500 down.',
       '- Keep a slide to one message. If the deck needs three points, that is one slide with three short lines, not three slides.',
@@ -1574,8 +1584,10 @@ function addinOperationList(host) {
     '{"op":"applyStyle","style":"Heading 2"}                                       styles the selected text',
     '{"op":"replaceAll","find":"ACME","replace":"Zuri"}',
     '{"op":"insertTable","where":"end","rows":[["Region","Sales"],["Lagos","1200"]]}',
+    '{"op":"insertFormatted","where":"end","markdown":"## Findings\\n\\n- **Revenue** up 12%\\n- Costs flat\\n\\n| Region | Sales |\\n| --- | --- |\\n| Lagos | 1200 |"}   headings, lists, tables, bold and italic as real Word formatting',
     '',
     'Word notes',
+    '- Prefer insertFormatted when you are writing more than a paragraph: it makes real headings, lists and tables in one step. Use insertParagraphs only when you need an exact Word style name.',
     '- "where" is one of start, end, afterSelection or replaceSelection.',
     "- Style names are Word's own: Title, Subtitle, Heading 1, Heading 2, Normal, Quote, List Bullet, List Number.",
     "- Keep the document's existing voice and heading levels. A rewrite replaces words, not structure, unless the person asked for a new structure.",
@@ -1937,13 +1949,21 @@ export async function sendChatMessage(threadId, options = {}) {
       reached = retry;
       textSoFar = typeof retry.data?.content === 'string' ? retry.data.content : '';
     }
-    if (reached.ok && wordless(reached.data?.content) && wordless(textSoFar)) {
+    // The first plain attempt keeps the conversation as it is. If the model still
+    // answers with a tool request, the history of earlier tool turns is what keeps
+    // pulling it back, so the last attempt sends a flat history and a firmer order.
+    const attempts = [
+      { nudge: NO_TOOLS_NUDGE, turns: wire },
+      { nudge: FLAT_REPLY_NUDGE, turns: flattenToolTurns(wire) },
+    ];
+    for (const attempt of attempts) {
+      if (!reached.ok || !wordless(reached.data?.content) || !wordless(textSoFar)) break;
       let askedAgain = '';
       let shownSoFar = 0;
       const retry = await options.cloudReply({
         // The nudge rides in the system instruction so a pretend turn from the person
         // is never added to the conversation the model reads.
-        conversation: { system: `${conversation.system}\n\n${NO_TOOLS_NUDGE}`, turns: wire },
+        conversation: { system: `${conversation.system}\n\n${attempt.nudge}`, turns: attempt.turns },
         settings: modelSettings,
         tools: [],
         signal: options.signal,

@@ -10,7 +10,9 @@
         Both values come from the app's own palette: the accent token in app.css and
         the dark theme's background token. Nothing is invented here.
     -->
+    <color name="zuriWhite">#FFFFFF</color>
     <color name="colorPrimary">#0D1B3A</color>
-    <color name="colorPrimaryDark">#040130</color>
-    <color name="colorAccent">#0D1B3A</color>
+    <!-- Was #040130, a violet-tinted near-black outside the palette. -->
+    <color name="colorPrimaryDark">#0D1B3A</color>
+    <color name="colorAccent">#2F6FED</color>
 </resources>

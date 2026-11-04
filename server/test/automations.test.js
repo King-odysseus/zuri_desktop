@@ -124,6 +124,52 @@ assert.deepEqual(searches, [{ query: 'project manager jobs Scotland' }]);
 assert.equal(usageCalls.filter(([kind]) => kind === 'commit').length, 2);
 console.log('PASS an automation run searches, then answers and records usage');
 
+// A silent round used to end the whole run as failed. It is asked once more with no
+// tools, and a search written into the text as markup is never saved as the answer.
+{
+  const models = [{ code: 'zuri-flash', supplierModel: 'supplier-model', supplier: 'deepseek', minPlan: 'starter', rateFactor: 1, isActive: true, inputUsdPerMillion: 1, outputUsdPerMillion: 1 }];
+  const quietRepository = {
+    async reserveUsage() { return { id: 'quiet-reservation' }; },
+    async commitUsage() {},
+    async releaseUsage() {},
+  };
+  const run = (replies, seen = []) => runAutomation({
+    automation: { id: 'automation-quiet', userId: 'user-a', prompt: 'Check jobs', cadence: { type: 'daily', timeOfDay: '07:00' } },
+    owner: { subscriptionId: 'subscription-a', planCode: 'starter' },
+    repository: quietRepository,
+    chatProvider: async (input) => { seen.push(input); return replies.shift(); },
+    searchWeb: async () => ({ query: '', results: [] }),
+    models,
+    now: () => now,
+  });
+  const usage = { inputTokens: 5, outputTokens: 1 };
+  const markup = '<tool_call>{"name": "webSearch", "arguments": {"query": "jobs"}}</tool_call>';
+
+  const seen = [];
+  const recovered = await run([
+    { model: 'supplier-model', content: '', toolCalls: [], usage },
+    { model: 'supplier-model', content: 'Two roles found.', toolCalls: [], usage },
+  ], seen);
+  assert.equal(recovered.status, 'ok');
+  assert.equal(recovered.text, 'Two roles found.');
+  assert.equal(seen.length, 2);
+  assert.equal(seen[1].tools.length, 0, 'the retry offers no tools');
+
+  const markupOnly = await run([
+    { model: 'supplier-model', content: markup, toolCalls: [], usage },
+    { model: 'supplier-model', content: 'Nothing new today.', toolCalls: [], usage },
+  ]);
+  assert.equal(markupOnly.text, 'Nothing new today.', 'raw markup is never the saved answer');
+
+  const stubborn = await run([
+    { model: 'supplier-model', content: '', toolCalls: [], usage },
+    { model: 'supplier-model', content: markup, toolCalls: [], usage },
+  ]);
+  assert.equal(stubborn.status, 'failed');
+  assert.equal(stubborn.text, '');
+  console.log('PASS a silent automation round is asked again before the run is called failed');
+}
+
 const settled = [];
 const sent = [];
 const schedulerRepository = {

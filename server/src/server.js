@@ -12,6 +12,27 @@ import { applySchema } from './schema.js';
 import { createAutomationScheduler } from './automations.js';
 import { createReminderScheduler } from './reminders.js';
 import { searchWeb } from './tools.js';
+
+/**
+ * The Office file builders. In the deployed image they sit beside this file (the
+ * deploy script copies them in); in a checkout they live in the desktop app's
+ * source. Either way there is one copy of the code, and a deployment that has
+ * neither simply answers "not switched on" instead of failing to start.
+ */
+async function loadOfficeBuilder() {
+  for (const location of ['./office.js', '../../src/main/office.js']) {
+    try {
+      const office = await import(location);
+      return { build: office.buildOfficeFile, review: office.reviewOfficeContent };
+    } catch (error) {
+      if (error?.code !== 'ERR_MODULE_NOT_FOUND') {
+        console.error(`[zuri-cloud] office builders at ${location} did not load:`, error?.message ?? error);
+      }
+    }
+  }
+  console.log('[zuri-cloud] file making is off: the Office builders were not found');
+  return null;
+}
 import { DEFAULT_MODELS } from './models.js';
 import { createPushDelivery } from './push.js';
 
@@ -79,10 +100,12 @@ const chatProvider = async (request) => {
 const paystack = createPaystackClient({ secretKey: config.paystackSecretKey, endpoint: config.paystackEndpoint });
 const mailer = createMailer({ apiKey: config.brevoApiKey, from: config.mailFrom, fromName: config.mailFromName });
 if (!mailer.configured) console.log('[zuri-cloud] password reset email is off: BREVO_API_KEY and MAIL_FROM are not both set');
+const officeBuilder = await loadOfficeBuilder();
 const app = createApp({
   auth,
   repository,
   chatProvider,
+  officeBuilder,
   nairaPerUsd: config.nairaPerUsd,
   paystack,
   paystackSecretKey: config.paystackSecretKey,

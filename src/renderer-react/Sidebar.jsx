@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui.jsx';
 import {
   AgentIcon,
+  ArchiveIcon,
   AutomationIcon,
   BellIcon,
   ChatIcon,
@@ -25,6 +26,7 @@ import {
   SkillsIcon,
   MoonIcon,
   OverlayIcon,
+  PinIcon,
   SunIcon,
   SyncIcon,
   TaskIcon,
@@ -67,30 +69,63 @@ function initialFor(name, email) {
  * One row of the account menu, drawn the way ChatGPT's is: a quiet icon, the word,
  * and a shortcut or count pushed to the right edge.
  */
-function AccountMenuRow({ Icon, label, hint, badge, active = false, onPress }) {
+function AccountMenuRow({ Icon, label, hint, onPress }) {
   return (
     <button
       type="button"
       role="menuitem"
-      aria-current={active ? 'page' : undefined}
-      className={`zuri-account-row${active ? ' is-active' : ''}`}
+      className="zuri-account-row"
       onClick={onPress}
     >
       <Icon size={16} className="zuri-account-row-icon" />
       <span className="zuri-account-row-label">{label}</span>
-      {badge}
       {hint && <span className="zuri-account-row-hint">{hint}</span>}
     </button>
   );
 }
 
-// One list, the way ChatGPT's sidebar is: New chat, Projects with their chats,
-// Recents, and a Menu at the bottom that holds every other destination.
-const MENU_ITEMS = NAV_ITEMS.filter(({ key }) => key !== 'chats');
+// A short, calm list: the everyday destinations stay on screen and the rest fold under
+// More, so Recents keeps most of the height. Settings lives in the account menu.
+const PRIMARY_KEYS = ['tasks', 'reminders', 'automations', 'files'];
+const MORE_KEYS = ['agents', 'skills', 'images', 'features', 'cloud'];
+const PRIMARY_ITEMS = NAV_ITEMS.filter(({ key }) => PRIMARY_KEYS.includes(key));
+const MORE_ITEMS = NAV_ITEMS.filter(({ key }) => MORE_KEYS.includes(key));
 
-// Settings has its own group at the top of the menu, so the destination list does
-// not repeat it.
-const DESTINATION_ITEMS = MENU_ITEMS.filter(({ key }) => key !== 'settings');
+/*
+ * The sidebar can be dragged wider or narrower. The limits keep it usable at both
+ * ends: below the minimum the New chat row and the account row no longer fit, and
+ * above the maximum it starts to crowd out the conversation. The choice is kept on
+ * this computer so the next launch opens at the width the person left it.
+ */
+const SIDEBAR_WIDTH_KEY = 'zuri.sidebarWidth';
+export const SIDEBAR_DEFAULT_WIDTH = 288;
+export const SIDEBAR_MIN_WIDTH = 220;
+export const SIDEBAR_MAX_WIDTH = 480;
+const SIDEBAR_KEY_STEP = 16;
+
+export function clampSidebarWidth(value) {
+  const width = Number.isFinite(value) ? Math.round(value) : SIDEBAR_DEFAULT_WIDTH;
+  return Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, width));
+}
+
+function readSidebarWidth() {
+  try {
+    const saved = Number(window.localStorage.getItem(SIDEBAR_WIDTH_KEY));
+    return saved > 0 ? clampSidebarWidth(saved) : SIDEBAR_DEFAULT_WIDTH;
+  } catch {
+    // Storage can be blocked; the default width is a fine place to start.
+    return SIDEBAR_DEFAULT_WIDTH;
+  }
+}
+
+function saveSidebarWidth(width) {
+  try {
+    window.localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+  } catch {
+    // Not being able to remember the width must never get in the way of resizing it.
+  }
+}
+
 export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -99,8 +134,9 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   const [movingThreadId, setMovingThreadId] = useState('');
   // Reminders whose time has come and that are still open: what the bell counts.
   const [dueReminders, setDueReminders] = useState(0);
-  // The bottom menu holds every destination that is not chat, so the list above it stays calm.
+  // The account menu at the foot, and whether the secondary destinations are unfolded.
   const [menuOpen, setMenuOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const menuRef = useRef(null);
 
   // Who is signed in and what plan pays for the answers, for the account button.
@@ -108,6 +144,45 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   // The Sync press beside Recents: in flight, and the one line it leaves behind.
   const [syncing, setSyncing] = useState(false);
   const [syncNote, setSyncNote] = useState('');
+  // How wide the panel is, and whether the edge is being dragged right now. The width
+  // animation is switched off during a drag, or the panel would trail the pointer.
+  const [width, setWidth] = useState(readSidebarWidth);
+  const [resizing, setResizing] = useState(false);
+  const dragRef = useRef({ startX: 0, startWidth: SIDEBAR_DEFAULT_WIDTH });
+
+  function beginResize(event) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = { startX: event.clientX, startWidth: width };
+    setResizing(true);
+  }
+
+  function continueResize(event) {
+    if (!resizing) return;
+    setWidth(clampSidebarWidth(dragRef.current.startWidth + event.clientX - dragRef.current.startX));
+  }
+
+  function endResize(event) {
+    if (!resizing) return;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+    setResizing(false);
+    saveSidebarWidth(width);
+  }
+
+  function resizeFromKeyboard(event) {
+    const step = { ArrowLeft: -SIDEBAR_KEY_STEP, ArrowRight: SIDEBAR_KEY_STEP }[event.key];
+    if (step === undefined) return;
+    event.preventDefault();
+    const next = clampSidebarWidth(width + step);
+    setWidth(next);
+    saveSidebarWidth(next);
+  }
+
+  function resetWidth() {
+    setWidth(SIDEBAR_DEFAULT_WIDTH);
+    saveSidebarWidth(SIDEBAR_DEFAULT_WIDTH);
+  }
 
   useEffect(() => {
     let active = true;
@@ -199,13 +274,23 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
     await window.zuri?.projects?.delete?.({ projectId: project.id });
   }
 
+  async function setFlags(thread, flags) {
+    await window.zuri?.chats?.flags?.({ threadId: thread.id, ...flags });
+  }
+
   const projectIds = new Set(projects.map((project) => project.id));
+  // Archived chats leave Recents but stay in Chat history. Pinned ones rise to the
+  // top; the sort is stable, so each group keeps main's newest-first order.
+  const visibleThreads = threads
+    .filter((thread) => thread.archived !== true)
+    .sort((left, right) => Number(right.pinned === true) - Number(left.pinned === true));
   // A chat whose project is gone still shows in Recents instead of vanishing.
-  const looseThreads = threads.filter((thread) => !projectIds.has(thread.projectId));
+  const looseThreads = visibleThreads.filter((thread) => !projectIds.has(thread.projectId));
 
   function renderThread(thread) {
+    const label = thread.title || 'New chat';
     return (
-      <div key={thread.id} className="mb-1">
+      <div key={thread.id} className="group mb-1">
         <div className="flex items-center gap-1">
           <Button
             type="button"
@@ -214,8 +299,34 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             className="min-w-0 flex-1 justify-start truncate rounded-lg px-2 py-2 text-left"
             onPress={() => onSelectThread(thread.id)}
           >
-            {thread.title || 'New chat'}
+            {thread.pinned === true && <PinIcon size={12} className="mr-1 shrink-0" aria-hidden="true" />}
+            <span className="zuri-thread-title" title={label}>{label}</span>
           </Button>
+          {/* Shown on hover or keyboard focus so the title keeps the room it needs. */}
+          <div className="hidden shrink-0 items-center group-focus-within:flex group-hover:flex">
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className="min-h-11 min-w-9 rounded-lg text-muted"
+              aria-label={thread.pinned === true ? `Unpin "${label}"` : `Pin "${label}"`}
+              title={thread.pinned === true ? 'Unpin' : 'Pin to top'}
+              onPress={() => void setFlags(thread, { pinned: thread.pinned !== true })}
+            >
+              <PinIcon size={15} />
+            </Button>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className="min-h-11 min-w-9 rounded-lg text-muted"
+              aria-label={`Archive "${label}"`}
+              title="Archive (kept in Chat history)"
+              onPress={() => void setFlags(thread, { archived: true })}
+            >
+              <ArchiveIcon size={15} />
+            </Button>
+          </div>
           {projects.length > 0 && (
             <Button
               isIconOnly
@@ -262,6 +373,26 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
       </div>
     );
   }
+  function renderDestination({ key, label, Icon }) {
+    return (
+      <Button
+        key={key}
+        type="button"
+        variant={current === key ? 'secondary' : 'ghost'}
+        fullWidth
+        className="min-h-11 justify-start gap-2 rounded-xl px-3 font-normal"
+        aria-current={current === key ? 'page' : undefined}
+        onPress={() => onNavigate(key)}
+      >
+        <Icon size={16} />
+        {label}
+        {key === 'reminders' && dueReminders > 0 && (
+          <span className="zuri-account-count ml-auto">{dueReminders > 9 ? '9+' : dueReminders}</span>
+        )}
+      </Button>
+    );
+  }
+
   const accountName = account?.user?.displayName || account?.user?.email || 'Your account';
   const accountPlan = account?.subscription?.planName || (account ? 'No paid plan' : 'Not signed in');
   const initials = initialFor(account?.user?.displayName, account?.user?.email);
@@ -325,7 +456,8 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
       )}
 
       <aside
-        className={`zuri-sidebar-panel flex flex-col transition-[width] duration-200 ${collapsed ? 'w-0 overflow-hidden' : 'w-72'}`}
+        className={`zuri-sidebar-panel relative flex shrink-0 flex-col ${resizing ? '' : 'transition-[width] duration-200'} ${collapsed ? 'overflow-hidden' : ''}`}
+        style={{ width: collapsed ? 0 : width }}
         aria-label="Conversations"
         aria-hidden={collapsed}
       >
@@ -358,6 +490,22 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           </Button>
         </div>
 
+        <nav aria-label="Destinations" className="flex flex-col gap-0.5 px-3 pt-1">
+          {PRIMARY_ITEMS.map(renderDestination)}
+          <Button
+            type="button"
+            variant="ghost"
+            fullWidth
+            className="min-h-11 justify-start gap-2 rounded-xl px-3 font-normal text-muted"
+            aria-expanded={moreOpen}
+            onPress={() => setMoreOpen((open) => !open)}
+          >
+            <ChevronRightIcon size={16} className={`transition-transform ${moreOpen ? 'rotate-90' : ''}`} />
+            More
+          </Button>
+          {moreOpen && MORE_ITEMS.map(renderDestination)}
+        </nav>
+
         <div className="flex items-center justify-between px-5 pb-2 pt-6">
           <p className="text-xs font-medium uppercase tracking-wide text-muted">Projects</p>
           <Button
@@ -372,12 +520,12 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             <FolderPlusIcon size={16} />
           </Button>
         </div>
-        <div className="zuri-scrollbar-hidden max-h-64 overflow-y-auto px-3 text-sm text-muted">
+        <div className="zuri-scrollbar-hidden max-h-40 shrink-0 overflow-y-auto px-3 text-sm text-muted">
           {projects.length === 0 && <p className="px-2">Keep one topic in one place. Create a project to group its chats.</p>}
           {projects.map((project) => {
             const ProjectIcon = projectIconFor(project.icon);
             const isOpen = openProjectIds.includes(project.id);
-            const projectThreads = threads.filter((thread) => thread.projectId === project.id);
+            const projectThreads = visibleThreads.filter((thread) => thread.projectId === project.id);
             return (
               <div key={project.id} className="mb-1">
                 <div className="flex items-center gap-1">
@@ -486,24 +634,9 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
               </div>
 
               <div className="zuri-account-group">
-                {DESTINATION_ITEMS.map(({ key, label, Icon }) => (
-                  <AccountMenuRow
-                    key={key}
-                    Icon={Icon}
-                    label={label}
-                    active={current === key}
-                    onPress={() => { setMenuOpen(false); onNavigate(key); }}
-                    badge={key === 'reminders' && dueReminders > 0 ? (
-                      <span className="zuri-account-count">{dueReminders > 9 ? '9+' : dueReminders}</span>
-                    ) : null}
-                  />
-                ))}
-              </div>
-
-              <div className="zuri-account-group">
                 <AccountMenuRow Icon={OverlayIcon} label="Quick ask" hint={QUICK_ASK_HINT} onPress={() => { setMenuOpen(false); void window.zuri?.overlay?.open?.(); }} />
                 <AccountMenuRow Icon={theme === 'dark' ? SunIcon : MoonIcon} label={theme === 'dark' ? 'Light mode' : 'Dark mode'} onPress={() => { setMenuOpen(false); onToggleTheme(); }} />
-                <AccountMenuRow Icon={SignOutIcon} label="Log out" onPress={() => void signOut()} />
+                <AccountMenuRow Icon={SignOutIcon} label="Sign out" onPress={() => void signOut()} />
               </div>
             </div>
           )}
@@ -524,6 +657,28 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             <ChevronUpIcon size={15} className={`zuri-account-chevron${menuOpen ? ' is-open' : ''}`} />
           </button>
         </div>
+
+        {/* The grab edge. A pointer drag, the arrow keys and a double click (back to the
+            default) all work, so the width is reachable without a mouse too. */}
+        {!collapsed && (
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            aria-valuemin={SIDEBAR_MIN_WIDTH}
+            aria-valuemax={SIDEBAR_MAX_WIDTH}
+            aria-valuenow={width}
+            tabIndex={0}
+            className={`zuri-sidebar-resizer${resizing ? ' is-dragging' : ''}`}
+            title="Drag to resize. Double click to reset."
+            onPointerDown={beginResize}
+            onPointerMove={continueResize}
+            onPointerUp={endResize}
+            onPointerCancel={endResize}
+            onKeyDown={resizeFromKeyboard}
+            onDoubleClick={resetWidth}
+          />
+        )}
       </aside>
     </div>
   );

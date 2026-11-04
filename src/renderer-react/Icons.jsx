@@ -75,6 +75,7 @@ import {
   TriangleAlert,
   User,
   UserPlus,
+  Volume2,
   Wallet,
   X,
   Zap,
@@ -273,6 +274,7 @@ export const PlusIcon = family(Plus, { name: 'PlusIcon' });
 export const PreviewIcon = family(Eye, { name: 'PreviewIcon' });
 export const ReceiptIcon = family(Receipt, { name: 'ReceiptIcon' });
 export const RegenerateIcon = family(RotateCw, { name: 'RegenerateIcon' });
+export const SpeakIcon = family(Volume2, { name: 'SpeakIcon' });
 export const SearchIcon = family(Search, { name: 'SearchIcon' });
 export const SendIcon = family(ArrowUp, { name: 'SendIcon' });
 export const SettingsIcon = family(Settings, { name: 'SettingsIcon' });

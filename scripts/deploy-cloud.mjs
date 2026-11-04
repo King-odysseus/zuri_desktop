@@ -17,7 +17,7 @@
  * reads at runtime (see server/src/downloads.js). Keeping 140 MB out of the image
  * is what makes a deploy finish quickly.
  */
-import { cp, mkdtemp, rm, readdir } from 'node:fs/promises';
+import { cp, mkdtemp, rm, readdir, copyFile } from 'node:fs/promises';
 import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -47,6 +47,9 @@ async function copyServer(scratch) {
     recursive: true,
     filter: (source) => !source.split(path.sep).includes('node_modules'),
   });
+  // The Office builders are the desktop app's own module. The image holds only server/,
+  // so the one copy is placed beside the server's code for the upload.
+  await copyFile(path.join(repoRoot, 'src', 'main', 'office.js'), path.join(scratch, 'src', 'office.js'));
 }
 
 async function main() {

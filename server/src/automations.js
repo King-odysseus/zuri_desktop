@@ -35,6 +35,10 @@ import {
   supplierCostMicroUsd,
 } from './models.js';
 import { limitsForPlan } from './limits.js';
+import { splitToolCalls } from './markup.js';
+
+/** Said once to a run whose round came back with nothing to read and nothing to run. */
+const EMPTY_ROUND_NOTE = 'Your previous reply had no words in it. Write the answer now in plain words. You have no tools in this reply: do not search, and do not write any tool request in any form.';
 
 /** The three rules an automation can carry. Anything else is not a schedule. */
 export const CADENCE_TYPES = Object.freeze(['once', 'daily', 'interval']);
@@ -298,14 +302,23 @@ export async function runAutomation({ automation, owner, repository, chatProvide
     const lastRound = round === MAX_ROUNDS_PER_RUN - 1 || searches >= MAX_SEARCHES_PER_RUN;
     const result = await askModel(lastRound ? [] : [SEARCH_TOOL]);
 
-    const text = plainDashes(words(result.content));
+    // A search written into the text as markup is not an answer: only what is left
+    // before it is, so the saved result can never be a raw tool request.
+    const text = plainDashes(words(splitToolCalls(result.content).visible));
     const calls = Array.isArray(result.toolCalls) ? result.toolCalls : [];
 
     if (calls.length === 0) {
       if (text === '') {
-        // A round with neither words nor a call is a dead end; another round would
-        // most likely repeat it, so the run says so rather than looping.
-        return { status: 'failed', text: '', error: 'Zuri did not write an answer for this run.', searches };
+        // A round with neither words nor a call is a dead end. Repeating it as it
+        // stands would most likely repeat the silence, so the model is asked once
+        // more with no tools and told why; only if that is silent too does the run fail.
+        messages.push({ role: 'system', content: EMPTY_ROUND_NOTE });
+        const retry = await askModel([]);
+        const retryText = plainDashes(words(splitToolCalls(retry.content).visible));
+        if (retryText === '') {
+          return { status: 'failed', text: '', error: 'Zuri did not write an answer for this run.', searches };
+        }
+        return { status: 'ok', text: retryText, error: '', searches };
       }
       return { status: 'ok', text, error: '', searches };
     }

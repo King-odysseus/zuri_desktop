@@ -2,6 +2,7 @@
 node_modules/
 dist/
 release/
+release-temp/
 
 # Provider API keys never belong in the repository. The app writes this file into
 # userData/zuri, outside the checkout, and this pattern also covers a stray copy
@@ -29,3 +30,4 @@ server/downloads/
 
 # Local scratch captures from agent runs
 .kai/tmp/
+tmp/

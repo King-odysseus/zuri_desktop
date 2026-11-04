@@ -53,6 +53,16 @@ const MAX_CHAT_BODY_BYTES = 256 * 1024;
 // A web search body is one short query: 4 KB is generous for that and still
 // refuses anything that is trying to arrive as a document.
 const MAX_SEARCH_BODY_BYTES = 4 * 1024;
+// A deck or report written out in full is far longer than a search query, but a
+// request is still capped so a runaway model reply cannot ask for a huge file.
+const MAX_DOCUMENT_BODY_BYTES = 512 * 1024;
+const MAX_DOCUMENT_BYTES = 6 * 1024 * 1024;
+const DOCUMENT_REQUEST_LIMITS = Object.freeze({ requestsPerMinute: 6, maxConcurrent: 1 });
+const DOCUMENT_MIME_TYPES = Object.freeze({
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+});
 const SEARCH_QUERY_MIN_LENGTH = 2;
 const SEARCH_QUERY_MAX_LENGTH = 400;
 // Fixed and modest, and deliberately separate from the plan's chat limits: a
@@ -630,6 +640,27 @@ function plainReply(result) {
   return result;
 }
 
+/** Told to the model when its reply had no words, on the second and last ask. */
+const EMPTY_REPLY_NOTE = 'Your previous reply had no words in it. Answer the person now in plain words. You have no tools in this reply: do not search, and do not write any tool request in any form. Use what you already know, and say plainly when a figure may be out of date.';
+
+/** What the person reads if even the second ask came back silent. */
+const EMPTY_REPLY_FALLBACK = 'I could not put an answer together this time. Please send your message again, or ask it a little differently.';
+
+/**
+ * Two asks' token counts as one, so a reply that needed a second try is billed for
+ * both. Either side may be missing when that ask returned nothing at all.
+ * @param {{ inputTokens?: number, outputTokens?: number } | null | undefined} first
+ * @param {{ inputTokens?: number, outputTokens?: number } | null | undefined} second
+ * @returns {{ inputTokens: number, outputTokens: number }}
+ */
+function addUsage(first, second) {
+  const count = (value) => (Number.isFinite(value) && value > 0 ? Math.floor(value) : 0);
+  return {
+    inputTokens: count(first?.inputTokens) + count(second?.inputTokens),
+    outputTokens: count(first?.outputTokens) + count(second?.outputTokens),
+  };
+}
+
 /** @param {unknown} messages @returns {{ ok: true, data: Array<{ role: string, content: string }>, inputTokens: number } | { ok: false, message: string }} */
 function validateMessages(messages) {
   if (!Array.isArray(messages) || messages.length === 0 || messages.length > 50) {
@@ -1122,6 +1153,66 @@ export function createApp(dependencies = {}) {
           return { status: 500, body: { ok: false, error: { code: 'CHAT_FAILED', message: 'The chat request could not be completed.' } } };
         };
 
+        /**
+         * Ask the model for one reply, and ask once more if it comes back with
+         * nothing a person can read.
+         *
+         * "Nothing" is no words after tool markup is stripped, and no call to a tool
+         * this request actually offered: a model that writes a search request as text
+         * for a tool it was never given, or that sends back an empty stream, would
+         * otherwise leave every app (desktop, browser, phone) to cope on its own. The
+         * second ask offers no tools and says so. If that is silent too the person
+         * gets a plain sentence rather than a blank, and the usage of both asks is
+         * charged as one reply.
+         * @param {{ tools?: object[], onDelta?: (text: string) => void, beforeRetry?: () => void }} options
+         * @returns {Promise<object>} A provider-shaped result that always has words or a call.
+         */
+        const completeWithWords = async ({ tools, onDelta, beforeRetry }) => {
+          const offered = new Set(offeredTools.data.map((tool) => tool.name));
+          const usableCalls = (result) => [
+            ...(Array.isArray(result?.toolCalls) ? result.toolCalls : []),
+            ...splitToolCalls(result?.content).calls,
+          ].filter((call) => offered.has(call?.name));
+          const hasWords = (result) => splitToolCalls(result?.content).visible.trim() !== '';
+          const ask = async (extraSystem) => {
+            try {
+              return await dependencies.chatProvider({
+                messages: extraSystem ? [...messages.data, { role: 'system', content: extraSystem }] : messages.data,
+                model: zuriModel.supplierModel,
+                supplier: zuriModel.supplier,
+                maxTokens: limits.maxOutputTokens,
+                signal: AbortSignal.timeout(120_000),
+                // A retry offers no tools, so it cannot answer with another request.
+                ...(tools ? { tools: extraSystem ? [] : tools } : {}),
+                ...(onDelta ? { onDelta } : {}),
+              });
+            } catch (error) {
+              // The supplier's own "incomplete response" is this same problem, seen
+              // earlier: nothing readable arrived. Every other failure is real.
+              if (error?.code === 'PROVIDER_RESPONSE_INVALID') return null;
+              throw error;
+            }
+          };
+
+          const first = await ask('');
+          if (first && (hasWords(first) || usableCalls(first).length > 0)) return first;
+
+          if (beforeRetry) beforeRetry();
+          const second = await ask(EMPTY_REPLY_NOTE);
+          if (second && hasWords(second)) {
+            return { ...second, usage: addUsage(first?.usage, second.usage) };
+          }
+
+          return {
+            id: '',
+            model: second?.model ?? first?.model ?? zuriModel.supplierModel,
+            content: EMPTY_REPLY_FALLBACK,
+            toolCalls: [],
+            reasoningContent: '',
+            usage: addUsage(first?.usage, second?.usage),
+          };
+        };
+
         try {
           // Reserve the full allowed request envelope, weighted for the model.
           // This is conservative, but prevents tokenizer differences from
@@ -1166,13 +1257,14 @@ export function createApp(dependencies = {}) {
                 // Everything received but not yet known to be ordinary words.
                 let pending = '';
                 let painted = 0;
-                const result = await dependencies.chatProvider({
-                  messages: messages.data,
-                  model: zuriModel.supplierModel,
-                  supplier: zuriModel.supplier,
-                  maxTokens: limits.maxOutputTokens,
-                  signal: AbortSignal.timeout(120_000),
+                const result = await completeWithWords({
                   tools: offeredTools.data,
+                  // Whatever the first ask left held back is markup, not words, so the
+                  // second ask starts with a clean slate.
+                  beforeRetry: () => {
+                    pending = '';
+                    painted = 0;
+                  },
                   // A supplier sometimes writes the request into the text instead of
                   // returning it as a call, so the reply is read for both shapes.
                   // A tool request written into the text is held back rather than
@@ -1242,7 +1334,7 @@ export function createApp(dependencies = {}) {
         }
 
         try {
-          const result = await dependencies.chatProvider({ messages: messages.data, model: zuriModel.supplierModel, supplier: zuriModel.supplier, maxTokens: limits.maxOutputTokens, signal: AbortSignal.timeout(120_000) });
+          const result = await completeWithWords({});
           await commitReply(result);
           // The supplier's model name stays server-side; customers see the Zuri name.
           const split = splitToolCalls(result.content);
@@ -1312,6 +1404,75 @@ export function createApp(dependencies = {}) {
             return response(502, { ok: false, error: { code: 'SEARCH_INVALID_RESPONSE', message: 'The search service answered with a page that could not be read. Try again later.' } });
           }
           return response(502, { ok: false, error: { code: 'SEARCH_FAILED', message: 'The search service could not be reached. Try again later.' } });
+        } finally {
+          lease.release();
+        }
+      } catch (error) {
+        if (error?.code === 'BODY_TOO_LARGE' || error?.code === 'INVALID_JSON') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        throw error;
+      }
+    }
+
+    // Build a Word, Excel or PowerPoint file for the browser and the phone, which
+    // cannot build one themselves. The builders are injected (server.js loads them),
+    // so this route holds no Office code and a deployment without them answers 503.
+    // The file comes back once, in this reply, and is not kept on the server.
+    if (request.method === 'POST' && url.pathname === '/api/tools/create-document') {
+      const office = dependencies.officeBuilder;
+      if (!dependencies.auth || !office || typeof office.build !== 'function') {
+        return response(503, { ok: false, error: { code: 'TOOLS_NOT_CONFIGURED', message: 'Making files is not switched on yet.' } });
+      }
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to make files.' } });
+      try {
+        const body = await readJson(request, MAX_DOCUMENT_BODY_BYTES);
+        const kind = typeof body.kind === 'string' ? body.kind.toLowerCase() : '';
+        if (!Object.hasOwn(DOCUMENT_MIME_TYPES, kind)) {
+          return response(400, { ok: false, error: { code: 'INVALID_KIND', message: 'Choose docx, xlsx or pptx.' } });
+        }
+        // Some suppliers hand nested arguments back as a JSON string.
+        let content = body.content;
+        if (typeof content === 'string') {
+          try {
+            content = JSON.parse(content);
+          } catch {
+            return response(400, { ok: false, error: { code: 'INVALID_CONTENT', message: 'The content must be a JSON object.' } });
+          }
+        }
+        if (content === null || typeof content !== 'object' || Array.isArray(content)) {
+          return response(400, { ok: false, error: { code: 'INVALID_CONTENT', message: 'The content must be a JSON object.' } });
+        }
+        const lease = limiter.acquire(`${session.user.id}:create-document`, DOCUMENT_REQUEST_LIMITS);
+        if (!lease.allowed) {
+          return response(429, { ok: false, error: { code: lease.reason === 'concurrency_limit' ? 'CONCURRENCY_LIMIT' : 'RATE_LIMITED', message: 'This account is making files too quickly. Try again shortly.' } }, { 'retry-after': String(lease.retryAfterSeconds) });
+        }
+        try {
+          let bytes;
+          try {
+            bytes = await office.build(kind, content);
+          } catch (error) {
+            // A refusal the builder words for the person (too many slides, no sheets)
+            // is safe to show; anything else stays in the log.
+            if (error?.name === 'OfficeError') return response(400, { ok: false, error: { code: 'INVALID_CONTENT', message: error.message } });
+            console.error('[zuri-cloud] create document', error?.message ?? error);
+            return response(500, { ok: false, error: { code: 'DOCUMENT_FAILED', message: `The ${kind} file could not be built.` } });
+          }
+          if (bytes.length > MAX_DOCUMENT_BYTES) {
+            return response(413, { ok: false, error: { code: 'DOCUMENT_TOO_LARGE', message: 'That file came out too large. Make it shorter.' } });
+          }
+          const stem = String(body.fileName ?? '').split(/[\\/]/).pop().replace(/\.(docx|xlsx|pptx)$/i, '').replace(/[<>:"|?*\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/^[.\s]+|[.\s]+$/g, '').slice(0, 80);
+          return response(200, {
+            ok: true,
+            data: {
+              kind,
+              name: `${stem || 'document'}.${kind}`,
+              mime: DOCUMENT_MIME_TYPES[kind],
+              bytes: bytes.length,
+              base64: Buffer.from(bytes).toString('base64'),
+              warnings: typeof office.review === 'function' ? office.review(kind, content) : [],
+            },
+          });
         } finally {
           lease.release();
         }

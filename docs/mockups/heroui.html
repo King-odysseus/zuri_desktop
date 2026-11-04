@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Zuri web UI mockups</title>
+  <meta name="description" content="Concept mockups of the Zuri web UI in the HeroUI component style: a ChatGPT-simple user view and an admin area. White, blue, navy and bronze only. Mockup only, no app code.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap">
+  <script src="https://cdn.tailwindcss.com/3.4.16"></script>
+  <script>
+    // Every colour is a CSS variable that heroui.js fills in from one palette: white, blue, navy and bronze.
+    const TOKENS = ['canvas', 'c1', 'c2', 'c3', 'c4', 'line', 'ink', 'navy', 'muted', 'faint', 'pri', 'pri-soft', 'pri-ink', 'bronze', 'bronze-soft', 'bronze-ink'];
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'Segoe UI', 'sans-serif'], display: ['Plus Jakarta Sans', 'Inter', 'sans-serif'] },
+          colors: Object.fromEntries(TOKENS.map((name) => [name, `var(--${name})`])),
+        },
+      },
+    };
+  </script>
+  <script src="./heroui.js"></script>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+</head>
+<body class="min-h-dvh bg-canvas font-sans text-ink antialiased">
+  <div id="app"></div>
+</body>
+</html>

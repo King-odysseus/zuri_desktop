@@ -3,12 +3,12 @@
  *
  * The tokens and control shapes are the desktop app's own (see
  * src/renderer-react/app.css): 44px controls on a 12px radius, 16px cards, pill
- * chips and the accent-tinted selected state. Keeping the values literal means
+ * chips and the soft-blue selected state. Keeping the values literal means
  * the two surfaces can be compared side by side without a mapping table.
  *
- * Light is the page's own paint: a first visit shows paper-white surfaces and a
- * blue accent. The navy canvas is one attribute away and the bar's toggle is
- * the only thing that sets it, so nobody lands on a dark screen by default.
+ * Light is the page's own paint: pure white with soft blue fills, navy ink and
+ * bronze for attention. The navy dark theme is one attribute away and the bar's
+ * toggle is the only thing that sets it, so nobody lands on it by default.
  */
 @import "tailwindcss";
 @import "flowbite-react/plugin/tailwindcss";
@@ -54,97 +54,98 @@
   --color-brand-blue-soft: var(--brand-blue-soft);
   --color-brand-blue-ink: var(--brand-blue-ink);
   --color-brand-navy: var(--brand-navy);
+  --color-brand-bronze: var(--brand-bronze);
+  --color-brand-bronze-soft: var(--brand-bronze-soft);
+  --color-brand-bronze-ink: var(--brand-bronze-ink);
   --radius-control: var(--radius-lg);
   --radius-card: var(--radius-xl);
 }
 
 :root {
   color-scheme: light;
-  /* The ChatGPT neutral scale with one deliberate change: the ink is a dark navy
-     instead of black, so a page reads as Zuri's rather than as someone else's
-     black. Every neutral keeps a hint of the same blue, which is why the panel
-     greys are cool rather than warm. A surface is still told apart by its fill
-     and by a 1px line, never by a brand colour or a shadow. */
+  /* Pure white page with soft blue-tinted fills: a surface is told apart by its
+     fill step, never by a line or a shadow. The ink is navy rather than black. */
   --canvas: #ffffff;
   --surface: #ffffff;
-  --surface-secondary: #f5f6fa;
-  --surface-tertiary: #ebedf3;
-  --raised: #e3e6ee;
+  --surface-secondary: #f3f6fc;
+  --surface-tertiary: #e6edfa;
+  --raised: #d3def5;
   --glass: #ffffff;
-  --hairline: #e6e8f0;
-  --strong: #d2d6e3;
-  --control-border: #e1e4ee;
-  --field-background: #ffffff;
+  /* Dividers are the second fill step so they stay quiet on white. */
+  --hairline: #e6edfa;
+  --strong: #d3def5;
+  /* Controls carry no outline: the soft fill is the edge. */
+  --control-border: transparent;
+  --field-background: #f3f6fc;
   --text: #0d1b3a;
-  /* #5a6480 clears 4.5:1 on white and on the panel grey, so a caption is still
-     readable at 12px. */
-  --muted: #5a6480;
-  --faint: #8b93a8;
-  /* Two brand colours, the way the mark has two: the navy plate and a light blue
-     that marks anything live. Navy is the filled primary control and the panel
-     beside the page; the light blue is a link, a secondary control, the row you
-     are on, the focus ring and a chart bar. Both are kept so the page reads as
-     Zuri at a glance rather than as a grey page with dark text. */
+  /* #55627f clears 4.5:1 on white and on the soft fill, so a 12px caption reads. */
+  --muted: #55627f;
+  --faint: #7f8aa3;
+  /* Two brand colours: navy for the filled primary control, blue for anything
+     live (link, selected row, focus ring, user bubble, chart bar). Bronze is the
+     third and marks attention, badges and the admin area. */
   --brand-navy: #0d1b3a;
-  --brand-navy-hover: #16264f;
+  --brand-navy-hover: #1a2c57;
   --brand-blue: #2f6fed;
   --brand-blue-hover: #2560d8;
   --brand-blue-soft: #e8effc;
   --brand-blue-ink: #1b47b8;
+  --brand-bronze: #9a6830;
+  --brand-bronze-soft: #f6ede2;
+  --brand-bronze-ink: #7a4f1f;
   --accent: var(--brand-navy);
   --accent-hover: var(--brand-navy-hover);
   --accent-foreground: #ffffff;
   --accent-soft: var(--brand-blue-soft);
-  /* Links and inline accents take the light blue, dark enough to read on white. */
+  /* Links and inline accents take the blue ink, dark enough to read on white. */
   --accent-text: var(--brand-blue-ink);
   --selected: var(--brand-blue-soft);
-  --selected-foreground: #12306f;
-  /* The panel beside the page stays a white surface with navy ink on it: the navy
-     belongs to the logo and the filled primary control, not to the background. The
-     row you are on carries the light blue, so the panel still shows the brand
-     without turning into a second page colour. */
+  --selected-foreground: var(--brand-blue-ink);
+  /* The sidebar is the white page itself; the row you are on carries the soft blue. */
   --nav-surface: #ffffff;
   --nav-foreground: #0d1b3a;
-  --nav-muted: #5a6480;
+  --nav-muted: #55627f;
   --nav-border: transparent;
-  --nav-hover: #f0f3fa;
+  --nav-hover: #f3f6fc;
   --nav-active: var(--brand-blue-soft);
-  --nav-field: #ffffff;
+  --nav-field: #f3f6fc;
   --nav-accent: var(--brand-blue-ink);
-  /* Status has to be recognised before it is read: green for a confirmation,
-     amber for an allowance running out, red for a refusal, the light blue for
-     news. Each carries a soft fill, an ink that still clears 4.5:1 on that fill,
-     and a line for the stripe down the side of a notice or a bar. */
-  --success: #15803d;
-  --success-soft: #e7f6ec;
-  --success-line: #8ed8a8;
-  --warning: #9a5b06;
-  --warning-soft: #fdf3e4;
-  --warning-line: #f2bd5c;
-  --danger: #c2253a;
-  --danger-soft: #fdecef;
-  --danger-line: #f1aeb9;
+  /* Status uses the palette only: blue is good or news, bronze is attention, and
+     an error is navy text on a pale bronze fill. Each has a soft fill, an ink that
+     clears 4.5:1 on it and a line colour. */
+  --success: var(--brand-blue-ink);
+  --success-soft: var(--brand-blue-soft);
+  --success-line: #b7cdfa;
+  --warning: var(--brand-bronze-ink);
+  --warning-soft: var(--brand-bronze-soft);
+  --warning-line: #e3cdb0;
+  --danger: var(--brand-navy);
+  --danger-soft: var(--brand-bronze-soft);
+  --danger-line: #e3cdb0;
   --info: var(--brand-blue-ink);
   --info-soft: var(--brand-blue-soft);
   --info-line: #b7cdfa;
   /* No elevation on the page. Only a floating layer (a menu, the phone's drawer)
-     casts anything, because it has to sit visibly above what it covers. */
+     casts anything, tinted with navy, because it has to sit above what it covers. */
   --shadow-soft: none;
-  --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.12);
-  --radius-sm: 6px;
-  --radius-md: 8px;
-  --radius-lg: 10px;
-  --radius-xl: 14px;
-  --radius-2xl: 18px;
+  --shadow-glass: 0 8px 24px rgba(13, 27, 58, 0.14);
+  --scrim: rgba(13, 27, 58, 0.4);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  /* Inputs and menus */
+  --radius-lg: 14px;
+  /* Cards */
+  --radius-xl: 20px;
+  /* The composer */
+  --radius-2xl: 28px;
   /* One height for every button and field, as on the desktop pages. */
   --control-height: 44px;
-  /* Buttons keep their own, smaller scale than fields, as the style guide asks
-     (36px tall, 16px of side padding, a 10px corner). A mouse can hit a 36px
-     target comfortably; a finger cannot, so the query below gives touch screens
-     the 44px height back rather than making every desktop button look inflated. */
+  /* Buttons keep their own, smaller scale than fields (36px tall, 16px of side
+     padding). A mouse can hit 36px; a finger cannot, so the query below gives touch
+     screens 44px back rather than inflating every desktop button. */
   --button-height: 36px;
   --button-padding-x: 16px;
-  --button-radius: var(--radius-lg);
+  --button-radius: 999px;
   --bar-height: 64px;
   /* The reading column. Bands keep their full width; this only decides where
      their content stops growing, so a 1920px window still shows one page. */
@@ -161,62 +162,64 @@
   }
 }
 
-/* The dark theme keeps ChatGPT's shape and swaps its greys for navy: the page is
-   the deep #040130 this account already asked for, each surface is a step
-   lighter on the same blue, and the primary control stays white with navy ink
-   on it so it still reads as the main action. */
+/* The dark theme is optional and uses only navy, blue and bronze: a deep navy
+   page, surfaces one step lighter on the same hue, and a white primary control so
+   it still reads as the main action. */
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --canvas: #040130;
-  --surface: #0a0738;
-  --surface-secondary: #070432;
-  --surface-tertiary: #14114a;
-  --raised: #1d1a56;
-  --glass: #040130;
-  --hairline: #221e63;
-  --strong: #332d86;
-  --control-border: #2b2673;
-  --field-background: #0b0838;
-  --text: #e9ebf7;
-  --muted: #b0b4dd;
-  --faint: #7e83ad;
-  --brand-navy: #040130;
-  --brand-navy-hover: #0f0b46;
+  --canvas: #060421;
+  --surface: #0f0c33;
+  --surface-secondary: #0f0c33;
+  --surface-tertiary: #181448;
+  --raised: #221d5c;
+  --glass: #060421;
+  --hairline: #181448;
+  --strong: #2a2570;
+  --control-border: transparent;
+  --field-background: #0f0c33;
+  --text: #ecebff;
+  --muted: #b3b1de;
+  --faint: #8381b5;
+  --brand-navy: #060421;
+  --brand-navy-hover: #0f0c33;
   --brand-blue: #7aa2ff;
   --brand-blue-hover: #9ab8ff;
   --brand-blue-soft: #16224d;
   --brand-blue-ink: #a9c1ff;
+  --brand-bronze: #d4a06a;
+  --brand-bronze-soft: #2e2118;
+  --brand-bronze-ink: #e6bd8f;
   --accent: #ffffff;
   --accent-hover: #e2e4f5;
-  --accent-foreground: #040130;
+  --accent-foreground: #060421;
   --accent-soft: var(--brand-blue-soft);
   /* On the navy page the light blue is the only colour bright enough to read. */
   --accent-text: var(--brand-blue-ink);
   --selected: var(--brand-blue-soft);
   --selected-foreground: #dbe6ff;
-  /* The docked panel is one step darker than the page, as it is in ChatGPT. */
-  --nav-surface: #030028;
-  --nav-foreground: #e9ebf7;
-  --nav-muted: #b0b4dd;
+  --nav-surface: #060421;
+  --nav-foreground: #ecebff;
+  --nav-muted: #b3b1de;
   --nav-border: transparent;
-  --nav-hover: #0e0b40;
+  --nav-hover: #0f0c33;
   --nav-active: #16224d;
-  --nav-field: #0b0838;
+  --nav-field: #0f0c33;
   --nav-accent: #a9c1ff;
-  --success: #6fce9a;
-  --success-soft: #16301f;
-  --success-line: #2f6b4a;
-  --warning: #e8b339;
-  --warning-soft: #33290f;
-  --warning-line: #6b5116;
-  --danger: #f08a8a;
-  --danger-soft: #3a1f1f;
-  --danger-line: #6b2f35;
+  --success: var(--brand-blue-ink);
+  --success-soft: var(--brand-blue-soft);
+  --success-line: #2b3f7a;
+  --warning: var(--brand-bronze);
+  --warning-soft: var(--brand-bronze-soft);
+  --warning-line: #5c4228;
+  --danger: #ecebff;
+  --danger-soft: var(--brand-bronze-soft);
+  --danger-line: #5c4228;
   --info: var(--brand-blue-ink);
   --info-soft: var(--brand-blue-soft);
   --info-line: #2b3f7a;
   --shadow-soft: none;
-  --shadow-glass: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --shadow-glass: 0 8px 24px rgba(0, 0, 8, 0.55);
+  --scrim: rgba(0, 0, 8, 0.6);
 }
 
 * {
@@ -428,7 +431,7 @@ a:hover {
    and never a second filled pill, so the navy primary still reads as the main. */
 .btn-secondary {
   background: var(--brand-blue-soft);
-  border-color: color-mix(in srgb, var(--brand-blue) 38%, transparent);
+  border-color: transparent;
   color: var(--brand-blue-ink);
 }
 
@@ -546,7 +549,7 @@ a:hover {
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 0;
   border-radius: 9999px;
   background: var(--surface-tertiary);
   color: var(--text);
@@ -590,8 +593,7 @@ a:hover {
   max-width: var(--max-width);
   margin: 16px auto 0;
   padding: 12px 16px;
-  border: 1px solid var(--info-line);
-  border-left: 4px solid var(--brand-blue);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
   color: var(--text);
@@ -599,27 +601,24 @@ a:hover {
 }
 
 /* A status line is its colour before it is its sentence: the fill names the kind
-   from across the room, the ink says it again in words, and the stripe down the
-   left edge is what the eye catches first. Informational news is the light blue,
-   so good news never wears a warning's amber. */
+   from across the room, the ink says it again in words, and nothing else is
+   needed to tell the kinds apart. Informational news is the light blue,
+   so good news never wears a warning's bronze. *
 .notice.is-info {
   background: var(--info-soft);
   border-color: var(--info-line);
-  border-left-color: var(--brand-blue);
   color: var(--info);
 }
 
 .notice.is-error {
   background: var(--danger-soft);
   border-color: var(--danger-line);
-  border-left-color: var(--danger);
   color: var(--danger);
 }
 
 .notice.is-success {
   background: var(--success-soft);
   border-color: var(--success-line);
-  border-left-color: var(--success);
   color: var(--success);
 }
 
@@ -666,7 +665,7 @@ a:hover {
   width: fit-content;
   white-space: nowrap;
   padding: 6px 12px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 0;
   border-radius: 9999px;
   background: color-mix(in srgb, var(--surface) 88%, var(--accent) 12%);
   color: var(--muted);
@@ -717,12 +716,12 @@ a:hover {
   stroke-linejoin: round;
 }
 
-/* A card is a white face with one hairline. No tint, no shadow: ChatGPT's own
-   panels are told apart by their edge alone. */
+/* A card is a soft blue-tinted face with no border. No shadow: the fill step
+   separates it from the page. */
 .card {
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
   padding: 20px;
 }
 
@@ -745,8 +744,8 @@ a:hover {
   flex-direction: column;
   gap: 16px;
   padding: 24px;
-  border: 1px solid var(--hairline);
-  background: var(--surface);
+  border: 0;
+  background: var(--surface-secondary);
   border-radius: var(--radius-2xl);
 }
 
@@ -787,9 +786,9 @@ a:hover {
   flex-direction: column;
   gap: 2px;
   padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 0;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--selected) 60%, transparent);
+  background: var(--surface-secondary);
 }
 
 .google-notice strong {
@@ -934,21 +933,20 @@ a:hover {
   flex-direction: column;
   gap: 12px;
   padding: 20px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
   transition: border-color 150ms ease;
 }
 
 .plan-card:hover {
-  border-color: var(--strong);
+  background: var(--surface-tertiary);
 }
 
-/* Where you already are is marked by a darker edge and the ink of its title, not
-   by a tint or a gradient. */
+/* Where you already are is marked by the soft blue fill, not by an edge or a
+   gradient. */
 .plan-card.is-current {
-  border-color: var(--text);
-  background: var(--surface);
+  background: var(--brand-blue-soft);
 }
 
 .plan-top {
@@ -1358,7 +1356,7 @@ a:hover {
   z-index: 55;
   padding: 0;
   border: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--scrim);
   cursor: pointer;
 }
 
@@ -1379,7 +1377,7 @@ a:hover {
   border-radius: 999px;
   border-color: var(--hairline);
   background: var(--surface);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.16);
+  box-shadow: var(--shadow-glass);
 }
 
 .nav-fab:hover {
@@ -1646,21 +1644,20 @@ body:has(.app) .app {
   min-height: 10rem;
   margin-top: 8px;
   padding: 20px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
   text-align: center;
 }
 
-/* A warning is amber, and it says so with a stripe as well as a fill, so it cannot
+/* A warning is bronze, and it says so with its fill and ink, so it cannot
    be mistaken for an ordinary grey panel. */
 .alert {
   padding: 12px 16px;
-  border: 1px solid var(--warning-line);
-  border-left: 4px solid var(--warning);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--warning-soft);
   color: var(--warning);
@@ -1670,14 +1667,12 @@ body:has(.app) .app {
 .alert.is-danger {
   background: var(--danger-soft);
   border-color: var(--danger-line);
-  border-left-color: var(--danger);
   color: var(--danger);
 }
 
 .alert.is-info {
   background: var(--info-soft);
   border-color: var(--info-line);
-  border-left-color: var(--brand-blue);
   color: var(--info);
 }
 
@@ -1885,14 +1880,19 @@ body:has(.app) .app {
     align-items: flex-start;
   }
 
-  /* The floating menu button hangs under the bar on the left, so the content below
-     it starts under the button rather than beside it. */
   .app-main {
-    padding-top: 68px;
+    padding-top: 24px;
   }
 
+  /* The fixed bottom tab bar (BottomBar, 4rem tall) sits over the foot of the screen, so the
+     chat reserves its height plus the safe area and the composer drops its own inset. */
   .app-main.is-chat {
     padding-top: 0;
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
+
+  .app-main.is-chat .chat-composer-wrap {
+    padding-bottom: 20px;
   }
 }
 
@@ -2107,7 +2107,7 @@ body:has(.app) .app {
   min-height: 220px;
   padding: clamp(16px, 2vw, 26px);
   overflow: hidden;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
   background: var(--surface-secondary);
 }
@@ -2123,9 +2123,9 @@ body:has(.app) .app {
   gap: 4px;
   min-width: 0;
   padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 62%, transparent);
+  border: 0;
   border-radius: var(--radius-lg);
-  background: var(--surface);
+  background: var(--surface-secondary);
   box-shadow: var(--shadow-soft);
 }
 
@@ -2191,10 +2191,10 @@ body:has(.app) .app {
   position: relative;
   display: none;
   overflow: hidden;
-  background-color: #0b1220;
+  background-color: #0d1b3a;
   background-image:
-    linear-gradient(180deg, rgba(5, 10, 20, 0.72) 0%, rgba(5, 10, 20, 0.06) 26%, rgba(5, 10, 20, 0.1) 70%, rgba(5, 10, 20, 0.7) 100%),
-    linear-gradient(90deg, rgba(5, 10, 20, 0.95) 0px, rgba(5, 10, 20, 0.92) 340px, rgba(5, 10, 20, 0.76) 440px, rgba(5, 10, 20, 0.36) 570px, rgba(5, 10, 20, 0.04) 700px, rgba(5, 10, 20, 0) 100%),
+    linear-gradient(180deg, rgba(13, 27, 58, 0.72) 0%, rgba(13, 27, 58, 0.06) 26%, rgba(13, 27, 58, 0.1) 70%, rgba(13, 27, 58, 0.7) 100%),
+    linear-gradient(90deg, rgba(13, 27, 58, 0.95) 0px, rgba(13, 27, 58, 0.92) 340px, rgba(13, 27, 58, 0.76) 440px, rgba(13, 27, 58, 0.36) 570px, rgba(13, 27, 58, 0.04) 700px, rgba(13, 27, 58, 0) 100%),
     url("/img/auth-team.jpg");
   /* The trio stand about a third of the way down the frame, so the crop keeps
      their faces when a narrow window takes the sides rather than the middle. */
@@ -2208,7 +2208,7 @@ body:has(.app) .app {
 .auth-aside .brand,
 .auth-aside .brand-mark {
   color: #ffffff;
-  text-shadow: 0 1px 8px rgba(3, 8, 18, 0.55);
+  text-shadow: 0 1px 8px rgba(13, 27, 58, 0.55);
 }
 
 /* Below 900px the aside is not drawn at all: there is no picture to carry, and the
@@ -2250,9 +2250,9 @@ body:has(.app) .app {
   flex-direction: column;
   gap: 14px;
   padding: 22px 20px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-2xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
 }
 
 /* Title and its one line of copy travel together, so the gap under the tabs is one
@@ -2281,7 +2281,7 @@ body:has(.app) .app {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 4px;
   padding: 4px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
 }
@@ -2307,7 +2307,7 @@ body:has(.app) .app {
 .auth-switch-btn.is-active {
   background: var(--selected);
   color: var(--selected-foreground);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--selected) 42%, transparent);
+  box-shadow: none;
 }
 
 .auth-benefits {
@@ -2405,9 +2405,9 @@ body:has(.app) .app {
   align-items: center;
   gap: 6px;
   padding: 6px 11px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: 9999px;
-  background: var(--surface);
+  background: var(--surface-secondary);
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
@@ -2587,9 +2587,9 @@ body:has(.app) .app {
   gap: 8px 16px;
   min-height: 96px;
   padding: 20px 24px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent);
+  border: 0;
   border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--surface) 94%, var(--accent) 6%);
+  background: var(--surface-secondary);
   color: var(--text);
   text-decoration: none;
   box-shadow: var(--shadow-soft);
@@ -2602,7 +2602,7 @@ body:has(.app) .app {
 }
 
 a.download-card:hover {
-  border-color: color-mix(in srgb, var(--accent) 58%, var(--control-border));
+  background: var(--surface-tertiary);
   transform: translateY(-1px);
 }
 
@@ -2611,8 +2611,8 @@ a.download-card:hover {
 }
 
 .download-card.is-recommended {
-  border-color: color-mix(in srgb, var(--accent) 58%, var(--control-border));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+  background: var(--brand-blue-soft);
+  box-shadow: none;
 }
 
 .download-release-note {
@@ -2682,7 +2682,7 @@ a.download-card:hover {
   align-items: center;
   min-height: 44px;
   padding: 0 12px;
-  border: 1px solid var(--nav-border);
+  border: 0;
   border-radius: var(--radius-lg);
   color: var(--nav-foreground);
   text-decoration: none;
@@ -2767,7 +2767,7 @@ a.download-card:hover {
     gap: 8px;
     border: 1px solid rgba(255, 255, 255, 0.26);
     border-radius: 999px;
-    background: rgba(8, 18, 36, 0.55);
+    background: rgba(13, 27, 58, 0.55);
     padding: 5px 12px;
     color: rgba(255, 255, 255, 0.9);
     font-size: 11px;
@@ -2780,7 +2780,7 @@ a.download-card:hover {
   .auth-aside-inner h1 {
     max-width: 16ch;
     color: #ffffff;
-    text-shadow: 0 1px 14px rgba(3, 8, 18, 0.65);
+    text-shadow: 0 1px 14px rgba(13, 27, 58, 0.65);
     font-size: clamp(26px, 2.6vw, 38px);
     font-weight: 600;
     letter-spacing: -0.03em;
@@ -2792,13 +2792,13 @@ a.download-card:hover {
     color: rgba(255, 255, 255, 0.84);
     font-size: 15px;
     line-height: 1.6;
-    text-shadow: 0 1px 12px rgba(3, 8, 18, 0.6);
+    text-shadow: 0 1px 12px rgba(13, 27, 58, 0.6);
   }
 
   /* Over a picture the chips read as glass rather than as card furniture. */
   .auth-aside .auth-trust li {
     border-color: rgba(255, 255, 255, 0.24);
-    background: rgba(8, 18, 36, 0.55);
+    background: rgba(13, 27, 58, 0.55);
     color: rgba(255, 255, 255, 0.92);
     backdrop-filter: blur(6px);
   }
@@ -3035,10 +3035,9 @@ a.download-card:hover {
 
 .legal-intro {
   padding: 14px 16px;
-  border: 1px solid color-mix(in srgb, var(--control-border) 70%, transparent);
-  border-left: 3px solid var(--warning);
+  border: 0;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+  background: var(--surface-secondary);
   font-size: 15px;
   line-height: 1.6;
 }
@@ -3135,7 +3134,7 @@ a.download-card:hover {
   min-height: 40px;
   margin: 10px 0 0;
   padding: 0 10px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: 10px;
   background: var(--nav-field);
   color: var(--nav-muted);
@@ -3301,7 +3300,7 @@ a.download-card:hover {
   min-width: 0;
   height: 32px;
   padding: 0 8px;
-  border: 1px solid var(--control-border);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--field-background);
   color: var(--text);
@@ -3403,7 +3402,7 @@ a.download-card:hover {
   line-height: 1.6;
 }
 
-/* A prompt is a grey bubble with ink in it, and a reply is bare text on the page.
+/* A prompt is a soft blue bubble with ink in it, and a reply is bare text on the page.
    That is the pair ChatGPT draws, and it means only the person's own words ever
    sit in a filled box. */
 .chat-bubble-user {
@@ -3435,7 +3434,7 @@ a.download-card:hover {
   width: min(100%, 340px);
   aspect-ratio: 1;
   margin-bottom: 8px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
   object-fit: cover;
@@ -3736,7 +3735,7 @@ a.download-card:hover {
   gap: 8px;
   margin: 0 0 8px;
   padding: 6px 8px 6px 12px;
-  border: 1px solid var(--control-border);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
   color: var(--text);
@@ -3763,9 +3762,9 @@ a.download-card:hover {
   align-items: flex-end;
   gap: 8px;
   padding: 10px 12px 10px 16px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-2xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
   box-shadow: var(--shadow-soft);
 }
 
@@ -3919,7 +3918,7 @@ a.download-card:hover {
   z-index: 20;
   min-width: 180px;
   padding: 4px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--shadow-glass);
@@ -4118,7 +4117,7 @@ h4,
   margin-bottom: 8px;
   border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--hairline);
+  border: 0;
 }
 
 .chat-attachment img {
@@ -4218,7 +4217,7 @@ h4,
   gap: 2px;
   min-width: 184px;
   padding: 6px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface);
 }
@@ -4337,9 +4336,9 @@ h4,
   gap: 12px;
   min-height: 92px;
   padding: 16px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
   text-align: left;
   cursor: pointer;
   transition: background 150ms ease, border-color 150ms ease;
@@ -4381,7 +4380,7 @@ h4,
 .project-empty,
 .project-loading {
   padding: 28px 20px;
-  border: 1px dashed var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
   color: var(--muted);
   font-size: 13px;
@@ -4393,9 +4392,9 @@ h4,
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
 }
 
 .project-form-title {
@@ -4427,7 +4426,7 @@ h4,
 .project-input,
 .project-textarea {
   width: 100%;
-  border: 1px solid var(--control-border);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--field-background);
   color: var(--text);
@@ -4593,7 +4592,7 @@ h4,
 
 /* Deleting a project is the last thing on the page and the quietest: a plain
    hairline card, with only the label borrowing the warning colour. A box outlined
-   in red would shout on every visit, including the visits where nothing is being
+   in bronze would shout on every visit, including the visits where nothing is being
    deleted, which is most of them. */
 .project-section.project-danger {
   flex-direction: row;
@@ -4708,9 +4707,9 @@ h4,
   flex-direction: column;
   gap: 2px;
   padding: 10px 12px 10px 16px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-2xl);
-  background: var(--surface);
+  background: var(--surface-secondary);
   box-shadow: var(--shadow-soft);
 }
 
@@ -5108,11 +5107,11 @@ h4,
 }
 
 .calm-bar > div.is-warn {
-  background: var(--warning, #b7791f);
+  background: var(--warning);
 }
 
 .calm-bar > div.is-danger {
-  background: var(--danger, #c0392b);
+  background: var(--brand-navy);
 }
 
 .calm-note {
@@ -5126,23 +5125,20 @@ h4,
 }
 
 /* The allowance banner on the overview. It keeps its own padding so the buttons
-   under it do not move, and takes the palette's tone so "nearly out" is amber and
-   "out" is red rather than both reading as a grey strip. */
+   under it do not move, and takes the palette's tone so "nearly out" is bronze and
+   "out" is navy rather than both reading as a grey strip. */
 .calm-note.is-info {
   background: var(--info-soft);
-  box-shadow: inset 3px 0 0 var(--brand-blue);
   color: var(--info);
 }
 
 .calm-note.is-warning {
   background: var(--warning-soft);
-  box-shadow: inset 3px 0 0 var(--warning);
   color: var(--warning);
 }
 
 .calm-note.is-danger {
   background: var(--danger-soft);
-  box-shadow: inset 3px 0 0 var(--danger);
   color: var(--danger);
 }
 
@@ -5163,7 +5159,7 @@ h4,
   border: 0;
   border-radius: var(--button-radius);
   background: var(--accent, var(--text));
-  color: var(--accent-foreground, #fff);
+  color: var(--accent-foreground);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -5220,7 +5216,8 @@ h4,
 }
 
 .calm-week-bar.is-today {
-  background: var(--brand-navy);
+  /* Navy vanishes into the dark canvas, so today's bar takes the blue there. */
+  background: var(--brand-blue);
 }
 
 .calm-week-label {
@@ -5533,7 +5530,7 @@ h4,
   align-items: center;
   gap: 4px;
   padding: 26px 18px;
-  border: 1px dashed var(--hairline);
+  border: 0;
   border-radius: var(--radius-xl);
   background: var(--surface-secondary);
   text-align: center;
@@ -5569,7 +5566,7 @@ h4,
 
 /* A created to-do, reminder or automation, painted under the reply that made it.
    Same class names and same shape as the desktop window's card, so one feature
-   looks like one feature on both. Green is carried by the stripe and the pill
+   looks like one feature on both. Blue is carried by the fill and the pill
    rather than the text, so the words keep their normal contrast in both themes. */
 .chat-notables {
   display: flex;
@@ -5586,8 +5583,7 @@ h4,
   gap: 8px;
   min-width: 0;
   padding: 14px 16px;
-  border: 1px solid var(--success-line);
-  border-left: 3px solid var(--success);
+  border: 0;
   border-radius: 14px;
   background: var(--success-soft);
   color: var(--text);
@@ -5605,7 +5601,7 @@ h4,
   align-items: center;
   gap: 6px;
   padding: 1px 10px 1px 4px;
-  border: 1px solid var(--success-line);
+  border: 0;
   border-radius: 999px;
   background: var(--glass);
   color: var(--success);
@@ -5679,7 +5675,7 @@ h4,
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  border: 1px solid var(--hairline);
+  border: 0;
   border-radius: var(--radius-lg);
   background: var(--surface-secondary);
 }
@@ -5707,4 +5703,23 @@ h4,
 .automation-prompt {
   min-height: 76px;
   resize: vertical;
+}
+
+/* A quoted passage is set apart by a tint alone, with no bar or border down its
+   side, and a rule is a quiet gap-sized line, so neither competes with text. */
+.message-body .message-quote {
+  border-radius: 8px;
+  background: var(--surface-tertiary);
+  padding: 10px 14px;
+}
+
+.message-body .message-rule {
+  height: 1px;
+  border: 0;
+  background: currentColor;
+  opacity: 0.15;
+}
+
+.message-body del {
+  opacity: 0.7;
 }

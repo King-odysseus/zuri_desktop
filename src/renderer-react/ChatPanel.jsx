@@ -9,6 +9,8 @@ import { QUICK_ADJUSTMENTS } from './answerAdjustments.js';
 // The card for something Zuri has just created, described once for both this app and the
 // web chat, so the two surfaces cannot word the same event differently.
 import { describeNotable } from '../shared/notableActions.js';
+// Reading a reply aloud with the device's own voice, shared with the web chat.
+import { speak, speechAvailable, stopSpeaking } from '../shared/speech.js';
 import {
   ArrowUpIcon,
   CheckIcon,
@@ -31,6 +33,7 @@ import {
   PreviewIcon,
   RegenerateIcon,
   SlashCommandIcon,
+  SpeakIcon,
   StopIcon,
 } from './Icons.jsx';
 import FormattedMessage from './FormattedMessage.jsx';
@@ -43,16 +46,17 @@ import { PENDING_IMAGE_PROMPT_KEY } from './ImageLibraryView.jsx';
 // fingerprint the file and rewrite the URL relative to the built index.html,
 // which is what keeps it loading over file:// in the packaged app.
 
-const OPENING_QUESTION = "What's on the agenda today?";
+const OPENING_HEADING = 'What can I help with?';
 
-/**
- * "Good morning", plus the first name when one was saved in Settings. The hour
- * is read when the chat view mounts, so an app left open overnight greets the
- * new day on the next new chat rather than staying on yesterday's afternoon.
- * @param {string} name Saved display name, or '' when none is set.
- * @param {Date} [now]
- * @returns {string}
- */
+// Each chip only fills the composer with a starter sentence, like the slash commands;
+// nothing is sent until the person presses Send.
+const OPENING_IDEAS = [
+  { label: 'Summarise a document', text: 'Summarise this: ' },
+  { label: 'Draft an email', text: 'Draft an email to ' },
+  { label: 'Search the web', text: 'Search the web for ' },
+  { label: 'Set a reminder', text: 'Remind me to ' },
+];
+
 /**
  * Drag the quick-ask card by its header.
  *
@@ -93,15 +97,6 @@ function beginOverlayDrag(event) {
   strip.addEventListener('pointerup', stop);
   strip.addEventListener('pointercancel', stop);
   strip.addEventListener('lostpointercapture', stop);
-}
-
-function greetingHeading(name, now = new Date()) {
-  const hour = now.getHours();
-  const part = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-  const trimmed = typeof name === 'string' ? name.trim() : '';
-  if (trimmed === '') return part;
-  // First name only: "Good evening, Alex" reads like a greeting, the full name reads like a form.
-  return `${part}, ${trimmed.split(/\s+/)[0]}`;
 }
 
 // Each command only fills the composer with a starter sentence; the person finishes
@@ -426,7 +421,7 @@ function usePopoverMaxHeight(open, anchorRef) {
   return open ? maxHeight : 0;
 }
 
-export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar, openingKind = 'question' }) {
+export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavigate, compact = false, onNewChat, sidebarCollapsed = false, onToggleSidebar }) {
   const api = typeof window !== 'undefined' ? window.zuri : undefined;
   const [draft, setDraft] = useState(() => {
     // "Make another" in the image library leaves the picture's words here for one read.
@@ -454,6 +449,8 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [attachment, setAttachment] = useState(null);
   const [listening, setListening] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState(-1);
+  // Which reply is being read aloud, so its button can offer Stop.
+  const [speakingIndex, setSpeakingIndex] = useState(-1);
   const [stopping, setStopping] = useState(false);
   // Ask, Act or Autopilot, remembered on this computer. Only the full window shows the
   // picker, so the quick-ask card always sends Ask and can never change anything.
@@ -497,25 +494,15 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const stickToBottomRef = useRef(true);
   const recognitionRef = useRef(null);
   const voiceDraftRef = useRef('');
-  // The shell alternates this per chat session, so the first screen is a
-  // greeting one time and the agenda question the next. It is a prop rather
-  // than a value this view picks itself: a mount counter would be read twice
-  // under React's development checks and land on the same line every time.
-  const [personName, setPersonName] = useState('');
-  const openingHeading = openingKind === 'greeting' ? greetingHeading(personName) : OPENING_QUESTION;
-
-  // The greeting greets the person by name only once Settings has answered, so
-  // the line is derived from state rather than baked in when the turn was taken.
   useEffect(() => {
     let active = true;
-    const loadName = async () => {
+    const loadSettings = async () => {
       const result = await api?.settings?.get?.();
       if (!active || !result?.ok) return;
-      if (typeof result.data?.name === 'string') setPersonName(result.data.name);
       if (typeof result.data?.answerLength === 'string') setAnswerLength(result.data.answerLength);
       if (typeof result.data?.model === 'string') setSettingsModelId(result.data.model);
     };
-    void loadName();
+    void loadSettings();
     return () => { active = false; };
   }, [api]);
 
@@ -656,6 +643,26 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     setCopiedIndex(index);
     window.setTimeout(() => setCopiedIndex((current) => (current === index ? -1 : current)), 1500);
   }
+
+  /** Read one reply aloud, or stop if that same reply is already being read. */
+  function toggleSpeech(message, index) {
+    if (speakingIndex === index) {
+      stopSpeaking();
+      setSpeakingIndex(-1);
+      return;
+    }
+    const started = speak(String(message?.content ?? ''), {
+      onEnd: () => setSpeakingIndex((current) => (current === index ? -1 : current)),
+    });
+    if (!started) {
+      setError('This computer has no voice available to read the reply aloud.');
+      return;
+    }
+    setSpeakingIndex(index);
+  }
+
+  // Leaving the chat, or switching to another one, must not leave a voice talking.
+  useEffect(() => () => stopSpeaking(), []);
 
   /**
    * Put an earlier prompt back in the composer so it can be corrected and sent
@@ -1302,7 +1309,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           // One line and the composer below it, the way ChatGPT opens: nothing competes with the box.
           <div className={`mb-8 flex w-full ${contentWidth} flex-col items-center`}>
             <span className="zuri-logo-badge mb-5" aria-hidden="true"><img src={zuriMarkUrl} alt="" width={52} height={52} className="zuri-chat-mark" decoding="async" /></span>
-          <h1 className="text-center text-3xl font-normal tracking-tight sm:text-4xl">{openingHeading}</h1>
+            <h1 className="text-center text-3xl font-normal tracking-tight sm:text-4xl">{OPENING_HEADING}</h1>
+            <div className="mt-6 flex max-w-2xl flex-wrap justify-center gap-2">
+              {OPENING_IDEAS.map((idea) => (
+                <Button key={idea.label} type="button" variant="secondary" className="min-h-11 rounded-full px-4 text-sm" onPress={() => insertCommand(idea.text)}>{idea.label}</Button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -1378,6 +1390,19 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                     >
                       {copiedIndex === index ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
                     </Button>
+                    {speechAvailable() && !(message.files ?? []).some((file) => file?.kind === 'image') && (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 rounded-lg text-muted"
+                        aria-label={speakingIndex === index ? 'Stop reading aloud' : 'Read reply aloud'}
+                        title={speakingIndex === index ? 'Stop reading aloud' : 'Read aloud'}
+                        onPress={() => toggleSpeech(message, index)}
+                      >
+                        {speakingIndex === index ? <StopIcon size={14} /> : <SpeakIcon size={14} />}
+                      </Button>
+                    )}
                     {/* A picture reply was drawn by an image model, not written by the chat
                         model, so writing it again would swap the picture for text. */}
                     {index === lastAnswerIndex && !replying && !(message.files ?? []).some((file) => file?.kind === 'image') && (

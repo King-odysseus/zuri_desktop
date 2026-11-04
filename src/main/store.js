@@ -910,6 +910,35 @@ export async function renameThread(threadId, title, options = {}) {
 }
 
 /**
+ * Pin or archive one saved conversation. Only the flags that are booleans change.
+ * updatedAt is left alone on purpose: tidying the list must not make an old chat
+ * look like it was just written in, and the list is ordered by that date.
+ * Pinning also lifts an archive, as the cloud list does, so a pinned chat can
+ * never be hidden.
+ */
+export async function setThreadFlags(threadId, flags = {}, options = {}) {
+  if (typeof threadId !== 'string' || threadId.trim() === '') {
+    return failure('CHAT_INVALID_THREAD', 'pinning or archiving a chat needs a thread id');
+  }
+  if (typeof flags?.pinned !== 'boolean' && typeof flags?.archived !== 'boolean') {
+    return failure('CHAT_INVALID_FLAGS', 'say whether to pin or archive the chat');
+  }
+
+  return withChatLock(async () => {
+    const read = await readStore('chats', options);
+    if (!read.ok) return read;
+    const thread = read.data.find((entry) => entry?.id === threadId);
+    if (!thread) return failure('CHAT_NOT_FOUND', `no chat thread with id ${threadId}`);
+    if (typeof flags.pinned === 'boolean') thread.pinned = flags.pinned;
+    if (typeof flags.archived === 'boolean') thread.archived = flags.archived;
+    if (flags.pinned === true && flags.archived !== true) thread.archived = false;
+    const written = await writeStore('chats', read.data, options);
+    if (!written.ok) return written;
+    return { ok: true, data: thread };
+  });
+}
+
+/**
  * Permanently remove one chat thread and its inline messages.
  * @param {string} threadId
  * @param {{ root?: string }} [options]

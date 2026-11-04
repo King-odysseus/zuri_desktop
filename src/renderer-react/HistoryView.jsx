@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from './ui.jsx';
-import { ChatIcon, DeleteIcon, EditIcon } from './Icons.jsx';
+import { ArchiveIcon, ChatIcon, DeleteIcon, EditIcon, PinIcon } from './Icons.jsx';
 
 function formatDate(value) {
   if (typeof value !== 'string' || value === '') return '';
@@ -45,6 +45,11 @@ export default function HistoryView({ onSelectThread }) {
   function beginRename(thread) {
     setRenamingId(thread.id);
     setRenameValue(thread.title || 'New chat');
+  }
+
+  async function setFlags(thread, flags) {
+    const result = await window.zuri?.chats?.flags?.({ threadId: thread.id, ...flags });
+    if (result?.ok) await reload();
   }
 
   async function saveRename(thread) {
@@ -95,8 +100,32 @@ export default function HistoryView({ onSelectThread }) {
                         <Button type="submit" size="sm" variant="secondary" isDisabled={renameValue.trim() === ''}>Save</Button>
                       </form>
                     ) : <p className="truncate text-sm font-medium">{thread.title || 'New chat'}</p>}
-                    <p className="mt-1 text-xs text-muted">{formatDate(thread.updatedAt) || 'No date available'}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {formatDate(thread.updatedAt) || 'No date available'}
+                      {thread.pinned === true ? ' - Pinned' : ''}
+                      {thread.archived === true ? ' - Archived' : ''}
+                    </p>
                   </div>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={thread.pinned === true ? `Unpin ${thread.title || 'chat'}` : `Pin ${thread.title || 'chat'}`}
+                    title={thread.pinned === true ? 'Unpin' : 'Pin to top'}
+                    onPress={() => void setFlags(thread, { pinned: thread.pinned !== true })}
+                  >
+                    <PinIcon size={16} />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    aria-label={thread.archived === true ? `Restore ${thread.title || 'chat'}` : `Archive ${thread.title || 'chat'}`}
+                    title={thread.archived === true ? 'Restore to Recents' : 'Archive'}
+                    onPress={() => void setFlags(thread, { archived: thread.archived !== true })}
+                  >
+                    <ArchiveIcon size={16} />
+                  </Button>
                   {renamingId !== thread.id && (
                     <Button
                       isIconOnly

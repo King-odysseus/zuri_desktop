@@ -59,21 +59,11 @@ body {
   font-family: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* The mark keeps the app icon's own colours: a navy plate behind a white bubble.
-   A grayscale filter used to sit here and turned that plate into a dark grey block,
-   which is heavier than anything else in the window. */
+/* The mark keeps the app icon's own colours and sits flat on the white page: no frame
+   and no shadow, so the opaque tile is the only weight in the header. */
 img.zuri-chat-mark,
 img[alt='Zuri'] {
   border-radius: 0.9rem;
-}
-
-/* The source mark is intentionally opaque, so a wrapper cannot recolour its navy
-   tile. A soft blue shadow and border make the same mark feel at home on the light
-   canvas without changing the bundled brand asset. */
-img.zuri-chat-mark,
-img[alt='Zuri'] {
-  border: 4px solid var(--brand-blue-soft);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-blue) 12%, transparent);
 }
 
 h1,
@@ -85,6 +75,13 @@ h6,
 button,
 [role='button'] {
   font-family: inherit;
+}
+
+/* One blue focus ring for anything keyboard-reachable; :where keeps it at zero
+   specificity so any component's own focus style still wins. */
+:where(a, button, [role='button'], summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
 }
 
 /* Every non-chat page uses the same readable gutter and centred content width.
@@ -167,20 +164,19 @@ button,
 .zuri-field-wrap .zuri-datepicker input {
   min-height: var(--control-height);
   height: var(--control-height);
-  border: 1px solid var(--control-border) !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.875rem !important;
   background: var(--field-background) !important;
   color: var(--foreground) !important;
   padding: 0 2.75rem !important;
   box-shadow: none !important;
 }
 
-/* Focus rings are the brand light blue, not --accent: --accent is the navy a filled
-   button is painted with, so a navy ring on a navy control disappeared. The halo is
-   the same colour at 32%, which is what makes the ring read as a glow rather than a
-   second hairline. */
+/* Focus rings are the brand blue, not --accent: --accent is the navy a filled button
+   is painted with, so a navy ring on a navy control disappeared. The halo is the
+   same colour at 32%, so the ring reads as a glow rather than a hairline. */
 .zuri-datepicker input:focus {
-  border-color: var(--accent) !important;
+  border-color: var(--brand-blue) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
@@ -191,8 +187,8 @@ button,
 
 .zuri-datepicker [class*='shadow-lg'] {
   min-width: 18rem;
-  border: 1px solid var(--control-border) !important;
-  border-radius: 1rem !important;
+  border: 0 !important;
+  border-radius: 1.25rem !important;
   background: var(--surface) !important;
   padding: 0.75rem !important;
   box-shadow: 0 18px 38px color-mix(in srgb, var(--foreground) 16%, transparent) !important;
@@ -299,8 +295,8 @@ button,
 }
 
 /* Flowbite wraps text inputs in a positioning element. Keep that wrapper
-   transparent so the control reads as one light pill instead of two stacked
-   white boxes. */
+   transparent so the control reads as one soft panel instead of two stacked
+   boxes. */
 .zuri-field-wrap > div {
   background: transparent !important;
   border: 0 !important;
@@ -315,8 +311,8 @@ button,
   padding: 0 !important;
 }
 
-/* TextInput owns two nested wrappers. The visible border belongs on the native
-   input, otherwise the wrapper reset above leaves a thin browser control behind. */
+/* TextInput owns two nested wrappers. The soft fill belongs on the native input,
+   otherwise the wrapper reset above leaves a thin browser control behind. */
 .zuri-field-wrap > div.zuri-field > div {
   background: transparent !important;
   border: 0 !important;
@@ -325,8 +321,8 @@ button,
 
 .zuri-field-wrap input {
   min-height: var(--control-height);
-  border: 1px solid var(--control-border) !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.875rem !important;
   background: var(--field-background) !important;
   color: var(--foreground) !important;
   padding: 0 1rem !important;
@@ -335,8 +331,8 @@ button,
 
 .zuri-field-wrap textarea {
   min-height: 7rem;
-  border: 1px solid var(--control-border) !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.875rem !important;
   background: var(--field-background) !important;
   color: var(--foreground) !important;
   padding: 0.875rem 1rem !important;
@@ -344,7 +340,7 @@ button,
 }
 
 .zuri-field-wrap input:focus {
-  border-color: var(--accent) !important;
+  border-color: var(--brand-blue) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
@@ -355,8 +351,8 @@ button,
 
 .zuri-field {
   min-height: var(--control-height);
-  border: 1px solid var(--control-border) !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.875rem !important;
   background: var(--field-background) !important;
   color: var(--foreground) !important;
   padding: 0 1rem !important;
@@ -364,127 +360,132 @@ button,
 }
 
 .zuri-field:focus {
-  border-color: var(--accent) !important;
+  border-color: var(--brand-blue) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
 /*
- * Maps the app's navy/dark palette onto semantic variables used by Flowbite
- * controls and the surrounding page surfaces. Hex values stay explicit so the
- * renderer theme remains easy to compare with the design tokens.
+ * Maps the app's white, navy, blue and bronze palette onto semantic variables used
+ * by Flowbite controls and the surrounding page surfaces. Hex values stay explicit
+ * so the renderer theme remains easy to compare with docs/design-direction.md.
  */
 @layer base {
-  /* Light is the same scale as the web dashboard: a white page, a cool off-white
-     panel, dark navy ink, one hairline, and a primary control that is simply that
-     navy. */
+  /* Light is pure white with soft blue-tinted fills (#f3f6fc, #e6edfa, #d3def5)
+     instead of lines: grouping comes from fill, text and primary buttons are navy. */
   [data-theme="light"] {
     --background: #ffffff;
     --foreground: #0d1b3a;
     --surface: #ffffff;
     --surface-foreground: #0d1b3a;
-    --surface-secondary: #f7f8fc;
+    --surface-secondary: #f3f6fc;
     --surface-secondary-foreground: #0d1b3a;
-    --surface-tertiary: #ebedf3;
+    --surface-tertiary: #e6edfa;
     --surface-tertiary-foreground: #0d1b3a;
-    --default: #ebedf3;
+    --default: #e6edfa;
     --default-foreground: #0d1b3a;
-    --muted: #5a6480;
+    --muted: #55627f;
+    --faint: #7f8aa3;
     --accent: #0d1b3a;
     --accent-foreground: #ffffff;
-    /* The two brand colours, the same pair the web dashboard uses: the navy the
-       logo is drawn in, and the light blue that marks anything live. Navy is a
-       filled primary control and the panel beside the thread; the light blue is a
-       link, a secondary control, the row you are on and the focus ring. */
+    /* Navy is the filled primary control; blue marks anything selected or live (link,
+       row you are on, user bubble, focus ring); bronze is badges and attention. */
     --brand-navy: #0d1b3a;
-    --brand-navy-hover: #16264f;
+    --brand-navy-hover: #1a2c57;
     --brand-blue: #2f6fed;
     --brand-blue-hover: #2560d8;
     --brand-blue-soft: #e8effc;
     --brand-blue-ink: #1b47b8;
-    /* The panel beside the thread stays a white surface carrying navy ink. The navy
-       is for the logo and the filled primary control, not for the background; the
-       row you are on takes the light blue so the panel still shows the brand. */
-    --nav-surface: var(--surface-secondary);
+    --brand-bronze: #9a6830;
+    --brand-bronze-soft: #f6ede2;
+    --brand-bronze-ink: #7a4f1f;
+    --fill-strong: #d3def5;
+    /* The side panel is a white surface with navy ink; the row you are on takes the
+       soft blue so the panel still shows the brand without a divider line. */
+    --nav-surface: var(--surface);
     --nav-foreground: #0d1b3a;
-    --nav-muted: #5a6480;
+    --nav-muted: #55627f;
     --nav-active: var(--brand-blue-soft);
     --nav-accent: var(--brand-blue-ink);
-    /* Status is recognised before it is read: green confirmation, amber allowance,
-       red refusal, light blue news. Each has a soft fill, an ink that still clears
-       4.5:1 on it, and a line for the stripe down the side of a notice. */
-    --success: #15803d;
-    --success-soft: #e7f6ec;
-    --success-line: #8ed8a8;
-    --warning: #9a5b06;
-    --warning-soft: #fdf3e4;
-    --warning-line: #f2bd5c;
-    --danger: #c2253a;
-    --danger-soft: #fdecef;
-    --danger-line: #f1aeb9;
+    /* Status uses only the palette: blue is good or news, bronze is attention, and
+       a refusal is navy text on a pale bronze fill. Each soft fill keeps 4.5:1 ink. */
+    --success: var(--brand-blue-ink);
+    --success-soft: var(--brand-blue-soft);
+    --success-line: #b7cdfa;
+    --warning: var(--brand-bronze-ink);
+    --warning-soft: var(--brand-bronze-soft);
+    --warning-line: #e3cdb0;
+    --danger: #0d1b3a;
+    --danger-soft: var(--brand-bronze-soft);
+    --danger-line: #e3cdb0;
     --info: var(--brand-blue-ink);
     --info-soft: var(--brand-blue-soft);
     --info-line: #b7cdfa;
-    --border: #e6e8f0;
-    --separator: #e6e8f0;
-    --field-background: #ffffff;
+    --border: #e6edfa;
+    --separator: #e6edfa;
+    --field-background: #f3f6fc;
     --selected: var(--brand-blue-soft);
-    --selected-foreground: #12306f;
-    --control-border: #e1e4ee;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%236b7f99' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --selected-foreground: var(--brand-blue-ink);
+    --control-border: #e6edfa;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%2355627f' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 
   [data-theme="dark"] {
-    /* The dark theme is the web dashboard's navy: the #040130 page, a lighter
-       panel beside it, and a white primary control with navy ink on it. */
-    --background: #040130;
-    --foreground: #e9ebf7;
-    --surface: #0a0738;
-    --surface-foreground: #e9ebf7;
-    --surface-secondary: #070432;
-    --surface-secondary-foreground: #e9ebf7;
-    --surface-tertiary: #14114a;
-    --surface-tertiary-foreground: #e9ebf7;
-    --default: #14114a;
-    --default-foreground: #e9ebf7;
-    --muted: #b0b4dd;
-    --accent: #ffffff;
-    --accent-foreground: #040130;
-    /* The dark theme keeps the same two brand colours; on a navy page the light
-       blue is the only one bright enough to read. */
-    --brand-navy: #040130;
-    --brand-navy-hover: #0f0b46;
+    /* The optional dark theme keeps to navy, blue and bronze hues: a #060421 page,
+       surfaces stepping up to #181448, and a light primary control with navy ink. */
+    --background: #060421;
+    --foreground: #ecebff;
+    --surface: #0f0c33;
+    --surface-foreground: #ecebff;
+    --surface-secondary: #0f0c33;
+    --surface-secondary-foreground: #ecebff;
+    --surface-tertiary: #181448;
+    --surface-tertiary-foreground: #ecebff;
+    --default: #181448;
+    --default-foreground: #ecebff;
+    --muted: #b3b1dc;
+    --faint: #8886b8;
+    --accent: #ecebff;
+    --accent-foreground: #060421;
+    /* Same brand trio; on a navy page the light blue and light bronze are the ones
+       bright enough to read. */
+    --brand-navy: #060421;
+    --brand-navy-hover: #181448;
     --brand-blue: #7aa2ff;
     --brand-blue-hover: #9ab8ff;
-    --brand-blue-soft: #16224d;
+    --brand-blue-soft: #1a2558;
     --brand-blue-ink: #a9c1ff;
-    --nav-surface: #030028;
-    --nav-foreground: #e9ebf7;
-    --nav-muted: #b0b4dd;
-    --nav-active: #16224d;
+    --brand-bronze: #d4a06a;
+    --brand-bronze-soft: #2b2230;
+    --brand-bronze-ink: #e6bd8f;
+    --fill-strong: #241f5e;
+    --nav-surface: #0a0829;
+    --nav-foreground: #ecebff;
+    --nav-muted: #b3b1dc;
+    --nav-active: #1a2558;
     --nav-accent: #a9c1ff;
-    --success: #6fce9a;
-    --success-soft: #16301f;
-    --success-line: #2f6b4a;
-    --warning: #e8b339;
-    --warning-soft: #33290f;
-    --warning-line: #6b5116;
-    --danger: #f08a8a;
-    --danger-soft: #3a1f1f;
-    --danger-line: #6b2f35;
+    --success: var(--brand-blue-ink);
+    --success-soft: var(--brand-blue-soft);
+    --success-line: #2b3f7a;
+    --warning: var(--brand-bronze-ink);
+    --warning-soft: var(--brand-bronze-soft);
+    --warning-line: #5c4630;
+    --danger: #ecebff;
+    --danger-soft: var(--brand-bronze-soft);
+    --danger-line: #5c4630;
     --info: var(--brand-blue-ink);
     --info-soft: var(--brand-blue-soft);
     --info-line: #2b3f7a;
-    --border: #221e63;
-    --separator: #221e63;
-    --field-background: #0b0838;
+    --border: #241f5e;
+    --separator: #241f5e;
+    --field-background: #181448;
     --selected: var(--brand-blue-soft);
     --selected-foreground: #dbe6ff;
-    --control-border: #2b2673;
-    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23b0b4dd' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    --control-border: #241f5e;
+    --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5 6 6.5 11 1.5' fill='none' stroke='%23b3b1dc' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   }
 }
 
-/* Keep panels clean and let elevation, not gray hairlines, define grouping. */
+/* Keep panels clean and let fill, not hairlines, define grouping. */
 .border-border {
   border-color: var(--control-border) !important;
 }
@@ -512,9 +513,8 @@ button,
   color: var(--selected-foreground) !important;
 }
 
-/* The panel beside the thread is the brand navy, so the logo's own colour is a
-   surface in the app and not only the outline of a primary button. Its rows are
-   the same navy a step lighter, and the row you are on takes the light blue. */
+/* The panel beside the thread is plain white with no divider; a hovered row takes a
+   soft fill and the row you are on takes the soft blue. */
 .zuri-sidebar-panel {
   background: var(--nav-surface) !important;
   color: var(--nav-foreground) !important;
@@ -531,8 +531,58 @@ button,
   background: var(--nav-active) !important;
 }
 
-/* New chat is the navy primary control on the light panel and a white one in the
-   dark theme, the pair the rest of the dashboard uses. */
+/* A long chat or project name ends in "..." instead of running into the panel's edge.
+   A button's label is a flex child, and a flex child will not shrink below its text
+   unless it is told it may, so a span inside a sidebar button gets min-width 0 and
+   the title is then clipped with an ellipsis. */
+.zuri-sidebar-panel .zuri-button > span {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.zuri-sidebar-panel .zuri-thread-title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The grab edge on the panel's right. It is wider than the line it draws so it is
+   easy to catch, and only the line shows, on hover, focus and while dragging. */
+.zuri-sidebar-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  width: 0.5rem;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.zuri-sidebar-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  transition: background-color 150ms ease;
+}
+
+.zuri-sidebar-resizer:hover::after,
+.zuri-sidebar-resizer:focus-visible::after,
+.zuri-sidebar-resizer.is-dragging::after {
+  background: var(--brand-blue);
+}
+
+.zuri-sidebar-resizer:focus-visible {
+  outline: none;
+}
+
+/* New chat is a soft blue pill on the panel, so the navy stays for the one primary action. */
 .zuri-sidebar-panel .zuri-new-chat {
   background: var(--brand-blue-soft) !important;
   color: var(--brand-blue-ink) !important;
@@ -557,16 +607,18 @@ button,
   padding-inline: 0 !important;
 }
 
+/* Send is the composer's one solid control: a navy disc with white ink. */
 .zuri-send-button {
-  background: var(--brand-blue-soft) !important;
-  color: var(--brand-blue-ink) !important;
+  border-radius: 9999px !important;
+  background: var(--accent) !important;
+  color: var(--accent-foreground) !important;
   box-shadow: none !important;
 }
 
 .zuri-send-button:hover,
 .zuri-send-button:focus-visible {
-  background: color-mix(in srgb, var(--brand-blue-soft) 72%, var(--brand-blue) 28%) !important;
-  color: var(--brand-blue-ink) !important;
+  background: color-mix(in srgb, var(--accent) 86%, var(--brand-blue)) !important;
+  color: var(--accent-foreground) !important;
 }
 
 .message-body a {
@@ -628,8 +680,7 @@ button,
   outline-offset: 2px;
 }
 
-/* Brand mark above the opening line on an empty chat. Its own corner radius
-   keeps the soft shadow on the mark rather than on the image's square edge. */
+/* Brand mark above the opening line on an empty chat; the radius rounds the tile's square edge. */
 .zuri-chat-mark {
   width: 3.25rem;
   height: 3.25rem;
@@ -682,14 +733,14 @@ button,
 
 .zuri-dropdown-trigger {
   min-height: var(--control-height);
-  border: 1px solid var(--control-border) !important;
-  border-radius: 0.75rem;
+  border: 1px solid transparent !important;
+  border-radius: 0.875rem;
   background: var(--field-background) !important;
   padding-inline: 1rem;
 }
 
 .zuri-dropdown-trigger:focus-visible {
-  border-color: var(--accent) !important;
+  border-color: var(--brand-blue) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
@@ -734,8 +785,8 @@ button,
   min-width: 8rem !important;
   max-width: min(18rem, calc(100vw - 2rem));
   overflow: hidden;
-  border: 1px solid var(--control-border) !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.875rem !important;
   background: var(--surface) !important;
   padding: 0.35rem !important;
   box-shadow: 0 12px 28px color-mix(in srgb, var(--foreground) 16%, transparent) !important;
@@ -749,8 +800,16 @@ button,
   /* Flowbite's colour themes hard-code gray-900 text and rely on dark: variants
      that this build never emits. Those utilities are emitted after this file, so
      without !important a plain button (the sidebar Recents rows, for instance)
-     keeps near-black text on the navy canvas. */
+     keeps near-black text in the dark theme. Buttons are flat pills: no ring, no shadow. */
   color: var(--foreground) !important;
+  border-radius: 9999px;
+  box-shadow: none;
+}
+
+.zuri-button:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+  box-shadow: none;
 }
 
 .zuri-button-ghost:hover,
@@ -775,36 +834,22 @@ label {
   background: color-mix(in srgb, var(--accent) 86%, var(--foreground)) !important;
 }
 
-/* A destructive action fills with --danger itself. The old fill was a lighter mix of
-   that colour with the surface, which in the light theme came out closer to pink than
-   to a refusal. The ink stays white for the light theme's red; the dark theme overrides
-   it just below, because its --danger is a pale pink where white all but vanished. */
+/* A destructive action is navy ink on the pale bronze fill, never a red block: it says
+   "careful" without shouting, and the same pair works in both themes. */
 .zuri-button-danger {
-  background: var(--danger) !important;
-  color: #ffffff !important;
+  background: var(--danger-soft) !important;
+  color: var(--danger) !important;
 }
 
 .zuri-button-danger:hover,
 .zuri-button-danger:focus-visible {
-  background: color-mix(in srgb, var(--danger) 86%, var(--foreground)) !important;
+  background: color-mix(in srgb, var(--brand-bronze) 22%, var(--danger-soft)) !important;
 }
 
-/* White ink is right on the light theme's red, but the dark theme's --danger is a pale
-   pink, so the label there takes the tone's own soft colour: the pair the tokens already
-   define, inverted for a filled control. */
-[data-theme='dark'] .zuri-button-danger,
-[data-theme='dark'] .zuri-button-danger:hover,
-[data-theme='dark'] .zuri-button-danger:focus-visible {
-  color: var(--danger-soft) !important;
-}
-
-/* The secondary action was a border and nothing else, so beside the navy primary button
-   it read as an outline rather than a second, quieter control. It now takes the brand
-   light blue: the soft fill says it can be pressed, the light blue border keeps its edge
-   visible on that fill, and --brand-blue-ink is the blue dark enough to read on it in
-   both themes. */
+/* The secondary action takes the soft blue fill: the fill alone says it can be pressed,
+   and --brand-blue-ink is the blue dark enough to read on it in both themes. */
 .zuri-button-secondary {
-  border: 1px solid var(--info-line) !important;
+  border: 0 !important;
   background: var(--brand-blue-soft) !important;
   color: var(--brand-blue-ink) !important;
 }
@@ -813,13 +858,12 @@ label {
    still puts the eye on the primary navy button first. */
 .zuri-button-secondary:hover,
 .zuri-button-secondary:focus-visible {
-  border-color: var(--brand-blue) !important;
   background: color-mix(in srgb, var(--brand-blue) 20%, var(--brand-blue-soft)) !important;
   color: var(--brand-blue-ink) !important;
 }
 
 .zuri-chip {
-  border: 1px solid color-mix(in srgb, var(--control-border) 72%, transparent) !important;
+  border: 0 !important;
   line-height: 1.2;
 }
 
@@ -850,7 +894,7 @@ label {
 }
 
 /* Warning shared the default rule and so came out the same grey as "nothing to see"; a
-   chip that needs attention is amber. It is split out of that rule above and restated
+   chip that needs attention is bronze. It is split out of that rule above and restated
    after it, so this tone wins. Success is new: a passing check had no chip of its own and
    fell back to the neutral one. */
 .zuri-chip-warning {
@@ -868,15 +912,13 @@ label {
 /* One shape for a message that reports something instead of asking for input. Before
    this every page drew its own strip, so a warning could look exactly like a success.
    The base tone is info, the brand light blue; a caller adds .is-success, .is-warning or
-   .is-danger. The stripe down the left is the tone at full strength: it names the tone
-   before the sentence is read, and it still reads for someone who cannot tell the soft
-   fills apart. The text is the tone's own ink, the pair the tokens set to clear 4.5:1 on
+   .is-danger. The soft fill names the tone before the sentence is read, and the text is
+   the tone's own ink, the pair the tokens set to clear 4.5:1 on
    that fill. */
 .zuri-notice {
   padding: 0.75rem 1rem;
-  border: 1px solid var(--info-line);
-  border-left: 4px solid var(--info);
-  border-radius: 0.75rem;
+  border: 0;
+  border-radius: 1rem;
   background: var(--info-soft);
   color: var(--info);
   font-size: 0.875rem;
@@ -884,21 +926,18 @@ label {
 
 .zuri-notice.is-success {
   border-color: var(--success-line);
-  border-left: 4px solid var(--success);
   background: var(--success-soft);
   color: var(--success);
 }
 
 .zuri-notice.is-warning {
   border-color: var(--warning-line);
-  border-left: 4px solid var(--warning);
   background: var(--warning-soft);
   color: var(--warning);
 }
 
 .zuri-notice.is-danger {
   border-color: var(--danger-line);
-  border-left: 4px solid var(--danger);
   background: var(--danger-soft);
   color: var(--danger);
 }
@@ -933,9 +972,9 @@ label {
 }
 
 .zuri-page-content > section {
-  border: 1px solid var(--border) !important;
-  border-radius: 1rem !important;
-  background: var(--surface) !important;
+  border: 0 !important;
+  border-radius: 1.25rem !important;
+  background: var(--surface-secondary) !important;
 }
 
 .zuri-page-content > section h2 {
@@ -946,9 +985,9 @@ label {
 
 .zuri-page-content > form {
   align-items: flex-end;
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  background: var(--surface);
+  border: 0;
+  border-radius: 1.25rem;
+  background: var(--surface-secondary);
   padding: 1rem;
 }
 
@@ -971,9 +1010,9 @@ label {
   justify-content: center;
   gap: 0.375rem;
   min-height: 10rem;
-  border: 1px dashed color-mix(in srgb, var(--control-border) 92%, transparent);
-  border-radius: 1rem;
-  background: color-mix(in srgb, var(--surface) 45%, transparent);
+  border: 0;
+  border-radius: 1.25rem;
+  background: var(--surface-secondary);
   padding: 2rem 1.5rem;
   text-align: center;
 }
@@ -992,7 +1031,7 @@ label {
   line-height: 1.5;
 }
 
-/* The cards sit inside a bordered section, so it needs its own inner padding, and
+/* The cards sit inside a filled section, so it needs its own inner padding, and
    minmax(0, 1fr) stops long descriptions from pushing a column past the section edge. */
 .zuri-features-grid {
   display: grid;
@@ -1016,9 +1055,9 @@ label {
   width: 100%;
   min-height: 0 !important;
   height: auto !important;
-  border: 1px solid color-mix(in srgb, var(--control-border) 82%, transparent) !important;
-  border-radius: 0.875rem !important;
-  background: var(--surface) !important;
+  border: 0 !important;
+  border-radius: 1.25rem !important;
+  background: var(--surface-secondary) !important;
   padding: 0.5rem 0.75rem !important;
   text-align: left;
   transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
@@ -1026,7 +1065,7 @@ label {
 
 .zuri-tool-card:hover,
 .zuri-tool-card:focus-visible {
-  border-color: var(--strong, var(--control-border)) !important;
+  background: var(--surface-tertiary) !important;
 }
 
 .zuri-tool-icon {
@@ -1044,9 +1083,9 @@ label {
 /* Suggestions are things to press, so they are chips in one wrapping row
    instead of three full-width lines of text. */
 .zuri-suggestion-chip {
-  border: 1px solid color-mix(in srgb, var(--control-border) 88%, transparent) !important;
+  border: 0 !important;
   border-radius: 9999px !important;
-  background: var(--surface) !important;
+  background: var(--surface-secondary) !important;
   padding: 0.5rem 0.875rem !important;
   color: var(--foreground) !important;
   font-weight: 400;
@@ -1054,7 +1093,6 @@ label {
 
 .zuri-suggestion-chip:hover,
 .zuri-suggestion-chip:focus-visible {
-  border-color: var(--accent) !important;
   background: var(--selected) !important;
   color: var(--selected-foreground) !important;
 }
@@ -1079,17 +1117,16 @@ label {
 .zuri-page-content > ul > li,
 .zuri-page-content > section li {
   min-height: 3.5rem;
-  border-color: color-mix(in srgb, var(--control-border) 72%, transparent) !important;
-  border-radius: 0.875rem !important;
-  background: color-mix(in srgb, var(--surface) 88%, var(--surface-secondary) 12%);
+  border: 0 !important;
+  border-radius: 1rem !important;
+  background: var(--surface);
   padding: 0.75rem 1rem;
-  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+  transition: background-color 150ms ease;
 }
 
 .zuri-page-content > ul > li:hover,
 .zuri-page-content > section li:hover {
-  border-color: var(--strong, var(--control-border)) !important;
-  background: var(--surface-secondary);
+  background: var(--surface-tertiary);
 }
 
 .zuri-page-content .zuri-field-label {
@@ -1129,8 +1166,7 @@ label {
 
 .zuri-danger-quiet:hover,
 .zuri-danger-quiet:focus-visible {
-  /* A 14% tint of the danger colour was barely a wash on a white page; the tone's own
-     soft fill is the same pink at a strength that reads as a hover. */
+  /* The tone's own soft fill (pale bronze) is the hover wash for a quiet delete. */
   background: var(--danger-soft) !important;
   color: var(--color-danger) !important;
 }
@@ -1169,7 +1205,7 @@ label {
 /* Drawn here rather than left to the browser. Tailwind's appearance-none
    utility is never emitted for this renderer, so an unchecked box painted as
    the platform control: a white square on the light canvas and a muddy tan one
-   on navy. This keeps the tick identical in both themes. */
+   on the dark theme. This keeps the tick identical in both themes. */
 .zuri-checkbox {
   appearance: none;
   display: inline-grid;
@@ -1178,7 +1214,7 @@ label {
   height: 1.05rem;
   flex: 0 0 auto;
   margin: 0;
-  border: 1px solid var(--control-border);
+  border: 1px solid var(--fill-strong);
   border-radius: 0.3rem;
   background: var(--field-background);
   cursor: pointer;
@@ -1249,8 +1285,8 @@ label {
   height: var(--control-height);
   min-height: var(--control-height);
   appearance: none;
-  border: 1px solid var(--control-border) !important;
-  border-radius: 0.75rem !important;
+  border: 1px solid transparent !important;
+  border-radius: 0.875rem !important;
   background-color: var(--field-background) !important;
   background-image: var(--select-chevron) !important;
   background-repeat: no-repeat !important;
@@ -1265,7 +1301,7 @@ label {
 .zuri-select select:focus,
 .zuri-select select:focus-visible {
   outline: none !important;
-  border-color: var(--accent) !important;
+  border-color: var(--brand-blue) !important;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-blue) 32%, transparent) !important;
 }
 
@@ -1329,7 +1365,7 @@ html:has(.zuri-overlay-root) #root {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 24px;
   background: var(--surface);
   /* The shadow must finish fading inside the 40px margin: 8px offset + 28px blur
@@ -1417,8 +1453,8 @@ html:has(.zuri-overlay-root) #root {
 
 .zuri-overlay-composer {
   min-width: 0;
-  border-color: var(--control-border) !important;
-  background: var(--surface) !important;
+  border-color: transparent !important;
+  background: var(--surface-secondary) !important;
   padding: 0.375rem 0.5rem;
 }
 
@@ -1471,8 +1507,8 @@ html:has(.zuri-overlay-root) #root {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  background: linear-gradient(135deg, #7c6bff, #4433c4);
-  color: #ffffff;
+  background: var(--accent);
+  color: var(--accent-foreground);
   font-size: 0.75rem;
   font-weight: 600;
   line-height: 1;
@@ -1528,11 +1564,11 @@ html:has(.zuri-overlay-root) #root {
   left: 0.75rem;
   right: 0.75rem;
   z-index: 40;
-  border: 1px solid var(--border);
-  border-radius: 0.875rem;
+  border: 0;
+  border-radius: 1.25rem;
   background: var(--surface);
   padding: 0.375rem;
-  box-shadow: 0 20px 48px rgb(0 0 0 / 0.22);
+  box-shadow: 0 20px 48px color-mix(in srgb, var(--foreground) 18%, transparent);
 }
 
 .zuri-account-head {
@@ -1624,8 +1660,7 @@ html:has(.zuri-overlay-root) #root {
   width: 17.5rem;
   flex: 0 0 auto;
   flex-direction: column;
-  border-right: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-secondary);
   padding: 0.75rem 0.75rem 1rem;
 }
 
@@ -1654,7 +1689,7 @@ html:has(.zuri-overlay-root) #root {
   gap: 0.5rem;
   margin: 0 0.25rem 0.875rem;
   border-radius: 999px;
-  background: var(--selected);
+  background: var(--surface-tertiary);
   padding: 0.4375rem 0.625rem;
   color: var(--muted);
 }
@@ -1765,9 +1800,9 @@ html:has(.zuri-overlay-root) #root {
 
 .zuri-set-card {
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 0.875rem;
-  background: var(--surface);
+  border: 0;
+  border-radius: 1.25rem;
+  background: var(--surface-secondary);
 }
 
 .zuri-set-row {
@@ -1842,7 +1877,9 @@ html:has(.zuri-overlay-root) #root {
 }
 
 .zuri-choice-row .zuri-choice {
-  border: 1px solid var(--border);
+  border: 0;
+  border-radius: 9999px;
+  background: var(--surface-secondary);
   padding: 0.3125rem 0.625rem;
 }
 
@@ -1867,13 +1904,14 @@ html:has(.zuri-overlay-root) #root {
 
 .zuri-choice-stack .zuri-choice,
 .zuri-age-choice {
-  border: 1px solid var(--border);
+  border: 0;
+  border-radius: 1rem;
+  background: var(--surface-secondary);
   padding: 0.625rem 0.75rem;
 }
 
 .zuri-choice.is-selected,
 .zuri-age-choice.is-selected {
-  border-color: var(--control-border, var(--border));
   background: var(--selected);
 }
 
@@ -1914,10 +1952,10 @@ html:has(.zuri-overlay-root) #root {
   appearance: none;
   -webkit-appearance: none;
   cursor: pointer;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--surface);
-  padding: 0.3125rem 1.75rem 0.3125rem 0.625rem;
+  border: 0;
+  border-radius: 9999px;
+  background: var(--surface-tertiary);
+  padding: 0.3125rem 1.75rem 0.3125rem 0.75rem;
   color: var(--foreground);
   font-size: 0.75rem;
 }
@@ -1956,9 +1994,9 @@ html:has(.zuri-overlay-root) #root {
 .zuri-settings-list {
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  background: var(--surface);
+  border: 0;
+  border-radius: 1.25rem;
+  background: var(--surface-secondary);
 }
 
 .zuri-settings-list li {
@@ -1989,9 +2027,9 @@ html:has(.zuri-overlay-root) #root {
   width: 100%;
   max-width: 32rem;
   margin: auto;
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  background: var(--surface);
+  border: 0;
+  border-radius: 1.25rem;
+  background: var(--surface-secondary);
   padding: 2rem;
 }
 
@@ -2012,8 +2050,6 @@ html:has(.zuri-overlay-root) #root {
 
   .zuri-settings-rail {
     width: 100%;
-    border-right: 0;
-    border-bottom: 1px solid var(--border);
     padding-bottom: 0.5rem;
   }
 
@@ -2074,7 +2110,7 @@ html:has(.zuri-overlay-root) #root {
   height: 1.375rem;
   align-items: center;
   border-radius: 999px;
-  background: var(--border);
+  background: var(--fill-strong);
   transition: background 150ms ease;
 }
 
@@ -2085,12 +2121,11 @@ html:has(.zuri-overlay-root) #root {
   height: 1rem;
   border-radius: 999px;
   background: #ffffff;
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.3);
   transition: transform 150ms ease;
 }
 
 .zuri-switch-input:checked + .zuri-switch-track {
-  background: #1a9e5c;
+  background: var(--brand-blue);
 }
 
 .zuri-switch-input:checked + .zuri-switch-track .zuri-switch-thumb {
@@ -2098,7 +2133,7 @@ html:has(.zuri-overlay-root) #root {
 }
 
 .zuri-switch-input:focus-visible + .zuri-switch-track {
-  outline: 2px solid var(--foreground);
+  outline: 2px solid var(--brand-blue);
   outline-offset: 2px;
 }
 
@@ -2123,9 +2158,8 @@ html:has(.zuri-overlay-root) #root {
 }
 
 /*
- * The sign-in panel wears the product's two identities at once: a green-white-green
- * band for Nigeria, a wash of model-blue and violet for the machine doing the
- * answering, and a warm dusk glow for Lagos in the evening. Drawn in CSS so it
+ * The sign-in panel wears the brand palette: a wash of blue for the machine doing the
+ * answering and a warm bronze glow for Lagos in the evening. Drawn in CSS so it
  * costs no image, and the grid lines take the text colour so they stay visible in
  * both themes.
  */
@@ -2141,10 +2175,10 @@ html:has(.zuri-overlay-root) #root {
   inset: -10% -5%;
   z-index: -2;
   background:
-    radial-gradient(52rem 34rem at 6% -14%, rgb(0 168 107 / 0.42), transparent 62%),
-    radial-gradient(46rem 30rem at 98% 0%, rgb(108 92 255 / 0.38), transparent 64%),
-    radial-gradient(34rem 26rem at 82% 108%, rgb(255 176 102 / 0.18), transparent 62%),
-    radial-gradient(40rem 28rem at 34% 112%, rgb(0 135 81 / 0.28), transparent 66%);
+    radial-gradient(52rem 34rem at 6% -14%, rgb(47 111 237 / 0.22), transparent 62%),
+    radial-gradient(46rem 30rem at 98% 0%, rgb(47 111 237 / 0.16), transparent 64%),
+    radial-gradient(34rem 26rem at 82% 108%, rgb(154 104 48 / 0.14), transparent 62%),
+    radial-gradient(40rem 28rem at 34% 112%, rgb(13 27 58 / 0.12), transparent 66%);
 }
 
 .zuri-signin::after {
@@ -2181,10 +2215,10 @@ html:has(.zuri-overlay-root) #root {
   flex-direction: column;
   justify-content: center;
   padding: 3.5rem 3rem;
-  background-color: #0b1220;
+  background-color: #0d1b3a;
   background-image:
-    linear-gradient(180deg, rgb(5 10 20 / 0.72), rgb(5 10 20 / 0.06) 26%, rgb(5 10 20 / 0.1) 70%, rgb(5 10 20 / 0.7)),
-    linear-gradient(90deg, rgb(5 10 20 / 0.95), rgb(5 10 20 / 0.92) 24%, rgb(5 10 20 / 0.76) 34%, rgb(5 10 20 / 0.36) 45%, rgb(5 10 20 / 0.04) 57%, transparent),
+    linear-gradient(180deg, rgb(13 27 58 / 0.72), rgb(13 27 58 / 0.06) 26%, rgb(13 27 58 / 0.1) 70%, rgb(13 27 58 / 0.7)),
+    linear-gradient(90deg, rgb(13 27 58 / 0.95), rgb(13 27 58 / 0.92) 24%, rgb(13 27 58 / 0.76) 34%, rgb(13 27 58 / 0.36) 45%, rgb(13 27 58 / 0.04) 57%, transparent),
     var(--zuri-auth-image);
   background-position: center, center, center 34%;
   background-size: cover;
@@ -2203,7 +2237,7 @@ html:has(.zuri-overlay-root) #root {
   font-size: 0.9375rem;
   font-weight: 600;
   text-decoration: none;
-  text-shadow: 0 1px 8px rgb(3 8 18 / 0.55);
+  text-shadow: 0 1px 8px rgb(13 27 58 / 0.55);
 }
 
 .zuri-auth-brand-mark {
@@ -2213,7 +2247,7 @@ html:has(.zuri-overlay-root) #root {
   place-items: center;
   overflow: hidden;
   border-radius: 0.5rem;
-  background: #2f6fed;
+  background: var(--brand-blue);
 }
 
 .zuri-auth-brand-mark img {
@@ -2235,7 +2269,7 @@ html:has(.zuri-overlay-root) #root {
   padding: 0.4rem 0.75rem;
   border: 1px solid rgb(255 255 255 / 0.26);
   border-radius: 999px;
-  background: rgb(8 18 36 / 0.55);
+  background: rgb(13 27 58 / 0.55);
   color: rgb(255 255 255 / 0.9);
   font-size: 0.6875rem;
   font-weight: 700;
@@ -2250,7 +2284,7 @@ html:has(.zuri-overlay-root) #root {
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.08;
-  text-shadow: 0 1px 14px rgb(3 8 18 / 0.65);
+  text-shadow: 0 1px 14px rgb(13 27 58 / 0.65);
 }
 
 .zuri-auth-aside p {
@@ -2258,7 +2292,7 @@ html:has(.zuri-overlay-root) #root {
   color: rgb(255 255 255 / 0.84);
   font-size: 0.9375rem;
   line-height: 1.6;
-  text-shadow: 0 1px 12px rgb(3 8 18 / 0.6);
+  text-shadow: 0 1px 12px rgb(13 27 58 / 0.6);
 }
 
 .zuri-auth-trust {
@@ -2273,7 +2307,7 @@ html:has(.zuri-overlay-root) #root {
   padding: 0.45rem 0.7rem;
   border: 1px solid rgb(255 255 255 / 0.24);
   border-radius: 999px;
-  background: rgb(8 18 36 / 0.55);
+  background: rgb(13 27 58 / 0.55);
   color: rgb(255 255 255 / 0.92);
   font-size: 0.75rem;
   font-weight: 600;
@@ -2306,9 +2340,9 @@ html:has(.zuri-overlay-root) #root {
   flex-direction: column;
   gap: 0.875rem;
   padding: 1.375rem 1.25rem;
-  border: 1px solid var(--control-border);
-  border-radius: 1rem;
-  background: var(--surface);
+  border: 0;
+  border-radius: 1.25rem;
+  background: var(--surface-secondary);
 }
 
 .zuri-auth-switch {
@@ -2316,15 +2350,15 @@ html:has(.zuri-overlay-root) #root {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.25rem;
   padding: 0.25rem;
-  border: 1px solid var(--control-border);
-  border-radius: 0.625rem;
-  background: var(--surface-secondary);
+  border: 0;
+  border-radius: 9999px;
+  background: var(--surface-tertiary);
 }
 
 .zuri-auth-switch button {
   min-height: 2.75rem;
   border: 0;
-  border-radius: 0.5rem;
+  border-radius: 9999px;
   background: transparent;
   color: var(--muted);
   font: 600 0.8125rem/1 'Segoe UI', system-ui, sans-serif;
@@ -2477,9 +2511,8 @@ html:has(.zuri-overlay-root) #root {
   background: transparent;
 }
 
-/* The flag itself, as a thin band across the top of the card: green, white,
-   green. It marks the panel as Zuri's own without turning into a loading bar
-   stretched across the window. */
+/* A thin blue and bronze band across the top of the card. It marks the panel as
+   Zuri's own without turning into a loading bar stretched across the window. */
 .zuri-signin .zuri-age-card,
 .zuri-signin section[aria-labelledby] {
   position: relative;
@@ -2492,7 +2525,7 @@ html:has(.zuri-overlay-root) #root {
   position: absolute;
   inset: 0 0 auto;
   height: 4px;
-  background: linear-gradient(90deg, #00a651 0 33.3%, #ffffff 33.3% 66.6%, #00a651 66.6% 100%);
+  background: linear-gradient(90deg, var(--brand-blue) 0 50%, var(--brand-bronze) 50% 100%);
 }
 
 .zuri-age-card button {
@@ -2504,9 +2537,9 @@ html:has(.zuri-overlay-root) #root {
 }
 
 /*
- * The account card at the panel's foot sits ON the navy panel, so it has to take
- * the panel's ink. Left to inherit, the trigger kept the page's navy-on-white
- * colour and its name vanished into the surface behind it.
+ * The account card at the panel's foot sits on the panel, so it takes the panel's
+ * ink. Left to inherit, the trigger could keep the page's colour and its name
+ * would vanish into the surface behind it in the dark theme.
  */
 .zuri-sidebar-panel .zuri-account-trigger,
 .zuri-sidebar-panel .zuri-account-name {
@@ -2514,9 +2547,9 @@ html:has(.zuri-overlay-root) #root {
 }
 
 /* A task, reminder or automation Zuri has just made is painted as a confirmation card
-   under the reply, the way ChatGPT shows "Task created": the stripe and the pill carry
-   the green before a word is read, so it cannot be mistaken for a warning. The body
-   text stays --foreground, because a paragraph of green ink would not clear 4.5:1. */
+   under the reply, the way ChatGPT shows "Task created": the soft blue fill and the pill carry
+   the tone before a word is read, so it cannot be mistaken for a warning. The body
+   text stays --foreground, because a paragraph of coloured ink would not clear 4.5:1. */
 .zuri-notable {
   display: flex;
   flex-direction: column;
@@ -2524,9 +2557,8 @@ html:has(.zuri-overlay-root) #root {
   width: 100%;
   min-width: 0;
   padding: 0.75rem 0.875rem;
-  border: 1px solid var(--success-line);
-  border-left: 3px solid var(--success);
-  border-radius: 0.9rem;
+  border: 0;
+  border-radius: 1.25rem;
   background: var(--success-soft);
   color: var(--foreground);
 }
@@ -2539,13 +2571,13 @@ html:has(.zuri-overlay-root) #root {
 }
 
 /* The pill sits on the card's own tint, so it takes the page background: white in the
-   light theme, navy in the dark one, and the green pair reads on both. */
+   light theme, navy in the dark one, and the blue pair reads on both. */
 .zuri-notable-badge {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
   padding: 0.0625rem 0.5rem 0.0625rem 0.1875rem;
-  border: 1px solid var(--success-line);
+  border: 0;
   border-radius: 999px;
   background: var(--background);
   color: var(--success);
@@ -2608,9 +2640,9 @@ html:has(.zuri-overlay-root) #root {
 .zuri-notable-open {
   margin-left: auto;
   padding: 0.125rem 0.625rem;
-  border: 1px solid var(--success-line);
+  border: 0;
   border-radius: 999px;
-  background: transparent;
+  background: var(--background);
   color: var(--success);
   font: inherit;
   font-size: 0.75rem;
@@ -2620,7 +2652,7 @@ html:has(.zuri-overlay-root) #root {
 }
 
 .zuri-notable-open:hover {
-  background: var(--background);
+  background: var(--selected);
 }
 
 .zuri-notable-open:focus-visible {
@@ -2630,4 +2662,23 @@ html:has(.zuri-overlay-root) #root {
 
 .zuri-sidebar-panel .zuri-account-plan {
   color: var(--nav-muted);
+}
+
+/* A quoted passage is set apart by a tint alone, with no bar or border down its
+   side, and a rule is a quiet gap-sized line, so neither competes with text. */
+.message-body .message-quote {
+  border-radius: 0.5rem;
+  background: var(--surface-tertiary);
+  padding: 0.625rem 0.875rem;
+}
+
+.message-body .message-rule {
+  height: 1px;
+  border: 0;
+  background: currentColor;
+  opacity: 0.15;
+}
+
+.message-body del {
+  opacity: 0.7;
 }

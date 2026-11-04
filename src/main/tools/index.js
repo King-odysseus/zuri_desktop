@@ -26,7 +26,7 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
 import { readStore, findAgent, createTask, createReminder, createAutomation } from '../store.js';
-import { OFFICE_KINDS, OfficeError, buildOfficeFile } from '../office.js';
+import { OFFICE_KINDS, OfficeError, buildOfficeFile, reviewOfficeContent } from '../office.js';
 import { describeWorkbook, editOfficeFile } from '../office-edit.js';
 
 const WORKSPACE_DIR_NAME = 'workspace';
@@ -624,6 +624,56 @@ async function freeDocumentPath(directory, base, kind) {
   throw new ToolError('TOOL_WRITE_FAILED', 'Too many files with that name already exist in the workspace.');
 }
 
+const IMAGE_TYPES = Object.freeze({ '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif' });
+const IMAGE_BYTES_LIMIT = 5 * 1024 * 1024;
+
+/**
+ * A picture in the workspace as a data link, which is the one form the builders take.
+ * The path goes through the same workspace guard as every other file the tools touch,
+ * so a model cannot name a picture elsewhere on the disk.
+ * @param {string} userPath
+ * @returns {Promise<string>}
+ */
+async function workspaceImageUri(userPath) {
+  const file = resolveWorkspacePath(userPath);
+  const type = IMAGE_TYPES[path.extname(file).toLowerCase()];
+  if (!type) throw new ToolError('TOOL_INVALID_ARGUMENT', `"${userPath}" is not a PNG, JPEG or GIF picture.`);
+  let bytes;
+  try {
+    const stats = await fs.stat(file);
+    if (stats.size > IMAGE_BYTES_LIMIT) throw new ToolError('TOOL_FILE_TOO_LARGE', `"${userPath}" is larger than 5 MB.`);
+    bytes = await fs.readFile(file);
+  } catch (error) {
+    if (error instanceof ToolError) throw error;
+    throw new ToolError('TOOL_READ_FAILED', `Could not open the picture "${userPath}" in the workspace.`);
+  }
+  return `data:${type};base64,${bytes.toString('base64')}`;
+}
+
+/**
+ * Replace picture paths in a document's content with data links, in place. A picture is
+ * any object of type "image", or the value under an "image" key, that names a file.
+ * @param {unknown} node
+ * @param {number} [depth]
+ * @returns {Promise<void>}
+ */
+async function inlineWorkspaceImages(node, depth = 0) {
+  if (depth > 6 || node === null || typeof node !== 'object') return;
+  const entries = Array.isArray(node) ? node.map((value, index) => [index, value]) : Object.entries(node);
+  for (const [key, value] of entries) {
+    if (key === 'image' && typeof value === 'string' && !value.startsWith('data:')) {
+      node[key] = { data: await workspaceImageUri(value) };
+      continue;
+    }
+    if (value === null || typeof value !== 'object') continue;
+    if (typeof value.path === 'string' && typeof value.data !== 'string' && (value.type === 'image' || key === 'image')) {
+      value.data = await workspaceImageUri(value.path);
+      delete value.path;
+    }
+    await inlineWorkspaceImages(value, depth + 1);
+  }
+}
+
 /** @param {any} args @param {any} context */
 async function createDocumentTool(args, context) {
   const kind = String(args?.kind ?? '').toLowerCase();
@@ -640,6 +690,8 @@ async function createDocumentTool(args, context) {
       throw new ToolError('TOOL_INVALID_ARGUMENT', 'createDocument `content` must be a JSON object.');
     }
   }
+
+  await inlineWorkspaceImages(content);
 
   let bytes;
   try {
@@ -666,6 +718,9 @@ async function createDocumentTool(args, context) {
     kind,
     relative: path.relative(getWorkspaceRoot(), filePath).split(path.sep).join('/'),
     bytes: bytes.length,
+    // Plain sentences about what will read badly; the model sees them in the tool
+    // result and can build a corrected copy, which is the repair round.
+    warnings: reviewOfficeContent(kind, content),
   });
 }
 

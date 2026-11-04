@@ -20,6 +20,7 @@ export const NOTABLE_TOOLS = {
   createTask: 'task',
   createReminder: 'reminder',
   createAutomation: 'automation',
+  createDocument: 'document',
 };
 
 /** The kind a tool name creates, or '' for a tool that creates nothing to show. */
@@ -164,6 +165,20 @@ export function describeNotable(kind, data) {
       lines,
       action: 'automations',
     };
+  }
+
+  if (kind === 'document') {
+    const name = clip(record.name, 120);
+    if (name === '') return null;
+    const types = { docx: 'Word document', xlsx: 'Excel workbook', pptx: 'PowerPoint deck' };
+    const lines = [];
+    const type = types[words(record.kind).toLowerCase()];
+    if (type) lines.push({ label: 'Type', value: type });
+    const bytes = Number(record.bytes);
+    if (Number.isFinite(bytes) && bytes > 0) {
+      lines.push({ label: 'Size', value: bytes >= 1024 * 1024 ? `${(bytes / (1024 * 1024)).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB` });
+    }
+    return { kind, tone: 'success', badge: 'File ready', title: name, lines, action: 'download' };
   }
 
   return null;

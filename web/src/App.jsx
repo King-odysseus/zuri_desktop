@@ -25,7 +25,9 @@ import {
 import { applyTheme, preferredTheme } from './lib/theme.js';
 import { registerNativePush } from './lib/push.js';
 
-const VIEWS = ['chat', 'projects', 'tasks', 'reminders', 'notifications', 'automations', 'images', 'overview', 'usage', 'plans', 'billing', 'account', 'admin'];
+const VIEWS = ['chat', 'projects', 'tasks', 'reminders', 'notifications', 'automations', 'images', 'settings', 'admin'];
+// The old top-level account screens now live under Settings; their addresses still resolve.
+const SETTINGS_TABS = ['overview', 'usage', 'plans', 'billing', 'account'];
 const CHAT_PATH = '/chat';
 const LEGAL_PATHS = ['/privacy', '/terms'];
 // The Android app has no marketing page to land on: signed out, it opens on sign-in.
@@ -55,10 +57,16 @@ function readRoute() {
 function viewFromPath(pathname) {
   // The address is the only way back into a section after a reload or a shared
   // link, so every section in VIEWS is recognised here rather than defaulting
-  // quietly to the overview.
+  // quietly; anything unknown opens Chat.
   const section = pathname.replace(/\/+$/, '').replace(/^\//, '');
-  if (section === CHAT_PATH.replace(/^\//, '')) return 'chat';
-  return VIEWS.includes(section) ? section : 'overview';
+  if (SETTINGS_TABS.includes(section)) return 'settings';
+  return VIEWS.includes(section) ? section : 'chat';
+}
+
+/** The Settings tab a pathname asks for; /usage and friends deep-link to their tab. */
+function settingsTabFromPath(pathname) {
+  const section = pathname.replace(/\/+$/, '').replace(/^\//, '');
+  return SETTINGS_TABS.includes(section) ? section : 'overview';
 }
 
 export default function App() {
@@ -76,10 +84,7 @@ export default function App() {
   const [topups, setTopups] = useState([]);
   const [busyTopup, setBusyTopup] = useState('');
   const [route, setRoute] = useState(readRoute);
-  // The navigation is a drawer below the sidebar breakpoint. It is held here because
-  // the button that opens it lives in the top bar and the panel it opens belongs to
-  // the signed-in shell.
-  const [navOpen, setNavOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState(() => settingsTabFromPath(window.location.pathname));
 
   useEffect(() => {
     applyTheme(theme);
@@ -92,22 +97,6 @@ export default function App() {
     if (status !== 'signed-in') return;
     registerNativePush().catch((error) => console.error('[zuri:push] native registration', error?.message ?? error));
   }, [status]);
-
-  // Escape closes the navigation drawer, the way every side panel on the web does,
-  // and the page behind it cannot scroll while it is open.
-  useEffect(() => {
-    if (!navOpen) return undefined;
-    const onKeyDown = (event) => {
-      if (event.key === 'Escape') setNavOpen(false);
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [navOpen]);
 
   // Back and forward move between the landing page and the account screens.
   useEffect(() => {
@@ -262,7 +251,7 @@ export default function App() {
       clearToken();
       setAccount(null);
       setStatus('signed-out');
-      setView('overview');
+      setView('chat');
       showNotice(null);
       navigate(typeof nextPath === 'string' ? nextPath : '/');
     },
@@ -300,10 +289,11 @@ export default function App() {
   );
 
   const handleViewChange = useCallback((next) => {
-    const section = VIEWS.includes(next) ? next : 'overview';
+    // An old screen id (usage, plans...) opens Settings on that tab.
+    const isTab = SETTINGS_TABS.includes(next);
+    const section = isTab ? 'settings' : VIEWS.includes(next) ? next : 'chat';
+    if (isTab) setSettingsTab(next);
     setView(section);
-    // Choosing a destination closes the drawer, which is the only reason it was open.
-    setNavOpen(false);
     // Chat is the one section with an address, so a reload or a shared /chat link
     // lands back on it; the rest stay in view state. replaceState rather than
     // pushState, because the single popstate handler only knows the public routes
@@ -357,6 +347,7 @@ export default function App() {
           account={account}
           plans={plans}
           view={view}
+          settingsTab={settingsTab}
           busy={busyPlan}
           onViewChange={handleViewChange}
           onChoose={handleChoose}
@@ -367,9 +358,6 @@ export default function App() {
           onSignOut={() => handleSignOut('/signin')}
           theme={theme}
           onToggleTheme={toggleTheme}
-          navOpen={navOpen}
-          onOpenNav={() => setNavOpen(true)}
-          onCloseNav={() => setNavOpen(false)}
         />
       );
     }
@@ -405,11 +393,10 @@ export default function App() {
     handleSignOut,
     handleViewChange,
     navigate,
-    // The drawer lives in the shell, so the memo has to rebuild when it opens.
-    navOpen,
     plans,
     topups,
     route.path,
+    settingsTab,
     showNotice,
     status,
     theme,

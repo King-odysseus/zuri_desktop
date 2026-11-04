@@ -36,10 +36,10 @@ export default function AdminView() {
     <section className="view calm calm-wide admin-view">
       <div className="view-head"><div><h1>Admin</h1><p>A quiet control room for people, models, pricing and platform health.</p></div><label className="field admin-window"><span>Period</span><select value={days} onChange={(event) => setDays(Number(event.target.value))}>{WINDOWS.map((value) => <option key={value} value={value}>Last {value} days</option>)}</select></label></div>
       {error && <Alert tone="danger">{error}</Alert>}{saved && <Alert>{saved}</Alert>}{overview.marginKobo < 0 && <Alert tone="danger">Supplier spend is higher than revenue for this period. Review the quota weights and plan prices.</Alert>}
-      <AdminStats overview={overview} rate={overview.nairaPerUsd} />
-      <AdminPeople days={days} plans={overview.plans} />
-      <AdminModels overview={overview} rate={overview.nairaPerUsd} draft={draft} busy={busy} onAdd={() => { setSaved(''); setDraft({ ...BLANK_MODEL }); }} onEdit={edit} onSave={save} onCancel={() => setDraft(null)} onEditModel={(model) => { setSaved(''); setDraft({ ...model }); }} />
-      <AdminPlans plans={overview.plans} />
+      <div id="admin-stats" className="scroll-mt-4"><AdminStats overview={overview} rate={overview.nairaPerUsd} /></div>
+      <div id="admin-people" className="scroll-mt-4"><AdminPeople days={days} plans={overview.plans} /></div>
+      <div id="admin-models" className="scroll-mt-4"><AdminModels overview={overview} rate={overview.nairaPerUsd} draft={draft} busy={busy} onAdd={() => { setSaved(''); setDraft({ ...BLANK_MODEL }); }} onEdit={edit} onSave={save} onCancel={() => setDraft(null)} onEditModel={(model) => { setSaved(''); setDraft({ ...model }); }} /></div>
+      <div id="admin-plans" className="scroll-mt-4"><AdminPlans plans={overview.plans} /></div>
     </section>
   );
 }

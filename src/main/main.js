@@ -61,6 +61,7 @@ import {
   readSettings,
   readStore,
   renameThread,
+  setThreadFlags,
   saveSettings,
   setThreadProject,
   updateAutomation,
@@ -328,6 +329,7 @@ const HANDLERS = new Map([
   ['zuri:chats:create', handleChatCreate],
   ['zuri:chats:delete', handleChatDelete],
   ['zuri:chats:rename', handleChatRename],
+  ['zuri:chats:flags', handleChatFlags],
   ['zuri:chats:move', handleChatMove],
   ['zuri:projects:list', handleProjectList],
   ['zuri:projects:create', handleProjectCreate],
@@ -538,6 +540,13 @@ async function handleChatDelete(payload) {
 /** Rename a saved conversation and announce it to the sidebar. */
 async function handleChatRename(payload) {
   const result = await renameThread(payload?.threadId, payload?.title);
+  if (result?.ok === true) announceState({ area: 'chats' });
+  return result;
+}
+
+/** Pin or archive a saved conversation and announce it to the sidebar. */
+async function handleChatFlags(payload) {
+  const result = await setThreadFlags(payload?.threadId, { pinned: payload?.pinned, archived: payload?.archived });
   if (result?.ok === true) announceState({ area: 'chats' });
   return result;
 }

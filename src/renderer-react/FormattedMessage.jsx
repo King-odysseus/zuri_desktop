@@ -4,7 +4,7 @@ import { plainDashes } from './formatting.js';
 
 // Inline markers are matched in this order so a URL that happens to contain an
 // asterisk is still read as a link rather than half-italic text.
-const INLINE_PATTERN = /(`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<>"']+|\*\*[^*]+\*\*|\*[^*]+\*)/g;
+const INLINE_PATTERN = /(`[^`]+`|\[[^\]]+\]\(https?:\/\/[^\s)]+\)|https?:\/\/[^\s<>"']+|\*\*[^*]+\*\*|~~[^~]+~~|\*[^*]+\*)/g;
 const MARKDOWN_LINK = /^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/;
 
 function trimLink(token) {
@@ -34,6 +34,8 @@ function inlineContent(text, keyPrefix) {
       pieces.push(<code key={`${keyPrefix}-code-${match.index}`} className="rounded bg-surface-tertiary px-1.5 py-0.5 text-[0.9em]">{token.slice(1, -1)}</code>);
     } else if (token.startsWith('**')) {
       pieces.push(<strong key={`${keyPrefix}-strong-${match.index}`}>{token.slice(2, -2)}</strong>);
+    } else if (token.startsWith('~~')) {
+      pieces.push(<del key={`${keyPrefix}-del-${match.index}`}>{token.slice(2, -2)}</del>);
     } else if (token.startsWith('[')) {
       const link = MARKDOWN_LINK.exec(token);
       if (link) {
@@ -76,7 +78,7 @@ function CodeBlock({ language, lines, onOpen }) {
 
   return (
     <div className="overflow-hidden rounded-xl bg-surface-tertiary">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-1.5 text-xs text-muted">
+      <div className="flex items-center justify-between gap-3 px-3 py-1.5 text-xs text-muted">
         <span className="font-mono">{language || 'code'}</span>
         <span className="flex items-center gap-1">
           {/* Only the desktop chat has a side panel to open it in; the web chat passes
@@ -115,6 +117,48 @@ function startsTable(lines, index) {
     && isSeparator(lines[index + 1]);
 }
 
+/** Two spaces (or one tab) of indent make one level; deeper than three is flattened. */
+function indentDepth(line) {
+  const indent = /^[ \t]*/.exec(line)[0].replace(/\t/g, '  ').length;
+  return Math.min(3, Math.floor(indent / 2));
+}
+
+/**
+ * Turn flat list items, each with a depth and a type, into nested ul/ol elements. An
+ * item that is deeper than its predecessor opens a child list inside that item.
+ */
+function renderListItems(items, keyPrefix) {
+  function build(start, depth) {
+    const type = items[start].type;
+    const children = [];
+    let index = start;
+    while (index < items.length && items[index].depth >= depth) {
+      if (items[index].depth > depth) {
+        const nested = build(index, items[index].depth);
+        const last = children[children.length - 1];
+        if (last) last.nested.push(nested.element);
+        index = nested.next;
+        continue;
+      }
+      children.push({ text: items[index].text, nested: [], at: index });
+      index += 1;
+    }
+    const ListTag = type === 'ordered' ? 'ol' : 'ul';
+    const element = (
+      <ListTag key={`${keyPrefix}-${start}`} className={`list-outside ps-5 ${type === 'ordered' ? 'list-decimal' : 'list-disc'}`}>
+        {children.map((child) => (
+          <li key={`${keyPrefix}-${child.at}`}>
+            {inlineContent(child.text, `${keyPrefix}-${child.at}`)}
+            {child.nested}
+          </li>
+        ))}
+      </ListTag>
+    );
+    return { element, next: index };
+  }
+  return build(0, items[0].depth).element;
+}
+
 export default function FormattedMessage({ content, onOpenCode }) {
   // Every reply is drawn through the house style, so a dash that predates the
   // rule, or came from a local model, still reads as a plain hyphen.
@@ -122,6 +166,7 @@ export default function FormattedMessage({ content, onOpenCode }) {
   const blocks = [];
   let paragraph = [];
   let list = null;
+  let quote = [];
   let code = null;
 
   // Snapshot of the block at the moment it closes: the same `code` object is reused
@@ -147,18 +192,27 @@ export default function FormattedMessage({ content, onOpenCode }) {
 
   const flushList = () => {
     if (!list) return;
-    const ListTag = list.type === 'ordered' ? 'ol' : 'ul';
-    blocks.push(
-      <ListTag key={`list-${blocks.length}`} className={`list-inside ${list.type === 'ordered' ? 'list-decimal' : 'list-disc'}`}>
-        {list.items.map((item, index) => <li key={`${list.type}-${index}`}>{inlineContent(item, `list-${blocks.length}-${index}`)}</li>)}
-      </ListTag>,
-    );
+    blocks.push(<div key={`list-${blocks.length}`}>{renderListItems(list.items, `list-${blocks.length}`)}</div>);
     list = null;
+  };
+
+  const flushQuote = () => {
+    if (quote.length === 0) return;
+    blocks.push(
+      <blockquote key={`quote-${blocks.length}`} className="message-quote">
+        {quote.flatMap((line, index) => [
+          index > 0 ? <br key={`quote-break-${index}`} /> : null,
+          ...inlineContent(line, `quote-${blocks.length}-${index}`),
+        ])}
+      </blockquote>,
+    );
+    quote = [];
   };
 
   const flushText = () => {
     flushParagraph();
     flushList();
+    flushQuote();
   };
 
   for (let index = 0; index < lines.length; index += 1) {
@@ -195,7 +249,7 @@ export default function FormattedMessage({ content, onOpenCode }) {
         rowIndex += 1;
       }
       blocks.push(
-        <div key={`table-${blocks.length}`} className="overflow-x-auto rounded-xl border border-border">
+        <div key={`table-${blocks.length}`} className="overflow-x-auto rounded-xl bg-surface-secondary">
           <table className="w-full border-collapse text-left text-sm">
             <thead className="bg-surface-tertiary">
               <tr>
@@ -206,7 +260,7 @@ export default function FormattedMessage({ content, onOpenCode }) {
             </thead>
             <tbody>
               {rows.map((row, rowIndex) => (
-                <tr key={`row-${rowIndex}`} className="border-t border-border">
+                <tr key={`row-${rowIndex}`} className="even:bg-surface-tertiary/50">
                   {header.map((_, cellIndex) => (
                     <td key={`cell-${cellIndex}`} className="px-3 py-2 align-top">{inlineContent(row[cellIndex] ?? '', `table-${blocks.length}-${rowIndex}-${cellIndex}`)}</td>
                   ))}
@@ -220,25 +274,48 @@ export default function FormattedMessage({ content, onOpenCode }) {
       continue;
     }
 
-    const heading = /^(#{1,3})\s+(.+)$/.exec(trimmed);
+    // Every level from # to ###### reads as the same small bold title: a chat
+    // answer has no room for a document-sized hierarchy.
+    const heading = /^#{1,6}\s+(.+)$/.exec(trimmed);
     if (heading) {
       flushText();
-      blocks.push(<h3 key={`heading-${blocks.length}`} className="text-base font-semibold">{inlineContent(heading[2], `heading-${blocks.length}`)}</h3>);
+      blocks.push(<h3 key={`heading-${blocks.length}`} className="text-base font-semibold">{inlineContent(heading[1], `heading-${blocks.length}`)}</h3>);
       continue;
     }
 
-    const unordered = /^[-*]\s+(.+)$/.exec(trimmed);
+    if (/^([-*_])(\s*\1){2,}$/.test(trimmed)) {
+      flushText();
+      blocks.push(<hr key={`rule-${blocks.length}`} className="message-rule" />);
+      continue;
+    }
+
+    const quoted = /^>\s?(.*)$/.exec(trimmed);
+    if (quoted) {
+      flushParagraph();
+      flushList();
+      quote.push(quoted[1]);
+      continue;
+    }
+
+    const unordered = /^[-*+]\s+(.+)$/.exec(trimmed);
     const ordered = /^\d+[.)]\s+(.+)$/.exec(trimmed);
     if (unordered || ordered) {
-      const type = unordered ? 'unordered' : 'ordered';
-      if (!list || list.type !== type) {
-        flushText();
-        list = { type, items: [] };
-      }
-      list.items.push((unordered ?? ordered)[1]);
+      flushParagraph();
+      flushQuote();
+      if (!list) list = { items: [] };
+      list.items.push({
+        type: unordered ? 'unordered' : 'ordered',
+        depth: list.items.length === 0 ? 0 : indentDepth(line),
+        text: (unordered ?? ordered)[1],
+      });
       continue;
     }
 
+    // A plain line right under a quote continues it, as Markdown does.
+    if (quote.length > 0) {
+      quote.push(trimmed);
+      continue;
+    }
     flushList();
     paragraph.push(line);
   }

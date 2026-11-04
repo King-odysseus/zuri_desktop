@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { Textarea } from 'flowbite-react';
-import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, FileIcon, FolderIcon, ICON_SIZE, ImageIcon, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
+import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, FileIcon, FolderIcon, ICON_SIZE, ImageIcon, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, SpeakIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
 import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
 import ConversationSearch from '../components/ConversationSearch.jsx';
 // The reply renderer and the clipboard fallback are the desktop app's own modules,
@@ -13,6 +13,8 @@ import { QUICK_ADJUSTMENTS } from '../../../src/renderer-react/answerAdjustments
 // One description of a created to-do, reminder or automation, shared with the
 // desktop window so the two cannot word the same card differently.
 import { describeNotable } from '../../../src/shared/notableActions.js';
+import { DOCUMENT_TOOL } from '../../../src/shared/documentTool.js';
+import { speak, speechAvailable, stopSpeaking } from '../../../src/shared/speech.js';
 import { copyText } from '../../../src/renderer-react/clipboard.js';
 import { shareText } from '../lib/share.js';
 import {
@@ -21,6 +23,7 @@ import {
   appendMessage,
   createAutomation,
   createConversation,
+  createDocumentFile,
   createMemory,
   createReminder,
   createTask,
@@ -40,6 +43,7 @@ import {
 import { LogoMark } from '../components/Icons.jsx';
 import { formatRelativeTime, greetingFor } from '../lib/format.js';
 import { clearChatDraft, readChatDraft, saveChatDraft } from '../lib/drafts.js';
+import { deleteFiles, listFiles, saveFiles } from '../lib/fileStore.js';
 // A picture made in the chat is filed with the pictures made on the Images page:
 // one library, whichever screen drew it.
 import { blobFromBase64, savePicture } from '../lib/imageStore.js';
@@ -581,6 +585,22 @@ async function runToolCall(call, signal, onStatus, onNotable) {
     }
   }
 
+  if (name === DOCUMENT_TOOL.name) {
+    onStatus('Building your file');
+    try {
+      const file = await createDocumentFile({ kind: args.kind, fileName: args.fileName, content: args.content });
+      if (signal?.aborted) throw stoppedReply();
+      if (typeof onNotable === 'function') onNotable('document', file);
+      const problems = file.warnings.length > 0
+        ? ` These problems were found: ${file.warnings.join(' ')} Fix them and create the file once more, then tell the person which file to use.`
+        : '';
+      return `Built "${file.name}" and put a Download button for it under this reply. Tell them it is ready in one short sentence.${problems}`;
+    } catch (error) {
+      if (signal?.aborted || error?.name === 'AbortError') throw stoppedReply();
+      return `The file was not made: ${error?.message || 'the server refused it.'}`;
+    }
+  }
+
   if (name !== WEB_SEARCH_TOOL.name) return `The tool "${name}" is not available in this chat.`;
 
   const asked = webSearchQuery(call);
@@ -598,6 +618,38 @@ async function runToolCall(call, signal, onStatus, onNotable) {
     // and answer from what it already knows, so the person still gets a reply.
     return `The web search failed: ${error?.message || 'the search service did not answer.'}`;
   }
+}
+
+/**
+ * Hand a file the server built to the person. On an Android phone it goes to the share
+ * sheet, because a download link inside the app's web view often saves nothing; every
+ * other browser gets an ordinary download, and so does a phone whose share sheet cannot
+ * take files.
+ */
+async function saveGeneratedFile(file) {
+  const binary = atob(file.base64);
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const onAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+  if (onAndroid && typeof navigator.canShare === 'function' && typeof File === 'function') {
+    const shared = new File([bytes], file.name, { type: file.mime });
+    if (navigator.canShare({ files: [shared] })) {
+      try {
+        await navigator.share({ files: [shared], title: file.name });
+        return;
+      } catch (error) {
+        // Closing the sheet is a choice, not a failure; anything else falls through to a download.
+        if (error?.name === 'AbortError') return;
+      }
+    }
+  }
+  const url = URL.createObjectURL(new Blob([bytes], { type: file.mime }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = file.name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 /** The failure a screen shows: the server's own sentence and status, never a guess. */
@@ -692,6 +744,8 @@ export default function ChatView({
   // none, because index 0 is a real message.
   const [copiedIndex, setCopiedIndex] = useState(-1);
   const [copyNote, setCopyNote] = useState('');
+  // Which reply is being read aloud, so its button can offer Stop.
+  const [speakingIndex, setSpeakingIndex] = useState(-1);
   const [shareNote, setShareNote] = useState('');
   const [incognito, setIncognito] = useState(false);
 
@@ -701,6 +755,8 @@ export default function ChatView({
   const menuRef = useRef(null);
   const modelMenuRef = useRef(null);
   const abortRef = useRef(null);
+  // Files built during the reply in flight, written to this device once the chat has an id.
+  const pendingFilesRef = useRef([]);
   /*
    * Bumped whenever the open chat changes. A reply still arriving from the chat
    * the person just left checks this before painting anything, so a late delta
@@ -854,7 +910,8 @@ export default function ChatView({
   const resetReply = useCallback(() => {
     setStreamReply('');
     setStreamError(null);
-    setNotables([]);
+    // A file's card stays for the whole chat; the other cards belong to one reply.
+    setNotables((rows) => rows.filter((row) => row.kept));
     setSaveWarning('');
     setToolStatus('');
   }, []);
@@ -871,7 +928,9 @@ export default function ChatView({
       setRenamingId(null);
       setConfirmId(null);
       resetReply();
+      setNotables([]);
       atBottomRef.current = true;
+      const run = runRef.current;
       try {
         const data = await fetchConversation(id);
         setThread({ title: data.title ?? 'Untitled chat', messages: chatMessages(data.messages) });
@@ -880,6 +939,11 @@ export default function ChatView({
         // last had selected. A code the picker does not offer is ignored.
         if (CHAT_MODELS.some((entry) => entry.code === data.model)) setModel(data.model);
         setThreadStatus('ready');
+        // Files this device built for the chat get their Download cards back.
+        void listFiles(id).then((files) => {
+          if (run !== runRef.current) return;
+          setNotables(files.map((file, index) => ({ ...describeNotable('document', file), id: `document-kept-${index}-${file.name}`, file, kept: true })).filter((card) => card.badge));
+        });
       } catch (error) {
         setThreadError(failureOf(error, 'This chat could not be opened.'));
         setThreadStatus('error');
@@ -901,6 +965,7 @@ export default function ChatView({
     setDraft('');
     clearChatDraft();
     resetReply();
+    setNotables([]);
     atBottomRef.current = true;
   }, [resetReply]);
 
@@ -988,6 +1053,12 @@ export default function ChatView({
           { role: 'user', content: question, attachment },
           { role: 'assistant', content: answer },
         ]);
+        // Only a chat that is saved keeps its files; a private chat returned above.
+        if (pendingFilesRef.current.length > 0) {
+          const files = pendingFilesRef.current;
+          pendingFilesRef.current = [];
+          await saveFiles(id, files);
+        }
         if (run === runRef.current) loadConversations();
       } catch (error) {
         if (run !== runRef.current) return;
@@ -1069,6 +1140,7 @@ export default function ChatView({
       setAttachNote('');
       clearChatDraft();
     }
+    pendingFilesRef.current = [];
     resetReply();
     setStreaming(true);
     setThread((previous) => ({
@@ -1135,7 +1207,7 @@ export default function ChatView({
        * are added to that copy alone, because saveExchange keeps only the question
        * and the final answer.
        */
-      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL, CREATE_MEMORY_TOOL];
+      const tools = pictureModel ? [] : [WEB_SEARCH_TOOL, DOCUMENT_TOOL, CREATE_TASK_TOOL, CREATE_REMINDER_TOOL, CREATE_AUTOMATION_TOOL, CREATE_MEMORY_TOOL];
       let wire = outgoing;
       let answer = '';
       let retriedEmpty = false;
@@ -1214,7 +1286,8 @@ export default function ChatView({
           const outcome = await runToolCall(call, controller.signal, setToolStatus, (kind, record) => {
             const card = describeNotable(kind, record);
             if (card === null) return;
-            setNotables((rows) => [...rows, { ...card, id: `${kind}-${rows.length}-${record?.id ?? ''}` }]);
+            if (kind === 'document') pendingFilesRef.current.push(record);
+            setNotables((rows) => [...rows, { ...card, id: `${kind}-${rows.length}-${record?.id ?? record?.name ?? ''}`, file: kind === 'document' ? record : null, kept: kind === 'document' }]);
           });
           if (run !== runRef.current) return;
           wire = [...wire, {
@@ -1303,6 +1376,7 @@ export default function ChatView({
     async (id) => {
       try {
         await deleteConversation(id);
+        void deleteFiles(id);
         setConversations((previous) => previous.filter((item) => item.id !== id));
         setConfirmId(null);
         if (openId === id) backToList();
@@ -1418,6 +1492,27 @@ export default function ChatView({
     setCopiedIndex(index);
     window.setTimeout(() => setCopiedIndex((current) => (current === index ? -1 : current)), 1500);
   }, []);
+
+  /** Read one reply aloud with the device's own voice, or stop if it is already being read. */
+  const toggleSpeech = useCallback((message, index) => {
+    if (speakingIndex === index) {
+      stopSpeaking();
+      setSpeakingIndex(-1);
+      return;
+    }
+    const started = speak(String(message?.content ?? ''), {
+      onEnd: () => setSpeakingIndex((current) => (current === index ? -1 : current)),
+    });
+    if (!started) {
+      setCopyNote('This device has no voice available to read the reply aloud.');
+      return;
+    }
+    setCopyNote('');
+    setSpeakingIndex(index);
+  }, [speakingIndex]);
+
+  // Leaving the chat must not leave a voice talking.
+  useEffect(() => () => stopSpeaking(), []);
 
   const shareMessage = useCallback(async (message) => {
     const content = String(message?.content ?? '').trim();
@@ -1873,6 +1968,16 @@ export default function ChatView({
                   >
                     {copiedIndex === index ? <CheckIcon size={14} aria-hidden="true" /> : <CopyIcon size={14} aria-hidden="true" />}
                   </IconButton>
+                  {message.role === 'assistant' && speechAvailable() && (
+                    <IconButton
+                      size="sm"
+                      className="chat-speak"
+                      label={speakingIndex === index ? 'Stop reading aloud' : "Read Zuri's reply aloud"}
+                      onClick={() => toggleSpeech(message, index)}
+                    >
+                      {speakingIndex === index ? <StopIcon size={14} aria-hidden="true" /> : <SpeakIcon size={14} aria-hidden="true" />}
+                    </IconButton>
+                  )}
                   {/*
                     * The same four rewrites the desktop shows under its newest reply, in
                     * the desktop's order: the icon actions first, the words after them.
@@ -1921,6 +2026,9 @@ export default function ChatView({
                     </span>
                   </div>
                   <p className="zuri-notable-title">{card.title}</p>
+                  {card.file && (
+                    <Button variant="secondary" onClick={() => saveGeneratedFile(card.file)}>Download</Button>
+                  )}
                   {card.lines.length > 0 && (
                     <dl className="zuri-notable-lines">
                       {card.lines.map((line, lineIndex) => (
