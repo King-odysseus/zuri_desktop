@@ -1,7 +1,7 @@
 {
   "name": "zuri-desktop",
   "productName": "Zuri",
-  "version": "0.2.7",
+  "version": "0.2.8",
   "private": true,
   "description": "Zuri Desktop - a local AI command centre for Windows",
   "author": "Zuri",
