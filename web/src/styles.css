@@ -2853,22 +2853,72 @@ a.download-card:hover {
 }
 
 /* Admin dashboard: model catalogue, spend and plan tables. */
-.field select {
+.field select,
+.project-input:is(select, input[type='date'], input[type='datetime-local'], input[type='time']),
+.image-model {
   width: 100%;
   min-width: 0;
   min-height: var(--control-height);
-  padding: 0 12px;
+  padding: 0 40px 0 12px;
   border: 1px solid var(--control-border);
   border-radius: var(--radius-lg);
   background: var(--field-background);
   color: var(--text);
   font: 400 14px/1.2 "Segoe UI", system-ui, sans-serif;
+  transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
 }
 
-.field select:focus-visible {
-  border-color: var(--accent);
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+.field select,
+.project-input:is(select),
+.image-model {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5 6 6l4.5-4.5' fill='none' stroke='%2355627f' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 12px 8px;
+  cursor: pointer;
+}
+
+.project-input:is(input[type='date'], input[type='datetime-local'], input[type='time']) {
+  color-scheme: light;
+}
+
+.project-input:is(input[type='date'], input[type='datetime-local'], input[type='time'])::-webkit-calendar-picker-indicator {
+  margin-right: 2px;
+  padding: 4px;
+  cursor: pointer;
+  opacity: 0.72;
+}
+
+.field select:hover,
+.project-input:is(select, input[type='date'], input[type='datetime-local'], input[type='time']):hover,
+.image-model:hover {
+  background-color: var(--surface-tertiary);
+}
+
+.field select:focus-visible,
+.project-input:is(select, input[type='date'], input[type='datetime-local'], input[type='time']):focus-visible,
+.image-model:focus-visible {
+  border-color: var(--brand-blue);
+  outline: 2px solid color-mix(in srgb, var(--brand-blue) 36%, transparent);
   outline-offset: 1px;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-blue) 18%, transparent);
+}
+
+.field select option,
+.project-input option {
+  background: var(--surface);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .field select,
+:root[data-theme="dark"] .project-input:is(select),
+:root[data-theme="dark"] .image-model {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5 6 6l4.5-4.5' fill='none' stroke='%23b3b1de' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="dark"] .project-input:is(input[type='date'], input[type='datetime-local'], input[type='time']) {
+  color-scheme: dark;
 }
 
 .admin-window {

@@ -194,6 +194,31 @@ button,
   box-shadow: 0 18px 38px color-mix(in srgb, var(--foreground) 16%, transparent) !important;
 }
 
+/* The calendar is a floating surface, so its header and month controls need the
+   same quiet hierarchy as the rest of the app instead of Flowbite's default grey
+   buttons. These broad selectors keep the skin stable when Flowbite changes one
+   utility class between releases. */
+.zuri-datepicker [class*='shadow-lg'] > div {
+  background: transparent !important;
+}
+
+.zuri-datepicker [class*='shadow-lg'] button {
+  color: var(--foreground) !important;
+  background: transparent !important;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.zuri-datepicker [class*='shadow-lg'] button:hover:not(:disabled),
+.zuri-datepicker [class*='shadow-lg'] button:focus-visible {
+  background: var(--selected) !important;
+  color: var(--selected-foreground) !important;
+}
+
+.zuri-datepicker [class*='shadow-lg'] [class*='text-center'] {
+  color: var(--foreground) !important;
+  font-weight: 600;
+}
+
 /* Flowbite's datepicker classes live in node_modules, so Tailwind does not emit
    their grid utilities for this renderer. Restoring the grid here keeps the
    popup compact instead of letting each day occupy its own vertical row. */
@@ -1320,6 +1345,16 @@ label {
 .zuri-input[type='datetime-local'],
 .zuri-input[type='time'] {
   color-scheme: light;
+  padding-right: 2.75rem !important;
+}
+
+.zuri-input[type='date']::-webkit-calendar-picker-indicator,
+.zuri-input[type='datetime-local']::-webkit-calendar-picker-indicator,
+.zuri-input[type='time']::-webkit-calendar-picker-indicator {
+  margin-right: 0.125rem;
+  padding: 0.25rem;
+  cursor: pointer;
+  opacity: 0.72;
 }
 
 [data-theme='dark'] .zuri-input[type='date'],
