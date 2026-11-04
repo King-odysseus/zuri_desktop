@@ -2,29 +2,25 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Left-align the account popup rows and make the popup readable in the dark theme",
+      "text": "Find the avatar + text row shown in the screenshot",
       "state": "done"
     },
     {
-      "text": "Confirm the branch tip is committed and pushed, and the live site serves it",
+      "text": "Pin the avatar to the left on mobile",
       "state": "done"
     },
     {
-      "text": "Build the Windows installer from a clean checkout of the pushed commit",
+      "text": "Keep the name and plan visible in the phone drawer",
       "state": "done"
     },
     {
-      "text": "Publish the installer as release 0.2.6 and check the download link works",
+      "text": "Verify in a browser at 390 and 1280 wide",
       "state": "done"
     },
     {
-      "text": "Confirm the website now offers 0.2.6",
-      "state": "done"
-    },
-    {
-      "text": "Remove the temporary checkout and check dependencies are untouched",
+      "text": "Run the project checks, then commit and push the fix",
       "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T12:07:46.521Z"
+  "updatedAt": "2026-11-04T12:18:06.700Z"
 }
