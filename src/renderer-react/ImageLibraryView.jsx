@@ -34,16 +34,19 @@ function Tile({ item, api, onOpen }) {
     return () => { active = false; observer.disconnect(); };
   }, [api, item.name]);
 
+  // The observed node is the wrapper: the shared Button does not forward refs,
+  // so the ref cannot sit on it or the tile would never start loading.
   return (
-    <button
-      ref={holder}
-      type="button"
-      onClick={() => onOpen(item, url)}
-      className="group relative aspect-square w-full overflow-hidden rounded-xl bg-surface-secondary"
-      aria-label={item.prompt !== '' ? `Open picture: ${item.prompt}` : 'Open picture'}
-    >
-      {url !== '' && <img src={url} alt={item.prompt} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]" decoding="async" />}
-    </button>
+    <div ref={holder} className="group relative aspect-square w-full">
+      <Button
+        type="button"
+        onPress={() => onOpen(item, url)}
+        className="h-full w-full overflow-hidden rounded-xl bg-surface-secondary"
+        aria-label={item.prompt !== '' ? `Open picture: ${item.prompt}` : 'Open picture'}
+      >
+        {url !== '' && <img src={url} alt={item.prompt} className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]" decoding="async" />}
+      </Button>
+    </div>
   );
 }
 

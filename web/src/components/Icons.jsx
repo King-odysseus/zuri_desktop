@@ -32,6 +32,7 @@ export {
   DeviceIcon,
   DownloadIcon,
   EditIcon,
+  EnhanceIcon,
   ExpandIcon,
   FeaturesIcon,
   FileIcon,

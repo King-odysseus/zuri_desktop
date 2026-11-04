@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '../components/DataRow.jsx';
+import { Button, Input, Select } from '../components/ui.jsx';
 import { changeAdminUser, createAdminUser, fetchAdminStats, fetchAdminUsers } from '../lib/api.js';
 import { formatNaira, formatTokens } from '../lib/format.js';
 
@@ -54,8 +55,8 @@ function PasswordNotice({ notice, onDismiss }) {
         Email <code>{notice.email}</code> and temporary password <code>{notice.password}</code>. It is shown once; Zuri keeps only a scrambled copy.
       </span>
       <span className="card-actions">
-        <button type="button" className="btn btn-secondary" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy login details'}</button>
-        <button type="button" className="btn btn-ghost" onClick={onDismiss}>Done</button>
+        <Button type="button" className="btn btn-secondary" variant="secondary" onClick={() => void copy()}>{copied ? 'Copied' : 'Copy login details'}</Button>
+        <Button type="button" className="btn btn-ghost" variant="ghost" onClick={onDismiss}>Done</Button>
       </span>
     </Alert>
   );
@@ -202,22 +203,22 @@ export default function AdminPeople({ days, plans }) {
         <div className="admin-section-heading"><div><h2>Add a person</h2><p>Create an account and assign its plan immediately.</p></div></div>
         <div className="admin-fields">
           <label className="field"><span>Name</span>
-            <input value={form.displayName} maxLength={60} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
+            <Input value={form.displayName} maxLength={60} onChange={(event) => setForm({ ...form, displayName: event.target.value })} />
           </label>
           <label className="field"><span>Email</span>
-            <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
+            <Input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
           </label>
           <label className="field"><span>Plan</span>
-            <select value={form.planCode} onChange={(event) => setForm({ ...form, planCode: event.target.value })}>
+            <Select value={form.planCode} onChange={(event) => setForm({ ...form, planCode: event.target.value })}>
               {plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}
-            </select>
+            </Select>
           </label>
           <label className="field"><span>Days active</span>
-            <input type="number" min="1" max="366" value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} />
+            <Input type="number" min="1" max="366" value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} />
           </label>
         </div>
         <div className="card-actions">
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Working' : 'Create account'}</button>
+          <Button type="submit" className="btn btn-primary" variant="primary" isDisabled={busy}>{busy ? 'Working' : 'Create account'}</Button>
         </div>
         <p className="stat-meta">The plan is active straight away with no payment step. A temporary password is generated for you to pass on.</p>
       </form>
@@ -227,7 +228,7 @@ export default function AdminPeople({ days, plans }) {
           <div><h2>Accounts</h2><p className="admin-help">Search, re-plan, reset or suspend an account.</p></div>
           <label className="field admin-window">
             <span className="sr-only">Search accounts</span>
-            <input type="search" placeholder="Search name or email" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <Input type="search" placeholder="Search name or email" value={search} onChange={(event) => setSearch(event.target.value)} />
           </label>
         </div>
         <p className="stat-meta">Plan puts an account on a plan straight away, with no payment step. It works for customers, for yourself, and for another administrator.</p>        {/* The editor is a card above the table, not a row inside it: the table is
@@ -238,12 +239,12 @@ export default function AdminPeople({ days, plans }) {
             <p className="stat-label">Plan for {planEditor.name}</p>
             <div className="admin-fields">
               <label className="field"><span>Plan</span>
-                <select value={planEditor.planCode} onChange={(event) => setPlanEditor({ ...planEditor, planCode: event.target.value })}>
+                <Select value={planEditor.planCode} onChange={(event) => setPlanEditor({ ...planEditor, planCode: event.target.value })}>
                   {plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}
-                </select>
+                </Select>
               </label>
               <label className="field"><span>Days active</span>
-                <input
+                <Input
                   type="number"
                   min="1"
                   max="366"
@@ -253,8 +254,8 @@ export default function AdminPeople({ days, plans }) {
               </label>
             </div>
             <div className="card-actions">
-              <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? 'Working' : 'Put on this plan'}</button>
-              <button type="button" className="btn btn-ghost" onClick={() => setPlanEditor(null)}>Cancel</button>
+              <Button type="submit" className="btn btn-primary" variant="primary" isDisabled={busy}>{busy ? 'Working' : 'Put on this plan'}</Button>
+              <Button type="button" className="btn btn-ghost" variant="ghost" onClick={() => setPlanEditor(null)}>Cancel</Button>
             </div>
             <p className="stat-meta">Takes effect now. No payment step and no Paystack charge.</p>
           </form>
@@ -283,22 +284,23 @@ export default function AdminPeople({ days, plans }) {
                     {/* The plan button is offered on every row, administrators and
                         this account included: a plan here is given, never bought. */}
                     <span className="card-actions">
-                      <button
+                      <Button
                         type="button"
                         className={`btn ${planEditor?.userId === user.id ? 'btn-secondary' : 'btn-ghost'}`}
-                        disabled={busy}
+                        variant={planEditor?.userId === user.id ? 'secondary' : 'ghost'}
+                        isDisabled={busy}
                         aria-expanded={planEditor?.userId === user.id}
                         onClick={() => openPlanEditor(user)}
                       >
                         Plan
-                      </button>
+                      </Button>
                       {!user.isAdmin && (
                         <>
-                          <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'reset-password' }, `Reset the password for ${user.email}? They will be signed out everywhere.`)}>Reset</button>
+                          <Button type="button" className="btn btn-ghost" variant="ghost" isDisabled={busy} onClick={() => act(user, { action: 'reset-password' }, `Reset the password for ${user.email}? They will be signed out everywhere.`)}>Reset</Button>
                           {user.status === 'suspended' ? (
-                            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'restore' })}>Restore</button>
+                            <Button type="button" className="btn btn-ghost" variant="ghost" isDisabled={busy} onClick={() => act(user, { action: 'restore' })}>Restore</Button>
                           ) : (
-                            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => act(user, { action: 'suspend' }, `Suspend ${user.email}? They are signed out and cannot sign in until restored.`)}>Suspend</button>
+                            <Button type="button" className="btn btn-ghost" variant="ghost" isDisabled={busy} onClick={() => act(user, { action: 'suspend' }, `Suspend ${user.email}? They are signed out and cannot sign in until restored.`)}>Suspend</Button>
                           )}
                         </>
                       )}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Button } from './ui.jsx';
+import { Button, Radio, RadioGroup } from './ui.jsx';
 
 /*
  * Zuri is an adult product: the models answer with a grown-up voice, and the
@@ -70,22 +70,20 @@ export default function AgeGateView({ onConfirmed, onSignOut }) {
             and asked only once.
           </p>
 
-          <div className="zuri-choice-stack mt-5" role="radiogroup" aria-label="Age">
-            <label className={`zuri-age-choice${choice === 'adult' ? ' is-selected' : ''}`}>
-              <input type="radio" name="age" className="zuri-radio" checked={choice === 'adult'} onChange={() => setChoice('adult')} />
+          <RadioGroup className="zuri-choice-stack mt-5" aria-label="Age" value={choice} onChange={setChoice}>
+            <Radio value="adult" className={`zuri-age-choice${choice === 'adult' ? ' is-selected' : ''}`}>
               <span className="zuri-choice-copy">
                 <span className="zuri-choice-label">18 or older</span>
                 <span className="zuri-choice-help">I am an adult and I own this Zuri account.</span>
               </span>
-            </label>
-            <label className={`zuri-age-choice${choice === 'under' ? ' is-selected' : ''}`}>
-              <input type="radio" name="age" className="zuri-radio" checked={choice === 'under'} onChange={() => setChoice('under')} />
+            </Radio>
+            <Radio value="under" className={`zuri-age-choice${choice === 'under' ? ' is-selected' : ''}`}>
               <span className="zuri-choice-copy">
                 <span className="zuri-choice-label">Under 18</span>
                 <span className="zuri-choice-help">Zuri cannot be used by anyone under 18.</span>
               </span>
-            </label>
-          </div>
+            </Radio>
+          </RadioGroup>
 
           {error !== '' && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
 

@@ -13,6 +13,7 @@ import { DOWNLOAD_CONTENT_TYPE, listDownloads, resolveDownloadPath } from './dow
 import { AUTOMATION_PROMPT_MAX_LENGTH, CONVERSATION_SEARCH_MAX_LENGTH, MEMORY_CONTENT_MAX_LENGTH, PROJECT_FILE_CONTENT_MAX_LENGTH, PROJECT_INSTRUCTIONS_MAX_LENGTH, PROJECT_NAME_MAX_LENGTH, REMINDER_REPEATS, REMINDER_TITLE_MAX_LENGTH, STORED_FILE_MAX_BYTES, TASK_DUE_MAX_LENGTH, TASK_NOTES_MAX_LENGTH, TASK_PRIORITIES, TASK_TITLE_MAX_LENGTH } from './db.js';
 import { ALLOWED_UPLOAD_TYPES, checkedAttachment, signUpload } from './uploads.js';
 import { IMAGE_SHAPES, MAX_IMAGE_PROMPT_LENGTH, improveImagePrompt } from './images.js';
+import { MAX_PROMPT_LENGTH, enhancePrompt } from './prompts.js';
 import { FORMATTING_RULES, ZURI_IDENTITY, plainDashes, withAnswerStyle, withFormattingRules, withZuriIdentity, withResearchRules, answerStyleLength } from './text.js';
 import { searchWeb } from './tools.js';
 import { splitToolCalls, visiblePrefixLength, visibleText } from './markup.js';
@@ -70,6 +71,9 @@ const SEARCH_QUERY_MAX_LENGTH = 400;
 // so the ceiling is there to stop one account hammering DuckDuckGo, not to sell
 // searches by the minute.
 const SEARCH_REQUEST_LIMITS = Object.freeze({ requestsPerMinute: 10, maxConcurrent: 2 });
+// The enhancer is a small model call the person triggers by hand, so it gets its own
+// bucket: a burst of clicks cannot spend a chat model's allowance or its concurrency.
+const ENHANCE_REQUEST_LIMITS = Object.freeze({ requestsPerMinute: 12, maxConcurrent: 2 });
 const MAX_WEBHOOK_BODY_BYTES = 256 * 1024;
 // Keep the lease longer than the provider timeout so a slow request cannot be
 // released while it is still in flight and allow another request to overspend.
@@ -1563,6 +1567,57 @@ export function createApp(dependencies = {}) {
         if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'PROVIDER_RESPONSE_INVALID') return response(502, { ok: false, error: { code: error.code, message: error.message } });
         console.error('[zuri-cloud] image', error?.message ?? error);
         return response(500, { ok: false, error: { code: 'IMAGE_FAILED', message: 'The picture could not be made.' } });
+      } finally {
+        lease.release();
+      }
+    }
+
+    // Rewrite a message into a prompt the model can answer accurately. Nothing is
+    // stored and nothing is reserved against the plan: the person is still writing
+    // their own message, so the tokens spent improving it do not come out of the
+    // allowance the answer is charged to.
+    if (request.method === 'POST' && url.pathname === '/api/prompts/enhance') {
+      if (!dependencies.auth || typeof dependencies.chatProvider !== 'function') {
+        return response(503, { ok: false, error: { code: 'ENHANCER_NOT_CONFIGURED', message: 'The prompt enhancer is not switched on yet.' } });
+      }
+      const session = await dependencies.auth.authenticate(bearerToken(request));
+      if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to continue.' } }, { 'www-authenticate': 'Bearer' });
+      // Same gate as the chat it feeds: an account that cannot ask a question does
+      // not get to spend a model call on phrasing one.
+      if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to improve prompts.' } });
+      let body;
+      try {
+        body = await readJson(request);
+      } catch (error) {
+        return response(400, { ok: false, error: { code: error.code ?? 'INVALID_JSON', message: error.message } });
+      }
+      const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+      if (prompt === '') return response(400, { ok: false, error: { code: 'INVALID_PROMPT', message: 'Write the message you want improved first.' } });
+      if (prompt.length > MAX_PROMPT_LENGTH) {
+        return response(400, { ok: false, error: { code: 'INVALID_PROMPT', message: `Keep the message under ${MAX_PROMPT_LENGTH} characters.` } });
+      }
+
+      const lease = limiter.acquire(`${session.user.id}:prompt-enhance`, ENHANCE_REQUEST_LIMITS);
+      if (!lease.allowed) {
+        return response(429, { ok: false, error: { code: lease.reason === 'concurrency_limit' ? 'CONCURRENCY_LIMIT' : 'RATE_LIMITED', message: 'The enhancer is busy. Try again in a moment.' } }, { 'retry-after': String(lease.retryAfterSeconds) });
+      }
+      try {
+        const improved = await enhancePrompt({ chatProvider: dependencies.chatProvider, prompt });
+        return response(200, {
+          ok: true,
+          data: {
+            prompt: plainDashes(improved),
+            // Kept so the app can put the person's own words back when they undo.
+            original: plainDashes(prompt),
+          },
+        });
+      } catch (error) {
+        if (error?.code === 'ENHANCER_TOO_LONG') return response(400, { ok: false, error: { code: error.code, message: error.message } });
+        if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'ENHANCER_EMPTY') {
+          return response(502, { ok: false, error: { code: 'ENHANCE_FAILED', message: error.message } });
+        }
+        console.error('[zuri-cloud] prompt enhance', error?.message ?? error);
+        return response(500, { ok: false, error: { code: 'ENHANCE_FAILED', message: 'The prompt could not be improved.' } });
       } finally {
         lease.release();
       }

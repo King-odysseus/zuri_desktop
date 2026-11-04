@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AuthShell from '../components/AuthShell.jsx';
-import { Button } from '../components/ui.jsx';
+import { Button, Input } from '../components/ui.jsx';
 import { requestPasswordReset } from '../lib/api.js';
 
 /**
@@ -85,7 +85,7 @@ export default function ForgotPasswordView({ onNavigate, signedIn = false }) {
         <form className="form-stack" onSubmit={submit} noValidate>
           <label className="field">
             <span>Email</span>
-            <input
+            <Input
               type="email"
               name="email"
               autoComplete="email"
@@ -102,7 +102,7 @@ export default function ForgotPasswordView({ onNavigate, signedIn = false }) {
             </p>
           )}
 
-          <Button type="submit" block disabled={busy}>
+          <Button type="submit" block isDisabled={busy}>
             {busy ? 'Sending the link...' : 'Send the link'}
           </Button>
         </form>

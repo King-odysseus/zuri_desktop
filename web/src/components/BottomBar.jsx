@@ -1,5 +1,7 @@
 // Phone-only primary navigation: fixed so it never scrolls away, hidden from 900px up where the sidebar takes over.
 // Add BOTTOM_BAR_SPACE to the scrolling content container so the last item is never covered.
+import { Button } from './ui.jsx'
+
 export const BOTTOM_BAR_SPACE = 'pb-[calc(4rem+env(safe-area-inset-bottom))] min-[900px]:pb-0'
 
 export default function BottomBar({ items, view, onViewChange }) {
@@ -14,7 +16,7 @@ export default function BottomBar({ items, view, onViewChange }) {
           const selected = item.id === view
           return (
             <li key={item.id} className="flex min-w-[44px] flex-1">
-              <button
+              <Button variant="ghost"
                 type="button"
                 aria-current={selected ? 'page' : undefined}
                 onClick={() => onViewChange(item.id)}
@@ -25,7 +27,7 @@ export default function BottomBar({ items, view, onViewChange }) {
               >
                 <span className="flex h-6 w-6 items-center justify-center" aria-hidden="true">{item.icon}</span>
                 <span>{item.label}</span>
-              </button>
+              </Button>
             </li>
           )
         })}

@@ -1006,6 +1006,21 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, project
  * @param {string} query
  * @returns {Promise<Array<{ title: string, url: string, snippet: string }>>}
  */
+/**
+ * Rewrite a message into the prompt a model can answer accurately.
+ *
+ * The reply goes back to the composer rather than being sent: the person reads it,
+ * changes any of it, or puts their own words back, and nothing is saved on the way.
+ * @param {string} prompt
+ * @returns {Promise<{ prompt: string, original: string }>}
+ */
+export function enhancePrompt(prompt) {
+  return api('/api/prompts/enhance', {
+    method: 'POST',
+    body: JSON.stringify({ prompt }),
+  });
+}
+
 export async function searchWeb(query) {
   const data = await api('/api/tools/web-search', {
     method: 'POST',

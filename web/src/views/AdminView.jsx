@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '../components/DataRow.jsx';
+import { Select } from '../components/ui.jsx';
 import { fetchAdminOverview, saveAdminModel } from '../lib/api.js';
 import AdminModels from './AdminModels.jsx';
 import AdminPeople from './AdminPeople.jsx';
@@ -34,7 +35,7 @@ export default function AdminView() {
   if (!overview) return <section className="view calm admin-view"><div className="view-head"><div><h1>Admin</h1></div></div><div className="skeleton" role="status" aria-label="Loading the admin report" /></section>;
   return (
     <section className="view calm calm-wide admin-view">
-      <div className="view-head"><div><h1>Admin</h1><p>A quiet control room for people, models, pricing and platform health.</p></div><label className="field admin-window"><span>Period</span><select value={days} onChange={(event) => setDays(Number(event.target.value))}>{WINDOWS.map((value) => <option key={value} value={value}>Last {value} days</option>)}</select></label></div>
+      <div className="view-head"><div><h1>Admin</h1><p>A quiet control room for people, models, pricing and platform health.</p></div><label className="field admin-window"><span>Period</span><Select value={days} onChange={(event) => setDays(Number(event.target.value))}>{WINDOWS.map((value) => <option key={value} value={value}>Last {value} days</option>)}</Select></label></div>
       {error && <Alert tone="danger">{error}</Alert>}{saved && <Alert>{saved}</Alert>}{overview.marginKobo < 0 && <Alert tone="danger">Supplier spend is higher than revenue for this period. Review the quota weights and plan prices.</Alert>}
       <div id="admin-stats" className="scroll-mt-4"><AdminStats overview={overview} rate={overview.nairaPerUsd} /></div>
       <div id="admin-people" className="scroll-mt-4"><AdminPeople days={days} plans={overview.plans} /></div>

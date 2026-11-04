@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Chip, IconButton, InlineAlert } from '../components/ui.jsx';
+import { Button, Checkbox, Chip, IconButton, InlineAlert, Input, Select, Textarea } from '../components/ui.jsx';
 import { AutomationIcon, DeleteIcon, PlusIcon } from '../components/Icons.jsx';
 // The schedule sentence is the one the chat card uses, read back out of the card
 // rather than written again here, so "Every day at 07:00" cannot come to mean two
@@ -294,7 +294,7 @@ export default function AutomationsView() {
           <label className="project-field-label" htmlFor="automation-new-prompt">
             What should Zuri do each time
           </label>
-          <textarea
+          <Textarea
             id="automation-new-prompt"
             className="project-input automation-prompt"
             rows={3}
@@ -310,7 +310,7 @@ export default function AutomationsView() {
             <label className="project-field-label" htmlFor="automation-new-cadence">
               How often
             </label>
-            <select
+            <Select
               id="automation-new-cadence"
               className="project-input"
               value={cadenceType}
@@ -321,7 +321,7 @@ export default function AutomationsView() {
                   {entry.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {cadenceType === 'daily' && (
@@ -329,7 +329,7 @@ export default function AutomationsView() {
               <label className="project-field-label" htmlFor="automation-new-time">
                 Time of day
               </label>
-              <input
+              <Input
                 id="automation-new-time"
                 className="project-input"
                 type="time"
@@ -344,7 +344,7 @@ export default function AutomationsView() {
               <label className="project-field-label" htmlFor="automation-new-interval">
                 Minutes apart
               </label>
-              <input
+              <Input
                 id="automation-new-interval"
                 className="project-input"
                 type="number"
@@ -362,7 +362,7 @@ export default function AutomationsView() {
               <label className="project-field-label" htmlFor="automation-new-at">
                 Date and time
               </label>
-              <input
+              <Input
                 id="automation-new-at"
                 className="project-input"
                 type="datetime-local"
@@ -373,14 +373,13 @@ export default function AutomationsView() {
           )}
         </div>
 
-        <label className="admin-check">
-          <input
-            type="checkbox"
-            checked={deliverEmail}
-            onChange={(event) => setDeliverEmail(event.target.checked)}
-          />
+        <Checkbox
+          className="admin-check"
+          checked={deliverEmail}
+          onChange={(event) => setDeliverEmail(event.target.checked)}
+        >
           <span>Email me the result</span>
-        </label>
+        </Checkbox>
 
         <p className="project-form-note">
           {cadenceType === 'daily'
@@ -394,7 +393,7 @@ export default function AutomationsView() {
 
         <div className="project-form-actions">
           {/* A blank instruction is not an automation, so the button stays off until there is one. */}
-          <Button type="submit" disabled={adding || prompt.trim() === ''}>
+          <Button type="submit" isDisabled={adding || prompt.trim() === ''}>
             <PlusIcon size={14} aria-hidden="true" />
             {adding ? 'Saving...' : 'Save automation'}
           </Button>
@@ -469,7 +468,7 @@ export default function AutomationsView() {
                       </Button>
                       <Button
                         variant="ghost"
-                        disabled={busyId === automation.id}
+                        isDisabled={busyId === automation.id}
                         onClick={() => void togglePaused(automation)}
                       >
                         {automation.enabled ? 'Pause' : 'Resume'}
@@ -478,7 +477,7 @@ export default function AutomationsView() {
                         label={`Delete ${name}`}
                         tone="danger"
                         size="sm"
-                        disabled={busyId === automation.id}
+                        isDisabled={busyId === automation.id}
                         onClick={() => {
                           setConfirmId(automation.id);
                           setActionError('');
@@ -498,7 +497,7 @@ export default function AutomationsView() {
                         <Button
                           variant="ghost"
                           className="task-confirm-delete"
-                          disabled={busyId === automation.id}
+                          isDisabled={busyId === automation.id}
                           onClick={() => void remove(automation)}
                         >
                           Delete

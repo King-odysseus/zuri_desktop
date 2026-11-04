@@ -11,9 +11,10 @@
  * toggle is the only thing that sets it, so nobody lands on it by default.
  */
 @import "tailwindcss";
-@import "flowbite-react/plugin/tailwindcss";
+/* HeroUI ships its own layered component CSS, so the build needs the package
+   stylesheet rather than a plugin that scans HeroUI's class list. */
+@import "@heroui/styles";
 @source "./**/*.{jsx,js}";
-@source "../../node_modules/flowbite-react/dist";
 /* The chat answer is rendered by the desktop app's own markdown component, so the
    utilities it uses have to be generated for this build too or a reply would lose
    its code blocks, lists and tables on the web. */
@@ -21,9 +22,69 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Tailwind and Flowbite React generate utilities; these tokens give those
- * utilities the site's own colours, so a Flowbite button, badge or progress bar
- * wears the same accent as the rest of the page instead of Flowbite's cyan.
+ * HeroUI component tweaks. HeroUI's controls carry their own pill radius; this
+ * page already owns the shape and size of a pill through its radius tokens, so
+ * HeroUI follows them rather than the other way round. Kept in the component
+ * layer so a page-level rule still wins when it needs to.
+ */
+@layer components {
+  .button,
+  .chip,
+  .select__trigger {
+    border-radius: var(--button-radius, 9999px);
+  }
+
+  .input,
+  .textarea {
+    border-radius: var(--field-radius);
+  }
+}
+
+/*
+ * HeroUI theme mapping. HeroUI paints its components from its own variable
+ * names, most of which this stylesheet already owns (surface, accent, muted,
+ * success, warning, danger). The rest are filled in here from the product
+ * tokens so a HeroUI control is the product's control: navy fill, soft blue
+ * focus, fill-only edges and the 12px/14px control radii from the style guide.
+ * Custom properties resolve at use time, so the dark block needs no repeat.
+ */
+:root {
+  --radius: 0.75rem;
+  --field-radius: 0.875rem;
+  --foreground: var(--text);
+  --default: var(--surface-secondary);
+  --default-hover: var(--surface-tertiary);
+  --default-foreground: var(--text);
+  --default-soft: var(--surface-secondary);
+  --default-soft-foreground: var(--text);
+  --default-soft-hover: var(--surface-tertiary);
+  --field-foreground: var(--text);
+  --field-placeholder: var(--muted);
+  --field-border: var(--control-border);
+  --field-border-hover: var(--control-border);
+  --field-border-focus: transparent;
+  --field-hover: var(--surface-tertiary);
+  --focus: var(--brand-blue);
+  --field-focus: var(--brand-blue);
+  --border: var(--hairline);
+  --border-secondary: var(--hairline);
+  --border-tertiary: var(--hairline);
+  --separator: var(--hairline);
+  --separator-secondary: var(--hairline);
+  --surface-hover: var(--surface-tertiary);
+  --accent-soft: var(--brand-blue-soft);
+  --accent-soft-foreground: var(--brand-blue-ink);
+  --accent-soft-hover: var(--brand-blue-soft);
+  --danger-foreground: #ffffff;
+  --success-foreground: #ffffff;
+  --warning-foreground: #ffffff;
+  --overlay-foreground: var(--text);
+}
+
+/*
+ * Tailwind generates the utilities; these tokens give those
+ * utilities the site's own colours, so a HeroUI button, badge or progress bar
+ * wears the same accent as the rest of the page instead of the library's default.
  */
 @theme inline {
   --color-canvas: var(--canvas);
@@ -514,7 +575,7 @@ a:hover {
 }
 
 /*
- * Flowbite paints a 4px rounded ring on whatever was clicked last and keeps it
+ * HeroUI paints a rounded focus ring on whatever was clicked last and keeps it
  * there while the control holds focus, so a nav row or an icon button went on
  * looking selected long after the click. A pointer press is not a request for a
  * focus outline; a keyboard press still is, and that one is drawn square so it
@@ -3736,7 +3797,7 @@ a.download-card:hover {
 
 /*
  * The composer's add menu. Two things went wrong when this was written with
- * utilities alone: Flowbite's Button is an inline-flex control that centres its
+ * utilities alone: HeroUI's Button is an inline-flex control that centres its
  * contents, so each row's icon and label started at a different place, and the
  * panel's own bottom edge rested on the composer instead of clearing it. Both
  * are decided here instead of by utilities, so every row starts on one line.
@@ -3759,7 +3820,7 @@ a.download-card:hover {
 .chat-menu-back {
   display: flex;
   align-items: center;
-  /* Flowbite's Button would centre the row; a menu reads down a single gutter. */
+  /* HeroUI's Button would centre the row; a menu reads down a single gutter. */
   justify-content: flex-start !important;
   gap: 10px;
   width: 100%;
@@ -3843,7 +3904,7 @@ a.download-card:hover {
   box-shadow: var(--shadow-soft);
 }
 
-/* Flowbite's Textarea supplies the element and its accessibility; the site supplies
+/* HeroUI's TextArea supplies the element and its accessibility; the site supplies
    the paint, so the field sits inside the composer without a second border. */
 .chat-composer .chat-input {
   flex: 1 1 auto;
@@ -3877,7 +3938,7 @@ a.download-card:hover {
   color: var(--muted);
 }
 
-/* The chip is a Flowbite Dropdown: its trigger button is the chip, restyled here so
+/* The chip is a HeroUI dropdown: its trigger button is the chip, restyled here so
    the two surfaces show the same plain name and chevron beside Send. */
 .chat-model-slot {
   position: relative;
@@ -4065,6 +4126,63 @@ a.download-card:hover {
   opacity: 0.4;
   box-shadow: none;
   cursor: not-allowed;
+}
+
+/* The prompt enhancer beside Send: a quiet round button, so Send stays the only
+   filled control in the composer. `is-active` means the box holds a rewrite, and the
+   same button now puts the person's own words back. */
+.chat-enhance {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.chat-enhance:hover:not(:disabled) {
+  background: var(--surface-tertiary);
+  color: var(--text);
+}
+
+.chat-enhance.is-active {
+  color: var(--accent);
+}
+
+.chat-enhance:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* A pulse rather than a spinner: the button keeps its shape and position while the
+   rewrite is on its way, so nothing in the composer jumps. */
+.chat-enhance svg.is-busy {
+  animation: chat-enhance-pulse 1s ease-in-out infinite;
+}
+
+@keyframes chat-enhance-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-enhance svg.is-busy {
+    animation: none;
+    opacity: 0.6;
+  }
 }
 
 .chat-composer .chat-send.is-stop {

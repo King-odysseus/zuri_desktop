@@ -50,7 +50,7 @@ export default function NotificationsView() {
         <BellIcon aria-hidden="true" />
       </div>
       <div className="view-actions">
-        <Button variant="secondary" size="sm" onClick={enablePush} disabled={pushState === 'loading' || pushState === 'enabled'}>
+        <Button variant="secondary" size="sm" onClick={enablePush} isDisabled={pushState === 'loading' || pushState === 'enabled'}>
           {pushState === 'enabled' ? 'Notifications enabled' : pushState === 'loading' ? 'Enabling...' : 'Enable notifications'}
         </Button>
       </div>

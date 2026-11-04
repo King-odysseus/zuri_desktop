@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from './ui.jsx';
+import { Button, Input } from './ui.jsx';
 import { ArchiveIcon, ChatIcon, DeleteIcon, EditIcon, PinIcon } from './Icons.jsx';
 
 function formatDate(value) {
@@ -89,7 +89,7 @@ export default function HistoryView({ onSelectThread }) {
                   <div className="min-w-0 flex-1">
                     {renamingId === thread.id ? (
                       <form className="flex gap-2" onSubmit={(event) => { event.preventDefault(); void saveRename(thread); }}>
-                        <input
+                        <Input
                           aria-label="Chat title"
                           autoFocus
                           className="min-w-0 flex-1 rounded-lg border border-border bg-background px-2 py-1 text-sm"

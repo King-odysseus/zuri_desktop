@@ -1,5 +1,6 @@
 import Footer from './Footer.jsx';
 import { AgentIcon, BoltIcon, BrainIcon, GlobeIcon, LockIcon, LogoMark } from './Icons.jsx';
+import { Button } from './ui.jsx';
 
 const TRUST = [
   { icon: <LockIcon />, label: 'Encrypted in transit' },
@@ -27,7 +28,7 @@ export default function AuthShell({ asideTitle, asideCopy, onNavigate, children 
     <main className="auth-page">
       <aside className="auth-aside">
         <div className="auth-aside-inner">
-          <button
+          <Button variant="ghost"
             type="button"
             className="brand auth-brand"
             onClick={() => onNavigate('/')}
@@ -37,7 +38,7 @@ export default function AuthShell({ asideTitle, asideCopy, onNavigate, children 
               <LogoMark size={20} />
             </span>
             <span className="brand-name">Zuri Cloud</span>
-          </button>
+          </Button>
           <span className="auth-eyebrow">
             <AgentIcon size={13} aria-hidden="true" />
             Your AI agent

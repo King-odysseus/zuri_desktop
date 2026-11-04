@@ -1,4 +1,4 @@
-import { Notice as FlowbiteNotice } from './ui.jsx';
+import { Notice as UiNotice } from './ui.jsx';
 
 /**
  * Status line under the bar. Kept as a live region so a payment confirmation or
@@ -6,5 +6,5 @@ import { Notice as FlowbiteNotice } from './ui.jsx';
  */
 export default function NoticeBar({ notice }) {
   if (!notice?.message) return null;
-  return <FlowbiteNotice kind={notice.kind}>{notice.message}</FlowbiteNotice>;
+  return <UiNotice kind={notice.kind}>{notice.message}</UiNotice>;
 }

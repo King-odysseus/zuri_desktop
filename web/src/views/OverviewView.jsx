@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PlusIcon } from '../../../src/renderer-react/Icons.jsx';
+import { Button } from '../components/ui.jsx';
 import { fetchConversations } from '../lib/api.js';
 import { formatDate, formatNaira, formatRelativeTime, formatTokens, greetingFor } from '../lib/format.js';
 
@@ -245,25 +246,25 @@ export default function OverviewView({ me, usage, onViewChange }) {
         // rather than the alert panel, which would move the buttons below it.
         <div role="status" className={`calm-note ${banner.tone === 'danger' ? 'is-danger' : banner.tone === 'warning' ? 'is-warning' : 'is-info'}`}>
           {banner.message}{' '}
-          <button type="button" onClick={() => onViewChange?.('plans')} className="calm-link">
+          <Button type="button" variant="ghost" onClick={() => onViewChange?.('plans')} className="calm-link">
             {banner.action}
-          </button>
+          </Button>
         </div>
       )}
 
       <div className="calm-actions" style={{ paddingBottom: 22 }}>
-        <button type="button" onClick={() => onViewChange?.('chat')} className="calm-primary">
+        <Button type="button" variant="primary" onClick={() => onViewChange?.('chat')} className="calm-primary">
           <PlusIcon className="size-4" aria-hidden="true" />
           New chat
-        </button>
+        </Button>
       </div>
 
       <div className="calm-section">
         <div className="calm-section-head">
           <h2>Your allowance</h2>
-          <button type="button" onClick={() => onViewChange?.('plans')} className="calm-link">
+          <Button type="button" variant="ghost" onClick={() => onViewChange?.('plans')} className="calm-link">
             Manage plan
-          </button>
+          </Button>
         </div>
         <div
           role="progressbar"
@@ -320,9 +321,9 @@ export default function OverviewView({ me, usage, onViewChange }) {
       <div className="calm-section">
         <div className="calm-section-head">
           <h2>Recent chats</h2>
-          <button type="button" onClick={() => onViewChange?.('chat')} className="calm-link">
+          <Button type="button" variant="ghost" onClick={() => onViewChange?.('chat')} className="calm-link">
             See all
-          </button>
+          </Button>
         </div>
         {chatsFailed ? (
           <p className="calm-help">Chats could not be loaded.</p>
@@ -347,9 +348,9 @@ export default function OverviewView({ me, usage, onViewChange }) {
       <div className="calm-section">
         <div className="calm-section-head">
           <h2>Billing period</h2>
-          <button type="button" onClick={() => onViewChange?.('billing')} className="calm-link">
+          <Button type="button" variant="ghost" onClick={() => onViewChange?.('billing')} className="calm-link">
             Open billing
-          </button>
+          </Button>
         </div>
         <div className="calm-lines">
           <div className="calm-line">
@@ -380,7 +381,8 @@ export default function OverviewView({ me, usage, onViewChange }) {
         <h2>Go to</h2>
         <div className="calm-lines">
           {QUICK_ACTIONS.map(({ view, title, subtitle }) => (
-            <button
+            <Button
+              variant="ghost"
               key={view}
               type="button"
               onClick={() => onViewChange?.(view)}
@@ -389,7 +391,7 @@ export default function OverviewView({ me, usage, onViewChange }) {
             >
               <span>{title}</span>
               <span className="calm-help">{subtitle}</span>
-            </button>
+            </Button>
           ))}
         </div>
       </div>

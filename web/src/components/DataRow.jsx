@@ -1,4 +1,4 @@
-import { Alert as FlowbiteAlert, Progress } from 'flowbite-react';
+import { InlineAlert, UsageBar } from './ui.jsx';
 
 /** A label/value line used by every dashboard table. */
 export function DataRow({ label, children }) {
@@ -11,31 +11,15 @@ export function DataRow({ label, children }) {
 }
 
 /**
- * Token allowance bar. Flowbite supplies role="progressbar" and aria-valuenow;
- * the site's bar classes paint it, and is-warning takes over near the limit.
+ * Token allowance bar. HeroUI's ProgressBar supplies role="progressbar" and
+ * aria-valuenow, and the warning colour takes over near the limit, so the dashboards
+ * and the account page report the same figure the same way.
  */
 export function ProgressBar({ percent, warn }) {
-  const value = Math.min(100, Math.max(0, Math.round(Number(percent) || 0)));
-  return (
-    <Progress
-      progress={value}
-      textLabel={`usage ${value}%`}
-      theme={{ base: 'bar', bar: 'bar-fill', color: { accent: warn ? 'is-warning' : '' } }}
-      color="accent"
-    />
-  );
+  return <UsageBar percent={percent} warn={warn} />;
 }
 
 /** Inline status messages: warning by default, danger when the limit is gone. */
 export function Alert({ tone = 'warning', children }) {
-  if (!children) return null;
-  return (
-    <FlowbiteAlert
-      color={tone === 'danger' ? 'failure' : 'warning'}
-      className={`alert${tone === 'danger' ? ' is-danger' : ''}`}
-      role="status"
-    >
-      {children}
-    </FlowbiteAlert>
-  );
+  return <InlineAlert tone={tone}>{children}</InlineAlert>;
 }

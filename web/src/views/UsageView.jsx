@@ -118,7 +118,7 @@ export default function UsageView({ usage, limits, topups = [], busyTopup = '', 
                     {formatNaira(pack.amountKobo)}
                     <Button
                       variant="secondary"
-                      disabled={busy}
+                      isDisabled={busy}
                       aria-label={`Buy ${pack.name}`}
                       onClick={() => onTopUp?.(pack.code)}
                     >

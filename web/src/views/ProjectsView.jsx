@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Button, InlineAlert } from '../components/ui.jsx';
+import { Button, InlineAlert, Input, Textarea } from '../components/ui.jsx';
 import {
   addProjectFile,
   createProject,
@@ -429,7 +429,7 @@ export default function ProjectsView({ onStartChat }) {
               <label className="project-field-label" htmlFor="project-new-name">
                 Name
               </label>
-              <input
+              <Input
                 id="project-new-name"
                 className="project-input"
                 maxLength={NAME_MAX_LENGTH}
@@ -444,7 +444,7 @@ export default function ProjectsView({ onStartChat }) {
               <label className="project-field-label" htmlFor="project-new-instructions">
                 Instructions (optional)
               </label>
-              <textarea
+              <Textarea
                 id="project-new-instructions"
                 className="project-textarea"
                 rows={4}
@@ -464,13 +464,13 @@ export default function ProjectsView({ onStartChat }) {
               </InlineAlert>
             )}
             <div className="project-form-actions">
-              <Button type="submit" disabled={createBusy || newName.trim() === ''}>
+              <Button type="submit" isDisabled={createBusy || newName.trim() === ''}>
                 {createBusy ? 'Creating...' : 'Save project'}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                disabled={createBusy}
+                isDisabled={createBusy}
                 onClick={() => {
                   setCreating(false);
                   setNewName('');
@@ -502,8 +502,9 @@ export default function ProjectsView({ onStartChat }) {
               const chats = Math.max(0, Math.floor(Number(project?.conversationCount) || 0));
               const files = Math.max(0, Math.floor(Number(project?.fileCount) || 0));
               return (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   className="project-card"
                   key={project.id}
                   onClick={() => void openProject(project.id)}
@@ -513,7 +514,7 @@ export default function ProjectsView({ onStartChat }) {
                   </span>
                   <span className="project-card-name">{project.name || 'Untitled project'}</span>
                   <span className="project-card-meta">{countsLabel(chats, files)}</span>
-                </button>
+                </Button>
               );
             })}
           </div>
@@ -538,10 +539,10 @@ export default function ProjectsView({ onStartChat }) {
     <section className="view project-view">
       <div className="view-head">
         <div>
-          <button type="button" className="project-back" onClick={closeProject}>
+          <Button type="button" variant="ghost" className="project-back" onClick={closeProject}>
             <ChevronLeftIcon size={16} aria-hidden="true" />
             All projects
-          </button>
+          </Button>
           <h1>{project.name || 'Project'}</h1>
           <p className="project-meta">{countsLabel(chatsInProject, filesInProject)}</p>
         </div>
@@ -579,7 +580,7 @@ export default function ProjectsView({ onStartChat }) {
             <label className="project-field-label" htmlFor="project-instructions">
               Instructions for this project
             </label>
-            <textarea
+            <Textarea
               id="project-instructions"
               className="project-textarea"
               rows={5}
@@ -599,14 +600,14 @@ export default function ProjectsView({ onStartChat }) {
               </InlineAlert>
             )}
             <div className="project-form-actions">
-              <Button type="submit" disabled={instructionsBusy}>
+              <Button type="submit" isDisabled={instructionsBusy}>
                 <CheckIcon size={14} aria-hidden="true" />
                 {instructionsBusy ? 'Saving...' : 'Save instructions'}
               </Button>
               <Button
                 type="button"
                 variant="ghost"
-                disabled={instructionsBusy}
+                isDisabled={instructionsBusy}
                 onClick={() => {
                   setEditingInstructions(false);
                   setInstructionsError('');
@@ -675,7 +676,7 @@ export default function ProjectsView({ onStartChat }) {
                 <span className="project-file-actions">
                   <Button
                     variant="ghost"
-                    disabled={fileBusy}
+                    isDisabled={fileBusy}
                     aria-label={
                       confirmFileId === file.id
                         ? `Confirm deleting ${file.name || 'this file'}`
@@ -704,7 +705,7 @@ export default function ProjectsView({ onStartChat }) {
           <Button
             variant="secondary"
             onClick={() => onStartChat?.(project)}
-            disabled={!project.id || typeof onStartChat !== 'function'}
+            isDisabled={!project.id || typeof onStartChat !== 'function'}
           >
             <PlusIcon size={14} aria-hidden="true" />
             New chat in this project
@@ -736,7 +737,7 @@ export default function ProjectsView({ onStartChat }) {
         </p>
         <Button
           variant="ghost"
-          disabled={deleteBusy || !project.id}
+          isDisabled={deleteBusy || !project.id}
           onClick={() => {
             if (confirmProject) void removeProject();
             else setConfirmProject(true);
@@ -746,7 +747,7 @@ export default function ProjectsView({ onStartChat }) {
           {confirmProject ? 'Confirm delete project' : 'Delete project'}
         </Button>
         {confirmProject && (
-          <Button variant="ghost" disabled={deleteBusy} onClick={() => setConfirmProject(false)}>
+          <Button variant="ghost" isDisabled={deleteBusy} onClick={() => setConfirmProject(false)}>
             Keep it
           </Button>
         )}

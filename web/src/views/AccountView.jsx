@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DataRow } from '../components/DataRow.jsx';
-import { Button } from '../components/ui.jsx';
+import { Button, Card, Input, Textarea } from '../components/ui.jsx';
 import { createMemory, deleteMemory, listMemories, setPassword, updateAccountName, updateMemory } from '../lib/api.js';
 import { formatDate } from '../lib/format.js';
 
@@ -199,15 +199,15 @@ export default function AccountView({ me, onSignOut }) {
         <span className={`chip${statusTone(user.status)}`}>{statusLabel(user.status)}</span>
       </div>
 
-      <article className="card">
+      <Card className="card">
         <p className="stat-label">Your details</p>
         <form className="form-stack" onSubmit={saveName} style={{ marginTop: 12 }} noValidate>
           <label className="field">
             <span>Your name</span>
-            <input value={displayName} maxLength={60} onChange={(event) => setDisplayName(event.target.value)} placeholder="What should Zuri call you?" />
+            <Input value={displayName} maxLength={60} onChange={(event) => setDisplayName(event.target.value)} placeholder="What should Zuri call you?" />
           </label>
           {nameMessage && <p className={nameMessage.ok ? 'form-success' : 'form-error'} role="status">{nameMessage.text}</p>}
-          <div className="card-actions"><Button type="submit" disabled={nameBusy}>{nameBusy ? 'Saving...' : 'Save name'}</Button></div>
+          <div className="card-actions"><Button type="submit" isDisabled={nameBusy}>{nameBusy ? 'Saving...' : 'Save name'}</Button></div>
         </form>
         <div className="row-list" style={{ marginTop: 8 }}>
           <DataRow label="Name">{name}</DataRow>
@@ -221,9 +221,9 @@ export default function AccountView({ me, onSignOut }) {
             </DataRow>
           )}
         </div>
-      </article>
+      </Card>
 
-      <article className="card">
+      <Card className="card">
         <p className="stat-label">Saved memories</p>
         <p className="stat-meta">
           Short facts and preferences you choose to keep across chats. Zuri uses them as context, and you can remove them at any time.
@@ -231,7 +231,7 @@ export default function AccountView({ me, onSignOut }) {
         <form className="form-stack" onSubmit={saveMemory} style={{ marginTop: 12 }} noValidate>
           <label className="field">
             <span>Add a memory</span>
-            <textarea
+            <Textarea
               value={memoryDraft}
               maxLength={500}
               rows={3}
@@ -239,7 +239,7 @@ export default function AccountView({ me, onSignOut }) {
               placeholder="For example: I prefer short, plain-English reports."
             />
           </label>
-          <div className="card-actions"><Button type="submit" disabled={memoryBusy || memoryDraft.trim() === ''}>{memoryBusy ? 'Saving...' : 'Save memory'}</Button></div>
+          <div className="card-actions"><Button type="submit" isDisabled={memoryBusy || memoryDraft.trim() === ''}>{memoryBusy ? 'Saving...' : 'Save memory'}</Button></div>
         </form>
         {memoryMessage && <p className={memoryMessage.ok ? 'form-success' : 'form-error'} role="status">{memoryMessage.text}</p>}
         {memoryStatus === 'loading' && <p className="stat-meta">Loading memories...</p>}
@@ -250,18 +250,18 @@ export default function AccountView({ me, onSignOut }) {
               <li className="data-row" key={memory.id}>
                 {editingMemoryId === memory.id ? (
                   <form className="form-stack" onSubmit={saveEditedMemory} style={{ flex: 1 }}>
-                    <textarea value={editingMemoryText} maxLength={500} rows={2} onChange={(event) => setEditingMemoryText(event.target.value)} />
+                    <Textarea value={editingMemoryText} maxLength={500} rows={2} onChange={(event) => setEditingMemoryText(event.target.value)} />
                     <div className="card-actions">
-                      <Button type="submit" size="sm" disabled={memoryBusy || editingMemoryText.trim() === ''}>Save</Button>
-                      <Button type="button" variant="ghost" size="sm" disabled={memoryBusy} onClick={() => setEditingMemoryId('')}>Cancel</Button>
+                      <Button type="submit" size="sm" isDisabled={memoryBusy || editingMemoryText.trim() === ''}>Save</Button>
+                      <Button type="button" variant="ghost" size="sm" isDisabled={memoryBusy} onClick={() => setEditingMemoryId('')}>Cancel</Button>
                     </div>
                   </form>
                 ) : (
                   <>
                     <span className="data-row-label">{memory.content}</span>
                     <div className="card-actions">
-                      <Button variant="ghost" size="sm" disabled={memoryBusy} onClick={() => { setEditingMemoryId(memory.id); setEditingMemoryText(memory.content); }}>Edit</Button>
-                      <Button variant="ghost" size="sm" disabled={memoryBusy} onClick={() => void removeMemory(memory)}>Delete</Button>
+                      <Button variant="ghost" size="sm" isDisabled={memoryBusy} onClick={() => { setEditingMemoryId(memory.id); setEditingMemoryText(memory.content); }}>Edit</Button>
+                      <Button variant="ghost" size="sm" isDisabled={memoryBusy} onClick={() => void removeMemory(memory)}>Delete</Button>
                     </div>
                   </>
                 )}
@@ -269,9 +269,9 @@ export default function AccountView({ me, onSignOut }) {
             ))}
           </ul>
         )}
-      </article>
+      </Card>
 
-      <article className="card">
+      <Card className="card">
         <p className="stat-label">Password</p>
         {canSetPassword ? (
           <>
@@ -282,7 +282,7 @@ export default function AccountView({ me, onSignOut }) {
             <form className="form-stack" onSubmit={save} style={{ marginTop: 12 }} noValidate>
               <label className="field">
                 <span>New password</span>
-                <input
+                <Input
                   type="password"
                   name="password"
                   autoComplete="new-password"
@@ -294,7 +294,7 @@ export default function AccountView({ me, onSignOut }) {
 
               <label className="field">
                 <span>New password again</span>
-                <input
+                <Input
                   type="password"
                   name="confirm"
                   autoComplete="new-password"
@@ -311,7 +311,7 @@ export default function AccountView({ me, onSignOut }) {
               )}
 
               <div className="card-actions">
-                <Button type="submit" disabled={busy}>
+                <Button type="submit" isDisabled={busy}>
                   {busy ? 'Saving...' : 'Set a password'}
                 </Button>
               </div>
@@ -320,9 +320,9 @@ export default function AccountView({ me, onSignOut }) {
         ) : (
           <p className="stat-meta">{passwordNote}</p>
         )}
-      </article>
+      </Card>
 
-      <article className="card">
+      <Card className="card">
         <p className="stat-label">Session</p>
         <p className="stat-meta">
           Signing out here ends this browser session. The desktop app keeps its own sign-in and is not
@@ -333,7 +333,7 @@ export default function AccountView({ me, onSignOut }) {
             Sign out
           </Button>
         </div>
-      </article>
+      </Card>
     </section>
   );
 }

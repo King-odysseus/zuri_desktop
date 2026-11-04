@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
+import { Button, IconButton, InlineAlert, Input, Select } from '../components/ui.jsx';
 import { BellIcon, CheckIcon, DeleteIcon, PlusIcon } from '../components/Icons.jsx';
 import { createReminder, deleteReminder, listReminders, updateReminder } from '../lib/api.js';
 
@@ -228,7 +228,7 @@ export default function RemindersView() {
             <label className="project-field-label" htmlFor="reminder-new-title">
               What should Zuri bring up
             </label>
-            <input
+            <Input
               id="reminder-new-title"
               className="project-input"
               maxLength={TITLE_MAX_LENGTH}
@@ -241,7 +241,7 @@ export default function RemindersView() {
             <label className="project-field-label" htmlFor="reminder-new-due">
               When
             </label>
-            <input
+            <Input
               id="reminder-new-due"
               className="project-input"
               type="datetime-local"
@@ -253,7 +253,7 @@ export default function RemindersView() {
             <label className="project-field-label" htmlFor="reminder-new-repeat">
               How often
             </label>
-            <select
+            <Select
               id="reminder-new-repeat"
               className="project-input"
               value={repeat}
@@ -264,7 +264,7 @@ export default function RemindersView() {
                   {entry.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -273,7 +273,7 @@ export default function RemindersView() {
             <label className="project-field-label" htmlFor="reminder-new-interval">
               Minutes apart
             </label>
-            <input
+            <Input
               id="reminder-new-interval"
               className="project-input"
               type="number"
@@ -298,7 +298,7 @@ export default function RemindersView() {
 
         <div className="project-form-actions">
           {/* A blank title is not a reminder, so the button stays off until there is one. */}
-          <Button type="submit" disabled={adding || title.trim() === ''}>
+          <Button type="submit" isDisabled={adding || title.trim() === ''}>
             <PlusIcon size={14} aria-hidden="true" />
             {adding ? 'Saving...' : 'Set reminder'}
           </Button>
@@ -340,7 +340,7 @@ export default function RemindersView() {
                       size="sm"
                       className="reminder-tick"
                       aria-pressed={Boolean(reminder.done)}
-                      disabled={busyId === reminder.id}
+                      isDisabled={busyId === reminder.id}
                       onClick={() => void toggle(reminder)}
                     >
                       {reminder.done && <CheckIcon size={14} aria-hidden="true" />}
@@ -361,7 +361,7 @@ export default function RemindersView() {
                         label={`Delete ${name}`}
                         tone="danger"
                         size="sm"
-                        disabled={busyId === reminder.id}
+                        isDisabled={busyId === reminder.id}
                         onClick={() => {
                           setConfirmId(reminder.id);
                           setActionError('');
@@ -379,7 +379,7 @@ export default function RemindersView() {
                         <Button
                           variant="ghost"
                           className="task-confirm-delete"
-                          disabled={busyId === reminder.id}
+                          isDisabled={busyId === reminder.id}
                           onClick={() => void remove(reminder)}
                         >
                           Delete

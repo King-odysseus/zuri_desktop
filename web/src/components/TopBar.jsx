@@ -1,5 +1,5 @@
 import { LogoMark, MoonIcon, SunIcon } from './Icons.jsx';
-import { Button } from './ui.jsx';
+import { Button, IconButton } from './ui.jsx';
 import { themeLabel } from '../lib/theme.js';
 
 /**
@@ -24,12 +24,12 @@ export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onNav
   return (
     <header className="topbar">
       <div className="topbar-inner">
-        <button type="button" className="brand" onClick={() => onNavigate('/')} aria-label="Zuri Cloud home">
+        <Button type="button" variant="ghost" className="brand" onClick={() => onNavigate('/')} aria-label="Zuri Cloud home">
           <span className="brand-mark">
             <LogoMark size={20} />
           </span>
           <span className="brand-name">Zuri Cloud</span>
-        </button>
+        </Button>
 
         <nav className="topbar-nav" aria-label="Page sections">
           <a href="#features" onClick={(event) => { event.preventDefault(); onNavigate('/#features'); }}>
@@ -44,15 +44,15 @@ export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onNav
         </nav>
 
         <div className="topbar-actions">
-          <button
+          <IconButton
             type="button"
             className="icon-btn"
             onClick={onToggleTheme}
-            aria-label={themeLabel(theme)}
+            label={themeLabel(theme)}
             title={themeLabel(theme)}
           >
             {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-          </button>
+          </IconButton>
           <Button variant="ghost" className="topbar-signin" onClick={onSignIn}>
             Sign in
           </Button>

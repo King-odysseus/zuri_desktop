@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Chip, IconButton, InlineAlert } from '../components/ui.jsx';
+import { Button, Chip, IconButton, InlineAlert, Input, Select } from '../components/ui.jsx';
 import { CheckIcon, DeleteIcon, PlusIcon, TaskIcon } from '../components/Icons.jsx';
 import { createTask, deleteTask, listTasks, updateTask } from '../lib/api.js';
 
@@ -188,7 +188,7 @@ export default function TasksView() {
             <label className="project-field-label" htmlFor="task-new-title">
               What needs doing
             </label>
-            <input
+            <Input
               id="task-new-title"
               className="project-input"
               maxLength={TITLE_MAX_LENGTH}
@@ -201,7 +201,7 @@ export default function TasksView() {
             <label className="project-field-label" htmlFor="task-new-due">
               Due (optional)
             </label>
-            <input
+            <Input
               id="task-new-due"
               className="project-input"
               type="date"
@@ -213,7 +213,7 @@ export default function TasksView() {
             <label className="project-field-label" htmlFor="task-new-priority">
               Priority
             </label>
-            <select
+            <Select
               id="task-new-priority"
               className="project-input"
               value={priority}
@@ -224,7 +224,7 @@ export default function TasksView() {
                   {entry.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
 
@@ -232,7 +232,7 @@ export default function TasksView() {
 
         <div className="project-form-actions">
           {/* A blank title is not a task, so the button stays off until there is one. */}
-          <Button type="submit" disabled={adding || title.trim() === ''}>
+          <Button type="submit" isDisabled={adding || title.trim() === ''}>
             <PlusIcon size={14} aria-hidden="true" />
             {adding ? 'Adding...' : 'Add task'}
           </Button>
@@ -276,7 +276,7 @@ export default function TasksView() {
                       size="sm"
                       className="task-tick"
                       aria-pressed={Boolean(task.done)}
-                      disabled={busyId === task.id}
+                      isDisabled={busyId === task.id}
                       onClick={() => void toggle(task)}
                     >
                       {task.done && <CheckIcon size={14} aria-hidden="true" />}
@@ -306,7 +306,7 @@ export default function TasksView() {
                         label={`Delete ${name}`}
                         tone="danger"
                         size="sm"
-                        disabled={busyId === task.id}
+                        isDisabled={busyId === task.id}
                         onClick={() => {
                           setConfirmId(task.id);
                           setActionError('');
@@ -324,7 +324,7 @@ export default function TasksView() {
                         <Button
                           variant="ghost"
                           className="task-confirm-delete"
-                          disabled={busyId === task.id}
+                          isDisabled={busyId === task.id}
                           onClick={() => void remove(task)}
                         >
                           Delete

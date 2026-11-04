@@ -52,16 +52,17 @@ const ADMIN_SECTIONS = [
 
 function NavList({ view, onViewChange }) {
   return NAV_ITEMS.map((item) => (
-    <button
+    <Button
+      variant="ghost"
       key={item.id}
       type="button"
-      className={`nav-item${view === item.id ? ' is-active' : ''}`}
+      className={`nav-item justify-start${view === item.id ? ' is-active' : ''}`}
       onClick={() => onViewChange(item.id)}
       aria-current={view === item.id ? 'page' : undefined}
     >
       {item.icon}
       <span>{item.label}</span>
-    </button>
+    </Button>
   ));
 }
 
@@ -120,25 +121,26 @@ function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut })
           style={{ left: position.left, bottom: position.bottom }}
         >
           {isAdmin && !inAdmin && (
-            <button type="button" role="menuitem" className={`${row} bg-bronze-soft font-medium text-bronze-ink`} onClick={() => choose(() => onViewChange('admin'))}>
+            <Button type="button" variant="secondary" role="menuitem" className={`${row} bg-bronze-soft font-medium text-bronze-ink`} onClick={() => choose(() => onViewChange('admin'))}>
               <ShieldIcon />
               <span>Switch to admin view</span>
-            </button>
+            </Button>
           )}
-          <button type="button" role="menuitem" className={row} onClick={() => choose(() => onViewChange('settings'))}>
+          <Button type="button" variant="ghost" role="menuitem" className={row} onClick={() => choose(() => onViewChange('settings'))}>
             <SettingsIcon />
             <span>Settings</span>
-          </button>
+          </Button>
           <div role="none" onClick={() => setOpen(false)}>
             <DownloadLink className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-black/5" />
           </div>
-          <button type="button" role="menuitem" className={row} onClick={() => choose(onSignOut)}>
+          <Button type="button" variant="ghost" role="menuitem" className={row} onClick={() => choose(onSignOut)}>
             <SignOutIcon />
             <span>Sign out</span>
-          </button>
+          </Button>
         </div>
       )}
-      <button
+      <Button
+        variant="ghost"
         ref={toggleRef}
         type="button"
         className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-2 text-left hover:bg-black/5"
@@ -152,7 +154,7 @@ function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut })
           <span className="account-email block truncate">{planText}</span>
         </span>
         <ChevronUpIcon className="[.is-collapsed_&]:hidden" />
-      </button>
+      </Button>
     </div>
   );
 }
@@ -226,10 +228,10 @@ function AdminSidebarContents({ user, name, planText, onViewChange, theme, onTog
       </Button>
       <nav className="nav" aria-label="Admin sections">
         {ADMIN_SECTIONS.map((item) => (
-          <button key={item.id} type="button" className="nav-item" onClick={() => jump(item.id)}>
+          <Button variant="ghost" key={item.id} type="button" className="nav-item justify-start" onClick={() => jump(item.id)}>
             <ShieldIcon />
             <span>{item.label}</span>
-          </button>
+          </Button>
         ))}
       </nav>
       <AccountMenu user={user} name={name} planText={planText} inAdmin onViewChange={onViewChange} onSignOut={onSignOut} />

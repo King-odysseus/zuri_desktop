@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AuthShell from '../components/AuthShell.jsx';
-import { Button } from '../components/ui.jsx';
+import { Button, Input } from '../components/ui.jsx';
 import { resetPassword } from '../lib/api.js';
 
 // The code travels in the query string of the link from the email, so it is read
@@ -100,7 +100,7 @@ export default function ResetPasswordView({ onNavigate, onNotify, signedIn = fal
           <form className="form-stack" onSubmit={submit} noValidate>
             <label className="field">
               <span>New password</span>
-              <input
+              <Input
                 type="password"
                 name="password"
                 autoComplete="new-password"
@@ -112,7 +112,7 @@ export default function ResetPasswordView({ onNavigate, onNotify, signedIn = fal
 
             <label className="field">
               <span>New password again</span>
-              <input
+              <Input
                 type="password"
                 name="confirm"
                 autoComplete="new-password"
@@ -128,7 +128,7 @@ export default function ResetPasswordView({ onNavigate, onNotify, signedIn = fal
               </p>
             )}
 
-            <Button type="submit" block disabled={busy}>
+            <Button type="submit" block isDisabled={busy}>
               {busy ? 'Saving your password...' : 'Save the new password'}
             </Button>
           </form>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ArrowRightIcon } from './Icons.jsx';
 import { DOWNLOAD_PLATFORMS, fetchDownloads, formatDownloadSize, recommendedPlatform, refreshDownloads } from '../lib/downloads.js';
+import { Button } from './ui.jsx';
 
 /**
  * Download cards, one per platform.
@@ -85,9 +86,9 @@ export default function DownloadList() {
         </p>
       )}
       {loaded && files.length === 0 && (
-        <button type="button" className="download-release-note" onClick={() => void retry()} disabled={retrying}>
+        <Button variant="ghost" type="button" className="download-release-note" onClick={() => void retry()} isDisabled={retrying}>
           {retrying ? 'Checking again...' : 'Try checking for downloads again'}
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -1,160 +1,253 @@
-import { forwardRef, useId } from 'react';
-import { Badge, Button as FlowbiteButton, Checkbox as FlowbiteCheckbox, Datepicker, Label, Select as FlowbiteSelect, TextInput, Textarea as FlowbiteTextarea } from 'flowbite-react';
+import { forwardRef, useId, Children } from 'react';
+import { CalendarDate } from '@internationalized/date';
+import {
+  Button as HeroButton,
+  Calendar,
+  Checkbox as HeroCheckbox,
+  Chip as HeroChip,
+  DateField as HeroDateField,
+  DatePicker,
+  Input as HeroInput,
+  Label,
+  ListBox,
+  Select as HeroSelect,
+  Radio as HeroRadio,
+  RadioGroup as HeroRadioGroup,
+  TextArea,
+  TextField,
+} from '@heroui/react';
 
-const BUTTON_COLORS = {
-  primary: 'blue',
-  secondary: 'gray',
-  danger: 'failure',
-  ghost: 'light',
-};
+/*
+ * HeroUI is the only component library in the renderer.
+ *
+ * Every control in the window comes through this module, so a page never builds
+ * a button, field, chip or select by hand. HeroUI supplies the semantics (real
+ * button roles, aria wiring between label and field, a listbox popover with
+ * keyboard support) and the skin, painted from the app's own palette because
+ * app.css maps HeroUI's variables onto the theme tokens.
+ */
 
-// Flowbite's own badge palette, kept in step with the tones the app uses. The
-// zuri-chip rules paint over these classes, but a tone with no entry here would
-// still hand the badge a grey border and text underneath them.
-const BADGE_COLORS = {
-  primary: 'info',
-  success: 'success',
-  warning: 'warning',
-  danger: 'failure',
-};
-
-// The chip contract has four tone classes: primary, success, warning and danger.
-// A tone outside that set emitted a class no stylesheet rule matched, so it fell
-// back to Flowbite's grey; every chip now resolves through this map, and `default`
-// is only another name for the primary tint.
-const CHIP_TONES = {
-  default: 'primary',
+// The app's variant names, kept as-is so no call site had to change: the flat
+// default button is HeroUI's ghost, and the tinted secondary is its secondary,
+// which is the soft accent fill with the blue ink on top.
+const BUTTON_VARIANTS = {
+  default: 'ghost',
   primary: 'primary',
+  secondary: 'secondary',
+  ghost: 'ghost',
+  danger: 'danger',
+};
+
+export function Button({ variant = 'default', size, isIconOnly = false, fullWidth = false, isDisabled = false, disabled, onPress, className = '', children, ...props }) {
+  return (
+    <HeroButton
+      variant={BUTTON_VARIANTS[variant] ?? 'ghost'}
+      size={size}
+      isIconOnly={isIconOnly}
+      fullWidth={fullWidth}
+      isDisabled={isDisabled || Boolean(disabled)}
+      onClick={onPress}
+      className={className}
+      {...props}
+    >
+      {children}
+    </HeroButton>
+  );
+}
+
+export function Checkbox({ isSelected = false, checked, onChange, isDisabled = false, disabled, className = '', children, ...props }) {
+  return (
+    <HeroCheckbox
+      isSelected={isSelected || Boolean(checked)}
+      isDisabled={isDisabled || Boolean(disabled)}
+      onChange={(selected) => onChange?.(selected)}
+      className={className}
+      {...props}
+    >
+      <HeroCheckbox.Content>
+        <HeroCheckbox.Control>
+          <HeroCheckbox.Indicator />
+        </HeroCheckbox.Control>
+        {children}
+      </HeroCheckbox.Content>
+    </HeroCheckbox>
+  );
+}
+
+const CHIP_COLORS = {
+  default: 'accent',
+  primary: 'accent',
   success: 'success',
   warning: 'warning',
   danger: 'danger',
 };
 
-const FIELD_CLASSES = 'zuri-field w-full rounded-xl border-0 bg-transparent p-3 text-sm text-foreground shadow-none focus:border-0 focus:ring-0 placeholder:text-muted';
-const FIELD_LABEL_CLASSES = 'zuri-field-label mb-2 block text-sm font-medium text-foreground';
+export function Chip({ color = 'default', size, className = '', children, ...props }) {
+  return (
+    <HeroChip color={CHIP_COLORS[color] ?? 'accent'} size={size} variant="soft" className={className} {...props}>
+      {children}
+    </HeroChip>
+  );
+}
 
 function fieldId(label, id, fallback) {
   const generatedId = useId();
   return id ?? (label ? `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${generatedId.replace(/:/g, '')}` : fallback);
 }
 
-export function Button({ variant = 'default', size, isIconOnly = false, fullWidth = false, isDisabled = false, onPress, className = '', children, ...props }) {
-  const color = BUTTON_COLORS[variant] ?? 'gray';
-  // Flowbite builds a button from its `size` prop (40px tall at the default, with
-  // 20px of side padding), and the page rule in app.css lifts that to 44px, so every
-  // desktop button read oversized. Buttons now take the style guide's compact scale:
-  // 36px tall, 16px of side padding, and square when icon-only. A caller that sets its
-  // own height or width keeps it, which is why the chat row actions at h-7 and the
-  // composer's send button are untouched. The trailing `!` is needed because the page
-  // rule in app.css is more specific than a utility class.
-  const sizedByCaller = /(?:h|min-h|w|min-w|size)-/.test(className);
-  const compact = sizedByCaller ? '' : 'h-9 min-h-9!';
-  const compactSquare = isIconOnly && !sizedByCaller ? 'w-9 min-w-9!' : '';
-  const classes = [
-    'zuri-button rounded-xl',
-    isIconOnly ? 'is-icon-only p-2' : 'px-4',
-    compact,
-    compactSquare,
-    fullWidth ? 'w-full' : '',
-    variant === 'primary' ? 'zuri-button-primary' : '',
-    variant === 'danger' ? 'zuri-button-danger' : '',
-    variant === 'secondary' ? 'zuri-button-secondary' : '',
-    variant === 'secondary' ? 'zuri-selected-pill' : '',
-    variant === 'ghost' ? 'zuri-button-ghost border-0 bg-transparent shadow-none' : '',
-    className,
-  ].filter(Boolean).join(' ');
-
-  return (
-    <FlowbiteButton
-      color={color}
-      size={size}
-      disabled={isDisabled}
-      onClick={onPress}
-      className={classes}
-      {...props}
-    >
-      {children}
-    </FlowbiteButton>
-  );
-}
-
-export function Checkbox({ isSelected = false, onChange, isDisabled = false, className = '', children, ...props }) {
-  return (
-    <label className={`flex items-center gap-2 text-sm text-foreground ${className}`}>
-      <FlowbiteCheckbox
-        className="zuri-checkbox"
-        checked={isSelected}
-        disabled={isDisabled}
-        onChange={(event) => onChange?.(event.target.checked)}
-        {...props}
-      />
-      {children && <span>{children}</span>}
-    </label>
-  );
-}
-
-export function Chip({ color = 'default', size, className = '', children, ...props }) {
-  const tone = CHIP_TONES[color] ?? 'primary';
-  return <Badge color={BADGE_COLORS[tone] ?? 'info'} size={size} className={`zuri-chip zuri-chip-${tone} rounded-full ${className}`.trim()} {...props}>{children}</Badge>;
-}
-
-export function Input({ label, id, isReadOnly = false, isDisabled = false, fullWidth = false, className = '', ...props }) {
+export function Input({ label, id, isReadOnly = false, isDisabled = false, fullWidth = false, className = '', disabled, readOnly, ...props }) {
   const inputId = fieldId(label, id, undefined);
   return (
-    <div className={`zuri-field-wrap ${fullWidth ? 'w-full' : ''} ${className}`.trim()}>
-      {label && <Label htmlFor={inputId} className={FIELD_LABEL_CLASSES}>{label}</Label>}
-      <TextInput id={inputId} readOnly={isReadOnly} disabled={isDisabled} sizing="md" className={`${FIELD_CLASSES} zuri-input`} {...props} />
-    </div>
+    <TextField
+      isDisabled={isDisabled || Boolean(disabled)}
+      isReadOnly={isReadOnly || Boolean(readOnly)}
+      fullWidth={fullWidth}
+      className={className}
+    >
+      {label && <Label htmlFor={inputId}>{label}</Label>}
+      <HeroInput id={inputId} {...props} />
+    </TextField>
   );
 }
 
 function dateValue(value) {
   if (typeof value !== 'string' || value.trim() === '') return null;
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return new CalendarDate(year, month, day);
 }
 
 function localDateValue(value) {
-  if (!(value instanceof Date) || Number.isNaN(value.getTime())) return '';
-  const pad = (part) => String(part).padStart(2, '0');
-  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+  if (!value || typeof value.toString !== 'function') return '';
+  // CalendarDate.toString() is already the ISO day the app stores.
+  return value.toString();
 }
 
-// Datepicker's own `label` prop is only placeholder text, so the visible label
-// comes from the same Label the other fields use.
+// The visible label belongs to DatePicker itself so React Aria wires it to the
+// segmented date input; the popover calendar is HeroUI's own composition.
 export function DateField({ label, value, onChange, className = '', ...props }) {
-  const dateInputId = fieldId(label, undefined, undefined);
   return (
-    <div className={`zuri-field-wrap ${className}`.trim()}>
-      {label && <Label htmlFor={dateInputId} className={FIELD_LABEL_CLASSES}>{label}</Label>}
-      <Datepicker
-        id={dateInputId}
-        placeholder={label}
-        value={dateValue(value)}
-        onChange={(next) => onChange?.(localDateValue(next))}
-        className="zuri-datepicker zuri-calendar-field"
-        {...props}
-      />
-    </div>
+    <DatePicker
+      value={dateValue(value)}
+      onChange={(next) => onChange?.(localDateValue(next))}
+      className={className}
+      {...props}
+    >
+      {label && <Label>{label}</Label>}
+      <HeroDateField.Group>
+        <HeroDateField.Input>
+          {(segment) => <HeroDateField.Segment segment={segment} />}
+        </HeroDateField.Input>
+        <HeroDateField.Suffix>
+          <DatePicker.Trigger>
+            <DatePicker.TriggerIndicator />
+          </DatePicker.Trigger>
+        </HeroDateField.Suffix>
+      </HeroDateField.Group>
+      <DatePicker.Popover>
+        <Calendar aria-label={label ?? 'Choose date'}>
+          <Calendar.Header>
+            <Calendar.YearPickerTrigger>
+              <Calendar.YearPickerTriggerHeading />
+              <Calendar.YearPickerTriggerIndicator />
+            </Calendar.YearPickerTrigger>
+            <Calendar.NavButton slot="previous" />
+            <Calendar.NavButton slot="next" />
+          </Calendar.Header>
+          <Calendar.Grid>
+            <Calendar.GridHeader>
+              {(day) => <Calendar.HeaderCell>{day}</Calendar.HeaderCell>}
+            </Calendar.GridHeader>
+            <Calendar.GridBody>
+              {(date) => <Calendar.Cell date={date} />}
+            </Calendar.GridBody>
+          </Calendar.Grid>
+        </Calendar>
+      </DatePicker.Popover>
+    </DatePicker>
   );
 }
 
-export const ComposerTextarea = forwardRef(function ComposerTextarea({ className = '', ...props }, ref) {
-  return <FlowbiteTextarea ref={ref} className={`composer-textarea resize-none overflow-x-hidden border-0 bg-transparent text-foreground shadow-none placeholder:text-muted ${className}`} {...props} />;
+// The composer types into a bare, borderless field, so it keeps its own class
+// for the page paint while HeroUI still owns the element and its autosize behaviour.
+export const ComposerTextarea = forwardRef(function ComposerTextarea({ className = 'composer-textarea', ...props }, ref) {
+  return <TextArea ref={ref} className={className} {...props} />;
 });
 
-export function Textarea({ label, id, isDisabled = false, className = '', ...props }) {
+export function Textarea({ label, id, isDisabled = false, disabled, className = '', ...props }) {
   const textareaId = fieldId(label, id, undefined);
   return (
-    <div className={`zuri-field-wrap ${className}`.trim()}>
-      {label && <Label htmlFor={textareaId} className={FIELD_LABEL_CLASSES}>{label}</Label>}
-      <FlowbiteTextarea id={textareaId} disabled={isDisabled} className={`${FIELD_CLASSES} zuri-textarea`} {...props} />
-    </div>
+    <TextField isDisabled={isDisabled || Boolean(disabled)} className={className}>
+      {label && <Label htmlFor={textareaId}>{label}</Label>}
+      <TextArea id={textareaId} {...props} />
+    </TextField>
   );
 }
 
-export function Select({ className = '', ...props }) {
-  return <FlowbiteSelect className={`zuri-select rounded-xl ${className}`.trim()} {...props} />;
+// A native <option> list is what the app's pages hand this component, so the
+// children are read as options and handed to HeroUI's ListBox instead.
+function readOptions(children) {
+  return Children.toArray(children)
+    .filter((child) => child?.type === 'option')
+    .map((child) => ({
+      id: String(child.props.value ?? child.props.children),
+      label: child.props.children,
+      isDisabled: Boolean(child.props.disabled),
+    }));
+}
+
+export function Select({ value, onChange, children, className = '', placeholder, isDisabled = false, disabled, ...props }) {
+  const items = readOptions(children);
+  const wanted = String(value ?? '');
+  const selected = items.some((item) => item.id === wanted) ? wanted : null;
+  return (
+    <HeroSelect
+      className={className}
+      placeholder={placeholder ?? 'Choose one'}
+      value={selected}
+      isDisabled={isDisabled || Boolean(disabled)}
+      onChange={(key) => onChange?.({ target: { value: key ?? '' } })}
+      {...props}
+    >
+      <HeroSelect.Trigger>
+        <HeroSelect.Value />
+        <HeroSelect.Indicator />
+      </HeroSelect.Trigger>
+      <HeroSelect.Popover>
+        <ListBox items={items}>
+          {(item) => (
+            <ListBox.Item id={item.id} isDisabled={item.isDisabled}>
+              {item.label}
+            </ListBox.Item>
+          )}
+        </ListBox>
+      </HeroSelect.Popover>
+    </HeroSelect>
+  );
 }
 
 export { Label };
+
+/**
+ * One choice from a short list: the age gate and the settings rows. HeroUI's
+ * RadioGroup owns the arrow-key handling and the single-selection contract, so
+ * the page passes a value and a change handler, never a native radio.
+ */
+export function RadioGroup({ value, onChange, className = '', children, ...props }) {
+  return (
+    <HeroRadioGroup value={value} onChange={onChange} className={className} {...props}>
+      {children}
+    </HeroRadioGroup>
+  );
+}
+
+export function Radio({ value, className = '', children, ...props }) {
+  return (
+    <HeroRadio value={value} className={className} {...props}>
+      <HeroRadio.Control>
+        <HeroRadio.Indicator />
+      </HeroRadio.Control>
+      {children}
+    </HeroRadio>
+  );
+}

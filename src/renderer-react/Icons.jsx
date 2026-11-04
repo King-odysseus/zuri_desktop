@@ -77,6 +77,7 @@ import {
   UserPlus,
   Volume2,
   Wallet,
+  WandSparkles,
   X,
   Zap,
 } from 'lucide-react';
@@ -244,6 +245,8 @@ export const DeleteIcon = family(Trash2, { name: 'DeleteIcon' });
 export const DeviceIcon = family(MonitorSmartphone, { name: 'DeviceIcon' });
 export const DownloadIcon = family(Download, { name: 'DownloadIcon' });
 export const EditIcon = family(Pencil, { name: 'EditIcon' });
+// A pencil with sparkles: the message box being rewritten, not the chat being edited.
+export const EnhanceIcon = family(WandSparkles, { name: 'EnhanceIcon' });
 export const ExpandIcon = family(Maximize2, { name: 'ExpandIcon' });
 export const FeaturesIcon = family(LayoutGrid, { name: 'FeaturesIcon' });
 export const FileIcon = family(FileText, { name: 'FileIcon' });

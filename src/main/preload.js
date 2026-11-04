@@ -108,6 +108,9 @@ const CHANNELS = Object.freeze([
   'zuri:images:library',
   'zuri:images:read',
   'zuri:images:remove',
+  // Rewriting the message box into a clearer prompt: phrasing only, so nothing is
+  // saved and nothing is added to the chat.
+  'zuri:prompts:enhance',
   // The tool registry, so the agents page ticks the tools that really exist rather
   // than trusting a copy kept in the renderer.
   'zuri:tools:list',

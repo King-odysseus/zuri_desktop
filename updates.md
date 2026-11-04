@@ -1,3 +1,15 @@
+## 2026-11-04 - Windows (HeroUI is the only component library on desktop, web and mobile)
+
+- Flowbite React is gone. Both surfaces now render HeroUI v3 (`@heroui/react` + `@heroui/styles`), and the shared `ui.jsx` of each surface is the only way a page reaches a control: Button, IconButton, Input, Textarea, Select, Checkbox, Radio, Chip, Card, UsageBar and Alert are all HeroUI underneath. `flowbite-react` is removed from the dependencies and from both stylesheets.
+- The product palette is mapped onto HeroUI's own CSS variables (`--accent`, `--default`, `--field-*`, `--focus`, `--separator`, radius), so HeroUI controls wear the navy/soft-blue theme in light and dark instead of HeroUI's default violet. Component tweaks live in the `components` layer of each stylesheet: 9999px pills, 12px fields.
+- Every hand-written control was converted: no `<button>`, `<select>` or `<textarea>` remains in `web/src` or `src/renderer-react`, and the only native inputs left are the hidden `type="file"` pickers. Mobile is unaffected in behaviour because Capacitor bundles the same web build (`dist-android`) into the Android project.
+- Android: `dist-android` and `android/app/src/main/assets/public` were rebuilt and synced, so the APK ships the HeroUI bundle.
+- The desktop sidebar check in the selftest asserted a Flowbite-era rule (`.zuri-button > span`) that no longer exists; it now asserts the HeroUI button can still shrink and the thread title still clips. The web chat check now requires zero raw buttons instead of tolerating three.
+- Checked: `npm run selftest` and `npm test` pass, both bundles build, the desktop window shows no console errors, and a DOM audit of the rendered pages found every control carrying HeroUI classes.
+- Key files: web/src/components/ui.jsx, src/renderer-react/ui.jsx, src/renderer-react/SelectField.jsx, web/src/styles.css, src/renderer-react/app.css, scripts/selftest.js, package.json.
+- Other OS action: run `npm install` (new dependencies `@heroui/react` and `@heroui/styles`, `flowbite-react` removed), then `npm test`.
+- Done on: Windows
+
 ## 2026-10-30 - Windows (selftest chat checks no longer race their temporary stores)
 
 - The wordless-turn selftest could fail with CHAT_NOT_FOUND because the preceding text-call check was still using the process-wide temporary store when the next check switched it. The checks now wait at that boundary before changing roots.

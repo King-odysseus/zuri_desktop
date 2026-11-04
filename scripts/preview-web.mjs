@@ -583,6 +583,18 @@ createServer(async (request, response) => {
     });
   }
 
+  // The prompt enhancer, so the button beside Send can be seen working with no provider
+  // key. This is a plain restatement, not a model reply: it exists to show the rewrite
+  // landing in the message box and the undo after it.
+  if (url.pathname === '/api/prompts/enhance' && request.method === 'POST') {
+    const sent = JSON.parse((await readBody(request)) || '{}');
+    const words = String(sent.prompt ?? '').trim();
+    return json(response, {
+      prompt: `Please help me with the following. Answer in three short paragraphs, with one example.\n\nWhat I need: ${words}\n\nAudience: [who it is for]\nBy when: [date]`,
+      original: words,
+    });
+  }
+
   if (url.pathname === '/api/chat' && request.method === 'POST') { streamChatRoute(response); return; }
   if (await conversationRoute(request, response, url)) return;
   if (await projectRoute(request, response, url)) return;

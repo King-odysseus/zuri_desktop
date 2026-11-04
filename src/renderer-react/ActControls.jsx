@@ -55,28 +55,28 @@ export function ModeMenu({ mode, onChange }) {
 
   return (
     <div ref={ref} className="relative shrink-0">
-      <button
+      <Button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Mode: ${current.label}`}
         title={`${current.label}. ${current.note}`}
         className="flex h-10 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted outline-none hover:text-foreground focus:ring-2 focus:ring-accent/30"
-        onClick={() => setOpen((value) => !value)}
+        onPress={() => setOpen((value) => !value)}
       >
         <span>{current.label}</span>
         <ChevronDownIcon size={12} />
-      </button>
+      </Button>
       {open && (
         <div role="menu" aria-label="Mode" className="absolute bottom-full right-0 z-20 mb-2 w-72 rounded-2xl border border-border bg-surface p-1 shadow-lg">
           {CHAT_MODE_CHOICES.map((choice) => (
-            <button
+            <Button
               key={choice.key}
               type="button"
               role="menuitemradio"
               aria-checked={choice.key === mode}
               className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary"
-              onClick={() => {
+              onPress={() => {
                 onChange(choice.key);
                 setOpen(false);
               }}
@@ -86,7 +86,7 @@ export function ModeMenu({ mode, onChange }) {
                 {choice.key === mode && <CheckIcon size={15} />}
               </span>
               <span className="text-xs text-muted">{choice.note}</span>
-            </button>
+            </Button>
           ))}
         </div>
       )}

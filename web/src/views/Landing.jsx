@@ -3,6 +3,7 @@ import { AgentIcon, ArrowRightIcon, BoltIcon, CheckIcon, FileIcon, GaugeIcon, Me
 import Footer from '../components/Footer.jsx';
 import DownloadList from '../components/DownloadList.jsx';
 import ImagePrices from '../components/ImagePrices.jsx';
+import { Button } from '../components/ui.jsx';
 import { fetchImagePrices } from '../lib/api.js';
 import { formatNaira, formatTokens } from '../lib/format.js';
 
@@ -17,9 +18,6 @@ const ANCHOR = 'scroll-mt-[72px]';
 // attribute on <html>, not a class, so the dark variant is written against
 // [data-theme=dark] rather than with Tailwind's dark: variant.
 const NAVY = 'bg-[#0d1b3a] [[data-theme=dark]_&]:bg-[#0d1b3a]';
-// The accent's own foreground token, so a send glyph stays legible when
-// the dark theme swaps the accent for a pale lavender.
-const ON_ACCENT = 'text-[color:var(--accent-foreground)]';
 
 const HERO_POINTS = [
   'One account for desktop and web',
@@ -159,21 +157,13 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             </p>
 
             <div className="flex w-full flex-col gap-2.5 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
-              <button
-                type="button"
-                onClick={() => onNavigate('/signup')}
-                className={`inline-flex min-h-[var(--button-height)] items-center justify-center gap-2 rounded-[var(--button-radius)] bg-accent px-[var(--button-padding-x)] text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
-              >
+              <Button type="button" variant="primary" onClick={() => onNavigate('/signup')}>
                 Start with Zuri
                 <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onClick={() => onNavigate('/#how')}
-                className="inline-flex min-h-[var(--button-height)] items-center justify-center rounded-[var(--button-radius)] border border-brand-blue/40 bg-brand-blue-soft px-[var(--button-padding-x)] text-[14px] font-semibold text-brand-blue-ink transition-colors hover:bg-brand-blue/15"
-              >
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => onNavigate('/#how')}>
                 See the app
-              </button>
+              </Button>
             </div>
 
             <ul className="flex flex-col gap-2 text-[13.5px] text-muted">
@@ -240,14 +230,10 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
             <p className="max-w-[44ch] text-[14.5px] leading-[1.6] text-muted">
               No setup calls and no training week. Most people send their first task within a few minutes.
             </p>
-            <button
-              type="button"
-              onClick={() => onNavigate('/signup')}
-              className={`inline-flex min-h-[var(--button-height)] items-center justify-center gap-2 rounded-[var(--button-radius)] bg-accent px-[var(--button-padding-x)] text-[14px] font-semibold transition-colors hover:bg-accent-hover ${ON_ACCENT}`}
-            >
+            <Button type="button" variant="primary" onClick={() => onNavigate('/signup')}>
               Create an account
               <ArrowRightIcon className="h-4 w-4" aria-hidden="true" />
-            </button>
+            </Button>
 
           </div>
 
@@ -324,18 +310,15 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
                       {formatTokens(plan.monthlyTokens)} tokens each month
                     </p>
 
-                    <button
+                    <Button
                       type="button"
+                      variant={featured ? 'primary' : 'secondary'}
                       onClick={() => onChoose(plan.code)}
-                      disabled={working}
-                      className={`mt-auto inline-flex min-h-[var(--button-height)] w-full items-center justify-center rounded-[var(--button-radius)] px-[var(--button-padding-x)] text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                        featured
-                          ? `bg-accent hover:bg-accent-hover ${ON_ACCENT}`
-                          : 'border border-hairline bg-surface-secondary text-body hover:bg-surface-tertiary'
-                      }`}
+                      isDisabled={working}
+                      className="mt-auto w-full"
                     >
                       {working ? 'Opening checkout...' : `Choose ${plan.name}`}
-                    </button>
+                    </Button>
                   </li>
                 );
               })}
@@ -390,13 +373,16 @@ export default function Landing({ plans, busy, onChoose, onNavigate }) {
                 move to the desktop app with the same account.
               </p>
             </div>
-            <button
+            {/* The one control on the navy band, so it keeps its white paint: the
+                band is dark in both themes and a themed fill would sink into it. */}
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => onNavigate('/signup')}
-              className="inline-flex min-h-[var(--button-height)] w-full items-center justify-center rounded-[var(--button-radius)] bg-white px-[var(--button-padding-x)] text-[14px] font-semibold text-[#0d1b3a] transition-colors hover:bg-white/90 lg:w-auto lg:shrink-0"
+              className="w-full bg-white text-[#0d1b3a] hover:bg-white/90 lg:w-auto lg:shrink-0"
             >
               Start free
-            </button>
+            </Button>
           </div>
         </div>
       </section>

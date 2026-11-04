@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
-import { Textarea } from 'flowbite-react';
-import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, FileIcon, FolderIcon, ICON_SIZE, ImageIcon, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, SpeakIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
-import { Button, IconButton, InlineAlert } from '../components/ui.jsx';
+import { TextArea } from '@heroui/react';
+import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, EnhanceIcon, FileIcon, FolderIcon, ICON_SIZE, ImageIcon, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, SpeakIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
+import { Button, IconButton, InlineAlert, Input } from '../components/ui.jsx';
 import ConversationSearch from '../components/ConversationSearch.jsx';
 // The reply renderer and the clipboard fallback are the desktop app's own modules,
 // imported rather than copied: an answer is then drawn by one set of markdown rules
@@ -28,6 +28,7 @@ import {
   createReminder,
   createTask,
   deleteConversation,
+  enhancePrompt,
   fetchConversation,
   fetchConversations,
   fetchPictureModels,
@@ -213,7 +214,7 @@ function MenuItem({ children, onSelect, role = 'menuitem', checked, className = 
       variant="ghost"
       role={role}
       aria-checked={role === 'menuitemradio' ? checked : undefined}
-      disabled={disabled}
+      isDisabled={disabled}
       title={title}
       className={`chat-menu-row ${className}`.trim()}
       onClick={onSelect}
@@ -696,6 +697,12 @@ export default function ChatView({
   const [threadError, setThreadError] = useState(null);
 
   const [draft, setDraft] = useState(() => readChatDraft());
+  // The prompt enhancer: `enhancing` covers the round trip, and `enhancedFrom` holds the
+  // person's own words while the rewritten ones sit in the box, so the same button can
+  // put them back before anything is sent.
+  const [enhancing, setEnhancing] = useState(false);
+  const [enhancedFrom, setEnhancedFrom] = useState(null);
+  const [enhanceNote, setEnhanceNote] = useState('');
   const [model, setModel] = useState(DEFAULT_CHAT_MODEL);
   // The picture models are the server's catalogue, not a list repeated here: a plan
   // decides which of them this account may use, and the picker says so.
@@ -963,6 +970,8 @@ export default function ChatView({
     setRenamingId(null);
     setConfirmId(null);
     setDraft('');
+    setEnhancedFrom(null);
+    setEnhanceNote('');
     clearChatDraft();
     resetReply();
     setNotables([]);
@@ -1074,6 +1083,51 @@ export default function ChatView({
     [loadConversations, model, projectId],
   );
 
+  /**
+   * Rewrite the message box into a clearer prompt, or put the person's own words back.
+   *
+   * The rewrite replaces the draft instead of being sent, so it can be read and edited
+   * first, and the same button undoes it. Typing by hand clears the undo, because
+   * restoring then would throw away what they just wrote.
+   * @returns {Promise<void>}
+   */
+  const enhance = useCallback(async () => {
+    if (enhancing) return;
+    if (enhancedFrom !== null) {
+      setDraft(enhancedFrom);
+      setEnhancedFrom(null);
+      setEnhanceNote('');
+      return;
+    }
+    const prompt = draft.trim();
+    if (prompt === '') {
+      setEnhanceNote('Write the message you want improved first.');
+      return;
+    }
+    // A picture request reads only words, so the enhancer works on it too; nothing
+    // here depends on the model picked.
+    setEnhanceNote('');
+    setEnhancing(true);
+    try {
+      const improved = await enhancePrompt(prompt);
+      const text = typeof improved?.prompt === 'string' ? improved.prompt.trim() : '';
+      if (text === '') {
+        setEnhanceNote('That message could not be improved. Try again.');
+        return;
+      }
+      setEnhancedFrom(draft);
+      setDraft(text);
+    } catch (error) {
+      setEnhanceNote(
+        Number(error?.status) === 401
+          ? 'Sign in again to improve prompts.'
+          : error?.message ?? 'That message could not be improved. Try again.',
+      );
+    } finally {
+      setEnhancing(false);
+    }
+  }, [draft, enhancedFrom, enhancing]);
+
   const send = useCallback(async (questionOverride = null, { rewrite = false } = {}) => {
     const question = (typeof questionOverride === 'string' ? questionOverride : draft).trim();
     // Regenerating re-asks an earlier question, so only a fresh send carries the file.
@@ -1136,6 +1190,8 @@ export default function ChatView({
     // stay where they are. A fresh send takes them, as it always did.
     if (!rewrite) {
       setDraft('');
+      setEnhancedFrom(null);
+      setEnhanceNote('');
       setAttachment(null);
       setAttachNote('');
       clearChatDraft();
@@ -1599,7 +1655,25 @@ export default function ChatView({
     // Measured after layout: a box that has just mounted reports no content height,
     // which would leave the field one line short of its own placeholder.
     const frame = window.requestAnimationFrame(fit);
-    return () => window.cancelAnimationFrame(frame);
+    // How much text fits on a line depends on the box's width, and that width changes
+    // between a phone and a desktop and when the buttons beside it change. Watching the
+    // width keeps a restored draft readable instead of clipping its second line before
+    // the first keystroke. The first callback lands after layout, so it also corrects a
+    // measurement taken too early.
+    let lastWidth = 0;
+    const observer = typeof ResizeObserver === 'function'
+      ? new ResizeObserver(() => {
+          const width = node.getBoundingClientRect().width;
+          if (Math.abs(width - lastWidth) < 1) return;
+          lastWidth = width;
+          fit();
+        })
+      : null;
+    observer?.observe(node);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+    };
     // showThread is a dependency because the field is not on screen until it is true.
   }, [draft, showThread]);
 
@@ -1724,7 +1798,7 @@ export default function ChatView({
                     void saveRename(conversation.id);
                   }}
                 >
-                  <input
+                  <Input
                     className="chat-recent-input"
                     aria-label="Chat name"
                     maxLength={120}
@@ -1732,7 +1806,7 @@ export default function ChatView({
                     onChange={(event) => setRenameDraft(event.target.value)}
                     autoFocus
                   />
-                  <IconButton type="submit" size="sm" label="Save name" disabled={renameDraft.trim() === ''}>
+                  <IconButton type="submit" size="sm" label="Save name" isDisabled={renameDraft.trim() === ''}>
                     <CheckIcon size={14} aria-hidden="true" />
                   </IconButton>
                   <IconButton
@@ -1745,8 +1819,9 @@ export default function ChatView({
                 </form>
               ) : (
                 <>
-                  <button
+                  <Button
                     type="button"
+                    variant="ghost"
                     className="chat-recent-open"
                     onClick={() => void openConversation(conversation.id)}
                     aria-current={conversation.id === openId ? 'page' : undefined}
@@ -1757,7 +1832,7 @@ export default function ChatView({
                       {conversation.title || 'New chat'}
                     </span>
                     <span className="chat-recent-meta">{formatRelativeTime(stamp(conversation) || undefined)}</span>
-                  </button>
+                  </Button>
                   <span className="chat-recent-actions">
                     {/*
                       * One control per row, as ChatGPT draws it: the actions appear in a
@@ -1991,16 +2066,17 @@ export default function ChatView({
                     * would draw a new image instead of rewriting the words above.
                     */}
                   {message.role === 'assistant' && index === lastAnswerIndex && !streaming && !pictureModel && !message.picture && QUICK_ADJUSTMENTS.map((adjustment) => (
-                    <button
+                    <Button
                       key={adjustment.label}
                       type="button"
+                      variant="ghost"
                       className="chat-quick-adjust"
                       title={`Rewrite: ${adjustment.label}`}
                       aria-label={`Rewrite: ${adjustment.label}`}
                       onClick={() => void send(adjustment.text, { rewrite: true })}
                     >
                       {adjustment.label}
-                    </button>
+                    </Button>
                   ))}
                   <IconButton
                     size="sm"
@@ -2075,6 +2151,7 @@ export default function ChatView({
           {copyNote !== '' && <p className="chat-note is-error">{copyNote}</p>}
           {shareNote !== '' && <p className="chat-note">{shareNote}</p>}
           {attachNote !== '' && <p className="chat-note is-error">{attachNote}</p>}
+          {enhanceNote !== '' && <p className="chat-note is-error">{enhanceNote}</p>}
           {attachment && (
             // The file waiting to go. A picture is drawn as itself, so a phone user
             // sees what they picked before sending instead of a name they have to
@@ -2232,22 +2309,28 @@ export default function ChatView({
               accept=".txt,.text,.md,.markdown,.csv,.tsv,.json,.log,.yml,.yaml,.html,.css,.js,.jsx,.ts,.tsx,.py,.sql,.xml,image/png,image/jpeg,image/webp,image/gif,application/pdf"
               onChange={(event) => void chooseAttachment(event)}
             />
-            <Textarea
+            <TextArea
               ref={draftRef}
               className="chat-input"
               rows={1}
               value={draft}
               placeholder={pictureModel ? 'Describe the picture to draw' : 'Ask Zuri anything'}
               aria-label="Message"
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => {
+                setDraft(event.target.value);
+                // Editing by hand ends the undo, or restoring would discard the edit.
+                if (enhancedFrom !== null) setEnhancedFrom(null);
+                if (enhanceNote !== '') setEnhanceNote('');
+              }}
               onKeyDown={onComposerKeyDown}
             />
 
             {/* The model chip sits beside Send, exactly as the desktop composer places
                 it, and names the model that will answer this chat. */}
             <div ref={modelMenuRef} className="chat-model-slot">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
                 aria-haspopup="menu"
                 aria-expanded={modelMenuOpen}
                 aria-label={`Model: ${modelName}`}
@@ -2263,7 +2346,7 @@ export default function ChatView({
                   aria-hidden="true"
                   className={`chat-model-chevron${modelMenuOpen ? ' is-open' : ''}`}
                 />
-              </button>
+              </Button>
               {modelMenuOpen && (
                 <div role="menu" aria-label="Choose a model" className="chat-model-menu">
                   {CHAT_MODELS.map((entry) => (
@@ -2310,12 +2393,24 @@ export default function ChatView({
               )}
             </div>
 
+            {/* Beside Send: one press rewrites the message box into a clearer prompt,
+                and a second puts the person's own words back before it is sent. */}
+            <IconButton
+              type="button"
+              label={enhancedFrom !== null ? 'Undo the improved prompt' : 'Improve the prompt'}
+              className={`chat-enhance${enhancedFrom !== null ? ' is-active' : ''}`}
+              isDisabled={enhancing || draft.trim() === ''}
+              onClick={enhance}
+            >
+              <EnhanceIcon size={18} aria-hidden="true" className={enhancing ? 'is-busy' : ''} />
+            </IconButton>
+
             {streaming ? (
               <IconButton label="Stop reply" className="chat-send" onClick={stop}>
                 <StopIcon size={14} aria-hidden="true" />
               </IconButton>
             ) : (
-              <IconButton type="submit" label="Send" className="chat-send" disabled={draft.trim() === '' && !attachment}>
+              <IconButton type="submit" label="Send" className="chat-send" isDisabled={draft.trim() === '' && !attachment}>
                 <SendIcon size={18} aria-hidden="true" />
               </IconButton>
             )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, ComposerTextarea } from './ui.jsx';
+import { Button, Checkbox, ComposerTextarea } from './ui.jsx';
 // The same catalogue Settings offers, so the chip and the Settings picker can never
 // disagree about which supplier id sits behind a Zuri name.
 import { ZURI_MODELS, zuriModelFor, zuriModelName } from './zuriModels.js';
@@ -19,6 +19,7 @@ import {
   CopyIcon,
   DownloadIcon,
   EditIcon,
+  EnhanceIcon,
   ExpandIcon,
   FileIcon,
   FolderIcon,
@@ -331,7 +332,7 @@ function NotableCard({ card, onOpen }) {
           </span>
         )}
         {onOpen && (
-          <button type="button" className="zuri-notable-open" onClick={onOpen}>Open</button>
+          <Button type="button" className="zuri-notable-open" onPress={onOpen}>Open</Button>
         )}
       </div>
       <p className="zuri-notable-title">{card.title}</p>
@@ -468,6 +469,11 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const [imageModels, setImageModels] = useState([]);
   const [imagePreviews, setImagePreviews] = useState({});
   const [imageBusy, setImageBusy] = useState('');
+  // The prompt enhancer: `enhancing` covers the round trip, and `enhancedFrom` holds the
+  // person's own words for as long as the rewritten ones are still in the message box,
+  // so the same button can put them back.
+  const [enhancing, setEnhancing] = useState(false);
+  const [enhancedFrom, setEnhancedFrom] = useState(null);
   const [imageShape, setImageShape] = useState(() => {
     const saved = readLocal(IMAGE_SHAPE_STORAGE_KEY, 'square');
     return IMAGE_SHAPES.some(([value]) => value === saved) ? saved : 'square';
@@ -812,6 +818,62 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
    * @param {{ code: string, name: string, nairaPerImage: number }} model
    * @returns {Promise<void>}
    */
+  /**
+   * Rewrite the message box into a clearer prompt, or put the person's own words back.
+   *
+   * The rewrite replaces the draft instead of being sent, so it can be read, edited or
+   * thrown away first, and the same button undoes it. Editing the text by hand clears
+   * the undo, because restoring then would discard what they just typed.
+   * @returns {Promise<void>}
+   */
+  async function improvePrompt() {
+    if (enhancing) return;
+    if (enhancedFrom !== null) {
+      setDraft(enhancedFrom);
+      setEnhancedFrom(null);
+      setError('');
+      return;
+    }
+    const prompt = draft.trim();
+    if (prompt === '') {
+      setError('Write the message you want improved first.');
+      return;
+    }
+    if (replying || imageBusy !== '') return;
+    if (typeof api?.prompts?.enhance !== 'function') {
+      setError('The prompt enhancer is only available inside the Zuri app.');
+      return;
+    }
+
+    setError('');
+    setMenuView('');
+    setEnhancing(true);
+    try {
+      const result = await api.prompts.enhance({ prompt });
+      const improved = result?.ok === true && typeof result.data?.prompt === 'string' ? result.data.prompt.trim() : '';
+      if (improved === '') {
+        setError(result?.error?.message ?? 'That message could not be improved. Try again.');
+        return;
+      }
+      setEnhancedFrom(draft);
+      setDraft(improved);
+      // The cursor goes to the end, so the person can carry on from what was written
+      // for them rather than hunting for the caret.
+      requestAnimationFrame(() => {
+        const box = composerRef.current;
+        if (box && typeof box.focus === 'function') {
+          box.focus();
+          const end = box.value.length;
+          if (typeof box.setSelectionRange === 'function') box.setSelectionRange(end, end);
+        }
+      });
+    } catch (thrown) {
+      setError(thrown?.message ?? 'That message could not be improved. Try again.');
+    } finally {
+      setEnhancing(false);
+    }
+  }
+
   async function createImage(model) {
     const prompt = draft.trim();
     setMenuView('');
@@ -1484,71 +1546,71 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                 <div role="menu" aria-label="Add to message" className="absolute bottom-full left-0 z-20 mb-2 w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg" style={addMenuMaxHeight ? { maxHeight: addMenuMaxHeight } : undefined}>
                   {menuView === 'main' ? (
                     <>
-                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseAttachment())}>
+                      <Button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => pickMenuItem(() => void chooseAttachment())}>
                         <PaperclipIcon size={16} />
                         <span>Add files or photos</span>
-                      </button>
-                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseFolder())}>
+                      </Button>
+                      <Button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => pickMenuItem(() => void chooseFolder())}>
                         <FolderIcon size={16} />
                         <span>Add folder</span>
-                      </button>
-                      <button type="button" role="menuitemcheckbox" aria-checked={webSearch} title="Lets Zuri search the web and read pages. Each lookup is an extra request to your provider." className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => { const next = !webSearch; setWebSearch(next); saveWebSearchPreference(next); }}>
+                      </Button>
+                      <Button type="button" role="menuitemcheckbox" aria-checked={webSearch} title="Lets Zuri search the web and read pages. Each lookup is an extra request to your provider." className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => { const next = !webSearch; setWebSearch(next); saveWebSearchPreference(next); }}>
                         <GlobeIcon size={16} />
                         <span className="flex-1">Search the web</span>
                         {webSearch && <CheckIcon size={16} />}
-                      </button>
-                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" title="Draw a picture with one of Zuri's image models" onClick={() => pickMenuItem(() => { void loadImageModels(); setMenuView('image'); })}>
+                      </Button>
+                      <Button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" title="Draw a picture with one of Zuri's image models" onPress={() => pickMenuItem(() => { void loadImageModels(); setMenuView('image'); })}>
                         <ImageIcon size={16} />
                         <span className="flex-1">Create an image</span>
-                      </button>
-                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => setMenuView('length')}>
+                      </Button>
+                      <Button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => setMenuView('length')}>
                         <SlashCommandIcon size={16} />
                         <span className="flex-1">Reply length</span>
                         <span className="text-xs text-muted capitalize">{answerLength}</span>
-                      </button>
-                      <button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => setMenuView('commands')}>
+                      </Button>
+                      <Button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => setMenuView('commands')}>
                         <SlashCommandIcon size={16} />
                         <span>Slash commands</span>
-                      </button>
-                      <button type="button" role="menuitemcheckbox" aria-checked={incognito} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => { if (!incognito) onNewChat?.(); setIncognito((current) => !current); }}>
+                      </Button>
+                      <Button type="button" role="menuitemcheckbox" aria-checked={incognito} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => { if (!incognito) onNewChat?.(); setIncognito((current) => !current); }}>
                         <span className="flex-1">Incognito chat</span>
                         {incognito && <CheckIcon size={16} />}
-                      </button>
+                      </Button>
                     </>
                   ) : menuView === 'image' ? (
                     <div className="flex flex-col gap-1">
                       <div role="radiogroup" aria-label="Picture shape" className="flex gap-1 px-2 pb-1">
                         {IMAGE_SHAPES.map(([value, label]) => (
-                          <button
+                          <Button
                             key={value}
                             type="button"
                             role="radio"
                             aria-checked={imageShape === value}
                             className={`min-h-9 flex-1 rounded-lg px-2 text-xs ${imageShape === value ? 'zuri-selected-pill' : 'text-muted hover:bg-surface-secondary'}`}
-                            onClick={() => { setImageShape(value); writeLocal(IMAGE_SHAPE_STORAGE_KEY, value); }}
+                            onPress={() => { setImageShape(value); writeLocal(IMAGE_SHAPE_STORAGE_KEY, value); }}
                           >
                             {label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
-                      <label className="flex items-center gap-2 px-3 pb-1 text-xs text-muted" title="Zuri rewrites your description into a better prompt for the picture maker. The picture library shows both.">
-                        <input
-                          type="checkbox"
+                      <div className="flex items-center gap-2 px-3 pb-1 text-xs text-muted" title="Zuri rewrites your description into a better prompt for the picture maker. The picture library shows both.">
+                        <Checkbox
+                          aria-label="Improve my description"
                           checked={improveImagePrompt}
-                          onChange={(event) => { setImproveImagePrompt(event.target.checked); writeLocal(IMAGE_IMPROVE_STORAGE_KEY, event.target.checked ? 'on' : 'off'); }}
+                          onChange={(selected) => { setImproveImagePrompt(selected); writeLocal(IMAGE_IMPROVE_STORAGE_KEY, selected ? 'on' : 'off'); }}
                         />
                         Improve my description
-                      </label>
+                      </div>
                       {imageModels.length === 0 && <p className="px-3 py-2 text-xs text-muted">Checking which picture models you can use...</p>}
                       {imageModels.map((model) => (
-                        <button
+                        <Button
                           key={model.code}
                           type="button"
                           role="menuitem"
-                          disabled={!model.available || imageBusy !== ''}
+                          isDisabled={!model.available || imageBusy !== ''}
                           title={`${model.hint}. About NGN ${model.nairaPerImage} an image.`}
                           className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary disabled:opacity-40"
-                          onClick={() => void createImage(model)}
+                          onPress={() => void createImage(model)}
                         >
                           <span className="flex w-full items-center gap-2">
                             <ImageIcon size={15} />
@@ -1556,22 +1618,22 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                             <span className="ml-auto text-xs text-muted">NGN {model.nairaPerImage}</span>
                           </span>
                           <span className="text-xs text-muted">{model.hint}</span>
-                        </button>
+                        </Button>
                       ))}
                     </div>
                   ) : menuView === 'length' ? (
                     [['concise', 'Concise'], ['balanced', 'Balanced'], ['detailed', 'Detailed']].map(([value, label]) => (
-                      <button key={value} type="button" role="menuitemradio" aria-checked={answerLength === value} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => void chooseAnswerLength(value))}>
+                      <Button key={value} type="button" role="menuitemradio" aria-checked={answerLength === value} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => pickMenuItem(() => void chooseAnswerLength(value))}>
                         <span className="flex-1">{label}</span>
                         {answerLength === value && <CheckIcon size={16} />}
-                      </button>
+                      </Button>
                     ))
                   ) : (
                     SLASH_COMMANDS.map((command) => (
-                      <button key={command.label} type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onClick={() => pickMenuItem(() => insertCommand(command.text))}>
+                      <Button key={command.label} type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => pickMenuItem(() => insertCommand(command.text))}>
                         <SlashCommandIcon size={16} />
                         <span>{command.label}</span>
-                      </button>
+                      </Button>
                     ))
                   )}
                 </div>
@@ -1580,13 +1642,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             <ComposerTextarea
               ref={composerRef}
               value={draft}
-              onChange={(event) => setDraft(event.target.value)}
+              onChange={(event) => { setDraft(event.target.value); if (enhancedFrom !== null) setEnhancedFrom(null); }}
               onKeyDown={handleComposerKeyDown}
               onPaste={handleComposerPaste}
               placeholder="Ask Zuri"
               aria-label="Message Zuri"
               rows={1}
-              className="min-h-10 min-w-0 flex-1 max-h-48 py-2 text-base outline-none"
+              className="composer-textarea min-h-10 min-w-0 flex-1 max-h-48 py-2 text-base outline-none"
             />
             <Button
               type="button"
@@ -1610,14 +1672,14 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
             {!compact && <ModeMenu mode={mode} onChange={chooseMode} />}
             {!compact && (
             <div ref={modelMenuRef} className="relative shrink-0">
-              <button
+              <Button
                 type="button"
                 aria-haspopup="menu"
                 aria-expanded={modelMenu}
                 aria-label={`Chat model: ${chatModelLabel}`}
                 title={`${chatModelLabel}${chatModel !== null ? `. ${chatModel.note}` : ''} Change the model for this chat.`}
                 className="zuri-chat-model-trigger flex h-10 max-w-32 items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted outline-none hover:text-foreground focus:ring-2 focus:ring-accent/30"
-                onClick={() => {
+                onPress={() => {
                   // The picture names are fetched the first time the list opens, so a chat
                   // that never draws a picture never asks the app for them.
                   if (!modelMenu) void loadImageModels();
@@ -1629,27 +1691,27 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   {chatModelLabel.replace(/^Zuri\s+/, '')}
                 </span>
                 <ChevronDownIcon size={12} />
-              </button>
+              </Button>
               {/* Chat models first, then picture models, so the same popup can also draw.
                   It opens upward too, so it carries the same viewport cap and scrolls. */}
               {modelMenu && (
                 <div role="menu" aria-label="Chat model" className="absolute bottom-full right-0 z-20 mb-2 w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg" style={modelMenuMaxHeight ? { maxHeight: modelMenuMaxHeight } : undefined}>
                   <p className="px-3 pb-1 pt-2 text-xs text-muted">Zuri answers this chat with:</p>
                   {ZURI_MODELS.map((entry) => (
-                    <button
+                    <Button
                       key={entry.model}
                       type="button"
                       role="menuitemradio"
                       aria-checked={entry.name === chatModelLabel}
                       className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary"
-                      onClick={() => pickModel(entry)}
+                      onPress={() => pickModel(entry)}
                     >
                       <span className="flex w-full items-center gap-2">
                         <span className="flex-1 truncate">{entry.name}</span>
                         {entry.model === chatModelId && <CheckIcon size={15} />}
                       </span>
                       <span className="text-xs text-muted">{entry.note}{entry.supportsImages ? ' Reads images.' : ''}</span>
-                    </button>
+                    </Button>
                   ))}
                   {/* A picture row does not answer with text: it draws what the message box
                       says, through the same handler the + menu's image list uses. */}
@@ -1657,14 +1719,14 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                     <>
                       <p className="px-3 pb-1 pt-2 text-xs text-muted">Draw a picture</p>
                       {imageModels.map((model) => (
-                        <button
+                        <Button
                           key={model.code}
                           type="button"
                           role="menuitem"
-                          disabled={!model.available || imageBusy !== ''}
+                          isDisabled={!model.available || imageBusy !== ''}
                           title={`${model.hint}. About NGN ${model.nairaPerImage} an image.`}
                           className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary disabled:opacity-40"
-                          onClick={() => { setModelMenu(false); void createImage(model); }}
+                          onPress={() => { setModelMenu(false); void createImage(model); }}
                         >
                           <span className="flex w-full items-center gap-2">
                             <ImageIcon size={15} />
@@ -1672,7 +1734,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                             <span className="ml-auto shrink-0 text-xs text-muted">NGN {model.nairaPerImage}</span>
                           </span>
                           <span className="text-xs text-muted">{model.hint}</span>
-                        </button>
+                        </Button>
                       ))}
                     </>
                   )}
@@ -1681,6 +1743,21 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               )}
             </div>
             )}
+            {/* Beside Send: one press rewrites the message box into a clearer prompt,
+                and a second puts the person's own words back before it is sent. */}
+            <Button
+              type="button"
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              className={`h-10 w-10 rounded-full p-0 ${enhancedFrom !== null ? 'text-accent' : 'text-muted'}`}
+              aria-label={enhancedFrom !== null ? 'Undo the improved prompt' : 'Improve the prompt'}
+              title={enhancedFrom !== null ? 'Put your own words back' : 'Rewrite this as a clearer prompt'}
+              onPress={() => void improvePrompt()}
+              isDisabled={enhancing || draft.trim() === ''}
+            >
+              <EnhanceIcon size={17} className={enhancing ? 'animate-pulse' : ''} />
+            </Button>
             {replying ? (
               <Button
                 type="button"

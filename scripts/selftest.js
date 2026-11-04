@@ -161,8 +161,14 @@ check('the sidebar can be dragged to a width that is kept, and long titles end i
   for (const declaration of ['overflow: hidden', 'text-overflow: ellipsis', 'white-space: nowrap']) {
     if (!title.includes(declaration)) throw new Error(`the title rule lacks ${declaration}`);
   }
-  if (!/\.zuri-sidebar-panel \.zuri-button > span\s*\{[^}]*min-width: 0/.test(css)) {
-    throw new Error('the button label wrapper can still stop a title from shrinking');
+  // HeroUI's Button draws its children directly, with no label wrapper span the
+  // way Flowbite had, so the title span itself must be allowed to shrink inside
+  // the button, or a long title widens the row instead of clipping.
+  if (!sidebar.includes('className="min-w-0 flex-1 justify-start truncate rounded-lg px-2 py-2 text-left"')) {
+    throw new Error('the thread button cannot shrink, so a long title would widen the row');
+  }
+  if (!sidebar.includes('className="zuri-thread-title"')) {
+    throw new Error('the thread title lost its clipping class');
   }
   return 'resizable between its limits, width remembered, titles clipped with an ellipsis';
 });
@@ -2467,7 +2473,7 @@ check('the composer offers the model chip and sends the choice with the message'
   }
   // The chip is plain text plus a chevron, not a filled pill: a fourth rounded shape
   // in a row of round buttons read as another action rather than as the model name.
-  const chipEnd = panel.indexOf('</button>', chipAt);
+  const chipEnd = panel.indexOf('</Button>', chipAt);
   const chipTag = chipEnd === -1 ? panel.slice(chipAt) : panel.slice(chipAt, chipEnd);
   for (const pill of ['rounded-full', 'bg-surface-secondary', 'border-border']) {
     if (chipTag.includes(pill)) throw new Error(`the chip is a filled pill again (${pill})`);
@@ -2615,7 +2621,7 @@ check("both the person's prompts and Zuri's replies carry a copy action", () => 
   const roleBranch = source.indexOf('message.role === \'assistant\'');
   if (roleBranch < 0 || copyAt < roleBranch) throw new Error('the copy action sits inside one role only');
   if (!source.includes('copyMessage(message, index)')) throw new Error('the copy action does not copy the message');
-  // The control is the shared Flowbite IconButton, which names itself through label.
+  // The control is the shared HeroUI IconButton, which names itself through label.
   if (!source.includes("label={copiedIndex === index ? 'Copied'")) throw new Error('the copy action never confirms');
   return 'one copy path for prompts and replies';
 });
@@ -2836,7 +2842,7 @@ check('the account menu closes on Escape and names itself for screen readers', (
   return 'Escape closes the menu and it is announced as a menu';
 });
 
-check('the web chat is built from Flowbite components and one icon family', () => {
+check('the web chat is built from HeroUI components and one icon family', () => {
   const chat = read('web/src/views/ChatView.jsx');
   const dashboard = read('web/src/views/Dashboard.jsx');
   const ui = read('web/src/components/ui.jsx');
@@ -2858,19 +2864,16 @@ check('the web chat is built from Flowbite components and one icon family', () =
   if (!ui.includes('aria-label={label}')) throw new Error('the icon button is unnamed for screen readers');
   for (const [name, source] of [['chat', chat], ['shell', dashboard]]) {
     const raw = (source.match(/<button[\s>]/g) ?? []).length;
-    // The chat keeps three plain buttons: a conversation row is a list row with two
-    // controls beside it, the model chip is a text trigger for its list, and the
-    // rewrite row is a set of text chips. The shell keeps six: a sidebar row, the account
-    // button with its three menu rows, and the admin section jump. The rest are components.
-    const allowed = name === 'chat' ? 3 : 6;
-    if (raw > allowed) throw new Error(`${name} still draws ${raw} raw buttons`);
+    // Every control is a HeroUI component now, so no page may draw a plain button:
+    // the shared wrapper is the only way in.
+    if (raw > 0) throw new Error(`${name} still draws ${raw} raw buttons instead of the shared Button`);
   }
 
-  // The composer stays a Flowbite textarea; the model chip owns its list so the
-  if (!chat.includes('Textarea')) throw new Error('the composer is not a Flowbite textarea');
+  // The composer is a HeroUI textarea, so a piece of Flowbite cannot creep back in;
+  if (!chat.includes('TextArea') || !chat.includes("from '@heroui/react'")) throw new Error('the composer is not a HeroUI textarea');
   if (!chat.includes('chat-model-menu')) throw new Error('the model menu is not anchored to its chip');
 
-  return 'Flowbite controls, one icon family, one copy path';
+  return 'HeroUI controls, one icon family, one copy path';
 });
 
 check('the reply house style is the same in the server and the app', async () => {
@@ -3282,10 +3285,10 @@ check('brand palette keeps navy and the light blue', () => {
   };
 
   const sheets = [
-    // A first visit lands on :root; :root[data-theme="dark"] only overrides it.
-    { file: 'web/src/styles.css', selector: ':root\\s*\\{' },
+    // A first visit lands on :root; :root[data-theme="dark"] only overrides it. The lookahead picks the :root that holds the palette: a stylesheet may open another :root block earlier (the HeroUI token mapping does), and reading that one reports the palette as missing when it sits further down.
+    { file: 'web/src/styles.css', selector: ':root\\s*\\{(?=[^}]*--brand-navy\\s*:)' },
     // The desktop app names both of its themes.
-    { file: 'src/renderer-react/app.css', selector: '\\[data-theme="light"\\]\\s*\\{' },
+    { file: 'src/renderer-react/app.css', selector: '\\[data-theme="light"\\]\\s*\\{(?=[^}]*--brand-navy\\s*:)' },
   ].map(({ file, selector }) => {
     const source = read(file);
     return { file, source, light: blockOf(source, selector) };
@@ -3293,6 +3296,13 @@ check('brand palette keeps navy and the light blue', () => {
 
   for (const { file, source, light } of sheets) {
     if (!light) throw new Error(`${file} no longer has a light theme block, so its colours cannot be read`);
+    // A HeroUI control is styled by the package's own stylesheet, not by utilities
+    // alone. Without this import every control on the surface renders as bare text:
+    // no fill, no edge, and no calendar panel when a date field is opened. That is
+    // silent, so it is checked here rather than left to be noticed on screen.
+    if (!/@import\s+["']@heroui\/styles["']/.test(source)) {
+      throw new Error(`${file} no longer imports @heroui/styles, so its HeroUI controls would render unstyled`);
+    }
     for (const token of BRAND_TOKENS) {
       if (!declares(light, token)) throw new Error(`${file} no longer sets ${token} in its light theme`);
     }

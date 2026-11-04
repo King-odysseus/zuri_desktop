@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import AuthShell from '../components/AuthShell.jsx';
 import GoogleSignIn from '../components/GoogleSignIn.jsx';
-import { Button } from '../components/ui.jsx';
+import { Button, Input } from '../components/ui.jsx';
 
 const COPY = {
   signin: {
@@ -114,7 +114,7 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
       onNavigate={onNavigate}
     >
       <div className="auth-switch" role="tablist" aria-label="Account action">
-        <button
+        <Button variant="ghost"
           type="button"
           role="tab"
           aria-selected={mode === 'signin'}
@@ -122,8 +122,8 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
           onClick={() => onNavigate('/signin')}
         >
           Sign in
-        </button>
-        <button
+        </Button>
+        <Button variant="ghost"
           type="button"
           role="tab"
           aria-selected={mode === 'signup'}
@@ -131,7 +131,7 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
           onClick={() => onNavigate('/signup')}
         >
           Create account
-        </button>
+        </Button>
       </div>
 
       <div className="auth-heading">
@@ -143,7 +143,7 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
         {mode === 'signup' && (
           <label className="field">
             <span>Full name</span>
-            <input
+            <Input
               type="text"
               name="name"
               autoComplete="name"
@@ -156,7 +156,7 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
 
         <label className="field">
           <span>Email</span>
-          <input
+          <Input
             type="email"
             name="email"
             autoComplete="email"
@@ -185,7 +185,7 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
               </a>
             )}
           </span>
-          <input
+          <Input
             type="password"
             name="password"
             autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
@@ -201,7 +201,7 @@ export default function AuthView({ mode, theme, onCredential, onError, onNavigat
           </p>
         )}
 
-        <Button type="submit" block disabled={busy}>
+        <Button type="submit" block isDisabled={busy}>
           {busy ? copy.busy : copy.submit}
         </Button>
       </form>

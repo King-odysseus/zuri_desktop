@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Chip, Input, Textarea } from './ui.jsx';
+import { Button, Checkbox, Chip, Input, Radio, Select, Textarea } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 // The catalogue lives in its own module because the composer's model chip offers
 // the same six names, and two copies of a supplier id would drift apart.
@@ -7,7 +7,6 @@ import { ZURI_MODELS } from './zuriModels.js';
 import {
   BellIcon,
   BrainIcon,
-  ChevronDownIcon,
   CloseIcon,
   CodeIcon,
   FileIcon,
@@ -92,8 +91,8 @@ const NOTIFICATION_DEFAULTS = {
 function applyTheme(theme) {
   const next = theme === 'light' ? 'light' : 'dark';
   document.documentElement.dataset.theme = next;
-  // The tokens follow data-theme, but Flowbite utilities follow the .dark
-  // class. Keep both in step so a theme saved here reaches the whole window.
+  // The tokens follow data-theme, but some styles key off the .dark class.
+  // Keep both in step so a theme saved here reaches the whole window.
   document.documentElement.classList.toggle('dark', next === 'dark');
   return next;
 }
@@ -127,13 +126,18 @@ function SettingsRow({ title, description, children }) {
  */
 function Choice({ name, label, description, checked, onPick }) {
   return (
-    <label className={`zuri-choice${checked ? ' is-selected' : ''}`}>
-      <input type="radio" name={name} className="zuri-radio" checked={checked} onChange={() => onPick()} />
+    <Radio
+      name={name}
+      value={label}
+      className={`zuri-choice${checked ? ' is-selected' : ''}`}
+      isSelected={checked}
+      onChange={() => onPick()}
+    >
       <span className="zuri-choice-copy">
         <span className="zuri-choice-label">{label}</span>
         {description && <span className="zuri-choice-help">{description}</span>}
       </span>
-    </label>
+    </Radio>
   );
 }
 
@@ -141,12 +145,11 @@ function Choice({ name, label, description, checked, onPick }) {
 function DeliverySelect({ label, value, onChange }) {
   return (
     <span className="zuri-set-select">
-      <select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
+      <Select aria-label={label} value={value} onChange={(event) => onChange(event.target.value)}>
         {DELIVERY_OPTIONS.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
-      </select>
-      <ChevronDownIcon size={14} className="zuri-set-select-chevron" />
+      </Select>
     </span>
   );
 }
@@ -392,7 +395,7 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
 
         <label className="zuri-settings-search">
           <SearchIcon size={15} className="zuri-settings-search-icon" />
-          <input
+          <Input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -406,16 +409,16 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
             <div className="zuri-settings-nav-group" key={group.group}>
               <p className="zuri-settings-nav-label">{group.group}</p>
               {group.items.map(({ key, label, Icon }) => (
-                <button
+                <Button
                   key={key}
                   type="button"
                   className={`zuri-settings-nav-item${section === key ? ' is-active' : ''}`}
                   aria-current={section === key ? 'page' : undefined}
-                  onClick={() => chooseSection(key)}
+                  onPress={() => chooseSection(key)}
                 >
                   <Icon size={16} />
                   <span>{label}</span>
-                </button>
+                </Button>
               ))}
             </div>
           ))}
@@ -444,20 +447,16 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
                   </div>
                 </SettingsRow>
                 <SettingsRow title="Assistant overlay" description="A small Zuri window over your work. Ctrl Alt Space opens it from anywhere.">
-                  <label className="zuri-switch">
-                    <input
-                      type="checkbox"
-                      className="zuri-switch-input"
-                      checked={current.overlayEnabled === true}
-                      disabled={busy}
-                      aria-label="Assistant overlay"
-                      onChange={(event) => void savePatch(
-                        { overlayEnabled: event.target.checked },
-                        event.target.checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.',
-                      )}
-                    />
-                    <span className="zuri-switch-track" aria-hidden="true"><span className="zuri-switch-thumb" /></span>
-                  </label>
+                  <Checkbox
+                    className="zuri-switch"
+                    checked={current.overlayEnabled === true}
+                    isDisabled={busy}
+                    aria-label="Assistant overlay"
+                    onChange={(selected) => void savePatch(
+                      { overlayEnabled: selected },
+                      selected ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.',
+                    )}
+                  />
                 </SettingsRow>
               </SettingsCard>
 

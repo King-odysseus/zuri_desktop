@@ -73,16 +73,16 @@ function initialFor(name, email) {
  */
 function AccountMenuRow({ Icon, label, hint, onPress }) {
   return (
-    <button
+    <Button
       type="button"
       role="menuitem"
       className="zuri-account-row"
-      onClick={onPress}
+      onPress={onPress}
     >
       <Icon size={16} className="zuri-account-row-icon" />
       <span className="zuri-account-row-label">{label}</span>
       {hint && <span className="zuri-account-row-hint">{hint}</span>}
-    </button>
+    </Button>
   );
 }
 
@@ -642,13 +642,13 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
               </div>
             </div>
           )}
-          <button
+          <Button
             type="button"
             className="zuri-account-trigger"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             aria-label={`Account menu for ${accountName}`}
-            onClick={() => setMenuOpen((open) => !open)}
+            onPress={() => setMenuOpen((open) => !open)}
           >
             <span className="zuri-avatar" aria-hidden="true">{initials}</span>
             <span className="zuri-account-identity">
@@ -657,7 +657,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             </span>
             {dueReminders > 0 && <span aria-label={`${dueReminders} reminders due`} className="size-2 shrink-0 rounded-full bg-accent" />}
             <ChevronUpIcon size={15} className={`zuri-account-chevron${menuOpen ? ' is-open' : ''}`} />
-          </button>
+          </Button>
         </div>
 
         {/* The grab edge. A pointer drag, the arrow keys and a double click (back to the

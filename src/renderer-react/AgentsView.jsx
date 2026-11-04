@@ -188,11 +188,11 @@ export default function AgentsView() {
                       const isSelected = editorOpen && agent.id === selectedId;
                       return (
                         <li key={agent.id}>
-                          <button
+                          <Button
                             type="button"
                             aria-pressed={isSelected}
                             className="flex min-h-11 w-full items-center gap-3 py-3 text-left hover:bg-surface-secondary/60"
-                            onClick={() => { setSelectedId(agent.id); setEditorOpen(true); }}
+                            onPress={() => { setSelectedId(agent.id); setEditorOpen(true); }}
                           >
                             <span className="flex min-w-0 flex-1 flex-col">
                               <span className={`truncate text-sm ${isSelected ? 'font-semibold' : 'font-medium'}`}>{agent.name || 'Untitled agent'}</span>
@@ -201,7 +201,7 @@ export default function AgentsView() {
                               </span>
                             </span>
                             {agent.id === activeAgentId && <Chip size="sm" color="primary">Active for chat</Chip>}
-                          </button>
+                          </Button>
                         </li>
                       );
                     })}

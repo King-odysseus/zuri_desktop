@@ -30,7 +30,7 @@ No dark theme in these mockups: the page is always white.
 ## Implementation brief (real apps)
 Reference mockup: `docs/mockups/heroui.html` with `heroui.js` (open it through a static server). Match its look and structure.
 
-- Web app (`web/`): one stylesheet, `web/src/styles.css`. Desktop app (`src/renderer-react/`): one stylesheet, `src/renderer-react/app.css`. Do not add a CSS file, style block or per-component stylesheet. New markup uses Tailwind utility classes and the Flowbite components the project already uses.
+- Web app (`web/`): one stylesheet, `web/src/styles.css`. Desktop app (`src/renderer-react/`): one stylesheet, `src/renderer-react/app.css`. Do not add a CSS file, style block or per-component stylesheet. New markup uses Tailwind utility classes and the HeroUI components the project already uses: import Button, IconButton, Input, Textarea, Select, Checkbox, Radio, Chip, Card, UsageBar, Alert from the shared `ui.jsx` of that surface rather than writing a `<button>` or `<input>` by hand.
 - Keep existing class names, props, routes, IPC channels and API calls working. This is a visual and navigation change, not a data change.
 - Light theme is the default and is pure white (#ffffff) with blue, navy and bronze only. The existing dark theme may stay as an optional choice, but it must also use only navy, blue and bronze (no violet, green, red or amber hues).
 - Status colours: blue = good or selected, bronze = attention or warning, navy = urgent or destructive. Errors may use navy text on a pale bronze fill with a warning icon.

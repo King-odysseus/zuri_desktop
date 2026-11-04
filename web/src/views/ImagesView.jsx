@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, InlineAlert } from '../components/ui.jsx';
+import { Button, Checkbox, InlineAlert, Input, Select, Textarea } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
 import { blobFromBase64, deletePicture, listPictures, savePicture } from '../lib/imageStore.js';
 import { ChevronDownIcon, DeleteIcon, DownloadIcon, ImageIcon, RegenerateIcon } from '../components/Icons.jsx';
@@ -132,7 +132,7 @@ export default function ImagesView() {
         * so writing a picture reads as the same act as writing a message.
         */}
       <form className="image-maker" onSubmit={(event) => void make(event)}>
-        <textarea
+        <Textarea
           className="image-prompt"
           rows={2}
           maxLength={2000}
@@ -153,34 +153,33 @@ export default function ImagesView() {
           {/* The model is named the way the chat composer names its own: a quiet chip
               with a chevron, so the tray holds controls rather than form fields. */}
           <span className="image-model-slot">
-            <select className="image-model" value={modelCode} onChange={(event) => setModelCode(event.target.value)} aria-label="Picture model">
+            <Select className="image-model" value={modelCode} onChange={(event) => setModelCode(event.target.value)} aria-label="Picture model">
               {models.map((model) => (
                 <option key={model.code} value={model.code} disabled={!model.available}>
                   {model.name}{model.available ? '' : ` (needs the ${model.minPlan} plan)`}
                 </option>
               ))}
-            </select>
+            </Select>
             <ChevronDownIcon size={14} aria-hidden="true" />
           </span>
           <div role="radiogroup" aria-label="Picture shape" className="image-shapes">
             {SHAPES.map(([value, label]) => (
-              <button key={value} type="button" role="radio" aria-checked={shape === value} className={`image-shape${shape === value ? ' is-active' : ''}`} onClick={() => setShape(value)}>
+              <Button key={value} type="button" variant="ghost" role="radio" aria-checked={shape === value} className={`image-shape${shape === value ? ' is-active' : ''}`} onClick={() => setShape(value)}>
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
-          <label className="image-improve">
-            <input
-              type="checkbox"
-              checked={improve}
-              onChange={(event) => {
-                setImprove(event.target.checked);
-                try { window.localStorage.setItem(IMPROVE_KEY, event.target.checked ? 'on' : 'off'); } catch { /* private browsing */ }
-              }}
-            />
+          <Checkbox
+            className="image-improve"
+            checked={improve}
+            onChange={(event) => {
+              setImprove(event.target.checked);
+              try { window.localStorage.setItem(IMPROVE_KEY, event.target.checked ? 'on' : 'off'); } catch { /* private browsing */ }
+            }}
+          >
             Improve my description
-          </label>
-          <Button type="submit" className="image-make" disabled={busy || prompt.trim() === '' || modelCode === ''}>
+          </Checkbox>
+          <Button type="submit" className="image-make" isDisabled={busy || prompt.trim() === '' || modelCode === ''}>
             <ImageIcon size={16} aria-hidden="true" />
             {busy ? 'Drawing...' : 'Make picture'}
           </Button>
@@ -190,22 +189,22 @@ export default function ImagesView() {
       {error && <InlineAlert tone="danger">{error}</InlineAlert>}
 
       {pictures.length > 0 && (
-        <input className="project-input image-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your pictures" aria-label="Search your pictures" />
+        <Input className="project-input image-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search your pictures" aria-label="Search your pictures" />
       )}
       {pictures.length === 0 && <p className="project-empty">No pictures yet. Your first one will appear here.</p>}
       {pictures.length > 0 && shown.length === 0 && <p className="project-empty">No picture matches that search.</p>}
 
       <div className="image-library-grid">
         {shown.map((picture) => (
-          <button key={picture.id} type="button" className="image-tile" onClick={() => { setOpenId(picture.id); setConfirmId(''); }} aria-label={`Open picture: ${picture.prompt}`}>
+          <Button key={picture.id} type="button" variant="ghost" className="image-tile" onClick={() => { setOpenId(picture.id); setConfirmId(''); }} aria-label={`Open picture: ${picture.prompt}`}>
             <img src={urls.get(picture.id)} alt={picture.prompt} loading="lazy" decoding="async" />
-          </button>
+          </Button>
         ))}
       </div>
 
       {open && (
         <div className="image-viewer" role="dialog" aria-modal="true" aria-label="Picture" onKeyDown={(event) => { if (event.key === 'Escape') setOpenId(''); }}>
-          <button type="button" className="image-viewer-close" onClick={() => setOpenId('')}>Close</button>
+          <Button type="button" variant="ghost" className="image-viewer-close" onClick={() => setOpenId('')}>Close</Button>
           <img src={urls.get(open.id)} alt={open.prompt} />
           <div className="image-viewer-info">
             <p className="project-field-label">Your description</p>

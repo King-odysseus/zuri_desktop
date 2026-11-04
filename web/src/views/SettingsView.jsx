@@ -1,4 +1,5 @@
 import { ChartIcon, CardIcon, GridIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
+import { Button } from '../components/ui.jsx';
 
 export const SETTINGS_TABS = [
   { id: 'overview', label: 'Overview', icon: <GridIcon /> },
@@ -27,7 +28,8 @@ export default function SettingsView({ tab, onTabChange, panels }) {
         className="flex min-w-0 gap-1 overflow-x-auto [scrollbar-width:none] md:flex-col md:overflow-visible"
       >
         {SETTINGS_TABS.map((item) => (
-          <button
+          <Button
+            variant="ghost"
             key={item.id}
             type="button"
             className={`nav-item${current === item.id ? ' is-active' : ''} shrink-0`}
@@ -36,7 +38,7 @@ export default function SettingsView({ tab, onTabChange, panels }) {
           >
             {item.icon}
             <span>{item.label}</span>
-          </button>
+          </Button>
         ))}
       </nav>
       <div className="min-w-0">{panels[current]}</div>

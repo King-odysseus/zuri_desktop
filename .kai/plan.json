@@ -2,25 +2,45 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Open the screenshot and inspect the web sidebar layout code",
+      "text": "Survey desktop, web and mobile component usage",
       "state": "done"
     },
     {
-      "text": "Find why the account card sits above the chat list instead of pinned at the bottom",
+      "text": "Install HeroUI 3 and learn its v3 API",
       "state": "done"
     },
     {
-      "text": "Fix the sidebar layout so the account card stays pinned at the bottom",
+      "text": "Wire HeroUI styles and theme tokens into both stylesheets",
       "state": "done"
     },
     {
-      "text": "Verify at 411px, 1280px and 1920px wide, then run the checks",
+      "text": "Rewrite web shared ui.jsx on HeroUI primitives",
       "state": "done"
     },
     {
-      "text": "Rebuild web assets, commit and report",
-      "state": "active"
+      "text": "Rewrite desktop ui.jsx and SelectField on HeroUI",
+      "state": "done"
+    },
+    {
+      "text": "Convert web views and components to HeroUI",
+      "state": "done"
+    },
+    {
+      "text": "Convert desktop renderer controls to HeroUI",
+      "state": "done"
+    },
+    {
+      "text": "Remove Flowbite, update the two stale test assertions and the docs",
+      "state": "done"
+    },
+    {
+      "text": "Build desktop, web and mobile bundles",
+      "state": "done"
+    },
+    {
+      "text": "Run npm test and verify HeroUI on all three targets in the browser and the desktop window",
+      "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T02:11:15.395Z"
+  "updatedAt": "2026-11-04T09:51:33.677Z"
 }

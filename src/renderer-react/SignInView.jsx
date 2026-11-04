@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from './ui.jsx';
 import CloudAuthForm from './CloudAuthForm.jsx';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 // The same mark the chat screen opens with, so the first screen already looks like Zuri.
@@ -118,8 +119,8 @@ export default function SignInView({ onDone }) {
         <div className="zuri-auth-body">
           <div className="zuri-auth-card" aria-labelledby="signin-title">
             <div className="zuri-auth-switch" role="tablist" aria-label="Account action">
-              <button type="button" role="tab" aria-selected={authMode === 'sign-in'} className={authMode === 'sign-in' ? 'is-active' : ''} onClick={() => setAuthMode('sign-in')}>Sign in</button>
-              <button type="button" role="tab" aria-selected={authMode === 'create'} className={authMode === 'create' ? 'is-active' : ''} onClick={() => setAuthMode('create')}>Create account</button>
+              <Button type="button" role="tab" aria-selected={authMode === 'sign-in'} className={authMode === 'sign-in' ? 'is-active' : ''} onPress={() => setAuthMode('sign-in')}>Sign in</Button>
+              <Button type="button" role="tab" aria-selected={authMode === 'create'} className={authMode === 'create' ? 'is-active' : ''} onPress={() => setAuthMode('create')}>Create account</Button>
             </div>
             <div className="zuri-auth-heading">
               {/* The short visual title is paired with the full product wording used by the launch contract: Sign in to Zuri. */}
@@ -136,7 +137,7 @@ export default function SignInView({ onDone }) {
                   api={api}
                   showModeLinks={false}
                 />
-                {authMode === 'sign-in' && <button type="button" className="zuri-auth-forgot" onClick={() => setAuthMode('forgot')}>Forgot?</button>}
+                {authMode === 'sign-in' && <Button type="button" className="zuri-auth-forgot" onPress={() => setAuthMode('forgot')}>Forgot?</Button>}
               </>
             )}
 

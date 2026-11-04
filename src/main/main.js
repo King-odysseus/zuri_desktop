@@ -394,6 +394,7 @@ const HANDLERS = new Map([
   ['zuri:images:library', handleImagesLibrary],
   ['zuri:images:read', handleImagesRead],
   ['zuri:images:remove', handleImagesRemove],
+  ['zuri:prompts:enhance', handlePromptsEnhance],
   ['zuri:tools:list', handleToolsList],
   ['zuri:tools:run', handleToolsRun],
   ['zuri:tools:cancel', handleToolsCancel],
@@ -2282,6 +2283,46 @@ async function handleImagesGenerate(payload, event) {
       // What the picture maker was actually told, so the person can see and reuse it.
       prompt: typeof made.data?.prompt === 'string' ? made.data.prompt : prompt,
       shape,
+    },
+  };
+}
+
+/* --------------------------------------------------------------- prompts */
+
+/**
+ * Rewrite the message box into a clearer prompt through the account.
+ *
+ * Phrasing only: the reply goes back to the window, which puts it in the message box
+ * for the person to edit or undo. Nothing is stored here and nothing is added to a
+ * chat, so pressing the button twice cannot leave a trail of half-asked questions.
+ * @param {{ prompt?: string }} payload
+ * @returns {Promise<{ ok: true, data: { prompt: string, original: string } } | { ok: false, error: { code: string, message: string } }>}
+ */
+async function handlePromptsEnhance(payload) {
+  const prompt = typeof payload?.prompt === 'string' ? payload.prompt.trim() : '';
+  if (prompt === '') {
+    return { ok: false, error: { code: 'PROMPT_REQUIRED', message: 'Write the message you want improved first.' } };
+  }
+
+  const improved = await cloudFetch('/api/prompts/enhance', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  }, true);
+  if (improved.ok !== true) {
+    return { ok: false, error: improved.error ?? { code: 'CLOUD_REQUEST_FAILED', message: 'Zuri could not improve that prompt. Try again.' } };
+  }
+
+  const text = typeof improved.data?.prompt === 'string' ? improved.data.prompt.trim() : '';
+  if (text === '') {
+    return { ok: false, error: { code: 'ENHANCE_EMPTY', message: 'The improved prompt came back empty. Try again.' } };
+  }
+  return {
+    ok: true,
+    data: {
+      prompt: text,
+      // The person's own words, so undo can put them back exactly as they were.
+      original: typeof improved.data?.original === 'string' ? improved.data.original : prompt,
     },
   };
 }

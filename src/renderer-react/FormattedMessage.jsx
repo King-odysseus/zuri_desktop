@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from './ui.jsx';
 import { copyText } from './clipboard.js';
 import { plainDashes } from './formatting.js';
 
@@ -84,13 +85,13 @@ function CodeBlock({ language, lines, onOpen }) {
           {/* Only the desktop chat has a side panel to open it in; the web chat passes
               nothing, so its code blocks keep the one Copy button they always had. */}
           {onOpen && (
-            <button type="button" onClick={onOpen} className="rounded px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground">
+            <Button type="button" onPress={onOpen} className="rounded px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground">
               Open in panel
-            </button>
+            </Button>
           )}
-          <button type="button" onClick={() => void copy()} className="rounded px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground">
+          <Button type="button" onPress={() => void copy()} className="rounded px-2 py-1 text-xs text-muted hover:bg-surface hover:text-foreground">
             {state === 'copied' ? 'Copied' : state === 'failed' ? 'Copy failed' : 'Copy'}
-          </button>
+          </Button>
         </span>
       </div>
       <pre className="overflow-x-auto p-3 text-xs leading-relaxed">
