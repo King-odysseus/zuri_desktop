@@ -2,25 +2,33 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Find the avatar + text row shown in the screenshot",
+      "text": "Pin the account row's contents to the left below 900px so the avatar sits left on phones",
       "state": "done"
     },
     {
-      "text": "Pin the avatar to the left on mobile",
+      "text": "Add a style check that fails if the left pin is removed",
       "state": "done"
     },
     {
-      "text": "Keep the name and plan visible in the phone drawer",
+      "text": "Confirm the fix is committed and pushed (19fac8f, 1a8a298)",
       "state": "done"
     },
     {
-      "text": "Verify in a browser at 390 and 1280 wide",
+      "text": "Re-run the full test suite on the current tree",
       "state": "done"
     },
     {
-      "text": "Run the project checks, then commit and push the fix",
+      "text": "Confirm the live site serves the fixed bundle",
       "state": "done"
+    },
+    {
+      "text": "Re-check the phone row visually after the other run's markup change",
+      "state": "active"
+    },
+    {
+      "text": "Commit the plan file and push",
+      "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T12:18:06.700Z"
+  "updatedAt": "2026-11-04T12:24:28.394Z"
 }
