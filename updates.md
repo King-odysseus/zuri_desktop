@@ -1,3 +1,27 @@
+## 2026-11-04 - Windows (Settings draws again, and only the shapes that were wrong changed)
+
+- The Settings page blanked the whole window. HeroUI's Radio reads its selected value and its disabled state from the RadioGroup above it; the theme and age pickers drew bare Radios, so mounting threw "Cannot read properties of null (reading 'isDisabled')". Both pickers are inside a real RadioGroup again, and a check now fails if any file draws a Radio without one.
+- The shape of a drop-down was a lozenge. The select trigger had taken the same 9999px pill as a button; it now takes the field radius, so it is the rounded rectangle a field should be. Nothing else was reshaped: the send and stop buttons keep their 36px circle, the suggestion chips keep their pill, and the radios, switches and tick boxes are untouched.
+- The Settings search was a box inside a box. The HeroUI field inside the pill drew its own fill, corners and shadow; it is see-through now and the pill draws the box, with the focus ring moved to the pill.
+- A suggested addition was a bare text row. It is the soft-filled pill now, on both surfaces, so it reads as something you can tap.
+- Left alignment: the account menu rows and the Settings rail were centred, because HeroUI centres whatever a button holds. Both start at the left edge again.
+- The message box grows with the typing. HeroUI's base sheet sets `textarea { resize: vertical }`, which put a drag handle in every multi-line field and a scrollbar down the composer; the composer now grows with the message and no textarea shows a handle.
+- Checked: npm run test passes, every stage, none failing. The desktop renderer was driven in a headless browser with the bridge stubbed: all nine Settings sections render with no page error, the menu and rail report flex-start, the send button computes 9999px on a 40px square, the select trigger computes 10px, and both halves of the prompt enhancer work (the draft is rewritten and three pill additions are drawn).
+- Key files: src/renderer-react/SettingsView.jsx, src/renderer-react/ChatPanel.jsx, src/renderer-react/Sidebar.jsx, src/renderer-react/app.css, web/src/styles.css, web/src/views/ChatView.jsx, scripts/selftest.js.
+- Other OS action: npm run web:build, then npm run cloud:deploy. The desktop needs the rebuilt installer.
+- Done on: Windows
+
+## 2026-11-04 - Windows (the enhancer does both jobs, and the selection is a pill)
+
+- The prompt enhancer is meant to do two things at once: word the typed message better in the composer, and list the details the message left open. The server always returned both, and both apps always wrote the rewrite back. What made it look broken was the local preview server, whose mock echoed the prompt back unchanged, so the composer showed the same words it started with. The mock now rewrites honestly and keeps only the suggestions the message is actually missing.
+- Two new checks hold the pair together. One fails if either surface stops putting the rewrite in the box or stops drawing the additions. The other drives `readEnhancerReply` directly: it reads the rewrite and the list apart, ignores a chatty opening line, and refuses a reply that is really an answer.
+- The nav items and the saved-chat rows take a fully rounded pill with symmetric padding. The highlight used to be a rounded box whose fill sat nearer the lower edge, so a two-line row read as though its words were sliding off the bottom of the selection.
+- The desktop sidebar rows now match the browser: the name, a quote of the last message, and how long ago the chat was touched. The row is content-sized off its own class rather than `:has()`, so the rule cannot quietly stop applying if the markup is nested differently.
+- Checked: npm run test passes, 309 checks, none failing. Looked at in a browser at 390, 1280 and 1920 wide, and the deployed bundle was read back to confirm the pill rule, the Recents heading and the single search field all reached Railway.
+- Key files: web/src/styles.css, src/renderer-react/app.css, src/renderer-react/Sidebar.jsx, scripts/preview-web.mjs, scripts/selftest.js.
+- Other OS action: npm run web:build, then npm run cloud:deploy for the browser and phone. The desktop needs a rebuilt installer to carry the sidebar row.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (a saved chat shows its name again, and chat history has a door)
 
 - In the browser, and on a phone through the same build, every saved chat in the sidebar showed only a time. The HeroUI migration had put each row's whole label inside HeroUI's Button, which is a fixed 40px box that centres what it holds; the row stacks a name, the last message and a time, so the name was squeezed to nothing while the timestamp, which does not clip, survived. The row is content-sized again with a 44px tap target, the name on one clipped line above the message and the time beside it. The desktop sidebar never lost its names and is unchanged.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, Chip, Input, Radio, Select, Textarea } from './ui.jsx';
+import { Button, Checkbox, Chip, Input, Radio, RadioGroup, Select, Textarea } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 // The catalogue lives in its own module because the composer's model chip offers
 // the same six names, and two copies of a supplier id would drift apart.
@@ -124,14 +124,19 @@ function SettingsRow({ title, description, children }) {
  * A single-choice control drawn as a radio, in ChatGPT's shape: the circle marks
  * the state and the whole row is the target, so the label is as tappable as the dot.
  */
-function Choice({ name, label, description, checked, onPick }) {
+/**
+ * A single-choice control drawn as a radio, in ChatGPT's shape: the circle marks
+ * the state and the whole row is the target, so the label is as tappable as the dot.
+ *
+ * HeroUI's Radio reads its selected value from the RadioGroup above it. Rendered on
+ * its own it has no group to read and the page crashes instead of drawing, so a
+ * Choice is only ever placed inside one.
+ */
+function Choice({ label, description, checked }) {
   return (
     <Radio
-      name={name}
       value={label}
       className={`zuri-choice${checked ? ' is-selected' : ''}`}
-      isSelected={checked}
-      onChange={() => onPick()}
     >
       <span className="zuri-choice-copy">
         <span className="zuri-choice-label">{label}</span>
@@ -441,10 +446,18 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
             <>
               <SettingsCard>
                 <SettingsRow title="Theme" description="Light for daytime, dark for the evening.">
-                  <div className="zuri-choice-row">
-                    <Choice name="theme" label="Light" checked={themeChoice === 'light'} onPick={() => void savePatch({ theme: 'light' }, 'Theme is now light.')} />
-                    <Choice name="theme" label="Dark" checked={themeChoice === 'dark'} onPick={() => void savePatch({ theme: 'dark' }, 'Theme is now dark.')} />
-                  </div>
+                  <RadioGroup
+                    aria-label="Theme"
+                    className="zuri-choice-row"
+                    value={themeChoice === 'light' ? 'Light' : 'Dark'}
+                    onChange={(event) => {
+                      const picked = String(event?.target?.value ?? event);
+                      void savePatch({ theme: picked === 'Light' ? 'light' : 'dark' }, `Theme is now ${picked.toLowerCase()}.`);
+                    }}
+                  >
+                    <Choice label="Light" checked={themeChoice === 'light'} />
+                    <Choice label="Dark" checked={themeChoice === 'dark'} />
+                  </RadioGroup>
                 </SettingsRow>
                 <SettingsRow title="Assistant overlay" description="A small Zuri window over your work. Ctrl Alt Space opens it from anywhere.">
                   <Checkbox
@@ -477,10 +490,18 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
           {status === 'ready' && section === 'appearance' && (
             <SettingsCard>
               <SettingsRow title="Theme" description="The change applies straight away and is remembered next time.">
-                <div className="zuri-choice-row">
-                  <Choice name="appearance-theme" label="Light" checked={themeChoice === 'light'} onPick={() => void savePatch({ theme: 'light' }, 'Theme is now light.')} />
-                  <Choice name="appearance-theme" label="Dark" checked={themeChoice === 'dark'} onPick={() => void savePatch({ theme: 'dark' }, 'Theme is now dark.')} />
-                </div>
+                <RadioGroup
+                  aria-label="Theme"
+                  className="zuri-choice-row"
+                  value={themeChoice === 'light' ? 'Light' : 'Dark'}
+                  onChange={(event) => {
+                    const picked = String(event?.target?.value ?? event);
+                    void savePatch({ theme: picked === 'Light' ? 'light' : 'dark' }, `Theme is now ${picked.toLowerCase()}.`);
+                  }}
+                >
+                  <Choice label="Light" checked={themeChoice === 'light'} />
+                  <Choice label="Dark" checked={themeChoice === 'dark'} />
+                </RadioGroup>
               </SettingsRow>
             </SettingsCard>
           )}
@@ -523,22 +544,27 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
               <section className="zuri-settings-block">
                 <h3 className="zuri-settings-block-title">Age</h3>
                 <p className="zuri-settings-block-help">Zuri is for people 18 and older.</p>
-                <div className="zuri-choice-stack" role="radiogroup" aria-label="Age">
+                <RadioGroup
+                  className="zuri-choice-stack"
+                  aria-label="Age"
+                  value={ageConfirmed ? '18 or older' : 'Under 18'}
+                  onChange={(event) => {
+                    const picked = String(event?.target?.value ?? event);
+                    if (picked === '18 or older') void savePatch({ ageConfirmed: true }, 'Age confirmed: 18 or older.');
+                    else void savePatch({ ageConfirmed: false }, 'Zuri is for people 18 and older. Your account stays signed in, but please stop using it.');
+                  }}
+                >
                   <Choice
-                    name="age"
                     label="18 or older"
                     description="You can use Zuri with no age limit on answers."
                     checked={ageConfirmed}
-                    onPick={() => void savePatch({ ageConfirmed: true }, 'Age confirmed: 18 or older.')}
                   />
                   <Choice
-                    name="age"
                     label="Under 18"
                     description="Zuri cannot be used by anyone under 18. Ask a parent or guardian for help."
                     checked={current.ageConfirmed === false}
-                    onPick={() => void savePatch({ ageConfirmed: false }, 'Zuri is for people 18 and older. Your account stays signed in, but please stop using it.')}
                   />
-                </div>
+                </RadioGroup>
               </section>
             </>
           )}

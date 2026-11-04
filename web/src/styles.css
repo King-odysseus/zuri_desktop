@@ -28,10 +28,17 @@
  * layer so a page-level rule still wins when it needs to.
  */
 @layer components {
+  /* A button is a pill: that is what makes the 36px send button a circle and what
+     sets the suggestion chips apart. The select trigger was the odd one out: it
+     took the same pill, so every drop-down drew as a lozenge. It takes the field
+     radius instead, which is the rounded rectangle a field should be. */
   .button,
-  .chip,
-  .select__trigger {
+  .chip {
     border-radius: var(--button-radius, 9999px);
+  }
+
+  .select__trigger {
+    border-radius: var(--field-radius);
   }
 
   .input,
@@ -3931,7 +3938,7 @@ a.download-card:hover {
 .chat-composer .chat-input {
   flex: 1 1 auto;
   min-width: 0;
-  max-height: 12rem;
+  max-height: 45vh;
   /* One line, so the box can never open shorter than its own placeholder: the
      auto-grow effect measures the text, and a box that has only just mounted
      reports none. */
@@ -3946,10 +3953,17 @@ a.download-card:hover {
   color: var(--text);
   font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
   resize: none;
-  /* A one-line box that scrolls draws a scrollbar down its own middle, which reads
-     as a second control. It grows in height instead, up to the cap above, and the
-     app-wide rule keeps the bar out of sight once the text runs past that. */
+  /* The field grows with what is typed, so it never shows a scrollbar down its own
+     middle the way a fixed box does. Only a paste larger than the ceiling above
+     scrolls, and that scroll is silent: scrollbar-width and the webkit rule below
+     keep the bar itself out of the composer. */
   overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.chat-composer .chat-input::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .chat-composer .chat-input:focus {
@@ -4250,10 +4264,13 @@ a.download-card:hover {
   justify-content: flex-start;
   gap: 6px;
   width: 100%;
-  padding: 8px 8px 8px 6px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 0;
-  background: transparent;
+  /* A pill, like every other pressable thing here: the shape is what tells a
+     person this row can be added with one tap. The soft fill keeps the shape
+     visible before the pointer arrives. */
+  border-radius: 9999px;
+  background: var(--surface-secondary);
   color: var(--text);
   font: inherit;
   font-size: 13px;
@@ -4762,7 +4779,6 @@ h4,
 
 .project-textarea {
   min-height: 96px;
-  resize: vertical;
   line-height: 1.55;
 }
 
@@ -6021,11 +6037,10 @@ h4,
   overflow-wrap: anywhere;
 }
 
-/* The instruction is a sentence, not a title, so the field is a textarea and may
-   be dragged taller; the shared input class gives it everything else. */
+/* The instruction is a sentence, not a title, so the field is a textarea and is
+   taller than one line; the shared input class gives it everything else. */
 .automation-prompt {
   min-height: 76px;
-  resize: vertical;
 }
 
 /* A quoted passage is set apart by a tint alone, with no bar or border down its

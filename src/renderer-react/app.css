@@ -19,10 +19,17 @@
  * page-level rule still wins where a screen needs a different shape.
  */
 @layer components {
+  /* A button is a pill: that is what makes the 36px send button a circle and what
+     sets the suggestion chips apart. The select trigger was the odd one out: it
+     took the same pill, so every drop-down drew as a lozenge. It takes the field
+     radius instead, which is the rounded rectangle a field should be. */
   .button,
-  .chip,
-  .select__trigger {
+  .chip {
     border-radius: var(--button-radius, 9999px);
+  }
+
+  .select__trigger {
+    border-radius: var(--field-radius);
   }
 
   .input,
@@ -445,8 +452,10 @@ button,
 /* A HeroUI button is a fixed 40px box that centres what it holds. With two lines in
    it, that box squeezed the name and left both lines sitting on its lower edge. The
    row is content-sized with even padding, so the words sit in the middle of the
-   highlight, and the highlight itself is a pill rather than a rounded box. */
-.zuri-sidebar-panel button:has(.zuri-thread-row) {
+   highlight, and the highlight itself is a pill rather than a rounded box.
+   A class of its own rather than :has(), so the rule does not depend on how deeply
+   the row is nested inside the button. */
+.zuri-sidebar-panel .zuri-thread-open {
   height: auto;
   min-height: 44px;
   align-items: center;
@@ -1203,6 +1212,10 @@ html:has(.zuri-overlay-root) #root {
   width: 100%;
   min-height: 2.125rem;
   align-items: center;
+  /* HeroUI centres whatever a button holds, which left every menu row floating in
+     the middle of its own width. A menu reads as a list: the icon starts at the
+     left edge, the label follows it, and only the hint goes to the right. */
+  justify-content: flex-start;
   gap: 0.625rem;
   border-radius: 0.5rem;
   padding: 0.375rem 0.5rem;
@@ -1318,6 +1331,25 @@ html:has(.zuri-overlay-root) #root {
   outline: none;
 }
 
+/* The HeroUI field inside the pill drew its own fill, corners and shadow, so the
+   search read as a box inside a box. The pill is the only box now; the field is
+   see-through and the wrapper shows the focus, since the field keeps none. */
+.zuri-settings-search .input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  outline: none;
+}
+
+.zuri-settings-search:focus-within {
+  box-shadow: 0 0 0 2px var(--focus);
+}
+
 .zuri-settings-search input::placeholder {
   color: var(--muted);
 }
@@ -1346,6 +1378,9 @@ html:has(.zuri-overlay-root) #root {
   width: 100%;
   min-height: 2rem;
   align-items: center;
+  /* A rail is a list of destinations, so each row starts at the left edge.
+     HeroUI centres what a button holds, which floated every one of them. */
+  justify-content: flex-start;
   gap: 0.625rem;
   border-radius: 0.5rem;
   padding: 0.375rem 0.5rem;

@@ -1709,7 +1709,15 @@ export default function ChatView({
       const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
       const measured = node.scrollHeight + padding;
       node.style.minHeight = floor;
-      node.style.height = `${Math.min(measured, 160)}px`;
+      // The field grows with the typing rather than stopping at a fixed number of
+      // lines and starting to scroll. The only ceiling is the room the window has:
+      // past that the composer would push the conversation off the screen.
+      const ceiling = Math.max(120, Math.round(window.innerHeight * 0.45));
+      node.style.height = `${Math.min(measured, ceiling)}px`;
+      // A paste longer than the ceiling still scrolls, but silently: the bar is a
+      // second control in the middle of the composer and there is nothing to point
+      // at, so it is hidden rather than shown.
+      node.style.overflowY = measured > ceiling ? 'auto' : 'hidden';
     };
 
     // Measured after layout: a box that has just mounted reports no content height,

@@ -342,7 +342,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             type="button"
             variant={thread.id === activeThreadId ? 'secondary' : 'ghost'}
             fullWidth
-            className="min-w-0 flex-1 justify-start rounded-full px-3 py-2 text-left"
+            className="zuri-thread-open min-w-0 flex-1 justify-start rounded-full px-3 py-2 text-left"
             onPress={() => onSelectThread(thread.id)}
           >
             <span className="zuri-thread-row">

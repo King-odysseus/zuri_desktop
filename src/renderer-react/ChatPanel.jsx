@@ -627,8 +627,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     const composer = composerRef.current;
     if (!composer) return;
     composer.style.height = 'auto';
-    composer.style.height = `${Math.min(composer.scrollHeight, 192)}px`;
-    composer.style.overflowY = composer.scrollHeight > 192 ? 'auto' : 'hidden';
+    // The draft grows with the typing instead of stopping after a fixed number of
+    // lines and starting to scroll. The only ceiling is the room the window has:
+    // past that the composer would push the conversation off the screen.
+    const ceiling = Math.max(120, Math.round(window.innerHeight * 0.45));
+    composer.style.height = `${Math.min(composer.scrollHeight, ceiling)}px`;
+    composer.style.overflowY = composer.scrollHeight > ceiling ? 'auto' : 'hidden';
   }, [draft]);
 
   // Follow a reply as it streams, but only while the reader is already at the
@@ -1586,7 +1590,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   type="button"
                   variant="ghost"
                   title="Add this line to your message"
-                  className="flex w-full items-start justify-start gap-1.5 rounded-none px-1.5 py-1.5 text-left text-[13px] font-normal leading-snug hover:bg-surface-secondary"
+                  className="zuri-suggestion flex w-full items-start justify-start gap-1.5 rounded-full bg-surface-secondary px-3 py-1.5 text-left text-[13px] font-normal leading-snug hover:bg-surface-tertiary"
                   onPress={() => addSuggestion(suggestion)}
                 >
                   <PlusIcon size={14} className="mt-0.5 shrink-0 text-muted" />
