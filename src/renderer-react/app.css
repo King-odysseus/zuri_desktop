@@ -533,10 +533,12 @@ button,
   outline: none;
 }
 
-/* New chat is a soft blue pill on the panel, so the navy stays for the one primary action. */
+/* New chat is an action, not a selection, so it sits unfilled like every other row
+   in the panel and only takes the soft blue while the pointer or the keyboard is on
+   it. A permanent fill read as though the row were the current chat. */
 .zuri-sidebar-panel .zuri-new-chat {
-  background: var(--brand-blue-soft) !important;
-  color: var(--brand-blue-ink) !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
   box-shadow: none !important;
 }
 
@@ -2318,4 +2320,15 @@ html:has(.zuri-overlay-root) #root {
 
 .message-body del {
   opacity: 0.7;
+}
+
+/* No box in this app is resized by dragging its corner.
+
+   HeroUI's base sheet sets `textarea { resize: vertical }`, so every multi-line
+   field drew a drag handle in its bottom corner: a second control in a field that
+   already knows how tall it should be. The composer grows with the typing by
+   itself, and every other field is sized by its rows and its min-height. One rule
+   for the whole app, so no existing or future field can bring the handle back. */
+textarea {
+  resize: none !important;
 }

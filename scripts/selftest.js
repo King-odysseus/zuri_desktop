@@ -262,6 +262,24 @@ check('a search field is one box, never a field inside a box', () => {
   return 'both search fields are see-through inside a single pill';
 });
 
+check('an empty composer is one line, and no row looks selected until it is', () => {
+  const chat = read('web/src/views/ChatView.jsx');
+  const desktop = read('src/renderer-react/ChatPanel.jsx');
+  // scrollHeight already covers the field's own padding. Adding it again made an
+  // empty box 18px taller than one line, which read as two lines of empty space.
+  if (/scrollHeight \+ padding/.test(chat)) throw new Error('the web composer counts its padding twice again');
+  if (/scrollHeight \+ padding/.test(desktop)) throw new Error('the desktop composer counts its padding twice again');
+  if (!chat.includes('const measured = node.scrollHeight;')) throw new Error('the web composer no longer measures the field as it is');
+  // New chat is an action. A permanent fill made it look like the current chat.
+  const css = read('src/renderer-react/app.css');
+  const at = css.indexOf('.zuri-sidebar-panel .zuri-new-chat {');
+  const rule = at === -1 ? '' : css.slice(at, css.indexOf('}', at));
+  if (/background: var\(--brand-blue-soft\)/.test(rule)) {
+    throw new Error('the New chat row is filled again, so it reads as the selected chat');
+  }
+  return 'the empty composer is one line and New chat is not permanently filled';
+});
+
 check('the saved-chat column names itself and opens the chat history', () => {
   const chat = read('web/src/views/ChatView.jsx');
   const app = read('web/src/App.jsx');

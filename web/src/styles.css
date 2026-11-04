@@ -3939,6 +3939,10 @@ a.download-card:hover {
   flex: 1 1 auto;
   min-width: 0;
   max-height: 45vh;
+  /* The typed line starts at the same place as the placeholder. HeroUI indents a
+     textarea's placeholder by its padding, so a box padded to nothing typed its
+     text further left than the grey line that invited it. */
+  text-indent: 0;
   /* One line, so the box can never open shorter than its own placeholder: the
      auto-grow effect measures the text, and a box that has only just mounted
      reports none. */
@@ -4243,10 +4247,13 @@ a.download-card:hover {
 
 /* What the enhancer suggests adding. The rewrite goes into the box above; these stay
    outside it, because a detail the person has not confirmed is not their message yet.
-   Square corners, no border, no shadow, and the same hover as the other quiet rows. */
+   Each one is a soft-filled pill, the way every other pressable row in this app is. */
 .chat-suggestions {
   display: flex;
   flex-direction: column;
+  /* A chip is as wide as its own words: a pill stretched across the whole column
+     stops reading as one thing you tap and starts reading as a band. */
+  align-items: flex-start;
   gap: 2px;
   margin: 0 0 8px;
 }
@@ -4263,7 +4270,8 @@ a.download-card:hover {
   align-items: flex-start;
   justify-content: flex-start;
   gap: 6px;
-  width: 100%;
+  width: auto;
+  max-width: 100%;
   padding: 8px 12px;
   border: 0;
   /* A pill, like every other pressable thing here: the shape is what tells a
@@ -5790,7 +5798,9 @@ h4,
   display: flex;
   flex: 1 1 180px;
   flex-direction: column;
-  gap: 3px;
+  /* The title, the message and the date are three separate things on a row that has
+     the height to spare, so they are spaced rather than stacked tight. */
+  gap: 6px;
   min-width: 0;
 }
 
@@ -6458,4 +6468,15 @@ h4,
    white mark sitting inside it. */
 .history-delete {
   color: var(--danger);
+}
+
+/* No box in this app is resized by dragging its corner.
+
+   HeroUI's base sheet sets `textarea { resize: vertical }`, so every multi-line
+   field drew a drag handle in its bottom corner: a second control in a field that
+   already knows how tall it should be. The composer grows with the typing by
+   itself, and every other field is sized by its rows and its min-height. One rule
+   for the whole app, so no existing or future field can bring the handle back. */
+textarea {
+  resize: none !important;
 }

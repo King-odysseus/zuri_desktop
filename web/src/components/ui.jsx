@@ -17,6 +17,7 @@ import {
   Radio as HeroRadio,
   RadioGroup as HeroRadioGroup,
   Select as HeroSelect,
+  Switch as HeroSwitch,
   TextArea,
   TimeField as HeroTimeField,
 } from '@heroui/react';
@@ -388,6 +389,32 @@ export function Select({ value, onChange, children, className = '', placeholder,
         </ListBox>
       </HeroSelect.Popover>
     </HeroSelect>
+  );
+}
+
+/**
+ * An on-or-off setting: the assistant overlay, and anything else that is simply
+ * on or off. HeroUI's Switch keeps the keyboard handling and the aria-checked
+ * state; a page passes the same `checked`/`onChange` contract the tick box took,
+ * so only the shape of the control changed.
+ */
+export function Switch({ className = '', checked, isSelected, onChange, disabled, isDisabled, children, ...props }) {
+  return (
+    <HeroSwitch
+      className={className}
+      isSelected={isSelected ?? checked}
+      isDisabled={isDisabled ?? disabled}
+      onChange={(selected) => onChange?.({ target: { checked: selected } })}
+      {...props}
+    >
+      {children ?? (
+        <>
+          <HeroSwitch.Control>
+            <HeroSwitch.Indicator />
+          </HeroSwitch.Control>
+        </>
+      )}
+    </HeroSwitch>
   );
 }
 

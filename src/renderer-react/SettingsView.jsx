@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, Checkbox, Chip, Input, Radio, RadioGroup, Select, Textarea } from './ui.jsx';
+import { Button, Chip, Input, Radio, RadioGroup, Select, Switch, Textarea } from './ui.jsx';
 import SelectField from './SelectField.jsx';
 // The catalogue lives in its own module because the composer's model chip offers
 // the same six names, and two copies of a supplier id would drift apart.
@@ -460,8 +460,7 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
                   </RadioGroup>
                 </SettingsRow>
                 <SettingsRow title="Assistant overlay" description="A small Zuri window over your work. Ctrl Alt Space opens it from anywhere.">
-                  <Checkbox
-                    className="zuri-switch"
+                  <Switch
                     checked={current.overlayEnabled === true}
                     isDisabled={busy}
                     aria-label="Assistant overlay"

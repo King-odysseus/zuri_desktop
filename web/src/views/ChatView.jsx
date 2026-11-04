@@ -1703,11 +1703,10 @@ export default function ChatView({
       const floor = node.style.minHeight;
       node.style.minHeight = '0';
       node.style.height = 'auto';
-      // scrollHeight covers the text only, and the site draws controls border-box, so
-      // the field's own padding has to be added or a one-line box clips its text.
-      const style = window.getComputedStyle(node);
-      const padding = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
-      const measured = node.scrollHeight + padding;
+      // scrollHeight already covers the field's own padding, so adding it again made
+      // an empty box 18px taller than one line. Measured as it is, one line of text
+      // is exactly one line of box.
+      const measured = node.scrollHeight;
       node.style.minHeight = floor;
       // The field grows with the typing rather than stopping at a fixed number of
       // lines and starting to scroll. The only ceiling is the room the window has:

@@ -1,3 +1,14 @@
+## 2026-11-04 - Windows (an empty composer is one line, and New chat stops looking selected)
+
+- The composer was 59px before anything was typed. The auto-grow measured the field and then added its own padding, but scrollHeight already includes that padding, so every box was 18px taller than its text: an empty box looked like two lines and a short sentence looked padded. Measured as it is, one line of text is one line of box (41px), and the field still grows with the typing.
+- The New chat row sat permanently filled soft blue among unfilled rows, so it read as the current chat. It is unfilled like its neighbours and only tints on hover or keyboard focus.
+- The notification rows had 3px between the title, the message and the date; they are 6px apart now, since the row has the height to spare.
+- Checked: npm run test passes, every stage, 196 checks, none failing, including a new check that fails if a composer counts its padding twice or if New chat is filled again. The empty composer measures 41px in a browser (22.5px line plus 18px padding), and every textarea on the chat, automations, reminders, tasks and projects screens reports resize none.
+- Still open: two reports I could not reproduce and so did not change blind. The allowance gauge and its track share an exact top and height (317.9px, 6px) and the seven weekly bars share one baseline, so I could not see the misalignment being described. The project row measures 44px with its label centred 12px from each edge, which is the 44px tap target; narrowing it needs a number from the person rather than a guess.
+- Key files: web/src/views/ChatView.jsx, web/src/views/OverviewView.jsx, src/renderer-react/app.css, web/src/styles.css, web/src/components/ui.jsx, src/renderer-react/ui.jsx, src/renderer-react/SettingsView.jsx, src/renderer-react/ChatPanel.jsx, scripts/selftest.js.
+- Other OS action: npm run web:build, then npm run cloud:deploy. The desktop needs the rebuilt installer.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (Settings draws again, and only the shapes that were wrong changed)
 
 - The Settings page blanked the whole window. HeroUI's Radio reads its selected value and its disabled state from the RadioGroup above it; the theme and age pickers drew bare Radios, so mounting threw "Cannot read properties of null (reading 'isDisabled')". Both pickers are inside a real RadioGroup again, and a check now fails if any file draws a Radio without one.
