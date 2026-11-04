@@ -14,13 +14,13 @@
       "state": "done"
     },
     {
-      "text": "Verify at 390px and 1920px wide, then run the checks",
+      "text": "Verify at 411px, 1280px and 1920px wide, then run the checks",
       "state": "done"
     },
     {
-      "text": "Rebuild web assets and report",
-      "state": "done"
+      "text": "Rebuild web assets, commit and report",
+      "state": "active"
     }
   ],
-  "updatedAt": "2026-11-04T02:07:01.559Z"
+  "updatedAt": "2026-11-04T02:11:15.395Z"
 }

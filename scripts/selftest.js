@@ -2644,6 +2644,34 @@ check('on a phone the content and the chat composer clear the bottom tab bar', (
   return 'content and the chat composer both reserve the bar height plus the safe area';
 });
 
+check('the account control sits at the foot of the signed-in sidebar', () => {
+  const styles = read('web/src/styles.css');
+  // The navigation panel arrives as one block whose last row is the account control,
+  // so on a chat it landed under the destinations, halfway up the column. The panel's
+  // rows join the chat column as siblings, and only their order puts it at the foot.
+  const orderOf = (selector) => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rule = styles.match(new RegExp(`${escaped} \\{([^}]*)\\}`));
+    const value = rule ? rule[1].match(/order: (\d+);/) : null;
+    return value ? Number(value[1]) : null;
+  };
+  const list = orderOf('.chat-recents-list');
+  const foot = orderOf('.chat-recents-foot');
+  const account = orderOf('.chat-nav .sidebar-account');
+  if (list === null || foot === null || account === null) {
+    throw new Error('the chat column does not declare the order of its rows');
+  }
+  if (!(list < foot && foot < account)) {
+    throw new Error(`the chat column orders its rows ${list}, ${foot}, ${account}; the account control has to come last`);
+  }
+  // A folded panel hides the list, and the auto margin is what still holds the
+  // account control against the bottom there.
+  if (!/\.sidebar-account \{[^}]*margin-top: auto;/.test(styles)) {
+    throw new Error('the account control no longer holds itself against the bottom of a folded panel');
+  }
+  return 'the account control is the last row of the chat column and is pinned when folded';
+});
+
 check('the chat takes the whole window and only the transcript scrolls', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
   const styles = read('web/src/styles.css');
