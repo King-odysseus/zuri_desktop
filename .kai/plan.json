@@ -2,25 +2,25 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Inspect project specs and deployment scripts",
+      "text": "Open the screenshot and inspect the web sidebar layout code",
       "state": "done"
     },
     {
-      "text": "Confirm the local web build is current with the latest source",
+      "text": "Find why the account card sits above the chat list instead of pinned at the bottom",
       "state": "done"
     },
     {
-      "text": "Deploy the web UI to Railway",
+      "text": "Fix the sidebar layout so the account card stays pinned at the bottom",
       "state": "done"
     },
     {
-      "text": "Verify the live site and run the project checks",
+      "text": "Verify at 390px and 1920px wide, then run the checks",
       "state": "done"
     },
     {
-      "text": "Commit the web build output and push",
+      "text": "Rebuild web assets and report",
       "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T02:05:09.086Z"
+  "updatedAt": "2026-11-04T02:07:01.559Z"
 }

@@ -3180,6 +3180,25 @@ a.download-card:hover {
   margin-top: 0;
 }
 
+/* The shared navigation panel arrives as one block, and the account control is
+   its last row: on a chat that put the account under the destinations, halfway up
+   the column. Reordering the panel's own rows (display: contents above makes them
+   siblings of the conversation list) moves it to the real foot of the sidebar, the
+   way the docked sidebar and the desktop app put it. The list grows into the height
+   left over, and the account keeps its own auto margin, so a folded panel with no
+   list still pins it to the bottom. */
+.chat-recents-list {
+  order: 8;
+}
+
+.chat-recents-foot {
+  order: 10;
+}
+
+.chat-nav .sidebar-account {
+  order: 12;
+}
+
 /* No filled control here any more: starting a chat is what the Chat destination
    does, so the column carries the search and the saved chats only. */
 
