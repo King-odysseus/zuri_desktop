@@ -1230,7 +1230,7 @@ export function getTool(name) {
  */
 export function listTools(options = {}) {
   const allowed = Array.isArray(options.allowedTools) ? options.allowedTools : null;
-  return [...TOOLS, ...connectorTools].filter((tool) => allowed === null || allowed.includes(tool.name)).map((tool) => ({
+  return TOOLS.filter((tool) => allowed === null || allowed.includes(tool.name)).map((tool) => ({
     name: tool.name,
     description: tool.description,
     requiresConfirmation: tool.requiresConfirmation,
@@ -1244,7 +1244,7 @@ export function listTools(options = {}) {
  * @returns {{ name: string, label: string, description: string }[]}
  */
 export function toolCatalogue() {
-  return [...TOOLS, ...connectorTools].map((tool) => ({ name: tool.name, label: tool.label ?? tool.name, description: tool.description }));
+  return TOOLS.map((tool) => ({ name: tool.name, label: tool.label, description: tool.description }));
 }
 
 /** Return enabled connector tools without exposing a handler to the renderer. */
@@ -1320,7 +1320,7 @@ export async function runTool(name, args = {}, options = {}) {
     }
   }
   if (!tool) {
-    return failure('TOOL_UNKNOWN', `"${String(name)}" is not a Zuri tool. The tools are: ${allToolNames().join(', ')}.`);
+    return failure('TOOL_UNKNOWN', `"${String(name)}" is not a Zuri tool. The tools are: ${TOOL_NAMES.join(', ')}.`);
   }
 
   if (Array.isArray(options.allowedTools) && !options.allowedTools.includes(tool.name)) {
