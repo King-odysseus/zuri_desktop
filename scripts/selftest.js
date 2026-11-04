@@ -30,8 +30,17 @@ const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'u
 const exists = (relativePath) => fs.existsSync(path.join(root, relativePath));
 const packageJson = JSON.parse(read('package.json'));
 
-check('React build output exists', () => {
-  const missing = ['dist-react/index.html', 'dist-react/assets'].filter((entry) => !exists(entry));
+check('React build output exists', async () => {
+  const missingNow = () => ['dist-react/index.html', 'dist-react/assets'].filter((entry) => !exists(entry));
+  // `npm test` builds first, but vite clears the output folder before it writes
+  // anything, so a second build in the same checkout empties it for the length of
+  // that build. Waiting tells "never built" apart from "being built right now";
+  // an output that is already there is accepted on the first look, with no wait.
+  let missing = missingNow();
+  for (let waited = 0; missing.length > 0 && waited < 40000; waited += 500) {
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    missing = missingNow();
+  }
   if (missing.length > 0) throw new Error(`missing ${missing.join(', ')}`);
   return 'dist-react';
 });
@@ -223,6 +232,87 @@ check('a radio is only ever drawn inside a group', () => {
     }
   }
   return 'every Radio sits inside a RadioGroup, so none of them can blank a page';
+});
+
+check('the account screens are one bright layout', () => {
+  // Sign-in, registration and the age question are the first thing anyone sees, and
+  // the web account page they have to match is bright. The saved theme is not known
+  // when the first of them paints, so the shell declares the light tokens itself for
+  // that subtree: a dark choice on this machine must not turn these screens navy.
+  const layout = read('src/renderer-react/AuthLayout.jsx');
+  if (!layout.includes('data-theme="light"')) {
+    throw new Error('the account shell does not declare the light tokens, so a saved dark theme would paint it dark');
+  }
+  for (const file of ['src/renderer-react/SignInView.jsx', 'src/renderer-react/SignUpView.jsx', 'src/renderer-react/AgeGateView.jsx']) {
+    if (!/import AuthLayout from '\.\/AuthLayout\.jsx'/.test(read(file))) {
+      throw new Error(`${file} does not use the one shared account layout`);
+    }
+  }
+  // The age answer has to register. HeroUI's Radio draws here without a role or an
+  // input, so Continue stayed disabled however the row was clicked; the two choices
+  // are native radios in a named fieldset instead.
+  const age = read('src/renderer-react/AgeGateView.jsx');
+  if (/<Radio[\s>]/.test(age)) {
+    throw new Error('the age question draws HeroUI Radios again, which do not register the answer');
+  }
+  if (!age.includes('<fieldset') || !age.includes('type="radio"')) {
+    throw new Error('the age question is not a fieldset of real radio buttons');
+  }
+  if (!read('src/renderer-react/app.css').includes('.zuri-auth-page')) {
+    throw new Error('the account shell has no styles of its own, so it cannot match the web card');
+  }
+  return 'sign-in, registration and the age question share one bright layout';
+});
+
+check('the colour scheme is one switch on every surface', () => {
+  // Light and dark are one on-off question, so each place that asks it draws one
+  // switch. Two radio circles stacked into a column of dots on a narrow window,
+  // which is what the settings page did, and a bare icon button hid which way the
+  // setting was. The two state colours are named here too: HeroUI paints the off
+  // track from its own token, and this theme set that to almost the page colour,
+  // so a switch read as an empty pill in light mode.
+  const desktop = read('src/renderer-react/SettingsView.jsx');
+  if (!/function ThemeSwitch\(/.test(desktop)) throw new Error('the desktop theme control is not the switch');
+  if (/<Choice label="(Light|Dark)"/.test(desktop)) throw new Error('the desktop asks light-or-dark with radios again');
+
+  for (const file of ['web/src/components/TopBar.jsx', 'web/src/views/SettingsView.jsx']) {
+    const source = read(file);
+    if (!/<Switch/.test(source)) throw new Error(`${file} no longer draws the theme switch`);
+    if (/label=\{theme === 'dark' \? 'Switch to light/.test(source)) {
+      throw new Error(`${file} is a theme button again, not a switch`);
+    }
+  }
+
+  for (const [file, ink] of [['web/src/styles.css', '--text'], ['src/renderer-react/app.css', '--foreground']]) {
+    const css = read(file);
+    if (!css.includes('--switch-control-bg-checked: var(--brand-blue)')) {
+      throw new Error(`${file} does not give the switch a colour when it is on`);
+    }
+    if (!css.includes(`var(${ink}) 32%`)) {
+      throw new Error(`${file} does not give the switch a visible track when it is off`);
+    }
+  }
+  // The desktop sidebar carries no theme control: the switch lives in Settings.
+  const sidebar = read('src/renderer-react/Sidebar.jsx');
+  if (/Dark mode|Light mode|AccountMenuSwitchRow/.test(sidebar)) {
+    throw new Error('the desktop sidebar holds a theme control again');
+  }
+
+  return 'one switch per surface, with a track that reads in both positions and both schemes';
+});
+
+check('an allowance bar is the shared HeroUI one, not a hand-drawn box', () => {
+  // A width on an empty div announces nothing to a screen reader. HeroUI's
+  // ProgressBar carries role and aria-valuenow, so every allowance reading goes
+  // through the one wrapper in components/ui.jsx.
+  const overview = read('web/src/views/OverviewView.jsx');
+  if (/role="progressbar"/.test(overview)) {
+    throw new Error('the overview draws its own progressbar again');
+  }
+  if (!/<UsageBar/.test(overview)) {
+    throw new Error('the overview no longer uses the shared allowance bar');
+  }
+  return 'the overview allowance reads through the shared HeroUI bar';
 });
 
 check('the send button is a circle and an addition is a pill', () => {
@@ -1041,6 +1131,31 @@ check('brand palette keeps navy and the light blue', () => {
   sheets.forEach(({ file, light }) => {
     statusReport(file, light);
 });
+});
+
+// A HeroUI control is assembled from named parts (<Select.Trigger>, <Switch.Thumb>).
+// A part that does not exist on that version resolves to undefined, and React
+// error 130 then unmounts the tree: the window goes blank with no message on
+// screen. That is how Settings died when the switch used a part Switch lacks.
+check('every HeroUI compound part a UI module references exists', async () => {
+  const heroui = await import('@heroui/react');
+  const modules = ['web/src/components/ui.jsx', 'src/renderer-react/ui.jsx'];
+  const aliases = {
+    HeroSwitch: 'Switch', HeroSelect: 'Select', HeroRadio: 'Radio',
+    HeroCheckbox: 'Checkbox', HeroChip: 'Chip', HeroInput: 'Input',
+  };
+  for (const file of modules) {
+    const source = read(file);
+    for (const match of source.matchAll(/<([A-Z][A-Za-z]*?)[.]([A-Z][A-Za-z]*)/g)) {
+      const root = aliases[match[1]] ?? match[1];
+      const part = match[2];
+      const component = heroui[root];
+      if (!component || typeof component !== 'object' && typeof component !== 'function') continue;
+      if (!(part in component)) {
+        throw new Error(file + ' renders <' + match[1] + '.' + part + '>, but ' + root + '.' + part + ' does not exist in this HeroUI version; React would blank the window');
+      }
+    }
+  }
 });
 
 await Promise.all(pendingChecks);

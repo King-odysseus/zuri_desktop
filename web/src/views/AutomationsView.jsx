@@ -312,6 +312,7 @@ export default function AutomationsView() {
             </label>
             <Select
               id="automation-new-cadence"
+              aria-label="How often"
               className="project-input"
               value={cadenceType}
               onChange={(event) => setCadenceType(event.target.value)}

@@ -2,9 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from './ui.jsx';
 import CloudAuthForm from './CloudAuthForm.jsx';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
-// The same mark the chat screen opens with, so the first screen already looks like Zuri.
-import zuriMarkUrl from './assets/zuri-logo.png';
-import authTeamUrl from './assets/auth-team.jpg';
+import AuthLayout from './AuthLayout.jsx';
 
 // Mirrors SETUP_NAME_MAX_LENGTH in onboarding.js; main still has the final word.
 const NAME_MAX_LENGTH = 60;
@@ -95,81 +93,69 @@ export default function SignInView({ onDone }) {
   const creating = authMode === 'create';
 
   return (
-    <main className="zuri-auth-page bg-background text-foreground">
-      <aside className="zuri-auth-aside" style={{ '--zuri-auth-image': `url(${authTeamUrl})` }}>
-        <a className="zuri-auth-brand" href="https://zuri.tijha.com" aria-label="Zuri Cloud home">
-          <span className="zuri-auth-brand-mark"><img src={zuriMarkUrl} alt="" width="24" height="24" decoding="async" /></span>
-          <span>Zuri Cloud</span>
-        </a>
-        <div className="zuri-auth-aside-copy">
-          <span className="zuri-auth-eyebrow">Your AI agent</span>
-          <h1>{creating ? 'One agent for work, and for everything else.' : 'Welcome back to your agent.'}</h1>
-          <p>{creating
-            ? 'Draft the report, plan the trip, chase the invoice, remember the appointment. Zuri keeps the whole of your day in one place, on your desktop and in the browser.'
-            : 'Your threads, files and plan are exactly where you left them, on your desktop and in the browser.'}</p>
-          <ul className="zuri-auth-trust" aria-label="Zuri benefits">
-            <li>Encrypted in transit</li>
-            <li>Works on any device</li>
-            <li>Naira billing</li>
-          </ul>
+    <AuthLayout
+      aside={{
+        eyebrow: 'Your AI agent',
+        headline: creating ? 'One agent for work, and for everything else.' : 'Welcome back to your agent.',
+        copy: creating
+          ? 'Draft the report, plan the trip, chase the invoice, remember the appointment. Zuri keeps the whole of your day in one place, on your desktop and in the browser.'
+          : 'Your threads, files and plan are exactly where you left them, on your desktop and in the browser.',
+      }}
+      meta="Zuri learns your answer style, not your secrets."
+      footer
+    >
+      <div className="zuri-auth-card" aria-labelledby="signin-title">
+        <div className="zuri-auth-switch" role="tablist" aria-label="Account action">
+          {/* Native buttons, not the shared Button: HeroUI drops role and aria-selected
+              from a pressable, and a tablist whose tabs are plain buttons is worse
+              for a screen reader than no tablist at all. */}
+          <button type="button" role="tab" aria-selected={authMode === 'sign-in'} className={authMode === 'sign-in' ? 'is-active' : ''} onClick={() => setAuthMode('sign-in')}>Sign in</button>
+          <button type="button" role="tab" aria-selected={authMode === 'create'} className={authMode === 'create' ? 'is-active' : ''} onClick={() => setAuthMode('create')}>Create account</button>
         </div>
-      </aside>
-
-      <section className="zuri-auth-panel">
-        <div className="zuri-auth-body">
-          <div className="zuri-auth-card" aria-labelledby="signin-title">
-            <div className="zuri-auth-switch" role="tablist" aria-label="Account action">
-              <Button type="button" role="tab" aria-selected={authMode === 'sign-in'} className={authMode === 'sign-in' ? 'is-active' : ''} onPress={() => setAuthMode('sign-in')}>Sign in</Button>
-              <Button type="button" role="tab" aria-selected={authMode === 'create'} className={authMode === 'create' ? 'is-active' : ''} onPress={() => setAuthMode('create')}>Create account</Button>
-            </div>
-            <div className="zuri-auth-heading">
-              {/* The short visual title is paired with the full product wording used by the launch contract: Sign in to Zuri. */}
-              <h2 id="signin-title">{resetting ? 'Reset your password' : creating ? 'Create account' : 'Sign in'}</h2>
-              <p>{resetting ? 'Choose a new password for your Zuri account.' : 'Pick up where your agent left off.'}</p>
-            </div>
-
-            {!resetting && (
-              <>
-                <CloudAuthForm
-                  mode={authMode}
-                  onModeChange={setAuthMode}
-                  onSignedIn={() => void finishSignIn()}
-                  api={api}
-                  showModeLinks={false}
-                />
-                {authMode === 'sign-in' && <Button type="button" className="zuri-auth-forgot" onPress={() => setAuthMode('forgot')}>Forgot?</Button>}
-              </>
-            )}
-
-            {!resetting && (
-              <>
-                <div className="zuri-auth-divider" role="separator">or</div>
-                <GoogleSignInButton
-                  clientId={googleClientId}
-                  onCredential={(credential) => void signInWithGoogle(credential)}
-                  onError={setError}
-                />
-              </>
-            )}
-
-            {resetting && (
-              <CloudAuthForm
-                mode={authMode}
-                onModeChange={setAuthMode}
-                onSignedIn={() => void finishSignIn()}
-                api={api}
-                showModeLinks
-              />
-            )}
-
-            {error !== '' && <p role="alert" className="zuri-notice is-danger zuri-auth-error text-sm text-danger">{error}</p>}
-            {busy && <p className="zuri-auth-busy text-sm text-muted">Signing you in...</p>}
-            <p className="zuri-auth-terms">By continuing you accept the <a href="https://zuri.tijha.com/terms">terms</a> and <a href="https://zuri.tijha.com/privacy">privacy notice</a>. AI can be wrong.</p>
-          </div>
-          <p className="zuri-auth-meta">Zuri learns your answer style, not your secrets.</p>
+        <div className="zuri-auth-heading">
+          {/* The short visual title is paired with the full product wording used by the launch contract: Sign in to Zuri. */}
+          <h2 id="signin-title">{resetting ? 'Reset your password' : creating ? 'Create account' : 'Sign in'}</h2>
+          <p>{resetting ? 'Choose a new password for your Zuri account.' : creating ? 'Any email address and a password of 8 characters or more.' : 'Pick up where your agent left off.'}</p>
         </div>
-        <footer className="zuri-auth-footer"><span>Zuri Cloud</span><a href="https://zuri.tijha.com/downloads">Download for Windows</a><a href="https://zuri.tijha.com/privacy">Privacy and data</a><a href="https://zuri.tijha.com/terms">Terms and AI disclaimer</a><small>Powered by Tijha</small></footer>
-      </section>
-    </main>
+
+        {!resetting && (
+          <>
+            <CloudAuthForm
+              mode={authMode}
+              onModeChange={setAuthMode}
+              onSignedIn={() => void finishSignIn()}
+              api={api}
+              showModeLinks={false}
+            />
+            {authMode === 'sign-in' && <Button type="button" className="zuri-auth-forgot" onPress={() => setAuthMode('forgot')}>Forgot?</Button>}
+          </>
+        )}
+
+        {!resetting && (
+          <>
+            <div className="zuri-auth-divider" role="separator">or</div>
+            <GoogleSignInButton
+              clientId={googleClientId}
+              onCredential={(credential) => void signInWithGoogle(credential)}
+              onError={setError}
+            />
+          </>
+        )}
+
+        {resetting && (
+          <CloudAuthForm
+            mode={authMode}
+            onModeChange={setAuthMode}
+            onSignedIn={() => void finishSignIn()}
+            api={api}
+            showModeLinks
+          />
+        )}
+
+        {error !== '' && <p role="alert" className="zuri-notice is-danger zuri-auth-error text-sm text-danger">{error}</p>}
+        {busy && <p className="zuri-auth-busy text-sm text-muted">Signing you in...</p>}
+        <p className="zuri-auth-terms">By continuing you accept the <a href="https://zuri.tijha.com/terms">terms</a> and <a href="https://zuri.tijha.com/privacy">privacy notice</a>. AI can be wrong.</p>
+      </div>
+    </AuthLayout>
   );
 }

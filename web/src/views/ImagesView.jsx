@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, InlineAlert, Input, Select, Textarea } from '../components/ui.jsx';
+import { Button, InlineAlert, Input, Select, Textarea } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
 import { blobFromBase64, deletePicture, listPictures, savePicture } from '../lib/imageStore.js';
-import { ChevronDownIcon, DeleteIcon, DownloadIcon, ImageIcon, RegenerateIcon } from '../components/Icons.jsx';
+import { DeleteIcon, DownloadIcon, EnhanceIcon, ImageIcon, RegenerateIcon } from '../components/Icons.jsx';
 
 const SHAPES = [['square', 'Square'], ['portrait', 'Portrait'], ['landscape', 'Landscape']];
 const IMPROVE_KEY = 'zuri-improve-image-prompt';
@@ -160,7 +160,6 @@ export default function ImagesView() {
                 </option>
               ))}
             </Select>
-            <ChevronDownIcon size={14} aria-hidden="true" />
           </span>
           <div role="radiogroup" aria-label="Picture shape" className="image-shapes">
             {SHAPES.map(([value, label]) => (
@@ -169,16 +168,23 @@ export default function ImagesView() {
               </Button>
             ))}
           </div>
-          <Checkbox
-            className="image-improve"
-            checked={improve}
-            onChange={(event) => {
-              setImprove(event.target.checked);
-              try { window.localStorage.setItem(IMPROVE_KEY, event.target.checked ? 'on' : 'off'); } catch { /* private browsing */ }
+          {/* The same wand the chat composer uses: lit while Zuri rewrites the
+              description into a better prompt, quiet when it sends the words as typed. */}
+          <Button
+            type="button"
+            variant="ghost"
+            className={`image-improve${improve ? ' is-on' : ''}`}
+            aria-pressed={improve}
+            aria-label="Improve my description"
+            title={improve ? 'Zuri will improve your description. Press to send it as typed.' : 'Press to let Zuri improve your description'}
+            onClick={() => {
+              const next = !improve;
+              setImprove(next);
+              try { window.localStorage.setItem(IMPROVE_KEY, next ? 'on' : 'off'); } catch { /* private browsing */ }
             }}
           >
-            Improve my description
-          </Checkbox>
+            <EnhanceIcon size={17} aria-hidden="true" />
+          </Button>
           <Button type="submit" className="image-make" isDisabled={busy || prompt.trim() === '' || modelCode === ''}>
             <ImageIcon size={16} aria-hidden="true" />
             {busy ? 'Drawing...' : 'Make picture'}

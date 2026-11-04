@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PlusIcon } from '../../../src/renderer-react/Icons.jsx';
-import { Button } from '../components/ui.jsx';
+import { Button, UsageBar } from '../components/ui.jsx';
 import { fetchConversations } from '../lib/api.js';
 import { formatDate, formatNaira, formatRelativeTime, formatTokens, greetingFor } from '../lib/format.js';
 
@@ -252,7 +252,7 @@ export default function OverviewView({ me, usage, onViewChange }) {
         </div>
       )}
 
-      <div className="calm-actions" style={{ paddingBottom: 22 }}>
+      <div className="calm-actions" style={{ paddingBottom: 14 }}>
         <Button type="button" variant="primary" onClick={() => onViewChange?.('chat')} className="calm-primary">
           <PlusIcon className="size-4" aria-hidden="true" />
           New chat
@@ -266,19 +266,12 @@ export default function OverviewView({ me, usage, onViewChange }) {
             Manage plan
           </Button>
         </div>
-        <div
-          role="progressbar"
-          aria-valuenow={percentUsed}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Share of this period's token allowance used"
-          className="calm-bar"
-        >
-          <div
-            className={quota.overQuota ? 'is-danger' : quota.nearLimit ? 'is-warn' : ''}
-            style={{ width: `${percentUsed}%` }}
-          />
-        </div>
+        <UsageBar
+          percent={percentUsed}
+          tone={quota.overQuota ? 'danger' : quota.nearLimit ? 'warning' : 'ok'}
+          label="Share of this period's token allowance used"
+          className="bar calm-bar"
+        />
         <p className="calm-help">
           {`${formatTokens(usedTokens)} of ${formatTokens(monthlyTokens)} tokens used (${percentUsed}%)`}
         </p>

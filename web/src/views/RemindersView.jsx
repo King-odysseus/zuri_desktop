@@ -252,6 +252,7 @@ export default function RemindersView() {
             </label>
             <Select
               id="reminder-new-repeat"
+              aria-label="How often"
               className="project-input"
               value={repeat}
               onChange={(event) => setRepeat(event.target.value)}

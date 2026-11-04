@@ -107,6 +107,27 @@ function SettingsCard({ children }) {
   return <div className="zuri-set-card">{children}</div>;
 }
 
+/**
+ * The colour scheme is one on-off choice, so it is one switch. The name of the
+ * mode it is in sits beside the track, and the track itself carries the state.
+ * Two radio circles for the same pair read as a list when there is only one
+ * question, and on a narrow window they stack into a column of dots.
+ */
+function ThemeSwitch({ theme, isDisabled, onChange }) {
+  const isDark = theme === 'dark';
+  return (
+    <>
+      <span className="zuri-set-value" aria-hidden="true">{isDark ? 'Dark' : 'Light'}</span>
+      <Switch
+        checked={isDark}
+        isDisabled={isDisabled}
+        aria-label="Dark mode"
+        onChange={({ target }) => onChange(target.checked ? 'dark' : 'light')}
+      />
+    </>
+  );
+}
+
 /** One hairline row: words on the left, the control that changes them on the right. */
 function SettingsRow({ title, description, children }) {
   return (
@@ -446,27 +467,21 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
             <>
               <SettingsCard>
                 <SettingsRow title="Theme" description="Light for daytime, dark for the evening.">
-                  <RadioGroup
-                    aria-label="Theme"
-                    className="zuri-choice-row"
-                    value={themeChoice === 'light' ? 'Light' : 'Dark'}
-                    onChange={(event) => {
-                      const picked = String(event?.target?.value ?? event);
-                      void savePatch({ theme: picked === 'Light' ? 'light' : 'dark' }, `Theme is now ${picked.toLowerCase()}.`);
-                    }}
-                  >
-                    <Choice label="Light" checked={themeChoice === 'light'} />
-                    <Choice label="Dark" checked={themeChoice === 'dark'} />
-                  </RadioGroup>
+                  <ThemeSwitch
+                    theme={themeChoice}
+                    isDisabled={busy}
+                    onChange={(next) => void savePatch({ theme: next }, `Theme is now ${next}.`)}
+                  />
                 </SettingsRow>
                 <SettingsRow title="Assistant overlay" description="A small Zuri window over your work. Ctrl Alt Space opens it from anywhere.">
                   <Switch
                     checked={current.overlayEnabled === true}
                     isDisabled={busy}
                     aria-label="Assistant overlay"
-                    onChange={(selected) => void savePatch(
-                      { overlayEnabled: selected },
-                      selected ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.',
+                    // Reports through a target event, as the tick box it replaced did.
+                    onChange={({ target }) => void savePatch(
+                      { overlayEnabled: target.checked },
+                      target.checked ? 'Assistant overlay enabled.' : 'Assistant overlay disabled.',
                     )}
                   />
                 </SettingsRow>
@@ -489,18 +504,11 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
           {status === 'ready' && section === 'appearance' && (
             <SettingsCard>
               <SettingsRow title="Theme" description="The change applies straight away and is remembered next time.">
-                <RadioGroup
-                  aria-label="Theme"
-                  className="zuri-choice-row"
-                  value={themeChoice === 'light' ? 'Light' : 'Dark'}
-                  onChange={(event) => {
-                    const picked = String(event?.target?.value ?? event);
-                    void savePatch({ theme: picked === 'Light' ? 'light' : 'dark' }, `Theme is now ${picked.toLowerCase()}.`);
-                  }}
-                >
-                  <Choice label="Light" checked={themeChoice === 'light'} />
-                  <Choice label="Dark" checked={themeChoice === 'dark'} />
-                </RadioGroup>
+                <ThemeSwitch
+                  theme={themeChoice}
+                  isDisabled={busy}
+                  onChange={(next) => void savePatch({ theme: next }, `Theme is now ${next}.`)}
+                />
               </SettingsRow>
             </SettingsCard>
           )}
@@ -527,7 +535,7 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
                   </SettingsRow>
                   <SettingsRow title="Username" description="A short handle, 3 to 30 letters, numbers, dots or underscores.">
                     <span className="zuri-set-prefix">
-                      <span aria-hidden="true">@</span>
+                      <span className="zuri-set-prefix-mark" aria-hidden="true">@</span>
                       <Input value={username} maxLength={30} aria-label="Username" onChange={(event) => setUsername(event.target.value)} placeholder="yourname" className="zuri-set-input" />
                     </span>
                   </SettingsRow>
@@ -607,8 +615,12 @@ export default function SettingsView({ initialSection = 'general', onSectionChan
           {status === 'ready' && section === 'model' && (
             <SettingsCard>
               <SettingsRow title="Answer model" description="Every reply in every chat comes from this model.">
+                {/* The row title already names this choice, so the field keeps its
+                    label for screen readers only and the row stays one line. */}
                 <SelectField
                   label="Model"
+                  hideLabel
+                  className="zuri-set-picker"
                   value={zuriModel?.model ?? savedModel}
                   options={modelOptions}
                   onChange={(value) => {

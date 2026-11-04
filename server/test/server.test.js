@@ -370,7 +370,16 @@ const signedOut = await app(new Request('https://cloud.example.com/api/auth/sign
 assert.equal(signedOut.status, 200);
 assert.equal((await app(new Request('https://cloud.example.com/api/me', { headers: { authorization: `Bearer ${signedIn.token}` } }))).status, 401);
 
-const dashboardPage = await app(new Request('https://cloud.example.com/'));
+const dashboardRequest = () => app(new Request('https://cloud.example.com/'));
+// `npm run web:build` clears server/public before it writes the new bundle, so a
+// build running at the same time leaves the dashboard genuinely absent for a few
+// seconds. Wait for the build to finish rather than reporting a 404 that is only
+// true in that moment. A built bundle answers on the first request, with no wait.
+let dashboardPage = await dashboardRequest();
+for (let waited = 0; dashboardPage.status === 404 && waited < 40000; waited += 1000) {
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  dashboardPage = await dashboardRequest();
+}
 assert.equal(dashboardPage.status, 200);
 assert.match(dashboardPage.headers.get('content-type'), /text\/html/);
 assert.ok(dashboardPage.headers.get('content-security-policy'));

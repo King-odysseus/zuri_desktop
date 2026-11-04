@@ -54,7 +54,9 @@ export function ModeMenu({ mode, onChange }) {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative shrink-0">
+    // Deliberately not positioned: the menu below anchors to the composer itself, so it
+    // clears the whole field. Anchored to this chip it would sit over a growing draft.
+    <div ref={ref} className="shrink-0">
       <Button
         type="button"
         aria-haspopup="menu"
@@ -68,24 +70,24 @@ export function ModeMenu({ mode, onChange }) {
         <ChevronDownIcon size={12} />
       </Button>
       {open && (
-        <div role="menu" aria-label="Mode" className="absolute bottom-full right-0 z-20 mb-2 w-72 rounded-2xl border border-border bg-surface p-1 shadow-lg">
+        <div role="menu" aria-label="Mode" className="zuri-composer-menu zuri-mode-menu">
           {CHAT_MODE_CHOICES.map((choice) => (
             <Button
               key={choice.key}
               type="button"
               role="menuitemradio"
               aria-checked={choice.key === mode}
-              className="flex w-full flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary"
+              className={`zuri-mode-option ${choice.key === mode ? 'is-active' : ''}`.trim()}
               onPress={() => {
                 onChange(choice.key);
                 setOpen(false);
               }}
             >
-              <span className="flex w-full items-center gap-2">
-                <span className="flex-1">{choice.label}</span>
-                {choice.key === mode && <CheckIcon size={15} />}
+              <span className="zuri-mode-option-title">
+                <span className="zuri-mode-option-name">{choice.label}</span>
+                {choice.key === mode && <CheckIcon size={15} className="shrink-0" />}
               </span>
-              <span className="text-xs text-muted">{choice.note}</span>
+              <span className="zuri-mode-option-note">{choice.note}</span>
             </Button>
           ))}
         </div>

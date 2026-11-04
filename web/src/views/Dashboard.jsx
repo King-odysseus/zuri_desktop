@@ -1,9 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import BottomBar, { BOTTOM_BAR_SPACE } from '../components/BottomBar.jsx';
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
 import { Button, IconButton } from '../components/ui.jsx';
-import { AutomationIcon, BellIcon, ChevronUpIcon, DownloadIcon, FolderIcon, ImageIcon, LockIcon, LogoMark, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SettingsIcon, ShieldIcon, SignOutIcon, SunIcon, TaskIcon } from '../components/Icons.jsx';
+import { AutomationIcon, BellIcon, ChevronUpIcon, DownloadIcon, FolderIcon, ImageIcon, LockIcon, LogoMark, MessageIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SettingsIcon, ShieldIcon, SignOutIcon, TaskIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor, planLabel } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
@@ -170,8 +169,8 @@ function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut })
   );
 }
 
-/** The brand row: name, collapse toggle and theme toggle. Shared by both sidebars. */
-function BrandRow({ collapsed, onToggleCollapsed, theme, onToggleTheme, badge = null }) {
+/** The brand row: name, and collapse toggle. Shared by both sidebars. */
+function BrandRow({ collapsed, onToggleCollapsed, badge = null }) {
   return (
     <div className="sidebar-brand">
       <span className="brand-mark">
@@ -190,13 +189,6 @@ function BrandRow({ collapsed, onToggleCollapsed, theme, onToggleTheme, badge = 
         >
           {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
         </IconButton>
-        <IconButton
-          size="sm"
-          label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-          onClick={onToggleTheme}
-        >
-          {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-        </IconButton>
       </span>
     </div>
   );
@@ -212,7 +204,7 @@ function BrandRow({ collapsed, onToggleCollapsed, theme, onToggleTheme, badge = 
 function SidebarContents({ user, name, planText, view, onViewChange, theme, onToggleTheme, onSignOut, collapsed = false, onToggleCollapsed = () => {} }) {
   return (
     <>
-      <BrandRow collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} theme={theme} onToggleTheme={onToggleTheme} />
+      <BrandRow collapsed={collapsed} onToggleCollapsed={onToggleCollapsed} />
       <nav className="nav" aria-label="Dashboard sections">
         <NavList view={view} onViewChange={onViewChange} />
       </nav>
@@ -229,8 +221,6 @@ function AdminSidebarContents({ user, name, planText, onViewChange, theme, onTog
       <BrandRow
         collapsed={collapsed}
         onToggleCollapsed={onToggleCollapsed}
-        theme={theme}
-        onToggleTheme={onToggleTheme}
         badge={<span className="rounded-full bg-bronze-soft px-2 py-0.5 text-xs font-semibold text-bronze-ink">Admin</span>}
       />
       <Button variant="secondary" block onClick={() => onViewChange('chat')}>
@@ -286,6 +276,8 @@ export default function Dashboard({ account, plans, view, settingsTab, busy, top
   // Bumped when a chat is deleted or restored on the history screen, so the Recents
   // column is built again instead of showing a row that no longer exists.
   const [chatsVersion, setChatsVersion] = useState(0);
+  // Below 900px the sidebar is a drawer that a floating button calls out, as on the desktop app.
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const toggleCollapsed = () => {
     setNavCollapsed((current) => {
       const next = !current;
@@ -298,6 +290,7 @@ export default function Dashboard({ account, plans, view, settingsTab, busy, top
     });
   };
   const chooseView = (next) => {
+    setDrawerOpen(false);
     if (next !== 'chat') setChatProject(null);
     onViewChange(next);
   };
@@ -346,30 +339,22 @@ export default function Dashboard({ account, plans, view, settingsTab, busy, top
     account: <AccountView me={account.me} onSignOut={onSignOut} />,
   };
 
-  // Phones get a bottom tab bar instead of a drawer; it renders itself only below 900px.
-  const barItems = inAdminFrame
-    ? [
-        { id: 'admin', label: 'Admin', icon: <ShieldIcon /> },
-        { id: 'chat', label: 'User view', icon: <MessageIcon /> },
-      ]
-    : [
-        { id: 'chat', label: 'Chat', icon: <MessageIcon /> },
-        { id: 'tasks', label: 'Tasks', icon: <TaskIcon /> },
-        { id: 'projects', label: 'Projects', icon: <FolderIcon /> },
-        { id: 'settings', label: 'Settings', icon: <SettingsIcon /> },
-        ...(isAdmin ? [{ id: 'admin', label: 'Admin', icon: <ShieldIcon /> }] : []),
-      ];
-
   return (
     <div className="app">
+      {!isChat && drawerOpen && <Button variant="ghost" className="nav-scrim" aria-label="Close menu" onClick={() => setDrawerOpen(false)} />}
       {!isChat && (
-        <aside className={`sidebar${navCollapsed ? ' is-collapsed' : ''}`} aria-label={inAdminFrame ? 'Admin navigation' : 'Dashboard navigation'}>
+        <IconButton className="nav-fab" label="Open menu" aria-expanded={drawerOpen} onClick={() => setDrawerOpen(true)}>
+          <PanelLeftOpenIcon />
+        </IconButton>
+      )}
+      {!isChat && (
+        <aside className={`sidebar${navCollapsed ? ' is-collapsed' : ''}${drawerOpen ? ' is-open' : ''}`} aria-label={inAdminFrame ? 'Admin navigation' : 'Dashboard navigation'}>
           {inAdminFrame ? <AdminSidebarContents {...sidebarProps} /> : navigation}
         </aside>
       )}
 
       <main className={`app-main${isChat ? ' is-chat' : ''}`}>
-        <div className={`app-content${isChat ? '' : ` ${BOTTOM_BAR_SPACE}`}`}>
+        <div className="app-content">
           {isChat && (
             <ChatView
               navCollapsed={navCollapsed}
@@ -407,7 +392,7 @@ export default function Dashboard({ account, plans, view, settingsTab, busy, top
           {view === 'notifications' && <NotificationsView />}
           {view === 'automations' && <AutomationsView />}
           {view === 'images' && <ImagesView />}
-          {view === 'settings' && <SettingsView tab={settingsTab} onTabChange={onViewChange} panels={settingsPanels} />}
+          {view === 'settings' && <SettingsView tab={settingsTab} onTabChange={onViewChange} panels={settingsPanels} theme={theme} onToggleTheme={onToggleTheme} />}
           {/* A non-admin never mounts AdminView, so the admin API is not even called. */}
           {view === 'admin' && (isAdmin ? <AdminView /> : <NoAccess onViewChange={chooseView} />)}
 
@@ -419,7 +404,6 @@ export default function Dashboard({ account, plans, view, settingsTab, busy, top
         </div>
       </main>
 
-      <BottomBar items={barItems} view={view} onViewChange={chooseView} />
     </div>
   );
 }

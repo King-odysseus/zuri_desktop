@@ -202,7 +202,7 @@ export default function TasksView() {
               Due (optional)
             </span>
             <DateField
-              aria-labelledby="task-new-due-label"
+              aria-label="Due (optional)"
               value={due}
               onChange={(event) => setDue(event.target.value)}
             />
@@ -213,6 +213,7 @@ export default function TasksView() {
             </label>
             <Select
               id="task-new-priority"
+              aria-label="Priority"
               className="project-input"
               value={priority}
               onChange={(event) => setPriority(event.target.value)}

@@ -22,6 +22,33 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
+ * HeroUI bakes a 2px focus ring into every field, tab and trigger as a box-shadow
+ * resolved from --tw-ring-shadow. Around a 40px control that reads as a hard box
+ * boxing in the row, so every ring resolves to a hairline instead. This rule sits
+ * unlayered, which outranks the package's own layered rules, so the weight is set
+ * once rather than by repeating every component's selector.
+ */
+:is(:focus, :focus-visible, [data-focused='true'], [data-focus-visible='true'], :focus-within, [data-focus-within='true'], [data-focus='true']) {
+  --tw-ring-shadow: var(--tw-ring-inset,) 0 0 0 calc(1px + var(--tw-ring-offset-width)) var(--tw-ring-color, currentcolor);
+}
+
+/*
+ * One focus mark per control. The rule above also fires on :focus-within, so a form,
+ * a card and the box that holds a date or time field's segments each drew a ring of
+ * their own around the one field being edited, and the focused segment drew a square
+ * outline inside the group's rounded ring. The ring belongs to the field's group alone.
+ */
+:is(form, .card, [data-slot$='-group-input']):focus-within,
+:is(form, .card, [data-slot$='-group-input'])[data-focus-within='true'] {
+  --tw-ring-shadow: 0 0 #0000;
+  box-shadow: none;
+}
+
+[data-slot$='-segment']:focus-visible {
+  outline: none;
+}
+
+/*
  * HeroUI component tweaks. HeroUI's controls carry their own pill radius; this
  * page already owns the shape and size of a pill through its radius tokens, so
  * HeroUI follows them rather than the other way round. Kept in the component
@@ -410,7 +437,7 @@ a:hover {
 /* The focus ring is the light blue rather than the ink: on a navy button a navy
    ring is invisible, and this is the one marker that must never be missed. */
 :focus-visible {
-  outline: 2px solid var(--brand-blue);
+  outline: 1px solid var(--brand-blue);
   outline-offset: 2px;
 }
 
@@ -610,22 +637,61 @@ a:hover {
 }
 
 :is(.nav-item, .icon-btn, .btn, .chat-menu-row, .chat-menu-back, .sidebar-foot .btn, .chat-model-slot button, select, [role="menuitem"]):focus-visible {
-  outline: 2px solid var(--brand-blue) !important;
-  outline-offset: -2px;
-  border-radius: 0;
+  outline: 1px solid var(--brand-blue) !important;
+  outline-offset: -1px;
+  border-radius: var(--radius-xl);
   box-shadow: none !important;
 }
 
-.theme-icon-sun {
-  display: none;
+/* One colour-scheme control in every bar: a switch, with the icon of the mode it
+   is in beside it, so the track never reads as an unlabelled toggle. */
+.theme-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
 }
 
-:root[data-theme="dark"] .theme-icon-sun {
-  display: block;
+/* The track is 20px tall, which is fine under a mouse and too small under a thumb.
+   On a phone the whole icon-and-switch group takes the full tap height instead. */
+@media (max-width: 768px) {
+  .theme-switch {
+    min-height: 44px;
+    padding: 0 6px;
+  }
 }
 
-:root[data-theme="dark"] .theme-icon-moon {
-  display: none;
+.theme-switch > svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* The switch inside it. HeroUI paints the off track from --switch-control-bg,
+   which this theme sets to almost the page colour, so in light mode a switch read
+   as an empty pill and its two positions looked the same. The states are drawn
+   from the project's colours instead: a muted track that turns brand blue when
+   on, with a white thumb that shows against either. */
+.switch {
+  --switch-control-bg: color-mix(in srgb, var(--text) 32%, transparent);
+  --switch-control-bg-hover: color-mix(in srgb, var(--text) 42%, transparent);
+  --switch-control-bg-pressed: color-mix(in srgb, var(--text) 48%, transparent);
+  --switch-control-bg-checked: var(--brand-blue);
+  --switch-control-bg-checked-hover: color-mix(in srgb, var(--brand-blue) 86%, #000);
+}
+
+.switch .switch__thumb {
+  background-color: #fff;
+}
+
+/* Held at the far side when on, whatever the thumb's own colour rule says. */
+.switch[data-selected="true"] .switch__control .switch__thumb {
+  background-color: #fff;
 }
 
 .chip {
@@ -1007,9 +1073,21 @@ a:hover {
 .plan-grid {
   display: grid;
   gap: 16px;
-  /* 200px keeps all four plans on one row inside the 952px content column at
-     1280px, instead of leaving one card orphaned on a second row. */
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  /* Four plans read as one row once the page has the room for four columns; a
+     narrower window steps down to two, then one, so no plan is left alone on a row. */
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+}
+
+@media (min-width: 700px) {
+  .plan-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1200px) {
+  .plan-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .plan-card {
@@ -1481,7 +1559,7 @@ a:hover {
 }
 
 .nav-fab:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -1561,6 +1639,14 @@ body:has(.app) .app {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
+}
+
+/* On a phone the floating menu button sits over the top-left corner, so a page keeps
+   clear of it instead of letting its heading run underneath. */
+@media (max-width: 899px) {
+  .app-main:not(.is-chat) {
+    padding-top: 64px;
+  }
 }
 
 /* Reports and tables need the whole workspace. Other pages keep the readable
@@ -1681,12 +1767,23 @@ body:has(.app) .app {
   font-size: 13px;
 }
 
+/* HeroUI lays its progress bar out as a two-row grid (label above, track below)
+   and keeps a 4px row gap even when the label is only the hidden output text.
+   A fixed height here then cropped the track in half, so the bar painted as a
+   thin sliver. Take the track out of the grid and give it the height instead. */
 .bar {
-  height: 8px;
+  display: block;
+  height: auto;
   margin-top: 14px;
   border-radius: 9999px;
+  background: transparent;
+  overflow: visible;
+}
+
+.bar .progress-bar__track {
+  height: 8px;
+  border-radius: 9999px;
   background: var(--surface-tertiary);
-  overflow: hidden;
 }
 
 /* One ink bar for a normal figure, and the warning colour only once the allowance
@@ -2569,7 +2666,7 @@ body:has(.app) .app {
 
 .field input:focus-visible {
   border-color: var(--accent);
-  outline: 2px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
   outline-offset: 1px;
 }
 
@@ -2992,7 +3089,7 @@ a.download-card:hover {
 .project-input:is(select, input[type='date'], input[type='datetime-local'], input[type='time']):focus-visible,
 .image-model:focus-visible {
   border-color: var(--brand-blue);
-  outline: 2px solid color-mix(in srgb, var(--brand-blue) 36%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--brand-blue) 36%, transparent);
   outline-offset: 1px;
   box-shadow: 0 0 0 1px color-mix(in srgb, var(--brand-blue) 18%, transparent);
 }
@@ -3419,8 +3516,8 @@ a.download-card:hover {
 }
 
 .chat-recent-open:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
 }
 
 .chat-recent-title {
@@ -3471,7 +3568,7 @@ a.download-card:hover {
 }
 
 .chat-recent-input:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: -1px;
 }
 
@@ -3510,7 +3607,8 @@ a.download-card:hover {
 
 /* The row itself ignores the pointer so the transcript scrolls under it; each control
    takes the pointer back, or the icons would be inert. */
-.chat-floats .icon-btn {
+.chat-floats .icon-btn,
+.chat-floats .button {
   pointer-events: auto;
 }
 
@@ -3949,7 +4047,7 @@ a.download-card:hover {
   min-height: 2.25rem;
   padding: 9px 2px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-lg);
   background: transparent;
   box-shadow: none;
   --tw-shadow: 0 0 #0000;
@@ -4052,7 +4150,7 @@ a.download-card:hover {
 }
 
 .chat-model-slot button:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -4311,7 +4409,7 @@ a.download-card:hover {
 }
 
 .chat-suggestion:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 0;
 }
 
@@ -4792,7 +4890,7 @@ h4,
 
 .project-input:focus-visible,
 .project-textarea:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 1px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -4923,16 +5021,11 @@ h4,
   color: var(--muted);
 }
 
+/* A HeroUI Button now, so it only needs to stay pill-sized in the section head. */
+/* A HeroUI Button opens the native file picker now, so the old trick of stretching
+   a transparent input over a label is gone. */
 .project-file-button {
   position: relative;
-  overflow: hidden;
-}
-
-.project-file-input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  cursor: pointer;
 }
 
 /* Deleting a project is the last thing on the page and the quietest: a plain
@@ -5072,7 +5165,7 @@ h4,
   max-height: 16rem;
   padding: 8px 2px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--text);
   font: 15px/1.55 "Segoe UI", system-ui, sans-serif;
@@ -5186,12 +5279,23 @@ h4,
 .image-improve {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  min-height: 34px;
-  padding: 0 4px;
+  justify-content: center;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
   color: var(--muted);
-  font-size: 12.5px;
   cursor: pointer;
+}
+
+.image-improve:hover {
+  background: var(--surface-secondary);
+}
+
+.image-improve.is-on {
+  color: var(--accent-text, var(--accent));
 }
 
 /* Last in the tray, where a composer puts Send. */
@@ -5229,8 +5333,12 @@ h4,
 
   .image-model,
   .image-shape,
-  .image-improve,
   .image-make {
+    min-height: 44px;
+  }
+
+  .image-improve {
+    width: 44px;
     min-height: 44px;
   }
 
@@ -5306,7 +5414,7 @@ h4,
   padding: 20px 0;
   border: 0;
   border-top: 1px solid var(--hairline);
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   background: transparent;
 }
 
@@ -5349,7 +5457,7 @@ h4,
 }
 
 .calm .view-head {
-  padding: 4px 0 20px;
+  padding: 4px 0 12px;
 }
 
 .calm .view-head h1 {
@@ -5364,9 +5472,9 @@ h4,
 .calm-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  padding: 22px 0;
+  padding: 14px 0;
   border-top: 1px solid var(--hairline);
 }
 
@@ -5404,9 +5512,9 @@ h4,
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 4px 16px;
-  min-height: 44px;
-  padding: 10px 0;
+  gap: 2px 16px;
+  min-height: 36px;
+  padding: 6px 0;
   border-top: 1px solid var(--hairline);
   color: var(--text);
   font-size: 14px;
@@ -5437,25 +5545,28 @@ h4,
   font-weight: 400;
 }
 
+/* The overview's allowance bar. It is the same HeroUI progress bar as the usage
+   page, drawn slimmer and without that page's top margin, so the calmer overview
+   rhythm is kept while role and aria-valuenow still come from HeroUI. */
 .calm-bar {
   width: 100%;
+  margin-top: 0;
+}
+
+.calm-bar .progress-bar__track {
   height: 6px;
-  overflow: hidden;
-  border-radius: 999px;
   background: var(--surface-secondary);
 }
 
-.calm-bar > div {
-  height: 100%;
-  border-radius: 999px;
+.calm-bar .bar-fill {
   background: var(--accent, var(--text));
 }
 
-.calm-bar > div.is-warn {
+.calm-bar .bar-fill.is-warning {
   background: var(--warning);
 }
 
-.calm-bar > div.is-danger {
+.calm-bar .bar-fill.is-danger {
   background: var(--brand-navy);
 }
 
@@ -5608,7 +5719,7 @@ h4,
   border-right: 0;
   border-bottom: 0;
   border-left: 0;
-  border-radius: 0;
+  border-radius: var(--radius-xl);
   background: transparent;
   box-shadow: none;
 }
@@ -6169,7 +6280,7 @@ h4,
    field is not the one control in the panel with no visible focus. */
 .chat-recent-input:focus,
 .chat-recent-input:focus-visible {
-  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 3px var(--brand-blue-soft);
+  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 2px var(--brand-blue-soft);
   outline: 0;
 }
 
@@ -6279,7 +6390,7 @@ h4,
 }
 
 .conversation-search:focus-within {
-  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 3px var(--brand-blue-soft);
+  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 2px var(--brand-blue-soft);
 }
 
 /* The clear button draws at 28px inside a 40px pill, so its thumb area is widened to
@@ -6334,7 +6445,7 @@ h4,
 }
 
 .history-search:focus-within {
-  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 3px var(--brand-blue-soft);
+  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 2px var(--brand-blue-soft);
 }
 
 /* Deleting is asked in place, in the same row, so a phone never gets a blocked

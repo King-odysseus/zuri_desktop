@@ -49,15 +49,6 @@ import { PENDING_IMAGE_PROMPT_KEY } from './ImageLibraryView.jsx';
 
 const OPENING_HEADING = 'What can I help with?';
 
-// Each chip only fills the composer with a starter sentence, like the slash commands;
-// nothing is sent until the person presses Send.
-const OPENING_IDEAS = [
-  { label: 'Summarise a document', text: 'Summarise this: ' },
-  { label: 'Draft an email', text: 'Draft an email to ' },
-  { label: 'Search the web', text: 'Search the web for ' },
-  { label: 'Set a reminder', text: 'Remind me to ' },
-];
-
 /**
  * Drag the quick-ask card by its header.
  *
@@ -1360,10 +1351,12 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   const chatModelLabel = zuriModelName(chatModelId) || 'Zuri';
 
   const hasConversation = messages.length > 0 || streamingText !== '';
-  // The window opens maximised, so a 56rem column left most of a wide screen
-  // empty. It grows in two steps while a line of text stays readable, and the
-  // floating overlay keeps the narrow width because it is a small card.
-  const contentWidth = compact ? 'max-w-4xl' : 'max-w-4xl xl:max-w-5xl 2xl:max-w-6xl';
+  // The chat is one narrow column at every window size, the same 48rem the other
+  // desktop screens use. On a wide monitor the wider column turned the composer
+  // into a band across the window with a long empty run between the plus and the
+  // message, so it no longer grows with the window. The floating overlay keeps its
+  // own width because it is a small card.
+  const contentWidth = compact ? 'max-w-4xl' : 'max-w-3xl';
 
   return (
     <main className={`relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground ${compact ? 'zuri-overlay-panel' : ''}`}>
@@ -1417,11 +1410,6 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           <div className={`mb-8 flex w-full ${contentWidth} flex-col items-center`}>
             <span className="zuri-logo-badge mb-5" aria-hidden="true"><img src={zuriMarkUrl} alt="" width={52} height={52} className="zuri-chat-mark" decoding="async" /></span>
             <h1 className="text-center text-3xl font-normal tracking-tight sm:text-4xl">{OPENING_HEADING}</h1>
-            <div className="mt-6 flex max-w-2xl flex-wrap justify-center gap-2">
-              {OPENING_IDEAS.map((idea) => (
-                <Button key={idea.label} type="button" variant="secondary" className="min-h-11 rounded-full px-4 text-sm" onPress={() => insertCommand(idea.text)}>{idea.label}</Button>
-              ))}
-            </div>
           </div>
         )}
 
@@ -1604,7 +1592,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           {/* No hairline round the composer: the field reads as one filled box, the
               same as the web composer, and a 1px border on a card is against the
               house rules anyway. */}
-          <form onSubmit={sendMessage} className={`flex items-end gap-2 rounded-3xl border-0 bg-surface-secondary px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>
+          <form onSubmit={sendMessage} className={`relative flex items-end gap-2 rounded-3xl border-0 bg-surface-secondary px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>
             <div ref={menuRef} className="relative">
               <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Add to message" aria-haspopup="menu" aria-expanded={menuView !== ''} title="Add files, photos or a command" onPress={() => setMenuView((current) => (current === '' ? 'main' : ''))}>
                 <PlusIcon />
@@ -1613,7 +1601,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   row would sit above the top edge. The viewport cap lets it scroll
                   instead, so no row becomes unreachable. */}
               {menuView !== '' && (
-                <div role="menu" aria-label="Add to message" className="absolute bottom-full left-0 z-20 mb-2 w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg" style={addMenuMaxHeight ? { maxHeight: addMenuMaxHeight } : undefined}>
+                <div role="menu" aria-label="Add to message" className="zuri-composer-menu left-0 w-64" style={addMenuMaxHeight ? { maxHeight: addMenuMaxHeight } : undefined}>
                   {menuView === 'main' ? (
                     <>
                       <Button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => pickMenuItem(() => void chooseAttachment())}>
@@ -1765,7 +1753,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               {/* Chat models first, then picture models, so the same popup can also draw.
                   It opens upward too, so it carries the same viewport cap and scrolls. */}
               {modelMenu && (
-                <div role="menu" aria-label="Chat model" className="absolute bottom-full right-0 z-20 mb-2 w-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-surface p-1 shadow-lg" style={modelMenuMaxHeight ? { maxHeight: modelMenuMaxHeight } : undefined}>
+                <div role="menu" aria-label="Chat model" className="zuri-composer-menu right-0 w-64" style={modelMenuMaxHeight ? { maxHeight: modelMenuMaxHeight } : undefined}>
                   <p className="px-3 pb-1 pt-2 text-xs text-muted">Zuri answers this chat with:</p>
                   {ZURI_MODELS.map((entry) => (
                     <Button

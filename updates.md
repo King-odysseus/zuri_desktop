@@ -1,3 +1,39 @@
+## 2026-11-04 - Windows (desktop matches the web, navy logo, no console errors)
+
+- The web text fields no longer pass isDisabled and isReadOnly to the page as unknown attributes, which logged two console errors. They go on as the native disabled and readonly attributes. The date, time and select fields carry an aria-label.
+- The doubled focus ring on date and time fields is gone on the web and the desktop.
+- The Plans grid shows four plans in one row from 1200px, two from 700px, one below.
+- On a phone the web bottom bar is gone: chat is the first screen and a floating menu button opens the sidebar as a drawer. The dark-mode switch lives in Settings only.
+- The logo plate is navy (#1e3a8a) on the web, the desktop and the docs. scripts/recolor-logo.py reads the plate colour it is given.
+- Bumped to 0.2.11.
+- Other OS action: npm run web:build, then npm run cloud:deploy. The desktop needs the rebuilt installer.
+- Done on: Windows
+
+## 2026-11-04 - Windows (the theme is one switch, in every UI that asks the question)
+
+- Light and dark are one on-or-off question, so each place that asks it now draws one switch. The desktop Settings General and Appearance rows show the mode name beside the track instead of two radio circles, which on a narrow window stacked into a column of dots. The desktop account menu's theme row was a plain row that flipped the scheme on every press, so it read as somewhere to go rather than as a setting; it holds a switch now and the row itself no longer reacts to the pointer. The web keeps the same control in the public top bar and in the sidebar brand row, with a sun or moon icon naming the mode it is in.
+- The switch was invisible in light mode. HeroUI paints the off track from --switch-control-bg, which this palette sets to almost the page colour, so both positions looked like an empty pill. Both themes now name the four state colours: a muted track that turns brand blue when on, and a white thumb that shows against either. Held at the far side when on, whatever the thumb's own colour rule says.
+- On a phone the icon-and-switch group takes the full 44px tap height and the bar keeps its 65px, with no sideways scroll at 390px. The web bar at 1920px is unchanged.
+- Two more hand-built controls moved onto the shared HeroUI wrappers. The overview's allowance was an empty div with a width, so a screen reader was told nothing; it is the same HeroUI progress bar as the usage page, drawn 6px slim and without that page's top margin. "Add a file" on a project was a file-upload label dressed as a button; it is a HeroUI Button that opens the picker through a ref, and the transparent stretched input is gone.
+- An abandoned hand-rolled switch (markup and six CSS rules that nothing rendered) is deleted from src/renderer-react/app.css, so its colours can no longer drift from the real control.
+- Checked: the desktop account menu, Settings General and Settings Appearance were driven in a browser against the built renderer with the bridge stubbed, at 1280 and 390 wide, in light and dark; the web switch in both bars at 390, 1280 and 1920, in light and dark. npm run test passes every stage (both builds, 46 selftest assertions, server tests, Electron smoke, first run, both demos, chat sync), including two new checks that fail if a light/dark radio pair, a theme icon button, or a hand-drawn progress bar comes back.
+- Still open: the desktop sign-in tab strip stays native, because HeroUI's Button drops the tab role there; the hidden file inputs stay native, since HeroUI has no file input; the two picture viewers stay as they are, being full-screen layouts rather than dialogs.
+- Key files: src/renderer-react/SettingsView.jsx, src/renderer-react/Sidebar.jsx, src/renderer-react/app.css, web/src/components/TopBar.jsx, web/src/views/Dashboard.jsx, web/src/components/ui.jsx, web/src/views/OverviewView.jsx, web/src/views/ProjectsView.jsx, web/src/styles.css, scripts/selftest.js.
+- Other OS action: npm run web:build, then npm run cloud:deploy. The desktop needs the rebuilt installer.
+- Done on: Windows
+
+## 2026-11-04 - Windows (the account screens open bright, and the age question is one of them)
+
+- The installed app's sign-in, create-account and age screens no longer take their colours from the saved theme. Each one carries data-theme="light" on its own page, which re-declares the light tokens for that subtree only: the screens are bright on every machine, whatever theme was last chosen, and the shell keeps its own theme underneath. The store still defaults to dark for the app, so before this the first screen of a fresh install was the navy canvas.
+- All three screens now share one layout (src/renderer-react/AuthLayout.jsx): the photograph panel with the brand mark, the eyebrow, the headline and the three glass trust chips, then the card and the four footer links. One copy instead of three, so the registration page and the age question cannot drift away from the sign-in screen again.
+- The card takes the web's numbers: 420px wide, 28px radius, 22px/20px padding, 14px gap, a 14px two-way switch whose active half lifts to --selected, a 20px heading and a 13.5px lead. The page is minmax(0, 1fr) minmax(380px, 30%), so 1280 and 1920 both fill the window with no dead strip, and below 900px the photograph steps aside and the card takes the width.
+- The fields lost their hairline and lift to the white surface instead, which is how the web tells one surface from another. Buttons on these screens take the web's 14px radius instead of the shell's pill, the page sets color-scheme light so native controls match, and a disabled primary fades its own navy to 45% rather than turning grey.
+- The age question is the same card as sign-in: "How old are you?", two full-width rows, Continue, and a way out to another account. Under 18 keeps the app closed and shows the refusal card in the same shell; changing the answer brings the question back. The rows are native radios inside a fieldset, so the answer is announced and the arrow keys work. HeroUI's Radio was tried first and renders here without a role or an input, so the choice never registered and Continue stayed disabled; the existing check that guards the Radios in Settings is untouched.
+- Checked: npm run test passes, every stage (build, 44 selftest assertions, server tests, Electron smoke, first run, both demos, chat sync), none failing. The desktop renderer was driven in a headless browser with the bridge stubbed and a dark saved theme: the page paints white with a 28px card, the password field computes white with a 0px border, selecting Under 18 enables Continue and opens the refusal card, choosing 18 or older enters the shell with no page error, and 390px has no sideways scroll while the photograph panel is hidden.
+- Key files: src/renderer-react/AuthLayout.jsx, SignInView.jsx, SignUpView.jsx, AgeGateView.jsx, src/renderer-react/app.css.
+- Other OS action: none for the browser, no web file changed. The desktop needs the rebuilt installer to carry the new screens.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (an empty composer is one line, and New chat stops looking selected)
 
 - The composer was 59px before anything was typed. The auto-grow measured the field and then added its own padding, but scrollHeight already includes that padding, so every box was 18px taller than its text: an empty box looked like two lines and a short sentence looked padded. Measured as it is, one line of text is one line of box (41px), and the field still grows with the typing.

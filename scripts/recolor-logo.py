@@ -1,4 +1,4 @@
-"""Repaint the Zuri mark's plate from bright blue to the brand navy.
+"""Repaint the Zuri mark's plate to the logo navy.
 
 The mark is the installed app icon: a flat rounded square behind a white speech
 bubble. Every pixel is a blend between the plate colour and white, so the plate is
@@ -12,8 +12,8 @@ Run it once whenever the brand navy changes:
 from PIL import Image
 import glob
 
-PLATE = (0, 111, 238)      # the bright blue every copy currently uses
-NAVY = (13, 27, 58)        # the brand ink, #0d1b3a
+PLATE = (13, 27, 58)       # the plate every copy currently uses, #0d1b3a
+NAVY = (30, 58, 138)       # the logo navy, #1e3a8a: clearly navy, not black
 TARGETS = [
     'web/public/zuri-logo.png',
     'src/renderer-react/assets/zuri-logo.png',
@@ -33,9 +33,9 @@ def repaint(image):
             if a == 0:
                 dst[x, y] = (0, 0, 0, 0)
                 continue
-            # How far this pixel sits from the plate toward white, read off the
-            # channel the plate has none of: red goes 0 at the plate to 255 at white.
-            t = min(1.0, r / 255.0)
+            # How far this pixel sits from the plate toward white, read off the red
+            # channel: it runs from the plate's red at the plate to 255 at white.
+            t = min(1.0, max(0.0, (r - PLATE[0]) / (255.0 - PLATE[0])))
             dst[x, y] = (
                 round(NAVY[0] + (255 - NAVY[0]) * t),
                 round(NAVY[1] + (255 - NAVY[1]) * t),

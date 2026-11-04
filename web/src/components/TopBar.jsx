@@ -1,5 +1,5 @@
 import { LogoMark, MoonIcon, SunIcon } from './Icons.jsx';
-import { Button, IconButton } from './ui.jsx';
+import { Button, Switch } from './ui.jsx';
 import { themeLabel } from '../lib/theme.js';
 
 /**
@@ -44,15 +44,17 @@ export default function TopBar({ theme, onToggleTheme, signedIn, onSignIn, onNav
         </nav>
 
         <div className="topbar-actions">
-          <IconButton
-            type="button"
-            className="icon-btn"
-            onClick={onToggleTheme}
-            label={themeLabel(theme)}
-            title={themeLabel(theme)}
-          >
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-          </IconButton>
+          {/* One on-off choice, so the bar carries a switch rather than a button
+              that hides which way it is set. The icon shows the mode it is in now,
+              so the track never reads as an unlabelled toggle. */}
+          <span className="theme-switch" title={themeLabel(theme)}>
+            {theme === 'dark' ? <MoonIcon /> : <SunIcon />}
+            <Switch
+              isSelected={theme === 'dark'}
+              aria-label="Dark mode"
+              onChange={onToggleTheme}
+            />
+          </span>
           <Button variant="ghost" className="topbar-signin" onClick={onSignIn}>
             Sign in
           </Button>

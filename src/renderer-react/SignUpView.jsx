@@ -1,12 +1,16 @@
 import { useState } from 'react';
 import { Button } from './ui.jsx';
-import { UserPlusIcon } from './Icons.jsx';
 import CloudAuthForm from './CloudAuthForm.jsx';
+import AuthLayout from './AuthLayout.jsx';
 
 /**
- * Cloud account entry point. An email and password is the primary route, and
- * Google stays available because Workspace identities are intentionally not
- * restricted to gmail.com: company, school and custom domains can join too.
+ * Cloud account entry point reached from inside the app. An email and password is
+ * the primary route, and Google stays available because Workspace identities are
+ * intentionally not restricted to gmail.com: company, school and custom domains
+ * can join too.
+ *
+ * It wears the same bright card as the sign-in screen; only the photograph panel
+ * is left out, because the app's own rail already sits beside it.
  */
 export default function SignUpView({ onNavigate }) {
   // 'sign-in' is not a mode here: that screen is the cloud route, so the form's
@@ -23,37 +27,40 @@ export default function SignUpView({ onNavigate }) {
   }
 
   return (
-    <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
-      <div className="zuri-page-content zuri-scrollbar-hidden flex items-center justify-center">
-        <section className="w-full max-w-lg rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8" aria-labelledby="signup-title">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent/10 text-accent">
-            <UserPlusIcon size={22} />
+    <AuthLayout className="is-embedded min-w-0 flex-1">
+      <div className="zuri-auth-card" aria-labelledby="signup-title">
+        {!resetting && (
+          <div className="zuri-auth-switch" role="tablist" aria-label="Account action">
+            <button type="button" role="tab" aria-selected={false} onClick={() => changeMode('sign-in')}>Sign in</button>
+            <button type="button" role="tab" aria-selected className="is-active" onClick={() => setMode('create')}>Create account</button>
           </div>
-          <h1 id="signup-title" className="mt-5 text-3xl font-medium tracking-tight">
-            {resetting ? 'Reset your password' : 'Create your Zuri Cloud account'}
-          </h1>
-          <p className="mt-3 text-sm leading-6 text-muted">
+        )}
+        <div className="zuri-auth-heading">
+          <h2 id="signup-title">{resetting ? 'Reset your password' : 'Create your account'}</h2>
+          <p>
             {resetting
-              ? 'We email a one-time link to the address on your account. Open it in your browser, or paste its code below to choose a new password here.'
-              : 'Use any email address and a password of at least 8 characters. If you would rather use Google, that works too, including company, school and other custom-domain Workspace accounts.'}
+              ? 'Use the code from the email we sent you.'
+              : 'Any email address and a password of 8 characters or more.'}
           </p>
+        </div>
 
-          <CloudAuthForm
-            mode={mode}
-            onModeChange={changeMode}
-            onSignedIn={() => onNavigate?.('cloud')}
-          />
+        <CloudAuthForm
+          mode={mode}
+          onModeChange={changeMode}
+          onSignedIn={() => onNavigate?.('cloud')}
+        />
 
-          {!resetting && (
-            <>
-              <p className="mt-6 text-center text-xs uppercase tracking-wide text-muted">or</p>
-              <Button type="button" variant="secondary" fullWidth className="mt-3" onPress={() => onNavigate?.('cloud')}>
-                Continue with Google
-              </Button>
-            </>
-          )}
-        </section>
+        {!resetting && (
+          <>
+            <div className="zuri-auth-divider" role="separator">or</div>
+            <Button type="button" variant="secondary" fullWidth onPress={() => onNavigate?.('cloud')}>
+              Continue with Google
+            </Button>
+          </>
+        )}
+
+        <p className="zuri-auth-terms">By continuing you accept the <a href="https://zuri.tijha.com/terms">terms</a> and <a href="https://zuri.tijha.com/privacy">privacy notice</a>. AI can be wrong.</p>
       </div>
-    </main>
+    </AuthLayout>
   );
 }

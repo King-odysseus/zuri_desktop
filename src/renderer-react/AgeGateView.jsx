@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Button, Radio, RadioGroup } from './ui.jsx';
+import { Button } from './ui.jsx';
+import AuthLayout from './AuthLayout.jsx';
 
 /*
  * Zuri is an adult product: the models answer with a grown-up voice, and the
@@ -39,62 +40,87 @@ export default function AgeGateView({ onConfirmed, onSignOut }) {
     }
   }
 
+  const aside = {
+    eyebrow: 'Before you start',
+    headline: 'Zuri is for grown-ups.',
+    copy: 'The agent writes reports, plans trips and answers with an adult voice. It is built for people of 18 and over, so we ask once before the first chat opens.',
+  };
+
   if (refused) {
     return (
-      <main className="zuri-signin flex h-dvh w-full flex-col bg-background text-foreground">
-        <div className="zuri-page-content zuri-scrollbar-hidden">
-          <section className="zuri-age-card" aria-labelledby="age-refused-title">
-            <h1 id="age-refused-title" className="text-2xl font-medium tracking-tight">Zuri is for people 18 and older</h1>
-            <p className="mt-3 text-sm leading-6 text-muted">
-              Thank you for answering honestly. Zuri cannot open on this computer until someone 18 or older confirms they
-              are the account holder. A parent or guardian can sign in with the account they own.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              <Button size="sm" variant="secondary" onPress={() => setRefused(false)}>Change my answer</Button>
-              <Button size="sm" variant="ghost" onPress={() => void onSignOut?.()}>Sign out</Button>
-            </div>
-          </section>
+      <AuthLayout aside={aside} meta="Your answer stays on this computer." footer>
+        <div className="zuri-auth-card" aria-labelledby="age-refused-title">
+          <div className="zuri-auth-heading">
+            <h2 id="age-refused-title">Zuri is for people 18 and older</h2>
+            <p>Thank you for answering honestly.</p>
+          </div>
+          <p className="zuri-auth-copy">
+            Zuri cannot open on this computer until someone 18 or older confirms they are the account holder. A parent
+            or guardian can sign in with the account they own.
+          </p>
+          <div className="zuri-auth-actions">
+            <Button variant="primary" fullWidth onPress={() => setRefused(false)}>Change my answer</Button>
+            <Button variant="ghost" fullWidth onPress={() => void onSignOut?.()}>Sign out</Button>
+          </div>
         </div>
-      </main>
+      </AuthLayout>
     );
   }
 
   return (
-    <main className="zuri-signin flex h-dvh w-full flex-col bg-background text-foreground">
-      <div className="zuri-page-content zuri-scrollbar-hidden">
-        <section className="zuri-age-card" aria-labelledby="age-title">
-          <p className="zuri-age-kicker">Before you start</p>
-          <h1 id="age-title" className="mt-2 text-2xl font-medium tracking-tight">How old are you?</h1>
-          <p className="mt-3 text-sm leading-6 text-muted">
-            Zuri answers with a grown-up voice and is meant for people 18 and older. The answer is kept on this computer
-            and asked only once.
-          </p>
+    <AuthLayout aside={aside} meta="Your answer stays on this computer." footer>
+      <div className="zuri-auth-card" aria-labelledby="age-title">
+        <div className="zuri-auth-heading">
+          <h2 id="age-title">How old are you?</h2>
+          <p>Zuri is meant for people 18 and older. The answer is asked once.</p>
+        </div>
 
-          <RadioGroup className="zuri-choice-stack mt-5" aria-label="Age" value={choice} onChange={setChoice}>
-            <Radio value="adult" className={`zuri-age-choice${choice === 'adult' ? ' is-selected' : ''}`}>
-              <span className="zuri-choice-copy">
-                <span className="zuri-choice-label">18 or older</span>
-                <span className="zuri-choice-help">I am an adult and I own this Zuri account.</span>
-              </span>
-            </Radio>
-            <Radio value="under" className={`zuri-age-choice${choice === 'under' ? ' is-selected' : ''}`}>
-              <span className="zuri-choice-copy">
-                <span className="zuri-choice-label">Under 18</span>
-                <span className="zuri-choice-help">Zuri cannot be used by anyone under 18.</span>
-              </span>
-            </Radio>
-          </RadioGroup>
+        <fieldset className="zuri-choice-stack">
+          {/* Native radios, not the shared Radio: that component renders without a role
+              or an input under this HeroUI build, so the answer never registered and
+              Continue stayed dead. A fieldset also names the group for a screen reader. */}
+          <legend className="sr-only">Your age</legend>
+          <label className={`zuri-age-choice${choice === 'adult' ? ' is-selected' : ''}`}>
+            <input
+              type="radio"
+              name="age"
+              value="adult"
+              className="zuri-age-input"
+              checked={choice === 'adult'}
+              onChange={() => setChoice('adult')}
+            />
+            <span className="zuri-choice-copy">
+              <span className="zuri-choice-label">18 or older</span>
+              <span className="zuri-choice-help">I am an adult and I own this Zuri account.</span>
+            </span>
+          </label>
+          <label className={`zuri-age-choice${choice === 'under' ? ' is-selected' : ''}`}>
+            <input
+              type="radio"
+              name="age"
+              value="under"
+              className="zuri-age-input"
+              checked={choice === 'under'}
+              onChange={() => setChoice('under')}
+            />
+            <span className="zuri-choice-copy">
+              <span className="zuri-choice-label">Under 18</span>
+              <span className="zuri-choice-help">Zuri cannot be used by anyone under 18.</span>
+            </span>
+          </label>
+        </fieldset>
 
-          {error !== '' && <p role="alert" className="mt-4 text-sm text-danger">{error}</p>}
+        {error !== '' && <p role="alert" className="zuri-notice is-danger zuri-auth-error text-sm text-danger">{error}</p>}
 
-          <div className="mt-6 flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="primary" isDisabled={choice === '' || busy} onPress={() => void confirm()}>
-              {busy ? 'Saving...' : 'Continue'}
-            </Button>
-            <Button size="sm" variant="ghost" onPress={() => void onSignOut?.()}>Sign out</Button>
-          </div>
-        </section>
+        <div className="zuri-auth-actions">
+          <Button variant="primary" fullWidth isDisabled={choice === '' || busy} onPress={() => void confirm()}>
+            {busy ? 'Saving...' : 'Continue'}
+          </Button>
+          <Button variant="ghost" fullWidth onPress={() => void onSignOut?.()}>Use a different account</Button>
+        </div>
+
+        <p className="zuri-auth-terms">Your answer is stored with your settings in this installation, never in your chats.</p>
       </div>
-    </main>
+    </AuthLayout>
   );
 }

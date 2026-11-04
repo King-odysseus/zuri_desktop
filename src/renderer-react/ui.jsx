@@ -153,6 +153,7 @@ export function DateField({ label, value, onChange, className = '', ...props }) 
       value={dateValue(value)}
       onChange={(next) => onChange?.(localDateValue(next))}
       className={className}
+      aria-label={label}
       {...props}
     >
       {label && <Label>{label}</Label>}
@@ -197,6 +198,7 @@ export function TimeField({ label, value, onChange, className = '', isDisabled =
       onChange={(next) => onChange?.(timeString(next))}
       isDisabled={isDisabled || Boolean(disabled)}
       className={className}
+      aria-label={label}
       {...props}
     >
       {label && <Label>{label}</Label>}
@@ -311,13 +313,15 @@ export function Switch({ className = '', checked, isSelected, onChange, disabled
       onChange={(selected) => onChange?.({ target: { checked: selected } })}
       {...props}
     >
-      {children ?? (
-        <>
-          <HeroSwitch.Control>
-            <HeroSwitch.Indicator />
-          </HeroSwitch.Control>
-        </>
-      )}
+      {/* HeroUI composes a Switch from Content/Control/Thumb. It has no
+          Indicator part: rendering one threw React error 130 and blanked the
+          whole window, because an undefined element type unmounts the tree. */}
+      <HeroSwitch.Content>
+        <HeroSwitch.Control>
+          <HeroSwitch.Thumb />
+        </HeroSwitch.Control>
+        {children}
+      </HeroSwitch.Content>
     </HeroSwitch>
   );
 }

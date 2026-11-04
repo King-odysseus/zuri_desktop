@@ -109,14 +109,19 @@ export function Chip({ tone = 'default', color, className = '', children }) {
 /**
  * Token allowance bar. HeroUI's ProgressBar gives the element role="progressbar"
  * and aria-valuenow, and draws its fill and track from the same tokens as the rest
- * of the page, so the warning state is the only thing a caller decides.
+ * of the page, so the caller only decides the tone and how slim the track is.
+ *
+ * `warn` is the older two-state spelling and stays accepted; `tone` adds the third
+ * state the overview needs, where an exhausted allowance is navy rather than amber.
  */
-export function UsageBar({ percent, warn = false, label = 'usage' }) {
+export function UsageBar({ percent, warn = false, tone, label = 'usage', className = 'bar' }) {
   const value = Math.min(100, Math.max(0, Math.round(Number(percent) || 0)));
+  const state = tone ?? (warn ? 'warning' : 'ok');
+  const fill = state === 'danger' ? 'bar-fill is-danger' : state === 'warning' ? 'bar-fill is-warning' : 'bar-fill';
   return (
-    <ProgressBar value={value} color={warn ? 'warning' : 'accent'} aria-label={`${label} ${value}%`} className="bar">
+    <ProgressBar value={value} color={state === 'ok' ? 'accent' : 'warning'} aria-label={`${label} ${value}%`} className={className}>
       <ProgressBar.Track>
-        <ProgressBar.Fill className={warn ? 'bar-fill is-warning' : 'bar-fill'} />
+        <ProgressBar.Fill className={fill} />
       </ProgressBar.Track>
       <ProgressBar.Output className="sr-only" />
     </ProgressBar>
@@ -148,14 +153,16 @@ export function InlineAlert({ tone = 'warning', children }) {
 /**
  * Text field. HeroUI's Input keeps the ref, the value and the change event, so a
  * page keeps using the same props it used on the plain element; disabled and
- * readOnly are translated because HeroUI names them isDisabled and isReadOnly.
+ * readOnly reach the field as the native attributes it expects.
  */
 export function Input({ className = '', disabled, isDisabled, readOnly, isReadOnly, ...props }) {
+  // This HeroUI build's Input is the native field itself, so the state goes on as
+  // the DOM attributes; isDisabled and isReadOnly would reach the element as unknown props.
   return (
     <HeroInput
       className={className}
-      isDisabled={isDisabled ?? disabled}
-      isReadOnly={isReadOnly ?? readOnly}
+      disabled={isDisabled ?? disabled}
+      readOnly={isReadOnly ?? readOnly}
       {...props}
     />
   );
@@ -165,8 +172,8 @@ export function Textarea({ className = '', disabled, isDisabled, readOnly, isRea
   return (
     <TextArea
       className={className}
-      isDisabled={isDisabled ?? disabled}
-      isReadOnly={isReadOnly ?? readOnly}
+      disabled={isDisabled ?? disabled}
+      readOnly={isReadOnly ?? readOnly}
       {...props}
     />
   );
@@ -407,13 +414,15 @@ export function Switch({ className = '', checked, isSelected, onChange, disabled
       onChange={(selected) => onChange?.({ target: { checked: selected } })}
       {...props}
     >
-      {children ?? (
-        <>
-          <HeroSwitch.Control>
-            <HeroSwitch.Indicator />
-          </HeroSwitch.Control>
-        </>
-      )}
+      {/* HeroUI composes a Switch from Content/Control/Thumb. It has no
+          Indicator part: rendering one threw React error 130 and blanked the
+          whole window, because an undefined element type unmounts the tree. */}
+      <HeroSwitch.Content>
+        <HeroSwitch.Control>
+          <HeroSwitch.Thumb />
+        </HeroSwitch.Control>
+        {children}
+      </HeroSwitch.Content>
     </HeroSwitch>
   );
 }

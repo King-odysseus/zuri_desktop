@@ -1,5 +1,5 @@
-import { ChartIcon, CardIcon, GridIcon, ReceiptIcon, ShieldIcon } from '../components/Icons.jsx';
-import { Button } from '../components/ui.jsx';
+import { ChartIcon, CardIcon, GridIcon, MoonIcon, ReceiptIcon, ShieldIcon, SunIcon } from '../components/Icons.jsx';
+import { Button, Switch } from '../components/ui.jsx';
 
 export const SETTINGS_TABS = [
   { id: 'overview', label: 'Overview', icon: <GridIcon /> },
@@ -13,14 +13,19 @@ export const SETTINGS_TABS = [
  * The account area that used to be five sidebar entries. Each tab renders an existing
  * screen unchanged; the shell passes them in so this file owns only the navigation.
  *
- * @param {{ tab: string, onTabChange: (id: string) => void, panels: Record<string, import('react').ReactNode> }} props
+ * @param {{ tab: string, onTabChange: (id: string) => void, panels: Record<string, import('react').ReactNode>, theme?: string, onToggleTheme?: () => void }} props
  */
-export default function SettingsView({ tab, onTabChange, panels }) {
+export default function SettingsView({ tab, onTabChange, panels, theme, onToggleTheme }) {
   const current = SETTINGS_TABS.some((item) => item.id === tab) ? tab : 'overview';
   return (
     <section className="flex w-full flex-col gap-4 md:grid md:grid-cols-[210px_minmax(0,1fr)] md:items-start md:gap-6" aria-label="Settings">
-      <div className="min-w-0 md:col-span-2">
+      <div className="flex min-w-0 items-center justify-between gap-3 md:col-span-2">
         <h1 className="font-display text-2xl font-extrabold">Settings</h1>
+        {/* The one place to change the colour scheme: the sidebar no longer carries it. */}
+        <span className="theme-switch">
+          {theme === 'dark' ? <MoonIcon /> : <SunIcon />}
+          <Switch isSelected={theme === 'dark'} aria-label="Dark mode" onChange={onToggleTheme} />
+        </span>
       </div>
       {/* A scroller on phones so five tabs never wrap or push the page sideways. */}
       <nav

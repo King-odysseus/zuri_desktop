@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, InlineAlert, Input, Textarea } from '../components/ui.jsx';
 import {
   addProjectFile,
@@ -124,6 +124,7 @@ export default function ProjectsView({ onStartChat }) {
   const [instructionsError, setInstructionsError] = useState('');
   const [fileNote, setFileNote] = useState('');
   const [fileBusy, setFileBusy] = useState(false);
+  const fileInputRef = useRef(null);
   const [confirmFileId, setConfirmFileId] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [confirmProject, setConfirmProject] = useState(false);
@@ -630,15 +631,22 @@ export default function ProjectsView({ onStartChat }) {
       <article className="card project-section">
         <div className="project-section-head">
           <h2 className="project-section-title">Files</h2>
-          <label className="btn btn-secondary project-file-button" htmlFor="project-file-input">
+          <Button
+            type="button"
+            variant="secondary"
+            className="project-file-button"
+            isDisabled={fileBusy}
+            onPress={() => fileInputRef.current?.click()}
+          >
             <PlusIcon size={14} aria-hidden="true" />
             Add a file
-          </label>
+          </Button>
         </div>
         <p className="project-section-note">
           Reference material Zuri can use in this project: a picture, a PDF or a short text file.
         </p>
         <input
+          ref={fileInputRef}
           id="project-file-input"
           type="file"
           className="sr-only project-file-input"

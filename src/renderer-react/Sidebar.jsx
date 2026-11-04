@@ -24,11 +24,9 @@ import {
   SignOutIcon,
   UserIcon,
   SkillsIcon,
-  MoonIcon,
   OverlayIcon,
   PinIcon,
   GridIcon,
-  SunIcon,
   SyncIcon,
   TaskIcon,
 } from './Icons.jsx';
@@ -170,7 +168,7 @@ function threadQuote(thread) {
     .slice(0, 160);
 }
 
-export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
+export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
   const [projects, setProjects] = useState([]);
   // Which projects are open in the list, and which chat is choosing a project.
@@ -700,7 +698,6 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
 
               <div className="zuri-account-group">
                 <AccountMenuRow Icon={OverlayIcon} label="Quick ask" hint={QUICK_ASK_HINT} onPress={() => { setMenuOpen(false); void window.zuri?.overlay?.open?.(); }} />
-                <AccountMenuRow Icon={theme === 'dark' ? SunIcon : MoonIcon} label={theme === 'dark' ? 'Light mode' : 'Dark mode'} onPress={() => { setMenuOpen(false); onToggleTheme(); }} />
                 <AccountMenuRow Icon={SignOutIcon} label="Sign out" onPress={() => void signOut()} />
               </div>
             </div>

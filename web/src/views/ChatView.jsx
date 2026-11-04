@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { TextArea } from '@heroui/react';
-import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, EnhanceIcon, FileIcon, FolderIcon, ICON_SIZE, ImageIcon, MoreIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, SpeakIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
+import { AlignLeftIcon, ArchiveIcon, CheckIcon, ChevronLeftIcon, ChevronUpIcon, CloseIcon, CommandIcon, CopyIcon, DeleteIcon, EditIcon, EnhanceIcon, FileIcon, FolderIcon, ICON_SIZE, ImageIcon, MoreIcon, PanelLeftOpenIcon, PaperclipIcon, PinIcon, PlusIcon, RegenerateIcon, SendIcon, ShareIcon, SpeakIcon, StopIcon } from '../../../src/renderer-react/Icons.jsx';
 import { Button, IconButton, InlineAlert, Input } from '../components/ui.jsx';
 import ConversationSearch from '../components/ConversationSearch.jsx';
 // The reply renderer and the clipboard fallback are the desktop app's own modules,
@@ -709,7 +709,7 @@ export default function ChatView({
    * before this state existed. A wide screen docks both panes side by side and
    * never reads it.
    */
-  const [listOpen, setListOpen] = useState(true);
+  const [listOpen, setListOpen] = useState(false);
   const [thread, setThread] = useState({ title: 'New chat', messages: [] });
   const [threadStatus, setThreadStatus] = useState('idle');
   const [threadError, setThreadError] = useState(null);
@@ -2021,11 +2021,11 @@ export default function ChatView({
               back to the list, even from the opening state with nothing open. A wide
               screen keeps the list beside the thread and hides the button in CSS. */}
           <IconButton
-            label={showThread ? 'Back to saved chats' : 'Open saved chats'}
+            label="Open menu"
             className="chat-back"
             onClick={backToList}
           >
-            <ChevronLeftIcon size={18} aria-hidden="true" />
+            <PanelLeftOpenIcon size={18} aria-hidden="true" />
           </IconButton>
           <div className="chat-floats-end">
             <IconButton label="New chat" onClick={startNewChat}>

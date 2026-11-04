@@ -99,13 +99,6 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [isOverlay]);
 
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.dataset.theme = next;
-    setTheme(next);
-    void window.zuri?.settings?.save?.({ theme: next });
-  }
-
   // Opening the New project screen from the sidebar always starts a blank one, even
   // if a project was being edited a moment ago.
   function navigate(next, section) {
@@ -189,7 +182,7 @@ export default function App() {
       {/* Settings takes the whole window, ChatGPT-style: its own rail with search
           stands where the app sidebar would, so the two never show side by side. */}
       {route !== 'settings' && (
-        <Sidebar current={route} onNavigate={navigate} onNewChat={startNewChat} onSelectThread={openThread} onEditProject={editProject} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} theme={theme} onToggleTheme={toggleTheme} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
+        <Sidebar current={route} onNavigate={navigate} onNewChat={startNewChat} onSelectThread={openThread} onEditProject={editProject} activeThreadId={activeThreadId} refreshKey={chatRefreshKey} collapsed={sidebarCollapsed} onToggleCollapsed={setSidebarCollapsed} />
       )}
       {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} onNewChat={startNewChat} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} />}
       {route === 'new-project' && <NewProjectView key={editingProject?.id ?? 'new'} project={editingProject} onCreated={() => { setEditingProject(null); refreshChats(); setRoute('chats'); }} />}
