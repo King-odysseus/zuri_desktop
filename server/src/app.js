@@ -1606,14 +1606,17 @@ export function createApp(dependencies = {}) {
         return response(200, {
           ok: true,
           data: {
-            prompt: plainDashes(improved),
+            prompt: plainDashes(improved.prompt),
+            // Details the person could add. Short lines meant to be read and then
+            // folded into the message by one press, so each is cleaned as well.
+            suggestions: improved.suggestions.map((suggestion) => plainDashes(suggestion)),
             // Kept so the app can put the person's own words back when they undo.
             original: plainDashes(prompt),
           },
         });
       } catch (error) {
         if (error?.code === 'ENHANCER_TOO_LONG') return response(400, { ok: false, error: { code: error.code, message: error.message } });
-        if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'ENHANCER_EMPTY') {
+        if (error?.code === 'PROVIDER_REQUEST_FAILED' || error?.code === 'ENHANCER_EMPTY' || error?.code === 'ENHANCER_FORMAT') {
           return response(502, { ok: false, error: { code: 'ENHANCE_FAILED', message: error.message } });
         }
         console.error('[zuri-cloud] prompt enhance', error?.message ?? error);

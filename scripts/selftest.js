@@ -137,6 +137,32 @@ check('the native desktop chrome follows the saved theme', () => {
   return 'native title bar and menu theme are synchronized';
 });
 
+check('dates, times and numbers are HeroUI fields, never the browser picker', () => {
+  // The browser's own date, time and number pickers ignore the page's palette:
+  // a white calendar drops onto the navy theme. Both surfaces therefore go
+  // through their shared date, time and number controls instead.
+  const nativePicker = /type="(?:date|time|datetime-local|number)"/;
+  const sources = [];
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const next = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(next);
+      else if (/\.jsx?$/.test(entry.name)) sources.push(next);
+    }
+  };
+  walk('src/renderer-react');
+  walk('web/src');
+  const offenders = sources.filter((file) => nativePicker.test(read(file)));
+  if (offenders.length > 0) throw new Error(`native date, time or number input in ${offenders.join(', ')}`);
+  for (const ui of ['src/renderer-react/ui.jsx', 'web/src/components/ui.jsx']) {
+    const source = read(ui);
+    for (const component of ['DateField', 'TimeField', 'NumberField']) {
+      if (!source.includes(`export function ${component}`)) throw new Error(`${ui} does not export ${component}`);
+    }
+  }
+  return `${sources.length} files use the shared fields`;
+});
+
 check('the sidebar refreshes after chat history changes', () => {
   const source = read('src/renderer-react/Sidebar.jsx');
   for (const required of ["window.zuri?.state?.onChanged?.", "change?.area === 'chats'", 'stopListening?.()']) {
@@ -2145,6 +2171,49 @@ check('both apps paint the card from the one shared description', () => {
   // list would be missing from the packaged app and the window would not open.
   if (!JSON.stringify(packageJson.build.files).includes('src/shared/**/*')) throw new Error('the installer does not package src/shared');
   return 'one description';
+});
+
+
+// The web bundle is what a shared browser and every Android install run, so its
+// theme is remembered per account on this device, not once for everyone.
+check('the web theme is remembered per account on this device', async () => {
+  const previousStorage = globalThis.localStorage;
+  const previousDocument = globalThis.document;
+  const hadStorage = Object.hasOwn(globalThis, 'localStorage');
+  const hadDocument = Object.hasOwn(globalThis, 'document');
+  const saved = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => (saved.has(key) ? saved.get(key) : null),
+    setItem: (key, value) => saved.set(key, String(value)),
+  };
+  const painted = {};
+  globalThis.document = { documentElement: { dataset: painted } };
+  try {
+    const modulePath = pathToFileURL(path.join(root, 'web/src/lib/theme.js')).href;
+    const theme = await import(modulePath + '?checks=' + Date.now());
+    const expect = (actual, wanted, what) => {
+      if (actual !== wanted) throw new Error(what + ': expected ' + wanted + ', got ' + actual);
+    };
+    expect(theme.preferredTheme(), 'light', 'a first visit');
+    theme.saveTheme('dark', 'acc-1');
+    theme.saveTheme('light', 'acc-2');
+    expect(theme.preferredTheme('acc-1'), 'dark', 'the first account coming back');
+    expect(theme.preferredTheme('acc-2'), 'light', 'the second account coming back');
+    expect(theme.preferredTheme(), 'light', 'the signed-out default');
+    theme.saveTheme('dark');
+    expect(theme.preferredTheme(), 'dark', 'a signed-out visit remembers on this device');
+    expect(theme.preferredTheme('acc-2'), 'light', 'an account choice that a signed-out visit must not overwrite');
+    const keysBeforePainting = saved.size;
+    theme.applyTheme('dark');
+    expect(painted.theme, 'dark', 'painting the page');
+    if (saved.size !== keysBeforePainting) throw new Error('painting the page wrote a choice nobody made');
+    return 'one key per account plus a device default';
+  } finally {
+    if (hadStorage) globalThis.localStorage = previousStorage;
+    else delete globalThis.localStorage;
+    if (hadDocument) globalThis.document = previousDocument;
+    else delete globalThis.document;
+  }
 });
 
 await Promise.all(pendingChecks);

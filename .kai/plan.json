@@ -2,33 +2,29 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Left-align the account popup rows and make the popup readable in the dark theme",
+      "text": "Store the web theme per account on this device (theme.js: key by user, keep a device default)",
       "state": "done"
     },
     {
-      "text": "Check the uncommitted stylesheet work and pick up where the other run stopped",
+      "text": "Wire App.jsx so the account's theme loads on sign-in and the device default returns on sign-out",
+      "state": "done"
+    },
+    {
+      "text": "Rebuild the web bundle and check the toggle in a browser at 1280px and 390px",
       "state": "active"
     },
     {
-      "text": "Run the full test suite and rebuild both bundles",
+      "text": "Check the chat sidebar for the outstanding faults (search field, previews, Recents header, padding)",
       "state": "pending"
     },
     {
-      "text": "Look over the changed screens at 390/768/1280/1920",
+      "text": "Run npm run test, commit and push",
       "state": "pending"
     },
     {
-      "text": "Commit and push",
-      "state": "pending"
-    },
-    {
-      "text": "Build the Windows installer",
-      "state": "pending"
-    },
-    {
-      "text": "Deploy the cloud server to Railway and confirm it is live",
+      "text": "Rebuild the Windows installer and deploy to Railway",
       "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T11:31:56.599Z"
+  "updatedAt": "2026-11-04T11:45:59.869Z"
 }

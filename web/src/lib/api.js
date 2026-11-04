@@ -1015,7 +1015,8 @@ export async function streamChat({ messages, model = DEFAULT_CHAT_MODEL, project
  * The reply goes back to the composer rather than being sent: the person reads it,
  * changes any of it, or puts their own words back, and nothing is saved on the way.
  * @param {string} prompt
- * @returns {Promise<{ prompt: string, original: string }>}
+ * @returns {Promise<{ prompt: string, suggestions: string[], original: string }>} the
+ *   rewritten message, the lines the person could add to it, and their own words
  */
 export function enhancePrompt(prompt) {
   return api('/api/prompts/enhance', {

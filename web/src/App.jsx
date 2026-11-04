@@ -22,7 +22,7 @@ import {
   signUpWithPassword,
   verifyPayment,
 } from './lib/api.js';
-import { applyTheme, preferredTheme } from './lib/theme.js';
+import { applyTheme, preferredTheme, saveTheme } from './lib/theme.js';
 import { registerNativePush } from './lib/push.js';
 
 const VIEWS = ['chat', 'history', 'projects', 'tasks', 'reminders', 'notifications', 'automations', 'images', 'settings', 'admin'];
@@ -76,6 +76,9 @@ export default function App() {
   // of the marketing page for a customer who is already signed in.
   const [status, setStatus] = useState('booting');
   const [account, setAccount] = useState(null);
+  // A theme choice belongs to an account on this device, not to the device alone,
+  // so two people sharing a browser each keep their own.
+  const themeUserId = account?.me?.user?.id ?? '';
   const [notice, setNotice] = useState(null);
   const [view, setView] = useState(() => viewFromPath(window.location.pathname));
   const [busyPlan, setBusyPlan] = useState('');
@@ -89,6 +92,16 @@ export default function App() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // The choice is loaded again whenever the account changes: signing in shows what
+  // that account saved on this device, and signing out returns to the device
+  // default. This runs after the effect above, so the last paint of the switch
+  // already shows the right theme.
+  useEffect(() => {
+    const next = preferredTheme(themeUserId);
+    applyTheme(next);
+    setTheme(next);
+  }, [themeUserId]);
 
   // Android needs the account token before its FCM token can be stored. The
   // native registration is optional, so a device without Google services still
@@ -308,8 +321,10 @@ export default function App() {
   }, []);
 
   const toggleTheme = useCallback(() => {
-    setTheme((current) => (current === 'dark' ? 'light' : 'dark'));
-  }, []);
+    const next = theme === 'dark' ? 'light' : 'dark';
+    saveTheme(next, themeUserId);
+    setTheme(next);
+  }, [theme, themeUserId]);
 
   const handleSignIn = useCallback(() => navigate('/signin'), [navigate]);
 

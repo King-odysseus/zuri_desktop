@@ -474,6 +474,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   // so the same button can put them back.
   const [enhancing, setEnhancing] = useState(false);
   const [enhancedFrom, setEnhancedFrom] = useState(null);
+  // What the enhancer thought the message was missing: short lines the person can fold
+  // into the prompt with one press. They sit under the box rather than in it, because
+  // they are advice about the ask, not part of it until it is taken.
+  const [enhanceSuggestions, setEnhanceSuggestions] = useState([]);
   const [imageShape, setImageShape] = useState(() => {
     const saved = readLocal(IMAGE_SHAPE_STORAGE_KEY, 'square');
     return IMAGE_SHAPES.some(([value]) => value === saved) ? saved : 'square';
@@ -830,6 +834,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     if (enhancing) return;
     if (enhancedFrom !== null) {
       setDraft(enhancedFrom);
+      setEnhanceSuggestions([]);
       setEnhancedFrom(null);
       setError('');
       return;
@@ -847,6 +852,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
 
     setError('');
     setMenuView('');
+    setEnhanceSuggestions([]);
     setEnhancing(true);
     try {
       const result = await api.prompts.enhance({ prompt });
@@ -856,6 +862,13 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         return;
       }
       setEnhancedFrom(draft);
+      // Only a list of lines is shown; anything else from the account is ignored rather
+      // than drawn as an empty row.
+      setEnhanceSuggestions(
+        Array.isArray(result.data?.suggestions)
+          ? result.data.suggestions.filter((suggestion) => typeof suggestion === 'string' && suggestion.trim() !== '')
+          : [],
+      );
       setDraft(improved);
       // The cursor goes to the end, so the person can carry on from what was written
       // for them rather than hunting for the caret.
@@ -872,6 +885,32 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     } finally {
       setEnhancing(false);
     }
+  }
+
+  /**
+   * Fold one suggested addition into the prompt.
+   *
+   * The line joins the message on its own line, so it reads as the requirement it is,
+   * and it leaves the list: the same detail is not offered twice. The caret stays in
+   * the box, at the end, ready for the next thing they want to say.
+   * @param {string} suggestion
+   * @returns {void}
+   */
+  function addSuggestion(suggestion) {
+    setDraft((current) => {
+      const base = current.replace(/\s+$/, '');
+      if (base.includes(suggestion)) return base;
+      return base === '' ? suggestion : `${base}\n${suggestion}`;
+    });
+    setEnhanceSuggestions((list) => list.filter((item) => item !== suggestion));
+    requestAnimationFrame(() => {
+      const box = composerRef.current;
+      if (box && typeof box.focus === 'function') {
+        box.focus();
+        const end = box.value.length;
+        if (typeof box.setSelectionRange === 'function') box.setSelectionRange(end, end);
+      }
+    });
   }
 
   async function createImage(model) {
@@ -936,6 +975,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
         setImagePreviews((current) => ({ ...current, [image.path]: made.data.previewUrl }));
       }
       setDraft('');
+      setEnhanceSuggestions([]);
       onChatUpdated?.();
     } catch (drawError) {
       setError(drawError?.message ?? 'Zuri could not make that picture.');
@@ -1188,6 +1228,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
     if ((prompt === '' && !attachment) || replying) return;
 
     setDraft('');
+    setEnhanceSuggestions([]);
     if (listening) recognitionRef.current?.stop();
     // Held from here so a second click during the file read cannot send twice.
     setReplying(true);
@@ -1532,6 +1573,26 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               <span className="flex-1">Make that your default for every answer?</span>
               <Button size="sm" variant="primary" onPress={() => void saveStyleDefault()}>Yes, save it</Button>
               <Button size="sm" variant="ghost" onPress={dismissStyleOffer}>Not now</Button>
+            </div>
+          )}
+          {enhanceSuggestions.length > 0 && (
+            // What the enhancer thought was missing. Each line is a press away from
+            // joining the message, so the person takes only what is true for them.
+            <div role="group" aria-label="Suggested additions to your prompt" className="mb-2 flex flex-col gap-0.5">
+              <p className="px-1 pb-0.5 text-xs font-semibold text-muted">Add to your prompt</p>
+              {enhanceSuggestions.map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  type="button"
+                  variant="ghost"
+                  title="Add this line to your message"
+                  className="flex w-full items-start justify-start gap-1.5 rounded-none px-1.5 py-1.5 text-left text-[13px] font-normal leading-snug hover:bg-surface-secondary"
+                  onPress={() => addSuggestion(suggestion)}
+                >
+                  <PlusIcon size={14} className="mt-0.5 shrink-0 text-muted" />
+                  <span className="flex-1">{suggestion}</span>
+                </Button>
+              ))}
             </div>
           )}
           <form onSubmit={sendMessage} className={`flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>

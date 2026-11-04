@@ -2296,7 +2296,7 @@ async function handleImagesGenerate(payload, event) {
  * for the person to edit or undo. Nothing is stored here and nothing is added to a
  * chat, so pressing the button twice cannot leave a trail of half-asked questions.
  * @param {{ prompt?: string }} payload
- * @returns {Promise<{ ok: true, data: { prompt: string, original: string } } | { ok: false, error: { code: string, message: string } }>}
+ * @returns {Promise<{ ok: true, data: { prompt: string, suggestions: string[], original: string } } | { ok: false, error: { code: string, message: string } }>}
  */
 async function handlePromptsEnhance(payload) {
   const prompt = typeof payload?.prompt === 'string' ? payload.prompt.trim() : '';
@@ -2321,6 +2321,11 @@ async function handlePromptsEnhance(payload) {
     ok: true,
     data: {
       prompt: text,
+      // Details the person could add, passed on as they arrived. The window draws them
+      // under the message box and folds one into the text when it is pressed.
+      suggestions: Array.isArray(improved.data?.suggestions)
+        ? improved.data.suggestions.filter((suggestion) => typeof suggestion === 'string' && suggestion.trim() !== '')
+        : [],
       // The person's own words, so undo can put them back exactly as they were.
       original: typeof improved.data?.original === 'string' ? improved.data.original : prompt,
     },

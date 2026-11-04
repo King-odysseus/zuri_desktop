@@ -721,6 +721,10 @@ export default function ChatView({
   const [enhancing, setEnhancing] = useState(false);
   const [enhancedFrom, setEnhancedFrom] = useState(null);
   const [enhanceNote, setEnhanceNote] = useState('');
+  // What the enhancer thought the message was missing: short lines the person can fold
+  // into the prompt with one press. They sit under the box rather than in it, because
+  // they are advice about the ask, not part of it until it is taken.
+  const [enhanceSuggestions, setEnhanceSuggestions] = useState([]);
   const [model, setModel] = useState(DEFAULT_CHAT_MODEL);
   // The picture models are the server's catalogue, not a list repeated here: a plan
   // decides which of them this account may use, and the picker says so.
@@ -1117,6 +1121,7 @@ export default function ChatView({
       setDraft(enhancedFrom);
       setEnhancedFrom(null);
       setEnhanceNote('');
+      setEnhanceSuggestions([]);
       return;
     }
     const prompt = draft.trim();
@@ -1127,6 +1132,7 @@ export default function ChatView({
     // A picture request reads only words, so the enhancer works on it too; nothing
     // here depends on the model picked.
     setEnhanceNote('');
+    setEnhanceSuggestions([]);
     setEnhancing(true);
     try {
       const improved = await enhancePrompt(prompt);
@@ -1137,6 +1143,13 @@ export default function ChatView({
       }
       setEnhancedFrom(draft);
       setDraft(text);
+      // Only a list of lines is shown; anything else from the server is ignored rather
+      // than drawn as an empty row.
+      setEnhanceSuggestions(
+        Array.isArray(improved?.suggestions)
+          ? improved.suggestions.filter((suggestion) => typeof suggestion === 'string' && suggestion.trim() !== '')
+          : [],
+      );
     } catch (error) {
       setEnhanceNote(
         Number(error?.status) === 401
@@ -1147,6 +1160,32 @@ export default function ChatView({
       setEnhancing(false);
     }
   }, [draft, enhancedFrom, enhancing]);
+
+  /**
+   * Fold one suggested addition into the prompt.
+   *
+   * The line joins the message on its own line, so it reads as the requirement it is,
+   * and it leaves the list: the same detail is not offered twice. The caret stays in
+   * the box, at the end, ready for the next thing they want to say.
+   * @param {string} suggestion
+   * @returns {void}
+   */
+  const addSuggestion = useCallback((suggestion) => {
+    setDraft((current) => {
+      const base = current.replace(/\s+$/, '');
+      if (base.includes(suggestion)) return base;
+      return base === '' ? suggestion : `${base}\n${suggestion}`;
+    });
+    setEnhanceSuggestions((list) => list.filter((item) => item !== suggestion));
+    requestAnimationFrame(() => {
+      const box = draftRef.current;
+      if (box && typeof box.focus === 'function') {
+        box.focus();
+        const end = box.value.length;
+        if (typeof box.setSelectionRange === 'function') box.setSelectionRange(end, end);
+      }
+    });
+  }, []);
 
   const send = useCallback(async (questionOverride = null, { rewrite = false } = {}) => {
     const question = (typeof questionOverride === 'string' ? questionOverride : draft).trim();
@@ -1212,6 +1251,7 @@ export default function ChatView({
       setDraft('');
       setEnhancedFrom(null);
       setEnhanceNote('');
+      setEnhanceSuggestions([]);
       setAttachment(null);
       setAttachNote('');
       clearChatDraft();
@@ -2185,6 +2225,24 @@ export default function ChatView({
           {shareNote !== '' && <p className="chat-note">{shareNote}</p>}
           {attachNote !== '' && <p className="chat-note is-error">{attachNote}</p>}
           {enhanceNote !== '' && <p className="chat-note is-error">{enhanceNote}</p>}
+          {enhanceSuggestions.length > 0 && (
+            // What the enhancer thought was missing. Each line is a press away from
+            // joining the message, so the person takes only what is true for them.
+            <div className="chat-suggestions" role="group" aria-label="Suggested additions to your prompt">
+              <p className="chat-suggestions-title">Add to your prompt</p>
+              {enhanceSuggestions.map((suggestion) => (
+                <Button
+                  key={suggestion}
+                  variant="ghost"
+                  className="chat-suggestion"
+                  onClick={() => addSuggestion(suggestion)}
+                >
+                  <PlusIcon size={14} aria-hidden="true" />
+                  <span>{suggestion}</span>
+                </Button>
+              ))}
+            </div>
+          )}
           {attachment && (
             // The file waiting to go. A picture is drawn as itself, so a phone user
             // sees what they picked before sending instead of a name they have to

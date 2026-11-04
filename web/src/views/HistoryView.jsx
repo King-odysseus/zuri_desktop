@@ -169,7 +169,7 @@ export default function HistoryView({ onBackToChat = () => {}, onChanged = () =>
           (confirmClear ? (
             <div className="history-confirm">
               <span>
-                Delete {rows.length === 1 ? 'this chat' : `all ${rows.length} chats`}? This cannot be undone.
+                Delete {rows.length === 1 ? 'this chat' : `these ${rows.length} chats`}? This cannot be undone.
               </span>
               <Button variant="ghost" className="history-confirm-delete" isDisabled={clearing} onClick={() => void clearAll()}>
                 {clearing ? 'Deleting...' : 'Yes, delete'}
