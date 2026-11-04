@@ -2,41 +2,21 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Read the tool registry, chat tool dispatch, settings store, and Plugins wiring",
+      "text": "Confirm the MCP connector feature reaches desktop only, not web, Android or the server",
       "state": "done"
     },
     {
-      "text": "Add MCP server settings with validation and safe defaults",
+      "text": "Repair the undefined connector helpers left in the committed tool registry",
       "state": "done"
     },
     {
-      "text": "Build the MCP stdio client with handshake, discovery, calls, timeouts, and shutdown",
+      "text": "Run the full npm test to confirm the repair and the other run's connector work pass together",
       "state": "done"
     },
     {
-      "text": "Expose enabled MCP tools to chat through approval-gated dispatch",
-      "state": "done"
-    },
-    {
-      "text": "Add connector management to the Plugins page",
-      "state": "done"
-    },
-    {
-      "text": "Add fake-server coverage and run the full npm test",
-      "state": "done"
-    },
-    {
-      "text": "Commit and push the completed MCP integration",
-      "state": "done"
-    },
-    {
-      "text": "Redeploy the web control styling after the dropdown and calendar polish",
-      "state": "done"
-    },
-    {
-      "text": "Move account cards to the bottom of desktop and web navigation",
+      "text": "Commit and push the repair",
       "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T03:05:00.000Z"
+  "updatedAt": "2026-11-04T01:41:10.298Z"
 }
