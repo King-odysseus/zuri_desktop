@@ -18,6 +18,7 @@
 
   var pane = {
     hostLabel: document.getElementById('host-label'),
+    connDot: document.getElementById('conn-dot'),
     thread: document.getElementById('thread'),
     empty: document.getElementById('empty'),
     emptyTitle: document.getElementById('empty-title'),
@@ -32,6 +33,8 @@
     modelLabel: document.getElementById('model-label'),
     edits: document.getElementById('edits-mode'),
     status: document.getElementById('status'),
+    enhance: document.getElementById('enhance'),
+    enhanceList: document.getElementById('enhance-list'),
   };
 
   /** How much of the file is read for the model. Every character is sent and billed. */
@@ -53,6 +56,12 @@
     context: { label: '', text: '' },
     model: '',
     streamNode: null,
+    currentMessage: null,
+    pendingNote: '',
+    // The prompt enhancer: `enhancing` covers the round trip, and `enhancedFrom`
+    // holds the words to put back when the same button is pressed again.
+    enhancing: false,
+    enhancedFrom: null,
   };
 
   var previewHost = (new URLSearchParams(window.location.search).get('preview') || '').toLowerCase();
@@ -158,6 +167,22 @@
   function setStatus(message, isError) {
     pane.status.textContent = message || '';
     pane.status.className = isError ? 'fine error' : 'fine';
+    // The same words go into the reply row while it is still empty. The line under
+    // the composer is easy to miss, and an empty row reads as nothing happening.
+    if (state.streaming && state.currentMessage && state.currentMessage.content.trim() === '') {
+      state.pendingNote = message || 'Thinking...';
+      if (state.streamNode) paintAssistant(state.streamNode, state.currentMessage);
+    }
+  }
+
+  /**
+   * The dot beside the app's name: waiting for Office, busy with an answer, ready,
+   * or the last answer failed. A pane that never says which one it is looks dead.
+   */
+  function setConnection(kind, title) {
+    if (!pane.connDot) return;
+    pane.connDot.className = 'conn-dot is-' + kind;
+    pane.connDot.title = typeof title === 'string' ? title : '';
   }
 
   function truncate(text, limit) {
@@ -710,15 +735,26 @@
     return node;
   }
 
+  /**
+   * Three dots that keep moving, then whatever the pane is doing in words.
+   *
+   * A still row is indistinguishable from a stalled one, so the dots animate and
+   * the note names the step: reading the file, thinking, or preparing a change.
+   */
+  function waitingRow(note) {
+    var row = el('div', 'ops-open waiting');
+    var dots = el('span', 'waiting-dots');
+    for (var dot = 0; dot < 3; dot += 1) dots.appendChild(el('span'));
+    row.appendChild(dots);
+    row.appendChild(el('span', 'waiting-note', note || 'Thinking...'));
+    return row;
+  }
+
   function paintAssistant(node, message) {
     while (node.lastChild && node.lastChild.className !== 'caption') node.removeChild(node.lastChild);
 
     var segments = ZuriOps.splitReply(message.content);
-    if (segments.length === 0) {
-      node.appendChild(el('div', 'ops-open', 'Thinking...'));
-      return;
-    }
-
+    var painted = 0;
     for (var index = 0; index < segments.length; index += 1) {
       var segment = segments[index];
       if (segment.type === 'text') {
@@ -727,20 +763,28 @@
         var bubble = el('div', 'bubble');
         paintProse(bubble, prose);
         node.appendChild(bubble);
+        painted += 1;
         continue;
       }
       if (segment.type === 'ops') {
         node.appendChild(buildChangeCard(segment));
+        painted += 1;
         continue;
       }
       if (segment.type === 'ops-open') {
         node.appendChild(el('div', 'ops-open', 'Preparing a change to the file...'));
+        painted += 1;
         continue;
       }
+      if (String(segment.text || '').trim() === '') continue;
       var codeBlock = el('pre');
       codeBlock.appendChild(el('code', null, segment.text));
       node.appendChild(codeBlock);
+      painted += 1;
     }
+    // An empty reply is one blank text segment rather than no segments at all, so
+    // asking whether there were segments drew an empty row. Ask what was painted.
+    if (painted === 0) node.appendChild(waitingRow(state.pendingNote));
   }
 
   /**
@@ -1517,6 +1561,14 @@
 
     pane.prompt.value = '';
     autosize();
+    // The draft has been sent, so there is nothing left to put back and the
+    // suggestions were about words that are already on their way.
+    state.enhancedFrom = null;
+    clearSuggestions();
+    if (pane.enhance) {
+      pane.enhance.textContent = 'Improve';
+      pane.enhance.title = 'Rewrite this as a clearer prompt';
+    }
     state.messages.push({ role: 'user', content: text });
     renderThread();
     scrollToEnd(true);
@@ -1540,10 +1592,13 @@
   function startStream(contextText) {
     state.streaming = true;
     toggleComposer(true);
+    setConnection('busy', 'Zuri is answering');
     setStatus('Zuri is working...');
 
     var message = { role: 'assistant', content: '' };
     state.messages.push(message);
+    state.currentMessage = message;
+    state.pendingNote = 'Thinking...';
     var node = el('div', 'msg msg-assistant streaming');
     node.appendChild(el('span', 'caption', 'Zuri'));
     var body = el('div');
@@ -1558,6 +1613,9 @@
 
     var controller = new AbortController();
     state.controller = controller;
+    // A request that never produced a word leaves nothing to show, so its row is
+    // removed rather than left reading "Thinking..." under a failure.
+    var dropped = false;
 
     var history = state.messages
       .slice(0, -1)
@@ -1576,20 +1634,33 @@
       })
       .then(function () {
         if (message.content.trim() === '') message.content = 'Zuri sent an empty reply. Try again.';
+        setConnection('ready', 'Connected');
       })
       .catch(function (error) {
         if (error && error.name === 'AbortError') {
           if (message.content.trim() === '') message.content = 'Stopped.';
+          setConnection('ready', 'Connected');
           return;
         }
-        if (message.content.trim() === '') state.messages.pop();
+        if (message.content.trim() === '') {
+          state.messages.pop();
+          dropped = true;
+        }
+        setConnection('error', 'Zuri could not reach the server');
         setStatus(error.message || 'Zuri could not answer that.', true);
       })
       .then(function () {
         state.streaming = false;
         state.controller = null;
+        state.currentMessage = null;
+        state.pendingNote = '';
         node.classList.remove('streaming');
-        paintAssistant(node, message);
+        if (dropped) {
+          node.remove();
+          state.streamNode = null;
+        } else {
+          paintAssistant(node, message);
+        }
         toggleComposer(false);
         if (state.messages[state.messages.length - 1] === message) remember();
         scrollToEnd(true);
@@ -1758,6 +1829,7 @@
   function retryHost() {
     var host = detectHost(null);
     if (host === '') {
+      setConnection('error', 'Office has not named the app');
       setStatus('Office still has not said which app this is. Close the pane and open it again from the ribbon.', true);
       return;
     }
@@ -1808,10 +1880,117 @@
 
   function toggleComposer(busy) {
     pane.send.classList.toggle('is-hidden', busy);
+    if (pane.enhance) pane.enhance.disabled = busy || state.enhancing;
     pane.stop.classList.toggle('is-hidden', !busy);
     pane.prompt.disabled = busy;
     pane.refreshContext.disabled = busy;
     pane.send.disabled = busy || pane.prompt.value.trim() === '';
+  }
+
+  /**
+   * Rewrite the message box into a clearer prompt, or put the person's own words
+   * back. The same behaviour as the app window and the web chat, and the same in
+   * Word and PowerPoint, because this page does not branch on the host.
+   *
+   * The rewrite replaces the draft rather than being sent, so it can be read and
+   * edited first. Typing by hand clears the undo: restoring then would throw away
+   * what was just written.
+   */
+  function enhancePrompt() {
+    if (state.enhancing) return;
+
+    if (state.enhancedFrom !== null) {
+      pane.prompt.value = state.enhancedFrom;
+      state.enhancedFrom = null;
+      pane.enhance.textContent = 'Improve';
+      pane.enhance.title = 'Rewrite this as a clearer prompt';
+      clearSuggestions();
+      autosize();
+      setStatus('');
+      pane.prompt.focus();
+      return;
+    }
+
+    var prompt = pane.prompt.value.trim();
+    if (prompt === '') {
+      setStatus('Write the message you want improved first.', true);
+      return;
+    }
+
+    state.enhancing = true;
+    pane.enhance.disabled = true;
+    pane.enhance.textContent = 'Improving...';
+    setStatus('Improving your message...');
+    clearSuggestions();
+
+    fetch('/api/enhance', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-zuri-token': token },
+      body: JSON.stringify({ prompt: prompt, host: state.host.toLowerCase() }),
+    })
+      .then(function (response) {
+        return response.json().then(function (body) {
+          if (!body || body.ok !== true) {
+            throw new Error((body && body.error && body.error.message) || 'Zuri could not improve that prompt. Try again.');
+          }
+          return body.data || {};
+        });
+      })
+      .then(function (improved) {
+        var text = typeof improved.prompt === 'string' ? improved.prompt.trim() : '';
+        if (text === '') throw new Error('That message could not be improved. Try again.');
+        state.enhancedFrom = pane.prompt.value;
+        pane.prompt.value = text;
+        pane.enhance.textContent = 'Undo';
+        pane.enhance.title = 'Put your own words back';
+        autosize();
+        setStatus('');
+        showSuggestions(improved.suggestions);
+        pane.prompt.focus();
+      })
+      .catch(function (error) {
+        setStatus((error && error.message) || 'Zuri could not improve that prompt. Try again.', true);
+      })
+      .then(function () {
+        state.enhancing = false;
+        pane.enhance.disabled = state.streaming;
+        if (state.enhancedFrom === null) pane.enhance.textContent = 'Improve';
+      });
+  }
+
+  /** A list of details the message was missing; each press folds one in. */
+  function showSuggestions(list) {
+    pane.enhanceList.textContent = '';
+    var lines = Array.isArray(list) ? list.filter(function (line) {
+      return typeof line === 'string' && line.trim() !== '';
+    }) : [];
+    if (lines.length === 0 || !pane.enhanceList) {
+      pane.enhanceList.classList.add('is-hidden');
+      return;
+    }
+    pane.enhanceList.classList.remove('is-hidden');
+    for (var index = 0; index < lines.length; index += 1) {
+      var button = el('button', 'enhance-chip', lines[index]);
+      button.type = 'button';
+      button.title = 'Add this to the message';
+      button.addEventListener('click', (function (line, node) {
+        return function () {
+          var current = pane.prompt.value.replace(/\s+$/, '');
+          pane.prompt.value = current === '' ? line : current + '\n' + line;
+          node.remove();
+          if (pane.enhanceList.children.length === 0) pane.enhanceList.classList.add('is-hidden');
+          autosize();
+          pane.prompt.focus();
+        };
+      })(lines[index], button));
+      pane.enhanceList.appendChild(button);
+    }
+  }
+
+  function clearSuggestions() {
+    if (!pane.enhanceList) return;
+    pane.enhanceList.textContent = '';
+    pane.enhanceList.classList.add('is-hidden');
   }
 
   function autosize() {
@@ -1852,6 +2031,12 @@
     appliedPlans = {};
     state.model = '';
     pane.modelLabel.textContent = '';
+    state.enhancedFrom = null;
+    clearSuggestions();
+    if (pane.enhance) {
+      pane.enhance.textContent = 'Improve';
+      pane.enhance.title = 'Rewrite this as a clearer prompt';
+    }
     setStatus('');
     renderThread();
     try {
@@ -1866,6 +2051,8 @@
     pane.hostLabel.textContent = previewHost !== '' ? 'Preview (' + state.host + ')'
       : state.host === '' ? 'Waiting for Office'
         : state.host;
+    setConnection(state.host === '' ? 'waiting' : 'ready',
+      state.host === '' ? 'Waiting for Office to say which app this is' : 'Connected to ' + state.host);
     pane.prompt.placeholder = state.host === 'Excel' ? 'Ask Zuri to change this sheet'
       : state.host === 'PowerPoint' ? 'Ask Zuri to change this slide'
         : state.host === 'Word' ? 'Ask Zuri to change this document'
@@ -1896,6 +2083,7 @@
     }
 
     pane.send.addEventListener('click', sendMessage);
+    if (pane.enhance) pane.enhance.addEventListener('click', enhancePrompt);
     pane.stop.addEventListener('click', function () {
       if (state.controller) state.controller.abort();
     });
@@ -1904,6 +2092,14 @@
     pane.prompt.addEventListener('input', function () {
       autosize();
       pane.send.disabled = pane.prompt.value.trim() === '';
+      // Typing after a rewrite makes the undo meaningless: it would replace what
+      // they just wrote with the older draft.
+      if (state.enhancedFrom !== null) {
+        state.enhancedFrom = null;
+        pane.enhance.textContent = 'Improve';
+        pane.enhance.title = 'Rewrite this as a clearer prompt';
+        clearSuggestions();
+      }
     });
     pane.prompt.addEventListener('keydown', function (event) {
       if (event.key === 'Enter' && !event.shiftKey) {

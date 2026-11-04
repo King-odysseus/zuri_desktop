@@ -32,7 +32,10 @@
           <span class="mark" aria-hidden="true">Z</span>
           <div class="pane-titles">
             <strong>Zuri</strong>
-            <span class="pane-sub" id="host-label">Connecting to Office...</span>
+            <span class="pane-sub">
+              <span class="conn-dot is-waiting" id="conn-dot" aria-hidden="true"></span>
+              <span id="host-label">Connecting to Office...</span>
+            </span>
           </div>
         </div>
         <div class="edits">
@@ -63,10 +66,16 @@
           <textarea id="prompt" rows="1" placeholder="Ask Zuri to change this file" aria-label="Message Zuri"></textarea>
           <div class="composer-bar">
             <span class="model" id="model-label"></span>
+            <!--
+              The same enhancer the app and the web chat have. One page serves Excel,
+              Word and PowerPoint, so this button behaves identically in all three.
+            -->
+            <button id="enhance" type="button" class="enhance" title="Rewrite this as a clearer prompt">Improve</button>
             <button id="send" type="button" class="send" title="Send">Send</button>
             <button id="stop" type="button" class="stop is-hidden" title="Stop">Stop</button>
           </div>
         </div>
+        <div class="enhance-list is-hidden" id="enhance-list"></div>
         <p class="fine" id="status" role="status"></p>
       </footer>
     </div>

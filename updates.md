@@ -1,3 +1,32 @@
+## 2026-11-04 - Windows (the Office pane says it is working, and can improve a prompt)
+
+- The Office pane drew an empty reply row while a request was in flight, so there was no sign of thinking, streaming or connection. The row was meant to read "Thinking...", but the check it used never fired: an empty reply splits into one blank text segment rather than no segments, so counting segments painted nothing. The row is now judged by what it actually drew.
+- A waiting reply row now carries three moving dots and names the step in words ("Thinking...", then whatever the server reports, such as "Reading the contract..."). The status line under the composer also fills that row, because an 11.5px grey line is easy to miss.
+- A dot beside the app's name says whether the pane is connected: amber while Office has not named the app, dark and pulsing while a request runs, green when the last answer came back, red when the server could not be reached. A failure also removes the "Thinking..." row instead of leaving it under the error, which read as still working.
+- The prompt enhancer is now in the pane, beside Send: it rewrites the draft in place, becomes "Undo" so the person's own words go back, and shows up to three pills naming details the message was missing. Typing by hand clears the undo. The rewrite is served by the app's own enhancer, so the words match the window and the web chat.
+- One page serves Excel, Word and PowerPoint, so the enhancer and the indicators are one code path with no branching on the host. A self-test fails if that changes, and a second one pins the thinking row and the four connection states.
+- Checked in a browser against the real pane files, with a stand-in Office and server: Excel, Word and PowerPoint each improved a draft, showed "Undo" and three pills; the busy state read "Improving..." with the button disabled; a failure showed the red dot with no leftover thinking row; a fresh pane showed amber "Connecting to Office..."; a normal answer went dark then green and cleared the waiting row. 0 console errors on the normal pane.
+- The pane now wears the same clothes as the app and the phone build. It had its own small scale: 8-10px corners and a 1px hairline around every button and card, so a panel docked in Word or PowerPoint looked like a different product. Buttons you press are pills (999px) with no outline, the composer is the app's 28px box, the proposed-change card and the open-prompt rows are rounded fills (20 and 14), and the header rule is gone. The numbers come from the app's own scale rather than new ones.
+- On a narrow pane the "Edits" label is hidden from the eye but kept for a screen reader, which frees the width the app name needed. Touch screens get 44px controls; a mouse keeps the denser height so a docked pane stays short. The spreadsheet preview keeps its cell lines, since that is data rather than a card.
+- Sending a message clears the enhancer: the button returns to "Improve", the suggestions go, and pressing it cannot restore a draft that has already been sent.
+- A self-test now pins the pane's shape (pill controls with no outline, the 28px composer, 44px touch targets, and the cell grid that must stay), so it cannot drift back.
+- Bumped to 0.2.16.
+- Key files: src/addin/taskpane.js, src/addin/taskpane.html, src/addin/taskpane.css, src/main/addin.js, src/main/main.js, scripts/selftest.js.
+- Other OS action: none beyond the usual. The pane ships inside the desktop app, so Word, Excel and PowerPoint pick the change up from the rebuilt installer.
+- Done on: Windows
+
+## 2026-11-04 - Windows (composer menus read down one gutter)
+
+- Every row in the composer pop-ups is a HeroUI Button, and the button base centres what it holds. A row only looked left-aligned when its label happened to stretch to fill the row, so the same menu showed four rows centred (Add files or photos, Add folder, Slash commands) and three starting at its left edge. The rows now set their own horizontal alignment, and the base's 2px side-shave on a glyph is neutralised inside the menu, so icon-led labels and iconless rows sit on one column.
+- A row with no glyph keeps an empty 1rem slot of the same width, in both apps, so the labels line up even where there is nothing to draw.
+- Measured, not eyeballed: the desktop + menu (7 rows) puts every icon at 334.7 and every label at 362.7, its reply-length sub-list puts all three labels at 217.3, and its model and mode menus are single-column (782.7 and 840.7). The web + menu at 390 wide puts every icon or empty slot at 42 and every label at 68, its sub-lists included.
+- Why it kept coming back: the correction was in the source but never shipped. The installed desktop copy carried the older rule without the alignment, and the phone bundle in the repository predated the empty-slot rule, so the phone put "Start incognito chat" and "Export chat" a glyph's width left of the rest.
+- A self-test assertion now pins the rule in both stylesheets and the slots in both menu components, so an edit that drops them fails the suite instead of shipping.
+- Bumped to 0.2.14.
+- Key files: src/renderer-react/app.css, src/renderer-react/ChatPanel.jsx, web/src/styles.css, web/src/views/ChatView.jsx, scripts/selftest.js.
+- Other OS action: npm run web:build, then npm run cloud:deploy. The Android needs npm run android:build; the desktop needs the rebuilt installer.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (a menu that scrolls says so)
 
 - Both apps hide every scrollbar on purpose, which is right for a page and wrong for a floating menu: the model picker ends in a row cut through the middle at the foot of its height cap, and nothing on its face said there was more below it. The composer pop-ups (the model list, the + menu and the desktop mode picker) and the web project menu now draw a thin 8px rounded bar in the muted tone, only while their rows actually overflow. Everywhere else the no-scrollbar design is unchanged.

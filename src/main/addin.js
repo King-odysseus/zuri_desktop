@@ -225,9 +225,12 @@ function readJsonBody(request) {
  *     emit?: (event: object) => void,
  *   }) => Promise<{ ok: boolean, data?: { text: string, model?: string }, error?: { message: string } }>
  * }} options
+ * @param {(request: { prompt: string, host: string }) => Promise<{ ok: boolean, data?: { prompt: string, suggestions?: string[] }, error?: { message: string } }>} [options.enhance]
+ *   The same rewrite the app and the web chat use. It is optional so a build without
+ *   it still serves the pane; the button then says the enhancer is unavailable.
  * @returns {Promise<{ port: number, token: string }>}
  */
-export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, chat }) {
+export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, chat, enhance }) {
   if (running) return { port, token: running.token };
   const token = randomBytes(24).toString('hex');
 
@@ -290,6 +293,33 @@ export async function startAddinServer({ pfx, passphrase, port = ADDIN_PORT, cha
         return response.end();
       }
 
+      if (request.method === 'POST' && route === '/api/enhance') {
+        if (!sameSecret(request.headers['x-zuri-token'] ?? '', token)) {
+          return sendJson(response, 401, { ok: false, error: { message: 'Reopen the Zuri pane in Office and try again.' } });
+        }
+        if (typeof enhance !== 'function') {
+          return sendJson(response, 501, { ok: false, error: { message: 'The prompt enhancer is not available in this copy of Zuri.' } });
+        }
+
+        const body = await readJsonBody(request);
+        const prompt = typeof body?.prompt === 'string' ? body.prompt.trim() : '';
+        if (prompt === '') {
+          return sendJson(response, 400, { ok: false, error: { message: 'Write the message you want improved first.' } });
+        }
+
+        const improved = await enhance({ prompt, host: String(body?.host ?? '') });
+        if (improved?.ok !== true) {
+          return sendJson(response, 502, { ok: false, error: improved?.error ?? { message: 'Zuri could not improve that prompt. Try again.' } });
+        }
+        return sendJson(response, 200, {
+          ok: true,
+          data: {
+            prompt: improved.data?.prompt ?? '',
+            suggestions: Array.isArray(improved.data?.suggestions) ? improved.data.suggestions : [],
+          },
+        });
+      }
+
       return sendJson(response, 404, { ok: false, error: { message: 'Not found.' } });
     } catch (error) {
       console.error('[zuri:addin]', error?.message ?? error);
@@ -335,13 +365,14 @@ export async function addinStatus(dataRoot) {
  * for this Windows user.
  * @param {string} dataRoot
  * @param {(request: object) => Promise<any>} chat
+ * @param {(request: object) => Promise<any>} enhance
  */
-export async function installAddin(dataRoot, chat) {
+export async function installAddin(dataRoot, chat, enhance) {
   if (process.platform !== 'win32') throw new Error('The Office add-in is only available on Windows.');
   const paths = addinPaths(dataRoot);
   const state = await ensureCertificate(paths);
 
-  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, chat });
+  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, chat, enhance });
   await fs.writeFile(paths.manifest, buildManifest({ id: state.manifestId, port: ADDIN_PORT }), 'utf8');
   const added = await runReg(['add', REGISTRY_KEY, '/v', REGISTRY_VALUE, '/t', 'REG_SZ', '/d', paths.manifest, '/f']);
   if (added.code !== 0) throw new Error('Windows would not let Zuri register the add-in for Word.');
@@ -351,13 +382,14 @@ export async function installAddin(dataRoot, chat) {
  * Start the page again after a restart, when the add-in was installed before.
  * @param {string} dataRoot
  * @param {(request: object) => Promise<any>} chat
+ * @param {(request: object) => Promise<any>} enhance
  */
-export async function resumeAddin(dataRoot, chat) {
+export async function resumeAddin(dataRoot, chat, enhance) {
   if (process.platform !== 'win32') return;
   const paths = addinPaths(dataRoot);
   const state = await readState(paths);
   if (!state?.passphrase) return;
-  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, chat });
+  await startAddinServer({ pfx: await fs.readFile(paths.pfx), passphrase: state.passphrase, chat, enhance });
 }
 
 /**

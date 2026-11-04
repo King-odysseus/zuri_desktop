@@ -417,6 +417,39 @@ check('the model beside Send is a menu anchored to its own chip', () => {
   return 'chip-anchored menu, per-chat model restored on open';
 });
 
+// The composer menus were aligned twice and drifted back both times: every row is a
+// HeroUI Button, and the button base centres what it holds, so a row only looked
+// left-aligned when its label happened to stretch to fill the row. That is how four
+// rows sat centred and three sat left in the same menu. The label column is held by
+// CSS rather than by each row's markup, so this check pins the rule itself.
+check('every composer menu row sits on one gutter', () => {
+  const desktopCss = read('src/renderer-react/app.css');
+  if (!/\.zuri-composer-menu \.button\s*\{[^}]*justify-content:\s*flex-start/.test(desktopCss)) {
+    throw new Error('desktop menu rows fall back to the button base, which centres them');
+  }
+  // The base shaves 2px off each side of a glyph, which moves that row's own label off
+  // the column the iconless rows use.
+  if (!/\.zuri-add-menu \.button > svg\s*\{[^}]*margin-inline:\s*0/.test(desktopCss)) {
+    throw new Error('the add menu glyph is shaved, so icon-led labels leave the label column');
+  }
+  if (read('src/renderer-react/ChatPanel.jsx').split('w-4 shrink-0').length - 1 < 2) {
+    throw new Error('a desktop row with no glyph starts a glyph width left of the others');
+  }
+
+  const webCss = read('web/src/styles.css');
+  if (!/\.chat-menu-row,\s*\.chat-menu-back\s*\{[^}]*justify-content:\s*flex-start/.test(webCss)) {
+    throw new Error('web menu rows fall back to the button base, which centres them');
+  }
+  // A row with no glyph keeps an empty slot of the same width, or it starts one glyph
+  // left of the rows that carry one.
+  if (!/\.chat-menu-slot\s*\{/.test(webCss)) throw new Error('the web menu has no empty glyph slot');
+  if (read('web/src/views/ChatView.jsx').split('chat-menu-slot').length - 1 < 4) {
+    throw new Error('a web row with no glyph starts a glyph width left of the others');
+  }
+
+  return 'menu rows share one glyph column and one label column';
+});
+
 check('conversation search is capped and encoded before it reaches the server', () => {
   const api = read('web/src/lib/api.js');
   const control = read('web/src/components/ConversationSearch.jsx');
@@ -731,13 +764,107 @@ check('Word paragraph writes use portable built-in styles', () => {
   return 'invalid display names cannot cancel the whole Word write';
 });
 
+check('the Office pane wears the same clothes as the app and the phone build', () => {
+  const css = read('src/addin/taskpane.css');
+
+  // The pane once had its own small scale of 8-10px corners and a hairline round every
+  // control, so a panel docked in Word looked like a different product from the app.
+  for (const token of ['--radius-md: 12px', '--radius-lg: 14px', '--radius-xl: 20px', '--radius-2xl: 28px', '--radius-pill: 999px']) {
+    if (!css.includes(token)) throw new Error(`the pane is missing the app's radius token ${token}`);
+  }
+
+  /** Every declaration body written for one selector, including a grouped rule. */
+  const rule = (selector) => {
+    const bodies = [];
+    for (const chunk of css.split('}')) {
+      const open = chunk.lastIndexOf('{');
+      if (open === -1) continue;
+      const selectors = chunk.slice(0, open).split(',').map((part) => part.trim().split('\n').pop().trim());
+      if (selectors.includes(selector)) bodies.push(chunk.slice(open + 1));
+    }
+    if (bodies.length === 0) throw new Error(`no rule for ${selector}`);
+    return bodies.join('\n');
+  };
+
+  // Anything you press is a pill, and a pill is a fill: no hairline outline.
+  for (const selector of ['.send', '.stop', '.enhance', '.ghost', '.apply', '.edits-select', '.enhance-chip']) {
+    const body = rule(selector);
+    if (!body.includes('border-radius: var(--radius-pill)')) throw new Error(`${selector} is not a pill`);
+    if (/border:\s*1px/.test(body)) throw new Error(`${selector} still draws a hairline outline`);
+  }
+
+  // Surfaces are rounded fills, and the composer is the app's 28px box.
+  for (const selector of ['.composer-box', '.ops', '.ops-open', '.suggestion', '.ghost']) {
+    const body = rule(selector);
+    if (/border:\s*1px/.test(body)) throw new Error(`${selector} draws a hairline border`);
+  }
+  if (!rule('.composer-box').includes('border-radius: var(--radius-2xl)')) {
+    throw new Error('the composer is not the app\u2019s 28px box');
+  }
+
+  // A thumb needs a bigger target than a mouse.
+  if (!css.includes('@media (pointer: coarse)')) throw new Error('the pane ignores touch screens');
+  const lastCoarse = css.lastIndexOf('@media (pointer: coarse)');
+  if (css.indexOf('min-height: 44px', lastCoarse) === -1) throw new Error('touch targets are not thumb-sized');
+  // The spreadsheet grid keeps its cell lines: that is data, not a card.
+  if (!rule('.ops-preview td').includes('border: 1px solid var(--line)')) {
+    throw new Error('the spreadsheet preview lost its cell grid');
+  }
+  return 'pill controls, rounded fill-only cards, a 28px composer, 44px touch targets';
+});
+
+check('the Office pane can improve a prompt in Excel, Word and PowerPoint alike', () => {
+  const page = read('src/addin/taskpane.html');
+  const script = read('src/addin/taskpane.js');
+  const server = read('src/main/addin.js');
+  const main = read('src/main/main.js');
+  const css = read('src/addin/taskpane.css');
+
+  if (!page.includes('id="enhance"')) throw new Error('the pane has no Improve button');
+  if (!script.includes("fetch('/api/enhance'")) throw new Error('the pane never asks for an improved prompt');
+  if (!script.includes('function enhancePrompt(')) throw new Error('the pane has no enhancer');
+  // One page serves all three apps, so any host branch here would give Word or
+  // PowerPoint a different enhancer from Excel.
+  if (/enhancePrompt[\s\S]{0,400}state\.host ===/.test(script)) {
+    throw new Error('the enhancer behaves differently depending on the Office app');
+  }
+  if (!server.includes("route === '/api/enhance'")) throw new Error('the local add-in server has no enhancer route');
+  if (!server.includes('enhance({ prompt, host:')) throw new Error('the route never calls the enhancer');
+  if (!main.includes('(request) => handlePromptsEnhance(request)')) throw new Error('the app does not hand the pane its enhancer');
+  if (!css.includes('.enhance-chip')) throw new Error('the suggestions have no style');
+  // A rewrite replaces the draft, so it must be undoable and must never be sent.
+  if (!script.includes("pane.enhance.textContent = 'Undo'")) throw new Error('an improved prompt cannot be undone');
+  return 'Improve, undo and suggestions, the same in Excel, Word and PowerPoint';
+});
+
 check('the Office pane shows thinking before the first streamed token', () => {
   const script = read('src/addin/taskpane.js');
   const css = read('src/addin/taskpane.css');
   if (!script.includes("paintAssistant(body, message);")) throw new Error('the empty assistant row is not painted immediately');
-  if (!script.includes("el('div', 'ops-open', 'Thinking...')")) throw new Error('the pane has no thinking state');
+  // An empty reply splits into one blank text segment rather than none, so counting
+  // segments drew an empty row: the row has to be judged by what it actually painted.
+  if (!script.includes('if (painted === 0)')) throw new Error('an empty reply paints a blank row again');
+  if (!script.includes('function waitingRow(')) throw new Error('the pane has no thinking state');
   if (!css.includes('.streaming .bubble::after')) throw new Error('the streaming typing indicator is missing');
-  return 'the pane shows Thinking... immediately and keeps a live cursor while text streams';
+  if (!script.includes('setConnection(')) throw new Error('the pane never says whether it is connected');
+  if (!css.includes('.conn-dot')) throw new Error('the pane has no connection dot');
+  return 'a moving thinking row, a live cursor while text streams, and a connection dot';
+});
+
+check('the Office pane says where it is in words, not only with dots', () => {
+  const script = read('src/addin/taskpane.js');
+  const css = read('src/addin/taskpane.css');
+  const page = read('src/addin/taskpane.html');
+  // The status line under the composer is easy to miss, so it also fills the row.
+  if (!script.includes('state.pendingNote = message')) throw new Error('the status line never reaches the reply row');
+  if (!css.includes('.waiting-dots')) throw new Error('the thinking state has nothing that moves');
+  if (!css.includes('.waiting-note')) throw new Error('the thinking state cannot show the step it is on');
+  if (!page.includes('id="conn-dot"')) throw new Error('the header has no connection dot');
+  for (const kind of ['waiting', 'busy', 'ready', 'error']) {
+    if (!css.includes(`.conn-dot.is-${kind}`)) throw new Error(`the connection dot has no ${kind} state`);
+  }
+  if (!css.includes('prefers-reduced-motion')) throw new Error('the dots ignore a request for less motion');
+  return 'four connection states, a moving row, and the step named in words';
 });
 
 check('the admin area is for admins, with a switch to the user view and back', () => {

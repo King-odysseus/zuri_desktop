@@ -1608,7 +1608,13 @@ async function handleSettingsAddinStatus() {
 
 async function handleSettingsAddinInstall() {
   try {
-    await installAddin(getStoreRoot(), (request) => chatForAddin(request, { cloudReply: cloudChatReply }));
+    await installAddin(
+      getStoreRoot(),
+      (request) => chatForAddin(request, { cloudReply: cloudChatReply }),
+      // The same rewrite the app window and the web chat get, so a prompt improved
+      // in Office reads the way one improved anywhere else does.
+      (request) => handlePromptsEnhance(request),
+    );
     return { ok: true, data: await addinStatus(getStoreRoot()) };
   } catch (error) {
     console.error('[zuri:addin] install', error);
@@ -2713,7 +2719,11 @@ app.whenReady().then(async () => {
   registerOverlayHotkey();
 
   try {
-    await resumeAddin(getStoreRoot(), (request) => chatForAddin(request, { cloudReply: cloudChatReply }));
+    await resumeAddin(
+      getStoreRoot(),
+      (request) => chatForAddin(request, { cloudReply: cloudChatReply }),
+      (request) => handlePromptsEnhance(request),
+    );
   } catch (error) {
     console.error('[zuri:addin] resume', error);
   }
