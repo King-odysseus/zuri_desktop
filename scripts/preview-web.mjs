@@ -609,8 +609,22 @@ createServer(async (request, response) => {
     // open. Echoing the message back, as this used to, made a working button look
     // broken, because the composer then showed the same words it started with.
     const tightened = words
-      .replace(/^(?:please\s+|(?:can|could|would)\s+you\s+(?:please\s+)?|i\s+(?:want|need)\s+you\s+to\s+|help\s+me\s+)/i, '')
-      .replace(/^([a-z])/, (letter) => letter.toUpperCase());
+      // Politeness comes off a step at a time, so "please can you" does not stop at
+      // "please" and leave the "can you" behind.
+      .replace(/^please\s+/i, '')
+      .replace(/^(?:can|could|would)\s+you\s+(?:please\s+)?/i, '')
+      .replace(/^(?:i\s+(?:want|need)\s+you\s+to\s+|help\s+me\s+)/i, '')
+      // "make me a ..." and "give me a ..." name the thing but not the action, so they
+      // become "Write a ...". A verb the person already used is kept. Stripping the
+      // lead-in alone would leave a bare noun, which is not a prompt.
+      .replace(/^(?:make|give)\s+me\s+(a|an|some)\s+/i, 'Write $1 ')
+      .replace(/^(write|draft|send)\s+me\s+(a|an|some)\s+/i, (_, verb, article) => {
+        const capitalised = verb.charAt(0).toUpperCase() + verb.slice(1).toLowerCase();
+        return `${capitalised} ${article} `;
+      })
+      .replace(/^([a-z])/, (letter) => letter.toUpperCase())
+      // An instruction reads as a sentence.
+      .replace(/([^.!?])$/, '$1.');
     const lower = words.toLowerCase();
     const suggestions = [];
     if (!/\b(for|audience|aimed at|readers?|users?|customers?)\b/.test(lower)) {

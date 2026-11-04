@@ -237,7 +237,7 @@ check('the send button is a circle and an addition is a pill', () => {
   if (!suggestion.includes('border-radius: 9999px')) throw new Error('a suggested addition is not a pill');
   // The desktop carries the pill on the element itself.
   const panel = read('src/renderer-react/ChatPanel.jsx');
-  if (!panel.includes('zuri-suggestion flex w-full')) throw new Error('the desktop addition has no pill class');
+  if (!panel.includes('zuri-suggestion flex w-auto max-w-full')) throw new Error('the desktop addition is not a pill sized to its own words');
   if (!/rounded-full/.test(panel)) throw new Error('the desktop addition is no longer rounded');
   return 'the send button is a circle and suggested additions are pills on both surfaces';
 });

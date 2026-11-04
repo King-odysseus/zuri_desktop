@@ -1582,7 +1582,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
           {enhanceSuggestions.length > 0 && (
             // What the enhancer thought was missing. Each line is a press away from
             // joining the message, so the person takes only what is true for them.
-            <div role="group" aria-label="Suggested additions to your prompt" className="mb-2 flex flex-col gap-0.5">
+            <div role="group" aria-label="Suggested additions to your prompt" className="mb-2 flex flex-col items-start gap-0.5">
               <p className="px-1 pb-0.5 text-xs font-semibold text-muted">Add to your prompt</p>
               {enhanceSuggestions.map((suggestion) => (
                 <Button
@@ -1590,7 +1590,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   type="button"
                   variant="ghost"
                   title="Add this line to your message"
-                  className="zuri-suggestion flex w-full items-start justify-start gap-1.5 rounded-full bg-surface-secondary px-3 py-1.5 text-left text-[13px] font-normal leading-snug hover:bg-surface-tertiary"
+                  // A chip is as wide as its own words: stretched across the column it
+                  // reads as a band rather than one thing you can tap. Matches the web.
+                  className="zuri-suggestion flex w-auto max-w-full items-start justify-start gap-1.5 rounded-full bg-surface-secondary px-3 py-1.5 text-left text-[13px] font-normal leading-snug hover:bg-surface-tertiary"
                   onPress={() => addSuggestion(suggestion)}
                 >
                   <PlusIcon size={14} className="mt-0.5 shrink-0 text-muted" />
