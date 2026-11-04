@@ -1461,6 +1461,17 @@
               if (candidate.name === operation.shape) { styleTarget = candidate; break; }
               if (styleTarget === null && candidate.name.toLowerCase().indexOf(operation.shape.toLowerCase()) !== -1) styleTarget = candidate;
             }
+            // PowerPoint can renumber a title placeholder when a slide is copied or
+            // imported. "Title 1" is a semantic request, not a stable shape id, so
+            // fall back to the slide's first title placeholder before refusing it.
+            if (styleTarget === null && /^title(?:\s+\d+)?$/i.test(operation.shape)) {
+              for (var titleIndex = 0; titleIndex < styleShapes.items.length; titleIndex += 1) {
+                if (/^title\b/i.test(styleShapes.items[titleIndex].name)) {
+                  styleTarget = styleShapes.items[titleIndex];
+                  break;
+                }
+              }
+            }
             if (styleTarget === null) throw new Error('Slide ' + (operation.slide || 1) + ' has no shape called "' + operation.shape + '".');
             if (operation.fill !== undefined) styleTarget.fill.setSolidColor(operation.fill);
             var styledFont = styleTarget.textFrame.textRange.font;

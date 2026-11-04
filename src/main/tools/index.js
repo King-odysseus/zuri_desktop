@@ -677,13 +677,30 @@ async function inlineWorkspaceImages(node, depth = 0) {
 
 /** @param {any} args @param {any} context */
 async function createDocumentTool(args, context) {
-  const kind = String(args?.kind ?? '').toLowerCase();
+  const requestedKind = String(args?.kind ?? args?.format ?? '').trim().toLowerCase();
+  const kind = {
+    word: 'docx',
+    document: 'docx',
+    doc: 'docx',
+    excel: 'xlsx',
+    spreadsheet: 'xlsx',
+    powerpoint: 'pptx',
+    presentation: 'pptx',
+    slides: 'pptx',
+  }[requestedKind] ?? requestedKind;
   if (!OFFICE_KINDS.includes(kind)) {
     throw new ToolError('TOOL_INVALID_ARGUMENT', 'createDocument needs `kind` to be docx, xlsx or pptx.');
   }
 
   // Some providers hand nested arguments back as a JSON string rather than an object.
-  let content = args?.content;
+  // Some providers flatten the structured payload or call it `document` even when
+  // the schema says `content`. Accept those equivalent shapes at this boundary so
+  // Word creation does not fail before the builder ever sees the document.
+  let content = args?.content ?? args?.document ?? args?.body;
+  if (content === undefined && args && typeof args === 'object') {
+    const { kind: _kind, format: _format, fileName: _fileName, ...flattened } = args;
+    if (Object.keys(flattened).length > 0) content = flattened;
+  }
   if (typeof content === 'string') {
     try {
       content = JSON.parse(content);

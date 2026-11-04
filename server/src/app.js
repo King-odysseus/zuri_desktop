@@ -1431,12 +1431,26 @@ export function createApp(dependencies = {}) {
       if (!hasPaidSubscription(session)) return response(402, { ok: false, error: { code: 'SUBSCRIPTION_REQUIRED', message: 'Choose a paid plan to make files.' } });
       try {
         const body = await readJson(request, MAX_DOCUMENT_BODY_BYTES);
-        const kind = typeof body.kind === 'string' ? body.kind.toLowerCase() : '';
+        const requestedKind = typeof body.kind === 'string' ? body.kind.trim().toLowerCase() : typeof body.format === 'string' ? body.format.trim().toLowerCase() : '';
+        const kind = {
+          word: 'docx',
+          document: 'docx',
+          doc: 'docx',
+          excel: 'xlsx',
+          spreadsheet: 'xlsx',
+          powerpoint: 'pptx',
+          presentation: 'pptx',
+          slides: 'pptx',
+        }[requestedKind] ?? requestedKind;
         if (!Object.hasOwn(DOCUMENT_MIME_TYPES, kind)) {
           return response(400, { ok: false, error: { code: 'INVALID_KIND', message: 'Choose docx, xlsx or pptx.' } });
         }
         // Some suppliers hand nested arguments back as a JSON string.
-        let content = body.content;
+        let content = body.content ?? body.document ?? body.body;
+        if (content === undefined && body && typeof body === 'object') {
+          const { kind: _kind, format: _format, fileName: _fileName, ...flattened } = body;
+          if (Object.keys(flattened).length > 0) content = flattened;
+        }
         if (typeof content === 'string') {
           try {
             content = JSON.parse(content);

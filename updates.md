@@ -1540,5 +1540,13 @@
 - Checked: `npm test` passes, including a fake-server handshake, discovery, call and approval regression check.
 - Key files: src/main/mcp/client.js, src/main/store.js, src/main/tools/index.js, src/main/providers/chat.js, src/main/main.js, src/renderer-react/PluginsView.jsx, scripts/selftest.js.
 - Other OS action: run `npm test` before using the MCP connector UI. No new dependency was added.
+
+## 2026-11-04 - Windows (Word document and Office add-in reliability)
+
+- Word document creation now accepts equivalent provider argument shapes such as `format: "word"`, `document`, `body`, and flattened document fields, while preserving the canonical `docx` path. PowerPoint add-in styling now resolves semantic title placeholders when copied slides rename them.
+- Added executable Word and PowerPoint Office batch regressions and a cloud document-route alias regression.
+- Checked: `npm test` passes, including the React build, all server tests, Electron smoke, selftest, first-run, demos and chat sync. Direct Word and PowerPoint package creation and editing checks also pass.
+- Key files: src/main/tools/index.js, server/src/app.js, src/addin/taskpane.js, scripts/selftest.js, server/test/documents.test.js.
+- Other OS action: run `npm test` before packaging or deploying. No new dependency was added.
 - Done on: Windows
 

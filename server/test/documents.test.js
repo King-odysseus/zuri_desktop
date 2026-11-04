@@ -62,6 +62,16 @@ for (const [kind, content, mime] of [
 // Content as a JSON string is accepted, as some suppliers send it.
 assert.equal((await post({ kind: 'pptx', content: JSON.stringify(DECK) })).status, 200);
 
+// Providers sometimes call the Word format "word" and flatten the document body.
+// The route normalises those equivalent shapes before the builder sees them.
+const wordAlias = await post({
+  format: 'word',
+  title: 'Alias plan',
+  sections: [{ heading: 'Intro', paragraphs: ['Created through the tolerant boundary.'] }],
+}, TOKEN, createApp({ auth, repository: {}, now: fixedNow, officeBuilder: { build: buildOfficeFile, review: reviewOfficeContent } }));
+assert.equal(wordAlias.status, 200, 'the Word alias is accepted');
+assert.equal((await wordAlias.json()).data.kind, 'docx');
+
 // What will read badly is reported, not hidden.
 const weak = await (await post({ kind: 'pptx', content: { title: 'Deck', slides: [{ title: 'Empty' }] } })).json();
 assert.ok(weak.data.warnings.some((warning) => /nothing under it/.test(warning)), 'a slide with no body is flagged');

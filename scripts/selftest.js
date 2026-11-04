@@ -1010,6 +1010,87 @@ check('Excel add-in applies values, formulas and formatting through the Office b
   return 'single-argument batch, named-sheet values, formulas and formatting';
 });
 
+check('Word and PowerPoint add-in edits use portable, single-argument Office batches', async () => {
+  const vm = await import('node:vm');
+  const source = read('src/addin/taskpane.js');
+
+  const paragraphs = [];
+  const replacements = [];
+  const body = {
+    insertParagraph(text) {
+      const paragraph = { text, styleBuiltIn: '' };
+      paragraphs.push(paragraph);
+      return paragraph;
+    },
+    insertTable() {},
+    insertHtml() {},
+    search() {
+      return {
+        items: [{ insertText(text) { replacements.push(text); } }],
+        load() {},
+      };
+    },
+  };
+  const selection = {
+    styleBuiltIn: '',
+    insertText() {},
+    insertParagraph() {},
+  };
+  const wordContext = {
+    document: { body, getSelection: () => selection },
+    sync: async () => {},
+  };
+  const wordSandbox = {
+    Word: { run(...args) {
+      if (args.length !== 1 || typeof args[0] !== 'function') throw new Error('Invalid Word batch arguments');
+      return Promise.resolve().then(() => args[0](wordContext));
+    } },
+    hostFor: () => 'word',
+    ZuriOps: { describeOperation: (operation) => operation.op, markdownToHtml: (markdown) => markdown },
+    officeMessage: (error, fallback) => error?.message || fallback,
+  };
+  vm.createContext(wordSandbox);
+  const wordStart = source.indexOf('  function applyWord(operations) {');
+  const powerPointStart = source.indexOf('  function applyPowerPoint(operations) {', wordStart);
+  if (wordStart < 0 || powerPointStart < 0) throw new Error('Word applier not found');
+  vm.runInContext(source.slice(wordStart, powerPointStart), wordSandbox);
+  await wordSandbox.applyWord([
+    { op: 'insertParagraphs', paragraphs: [{ text: 'Heading', style: 'Heading 1' }] },
+    { op: 'replaceAll', find: 'old', replace: 'new' },
+  ]);
+  if (paragraphs[0]?.styleBuiltIn !== 'Heading1') throw new Error('Word heading was not assigned through styleBuiltIn');
+  if (replacements[0] !== 'new') throw new Error('Word replace-all did not update a match');
+
+  const font = {};
+  const titlePlaceholder = { name: 'Title 4', fill: { setSolidColor() {} }, textFrame: { textRange: { font } } };
+  const slide = { shapes: { items: [titlePlaceholder], load() {} } };
+  const powerPointContext = {
+    presentation: { slides: { getItemAt: () => slide, add: () => slide } },
+    sync: async () => {},
+  };
+  const powerPointSandbox = {
+    PowerPoint: { run(...args) {
+      if (args.length !== 1 || typeof args[0] !== 'function') throw new Error('Invalid PowerPoint batch arguments');
+      return Promise.resolve().then(() => args[0](powerPointContext));
+    } },
+    Office: { context: { requirements: { isSetSupported: () => true } } },
+    supported: () => true,
+    hostFor: () => 'powerpoint',
+    ZuriOps: { describeOperation: (operation) => operation.op },
+    officeMessage: (error, fallback) => error?.message || fallback,
+    setStatus() {},
+  };
+  vm.createContext(powerPointSandbox);
+  const placeTableStart = source.indexOf('  function placeTable(', powerPointStart);
+  if (placeTableStart < 0) throw new Error('PowerPoint applier not found');
+  vm.runInContext(source.slice(powerPointStart, placeTableStart), powerPointSandbox);
+  await powerPointSandbox.applyPowerPoint([{ op: 'styleShape', slide: 5, shape: 'Title 1', color: '#123456', size: 30, bold: true }]);
+  if (font.color !== '#123456' || font.size !== 30 || font.bold !== true) {
+    throw new Error('PowerPoint title fallback did not style the available title placeholder');
+  }
+  return 'Word styles and replacements, plus PowerPoint title fallback, survive Office batch validation';
+});
+
 check('Excel context gives multi-tab plans the workbook map they need', () => {
   const source = read('src/addin/taskpane.js');
   const readStart = source.indexOf('  function readExcel() {');
