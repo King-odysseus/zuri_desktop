@@ -3,23 +3,7 @@ import { DataRow } from '../components/DataRow.jsx';
 import { Button, Card, Input, Textarea } from '../components/ui.jsx';
 import { createMemory, deleteMemory, listMemories, setPassword, updateAccountName, updateMemory } from '../lib/api.js';
 import { formatDate } from '../lib/format.js';
-
-/** @param {unknown} value Turns "past_due" into "Past due" for a reading eye. */
-function statusLabel(value) {
-  const words = typeof value === 'string' && value ? value.replace(/_/g, ' ') : 'active';
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
-
-/**
- * The pill colour for an account status: green while the account is in good
- * standing, red once it is suspended, amber while it waits on something.
- */
-function statusTone(value) {
-  const status = String(value ?? 'active').toLowerCase();
-  if (status === 'suspended' || status === 'blocked' || status === 'disabled') return ' chip-danger';
-  if (status === 'pending') return ' chip-warning';
-  return ' chip-success';
-}
+import { statusChipClass, statusLabel } from '../lib/status.js';
 
 const PASSWORD_ERRORS = {
   PASSWORD_TOO_SHORT: 'Use at least 8 characters for your password.',
@@ -196,7 +180,7 @@ export default function AccountView({ me, onSignOut }) {
           <h1>Account</h1>
           <p>Who is signed in, the plan behind it, and how to get back in next time.</p>
         </div>
-        <span className={`chip${statusTone(user.status)}`}>{statusLabel(user.status)}</span>
+        <span className={statusChipClass(user.status)}>{statusLabel(user.status)}</span>
       </div>
 
       <Card className="card">
@@ -213,7 +197,7 @@ export default function AccountView({ me, onSignOut }) {
           <DataRow label="Name">{name}</DataRow>
           <DataRow label="Email">{user.email ?? 'Not set'}</DataRow>
           <DataRow label="Plan">{subscription.planName ?? 'Starter'}</DataRow>
-          <DataRow label="Status">{statusLabel(user.status)}</DataRow>
+          <DataRow label="Status"><span className={statusChipClass(user.status)}>{statusLabel(user.status)}</span></DataRow>
           <DataRow label="Member since">{formatDate(user.createdAt)}</DataRow>
           {reportsPassword && (
             <DataRow label="Sign-in method">

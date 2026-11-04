@@ -2174,6 +2174,65 @@ check('both apps paint the card from the one shared description', () => {
 });
 
 
+// A status pill has to read by colour before anyone reads the word, so green means
+// well, amber means waiting and red means stopped, in both palettes and both UIs.
+check('status badges read green, amber and red in both apps', async () => {
+  const sampled = ['success', 'warning', 'danger'].map((tone) => {
+    const out = {};
+    for (const [name, file] of [['web', 'web/src/styles.css'], ['desktop', 'src/renderer-react/app.css']]) {
+      const css = read(file);
+      const block = new RegExp('--' + tone + ':\\s*([^;]+);').exec(css);
+      if (!block) throw new Error(name + ' has no ' + tone + ' colour');
+      const value = block[1].trim();
+      if (!/^#[0-9a-f]{6}$/i.test(value)) throw new Error(name + ' ' + tone + ' is not a plain hex: ' + value);
+      out[name] = value;
+    }
+    // A soft fill needs its own ink token or HeroUI chips fall back to the page text.
+    for (const file of ['web/src/styles.css', 'src/renderer-react/app.css']) {
+      if (!read(file).includes('--' + tone + '-soft-foreground:')) {
+        throw new Error(file + ' has no ' + tone + ' soft foreground');
+      }
+    }
+    return [tone, out];
+  });
+
+  const hue = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    if (max === min) return 0;
+    const d = max - min;
+    const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return ((h * 60) % 360 + 360) % 360;
+  };
+  const near = (hex, from, to) => {
+    const h = hue(hex);
+    return h >= from && h <= to;
+  };
+
+  for (const [name, value] of Object.entries(sampled[0][1])) {
+    if (!near(value, 90, 165)) throw new Error(name + ' success is not green: ' + value);
+  }
+  for (const [name, value] of Object.entries(sampled[1][1])) {
+    if (!near(value, 25, 70)) throw new Error(name + ' warning is not amber: ' + value);
+  }
+  for (const [name, value] of Object.entries(sampled[2][1])) {
+    const h = hue(value);
+    if (!(h >= 340 || h <= 20)) throw new Error(name + ' danger is not red: ' + value);
+  }
+
+  // The web pills come from one rule, so the same word is never two colours.
+  const status = await import(pathToFileURL(path.join(root, 'web/src/lib/status.js')).href + '?checks=' + Date.now());
+  const cases = { active: 'success', paused: 'warning', pending: 'warning', suspended: 'danger', deactivated: 'danger', past_due: 'danger', odd_made_up_word: 'warning' };
+  for (const [word, tone] of Object.entries(cases)) {
+    const got = status.statusTone(word);
+    if (got !== tone) throw new Error(word + ' should read ' + tone + ', got ' + got);
+  }
+  if (status.statusChipClass('deactivated') !== 'chip chip-danger') throw new Error('a deactivated account does not get the red pill');
+  if (status.statusLabel('past_due') !== 'Past due') throw new Error('a status word is not made readable');
+  return 'green, amber and red in both palettes, one rule for every pill';
+});
+
 // The web bundle is what a shared browser and every Android install run, so its
 // theme is remembered per account on this device, not once for everyone.
 check('the web theme is remembered per account on this device', async () => {
@@ -2745,6 +2804,28 @@ check('the account control sits at the foot of the signed-in sidebar', () => {
     throw new Error('the account control no longer holds itself against the bottom of a folded panel');
   }
   return 'the account control is the last row of the chat column and is pinned when folded';
+});
+
+check('on a phone the account row starts at the left edge', () => {
+  const dashboard = read('web/src/views/Dashboard.jsx');
+  const start = dashboard.indexOf('sidebar-account relative mt-auto');
+  if (start === -1) throw new Error('the account row is no longer drawn');
+  // The menu items inside the same wrapper carry their own justify-start, and they
+  // only exist once the menu is open, so the first class list after the wrapper is
+  // the row itself. A HeroUI button centres what it holds, and a folded panel on a
+  // phone leaves that row holding the avatar alone: centred, it floated in the
+  // middle of an empty row while every other row started at the left edge.
+  const button = dashboard.slice(start).match(/className="(flex min-h-14 w-full[^"]*)"/);
+  if (button === null) throw new Error('the account button no longer has a class list of its own');
+  if (!/\bmax-\[900px\]:justify-start\b/.test(button[1])) {
+    throw new Error('the account row centres its avatar on a phone again');
+  }
+  // The folded rail on a wide screen lines the avatar up with the icons above it, so
+  // the pin has to be a phone-only variant rather than an unconditional one.
+  if (/(^|\s)justify-start/.test(button[1])) {
+    throw new Error('the account avatar is pinned left in the wide folded rail too');
+  }
+  return 'the account avatar is pinned left on a phone and stays centred in the wide rail';
 });
 
 check('a saved chat row keeps its name beside what was last said', () => {

@@ -1,17 +1,11 @@
 import { DataRow } from '../components/DataRow.jsx';
 import { formatDate, formatNaira, formatTokens } from '../lib/format.js';
+import { statusChipClass, statusLabel } from '../lib/status.js';
 
+// Money and accounts share one rule for colour, so "past_due" is the same red on a
+// payment row as it is on the account page.
 function statusChip(status) {
-  const value = String(status ?? '').toLowerCase();
-  const tone = value === 'success' || value === 'active'
-    ? ' chip-success'
-    : value === 'failed' || value === 'past_due' || value === 'reversed'
-      ? ' chip-danger'
-      // A payment still on its way is news, not a failure, so it reads amber.
-      : value === 'pending' || value === 'processing' || value === 'abandoned'
-        ? ' chip-warning'
-        : '';
-  return <span className={`chip${tone}`}>{value || 'unknown'}</span>;
+  return <span className={statusChipClass(status)}>{statusLabel(status)}</span>;
 }
 
 /** Subscription state plus the last 20 payments. */

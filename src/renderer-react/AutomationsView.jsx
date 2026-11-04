@@ -317,7 +317,7 @@ export default function AutomationsView() {
                       <p className="truncate text-sm font-medium">{automation.prompt}</p>
                       <p className="mt-1 text-xs text-muted">{describeCadence(automation.cadence)} - {describeNextRun(automation.nextRunAt)}</p>
                     </div>
-                    <Chip size="sm" color={automation.enabled === false ? 'warning' : 'primary'}>{automation.enabled === false ? 'Paused' : automation.dryRun === true ? 'Preview' : 'Enabled'}</Chip>
+                    <Chip size="sm" color={automation.enabled === false ? 'warning' : automation.dryRun === true ? 'default' : 'success'}>{automation.enabled === false ? 'Paused' : automation.dryRun === true ? 'Preview' : 'Enabled'}</Chip>
                     <Checkbox aria-label={`Enable ${automation.prompt}`} isSelected={automation.enabled !== false} onChange={() => void toggleEnabled(automation)}>Enabled</Checkbox>
                     <Button size="sm" variant="ghost" onPress={() => openEdit(automation)}>Edit</Button>
                     <Button size="sm" variant="ghost" className="zuri-danger-quiet" onPress={() => void remove(automation)}>Delete</Button>

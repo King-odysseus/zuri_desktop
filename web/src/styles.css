@@ -176,18 +176,22 @@
   --nav-active: var(--brand-blue-soft);
   --nav-field: #f3f6fc;
   --nav-accent: var(--brand-blue-ink);
-  /* Status uses the palette only: blue is good or news, bronze is attention, and
-     an error is navy text on a pale bronze fill. Each has a soft fill, an ink that
-     clears 4.5:1 on it and a line colour. */
-  --success: var(--brand-blue-ink);
-  --success-soft: var(--brand-blue-soft);
-  --success-line: #b7cdfa;
-  --warning: var(--brand-bronze-ink);
-  --warning-soft: var(--brand-bronze-soft);
-  --warning-line: #e3cdb0;
-  --danger: var(--brand-navy);
-  --danger-soft: var(--brand-bronze-soft);
-  --danger-line: #e3cdb0;
+  /* Status reads by colour, not by word: green is well and working, amber is a
+     wait, red is failed or refused. Blue stays for navigation and brand, so a
+     status pill can never be mistaken for a link or a selected row. Each tone has
+     a soft fill, an ink that clears 4.5:1 on it and a line colour. */
+  --success: #0f6b3d;
+  --success-soft: #e3f5ea;
+  --success-soft-foreground: #0f6b3d;
+  --success-line: #a5d9bc;
+  --warning: #8a5a12;
+  --warning-soft: #fdf0d5;
+  --warning-soft-foreground: #8a5a12;
+  --warning-line: #ecd39c;
+  --danger: #a8281f;
+  --danger-soft: #fce7e4;
+  --danger-soft-foreground: #a8281f;
+  --danger-line: #f2b7b0;
   --info: var(--brand-blue-ink);
   --info-soft: var(--brand-blue-soft);
   --info-line: #b7cdfa;
@@ -275,15 +279,18 @@
   --nav-active: #16224d;
   --nav-field: #0f0c33;
   --nav-accent: #a9c1ff;
-  --success: var(--brand-blue-ink);
-  --success-soft: var(--brand-blue-soft);
-  --success-line: #2b3f7a;
-  --warning: var(--brand-bronze);
-  --warning-soft: var(--brand-bronze-soft);
-  --warning-line: #5c4228;
-  --danger: #ecebff;
-  --danger-soft: var(--brand-bronze-soft);
-  --danger-line: #5c4228;
+  --success: #6fdfa1;
+  --success-soft: #103627;
+  --success-soft-foreground: #6fdfa1;
+  --success-line: #1f6b49;
+  --warning: #f0c169;
+  --warning-soft: #3a2c11;
+  --warning-soft-foreground: #f0c169;
+  --warning-line: #6d5520;
+  --danger: #ff9d93;
+  --danger-soft: #3d1a18;
+  --danger-soft-foreground: #ff9d93;
+  --danger-line: #7a322c;
   --info: var(--brand-blue-ink);
   --info-soft: var(--brand-blue-soft);
   --info-line: #2b3f7a;
@@ -4307,7 +4314,6 @@ a.download-card:hover {
     padding-top: 20px;
   }
 
-  .chat-nav .account-card,
   .chat-nav .sidebar-note,
   .chat-nav .sidebar-download {
     display: none;

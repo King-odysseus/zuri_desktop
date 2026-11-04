@@ -4,6 +4,20 @@ import { CheckIcon, CloudIcon, LogOutIcon, UserPlusIcon } from './Icons.jsx';
 import CloudAuthForm from './CloudAuthForm.jsx';
 import GoogleSignInButton from './GoogleSignInButton.jsx';
 
+/**
+ * A subscription word in the colour it deserves: green while it is paid up, amber
+ * while it waits, red once it has stopped. Anything unknown reads amber, because a
+ * state nobody recognises is something to look at, never a silent all-clear.
+ * @param {unknown} value
+ * @returns {'success' | 'warning' | 'danger'}
+ */
+function subscriptionTone(value) {
+  const status = String(value ?? '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (status === 'active' || status === 'success' || status === 'succeeded' || status === 'paid') return 'success';
+  if (status === 'pending' || status === 'processing' || status === 'abandoned') return 'warning';
+  return 'danger';
+}
+
 function dateLabel(value) {
   if (!value) return 'Not available';
   const date = new Date(value);
@@ -201,7 +215,7 @@ export default function CloudView({ onNavigate }) {
                 <div className="flex items-center gap-3"><span className="flex h-10 w-10 items-center justify-center rounded-full bg-accent/10 text-accent"><UserPlusIcon size={20} /></span><div><h2 className={heading}>{account.user?.displayName || account.user?.email}</h2><p className="text-sm text-muted">{account.user?.email}</p></div></div>
                 <Button variant="ghost" onPress={() => void signOut()} isDisabled={busy}><LogOutIcon size={16} /> Sign out</Button>
               </div>
-              <dl className="mt-5 grid gap-4 sm:grid-cols-3"><div><dt className="text-xs text-muted">Plan</dt><dd className="mt-1 text-sm font-medium">{account.subscription?.planName ?? currentPlan}</dd></div><div><dt className="text-xs text-muted">Renews</dt><dd className="mt-1 text-sm font-medium">{dateLabel(account.subscription?.currentPeriodEnd)}</dd></div><div><dt className="text-xs text-muted">Status</dt><dd className="mt-1 text-sm font-medium">{account.subscription?.status ?? 'active'}</dd></div></dl>
+              <dl className="mt-5 grid gap-4 sm:grid-cols-3"><div><dt className="text-xs text-muted">Plan</dt><dd className="mt-1 text-sm font-medium">{account.subscription?.planName ?? currentPlan}</dd></div><div><dt className="text-xs text-muted">Renews</dt><dd className="mt-1 text-sm font-medium">{dateLabel(account.subscription?.currentPeriodEnd)}</dd></div><div><dt className="text-xs text-muted">Status</dt><dd className="mt-1"><Chip size="sm" color={subscriptionTone(subscriptionStatus ?? 'active')}>{subscriptionStatus ?? 'active'}</Chip></dd></div></dl>
             </section>
             <section className={section}>
               <div className="flex items-center justify-between gap-3"><div><h2 className={heading}>Usage this month</h2><p className={helper}>Your allowance resets at the end of the current period.</p></div><Chip color={usage?.overQuota ? 'danger' : usage?.nearLimit ? 'warning' : 'primary'}>{usage?.percentUsed ?? 0}% used</Chip></div>

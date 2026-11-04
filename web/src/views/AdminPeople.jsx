@@ -3,6 +3,7 @@ import { Alert } from '../components/DataRow.jsx';
 import { Button, Input, NumberField, Select } from '../components/ui.jsx';
 import { changeAdminUser, createAdminUser, fetchAdminStats, fetchAdminUsers } from '../lib/api.js';
 import { formatNaira, formatTokens } from '../lib/format.js';
+import { statusChipClass, statusLabel } from '../lib/status.js';
 
 /** "3h", "2d" and so on, for when someone last used Zuri. */
 function since(iso) {
@@ -279,7 +280,7 @@ export default function AdminPeople({ days, plans }) {
                   <td>{user.planName || 'none'}<small>{user.subscriptionStatus}{user.periodEnd ? ` until ${user.periodEnd.slice(0, 10)}` : ''}</small></td>
                   <td>{formatTokens(user.usedTokens)}<small>of {formatTokens(user.monthlyTokens)}</small></td>
                   <td>{since(user.lastSeenAt)}</td>
-                  <td>{user.status}</td>
+                  <td><span className={statusChipClass(user.status)}>{statusLabel(user.status)}</span></td>
                   <td>
                     {/* The plan button is offered on every row, administrators and
                         this account included: a plan here is given, never bought. */}
