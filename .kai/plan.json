@@ -2,41 +2,33 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "View screenshots and reproduce the three sidebar faults",
+      "text": "Find the composer in the screenshot and why its controls cannot be selected",
       "state": "done"
     },
     {
-      "text": "Fix chat row titles/previews, single search pill, Recents header + history door",
+      "text": "Confirm whether the composer controls are dead, on web and desktop",
       "state": "done"
     },
     {
-      "text": "Verify in browser and run the full suite",
+      "text": "Remove the stray lines (hairline round the desktop composer, divider above the account block) so both surfaces match the web",
       "state": "done"
     },
     {
-      "text": "Audit desktop, web and mobile for the same UI features",
+      "text": "Rebuild the desktop bundle and verify both lines are gone and nothing else moved",
       "state": "done"
     },
     {
-      "text": "Make the prompt enhancer rewrite the prompt as well as list additions, on both surfaces",
-      "state": "done"
-    },
-    {
-      "text": "Make the nav active/hover highlight fully rounded with padding off the bottom edge",
+      "text": "Run npm run test",
       "state": "active"
     },
     {
-      "text": "Rebuild bundles, run npm run test, commit and push",
+      "text": "Commit and push the fix",
       "state": "pending"
     },
     {
-      "text": "Rebuild and install the Windows installer",
-      "state": "pending"
-    },
-    {
-      "text": "Deploy the web UI to Railway and verify the live site",
+      "text": "Show the running UI and wait for confirmation before the installer and the Railway deploy",
       "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T13:05:51.836Z"
+  "updatedAt": "2026-11-04T15:13:38.081Z"
 }

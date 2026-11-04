@@ -671,7 +671,9 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           {looseThreads.map(renderThread)}
         </div>
 
-        <div className="relative mt-auto border-t border-border px-3 py-3" ref={menuRef}>
+        {/* No divider above the account block: the web column has none, and a 1px
+            hairline there reads as a line across the panel rather than a boundary. */}
+        <div className="relative mt-auto px-3 py-3" ref={menuRef}>
           {menuOpen && (
             <div role="menu" aria-label="Your account" className="zuri-account-menu">
               <div className="zuri-account-head">

@@ -1599,7 +1599,10 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
               ))}
             </div>
           )}
-          <form onSubmit={sendMessage} className={`flex items-end gap-2 rounded-3xl border border-border bg-surface px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>
+          {/* No hairline round the composer: the field reads as one filled box, the
+              same as the web composer, and a 1px border on a card is against the
+              house rules anyway. */}
+          <form onSubmit={sendMessage} className={`flex items-end gap-2 rounded-3xl border-0 bg-surface-secondary px-3 py-2 shadow-sm ${compact ? 'zuri-overlay-composer' : ''}`}>
             <div ref={menuRef} className="relative">
               <Button type="button" isIconOnly size="sm" variant="ghost" aria-label="Add to message" aria-haspopup="menu" aria-expanded={menuView !== ''} title="Add files, photos or a command" onPress={() => setMenuView((current) => (current === '' ? 'main' : ''))}>
                 <PlusIcon />
