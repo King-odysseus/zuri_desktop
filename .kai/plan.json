@@ -2,45 +2,17 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Audit Office creation gaps and choose a focused cross-format improvement",
+      "text": "Inspect project specs and deployment scripts",
       "state": "done"
     },
     {
-      "text": "Implement Office creation templates and regression coverage",
+      "text": "Build and deploy the web UI",
       "state": "done"
     },
     {
-      "text": "Read the skills store, handlers, preload bridge and SkillsView to find the export/import points",
+      "text": "Verify deployment and report result",
       "state": "done"
-    },
-    {
-      "text": "Add skill pack export: build a portable bundle from chosen skills, saved through a file dialog",
-      "state": "done"
-    },
-    {
-      "text": "Add skill pack import: validate the file, create the skills switched off so nothing applies unreviewed",
-      "state": "done"
-    },
-    {
-      "text": "Wire the two channels through main, preload and the Skills page",
-      "state": "done"
-    },
-    {
-      "text": "Add self-tests for pack round-trip, bad files and the switched-off default",
-      "state": "done"
-    },
-    {
-      "text": "Run the full npm test",
-      "state": "done"
-    },
-    {
-      "text": "Rebuild and install the desktop app so connectors and skill packs are testable",
-      "state": "done"
-    },
-    {
-      "text": "Commit and push",
-      "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T01:44:48.872Z"
+  "updatedAt": "2026-11-04T02:04:09.216Z"
 }
