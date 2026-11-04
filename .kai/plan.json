@@ -2,33 +2,29 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Pin the account row's contents to the left below 900px so the avatar sits left on phones",
+      "text": "Find the avatar + text row shown in the screenshot",
       "state": "done"
     },
     {
-      "text": "Add a style check that fails if the left pin is removed",
+      "text": "Pin the avatar to the left on mobile; also fix the folded 76px rail where the avatar hung outside the panel",
       "state": "done"
     },
     {
-      "text": "Confirm the fix is committed and pushed (19fac8f, 1a8a298)",
+      "text": "Give status badges recognisable colours (active green, deactivated red) across web, desktop and phone",
       "state": "done"
     },
     {
-      "text": "Re-run the full test suite on the current tree",
+      "text": "Verify the badges and the avatar in a browser at 390 and 1280 wide",
       "state": "done"
     },
     {
-      "text": "Confirm the live site serves the fixed bundle",
+      "text": "Run the full test suite (307 checks, no failures)",
       "state": "done"
     },
     {
-      "text": "Re-check the phone row visually after the other run's markup change",
-      "state": "active"
-    },
-    {
-      "text": "Commit the plan file and push",
-      "state": "pending"
+      "text": "Rebuild the Windows installer and deploy to Railway (installer 0.2.6 built, live site serving the new colours)",
+      "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T12:24:28.394Z"
+  "updatedAt": "2026-11-04T12:33:22.694Z"
 }
