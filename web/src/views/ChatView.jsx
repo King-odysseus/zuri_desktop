@@ -2337,10 +2337,14 @@ export default function ChatView({
                         if (!incognito) startNewChat();
                         setIncognito((current) => !current);
                       })}>
+                        <span aria-hidden="true" className="chat-menu-slot" />
                         <span className="flex-1">{incognito ? 'Turn off incognito chat' : 'Start incognito chat'}</span>
                         {incognito && <CheckIcon size={16} aria-hidden="true" />}
                       </MenuItem>
                       <MenuItem disabled={thread.messages.length === 0} onSelect={() => pickMenuItem(exportChat)}>
+                        {/* Nothing to show in the icon column, so it keeps the empty
+                            slot rather than starting a column to the left. */}
+                        <span aria-hidden="true" className="chat-menu-slot" />
                         <span>Export chat</span>
                       </MenuItem>
                     </>
@@ -2354,6 +2358,7 @@ export default function ChatView({
                           checked={answerLength === value}
                           onSelect={() => pickMenuItem(() => setAnswerLength(value))}
                         >
+                          <span aria-hidden="true" className="chat-menu-slot" />
                           <span className="flex-1">{label}</span>
                           <span className="text-xs text-[var(--muted)]">{hint}</span>
                           {answerLength === value && <CheckIcon size={16} aria-hidden="true" />}
@@ -2378,6 +2383,7 @@ export default function ChatView({
                               setMenuView('');
                             }}
                           >
+                            <span aria-hidden="true" className="chat-menu-slot" />
                             <span className="flex-1">{entry.name}</span>
                             {entry.available
                               ? (model === entry.code && <CheckIcon size={16} aria-hidden="true" />)

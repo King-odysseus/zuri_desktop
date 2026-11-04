@@ -4040,12 +4040,36 @@ a.download-card:hover {
 /* The glyph keeps a fixed gutter, so a row that has none still lines up with one
    that does. */
 .chat-menu-row > svg {
-  flex: 0 0 auto;
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
+  /* The button base shaves 2px off each side of its glyph, which left every
+     icon-led label 4px right of the empty slot the iconless rows use. */
+  margin-inline: 0;
   color: var(--muted);
+}
+
+/* A row with no glyph keeps an empty slot of the same width, so the menu reads down
+   two columns - the icons, then the labels - instead of every iconless row starting
+   a glyph's width to the left of the others. */
+.chat-menu-slot {
+  flex: 0 0 auto;
+  width: 1rem;
+  height: 1rem;
 }
 
 .chat-menu-row:hover > svg {
   color: var(--text);
+}
+
+/* The way back is a caption with a glyph, so it holds the same two columns the rows
+   do: a 1rem box for the chevron, then the caption on the label line. Without it the
+   narrower chevron left the caption 4px left of every label under it. */
+.chat-menu-back > svg {
+  flex: 0 0 1rem;
+  width: 1rem;
+  height: 1rem;
+  margin-inline: 0;
 }
 
 /* A sub-list's header doubles as the way back, so it is set quieter than the rows. */

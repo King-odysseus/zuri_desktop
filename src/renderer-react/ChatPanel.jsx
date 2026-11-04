@@ -1601,7 +1601,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   row would sit above the top edge. The viewport cap lets it scroll
                   instead, so no row becomes unreachable. */}
               {menuView !== '' && (
-                <div role="menu" aria-label="Add to message" className="zuri-composer-menu left-0 w-64" style={addMenuMaxHeight ? { maxHeight: addMenuMaxHeight } : undefined}>
+                <div role="menu" aria-label="Add to message" className="zuri-add-menu zuri-composer-menu left-0 w-64" style={addMenuMaxHeight ? { maxHeight: addMenuMaxHeight } : undefined}>
                   {menuView === 'main' ? (
                     <>
                       <Button type="button" role="menuitem" className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => pickMenuItem(() => void chooseAttachment())}>
@@ -1631,6 +1631,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                         <span>Slash commands</span>
                       </Button>
                       <Button type="button" role="menuitemcheckbox" aria-checked={incognito} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => { if (!incognito) onNewChat?.(); setIncognito((current) => !current); }}>
+                        {/* No glyph of its own, so it keeps the empty slot the icons above it
+                            occupy rather than starting a column to the left. */}
+                        <span aria-hidden="true" className="w-4 shrink-0" />
                         <span className="flex-1">Incognito chat</span>
                         {incognito && <CheckIcon size={16} />}
                       </Button>
@@ -1682,6 +1685,9 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   ) : menuView === 'length' ? (
                     [['concise', 'Concise'], ['balanced', 'Balanced'], ['detailed', 'Detailed']].map(([value, label]) => (
                       <Button key={value} type="button" role="menuitemradio" aria-checked={answerLength === value} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm hover:bg-surface-secondary" onPress={() => pickMenuItem(() => void chooseAnswerLength(value))}>
+                        {/* These rows replace the main list in place, so they keep its icon
+                            column even though they hold no icon. */}
+                        <span aria-hidden="true" className="w-4 shrink-0" />
                         <span className="flex-1">{label}</span>
                         {answerLength === value && <CheckIcon size={16} />}
                       </Button>
