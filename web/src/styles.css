@@ -3914,7 +3914,9 @@ a.download-card:hover {
 }
 
 /* HeroUI's TextArea supplies the element and its accessibility; the site supplies
-   the paint, so the field sits inside the composer without a second border. */
+   the paint, so the field sits inside the composer without a second border. Its own
+   raised shadow is cleared as well: inside the composer it read as a second input
+   box, with the text sitting in a panel of its own. */
 .chat-composer .chat-input {
   flex: 1 1 auto;
   min-width: 0;
@@ -3925,7 +3927,11 @@ a.download-card:hover {
   min-height: 2.25rem;
   padding: 9px 2px;
   border: 0;
+  border-radius: 0;
   background: transparent;
+  box-shadow: none;
+  --tw-shadow: 0 0 #0000;
+  --tw-ring-shadow: 0 0 #0000;
   color: var(--text);
   font: 15px/1.5 "Segoe UI", system-ui, sans-serif;
   resize: none;
@@ -4254,6 +4260,18 @@ a.download-card:hover {
   flex: 0 0 auto;
   margin-top: 2px;
   color: var(--muted);
+}
+
+/* On a phone the line is longer than the composer, so it has to wrap inside it
+   rather than run off the edge. A flex item keeps its min-content width unless it
+   is told otherwise, which is what stopped the wrap. */
+.chat-suggestion span {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* HeroUI's button base keeps its label on one line, which is right for a button
+     and wrong for a sentence that has to wrap on a phone. */
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .chat-suggestion:focus-visible {

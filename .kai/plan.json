@@ -2,29 +2,29 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Store the web theme per account on this device (theme.js: key by user, keep a device default)",
+      "text": "Left-align the account popup rows and make the popup readable in the dark theme",
       "state": "done"
     },
     {
-      "text": "Wire App.jsx so the account's theme loads on sign-in and the device default returns on sign-out",
+      "text": "Confirm the branch tip is committed and pushed, and the live site serves it",
       "state": "done"
     },
     {
-      "text": "Rebuild the web bundle and check the toggle in a browser at 1280px and 390px",
+      "text": "Build the Windows installer from a clean checkout of the pushed commit",
       "state": "done"
     },
     {
-      "text": "Check the chat sidebar for the outstanding faults (search field, previews, Recents header, padding)",
+      "text": "Publish the installer as release 0.2.6 and check the download link works",
       "state": "done"
     },
     {
-      "text": "Run npm run test, commit and push",
-      "state": "active"
+      "text": "Confirm the website now offers 0.2.6",
+      "state": "done"
     },
     {
-      "text": "Rebuild the Windows installer and deploy to Railway",
-      "state": "pending"
+      "text": "Remove the temporary checkout and check dependencies are untouched",
+      "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T11:50:31.690Z"
+  "updatedAt": "2026-11-04T12:07:46.521Z"
 }

@@ -1590,7 +1590,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
                   onPress={() => addSuggestion(suggestion)}
                 >
                   <PlusIcon size={14} className="mt-0.5 shrink-0 text-muted" />
-                  <span className="flex-1">{suggestion}</span>
+                  <span className="min-w-0 flex-1 break-words">{suggestion}</span>
                 </Button>
               ))}
             </div>

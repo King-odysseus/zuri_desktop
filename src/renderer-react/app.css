@@ -199,6 +199,12 @@ button,
      buttons inside an empty one-line textarea. */
   overflow-y: hidden;
   scrollbar-width: none;
+  /* The field is flat inside the composer. HeroUI's own raised shadow, fill and
+     rounding read as a second input box behind the text. */
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .composer-textarea::-webkit-scrollbar {
