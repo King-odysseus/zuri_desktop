@@ -10,7 +10,7 @@
       "state": "done"
     },
     {
-      "text": "Deploy the web UI if the live site is behind (no deploy needed: live already matches)",
+      "text": "Deploy the web UI to Railway",
       "state": "done"
     },
     {
@@ -19,8 +19,8 @@
     },
     {
       "text": "Commit the web build output and push",
-      "state": "active"
+      "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T02:04:45.112Z"
+  "updatedAt": "2026-11-04T02:05:09.086Z"
 }
