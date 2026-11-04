@@ -71,6 +71,7 @@ import {
 } from './store.js';
 import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, resolveWorkspacePath, runTool, toolCatalogue } from './tools/index.js';
 import { publicMcpServer, testMcpServer } from './mcp/client.js';
+import { SKILL_PACK_MAX_BYTES, buildSkillPack, packFileName, parseSkillPack, planSkillImport } from './skillPacks.js';
 
 // ESM main process (package.json sets "type": "module"), so __dirname is built here.
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
@@ -345,6 +346,8 @@ const HANDLERS = new Map([
   ['zuri:skills:create', handleSkillCreate],
   ['zuri:skills:update', handleSkillUpdate],
   ['zuri:skills:delete', handleSkillDelete],
+  ['zuri:skills:export', handleSkillsExport],
+  ['zuri:skills:import', handleSkillsImport],
   ['zuri:settings:get', handleSettingsGet],
   ['zuri:settings:save', handleSettingsSave],
   ['zuri:onboarding:complete', handleOnboardingComplete],
@@ -933,6 +936,134 @@ async function handleSkillDelete(payload) {
   const result = await deleteSkill(payload?.skillId);
   if (result?.ok === true) announceState({ area: 'skills' });
   return result;
+}
+
+/**
+ * Write the chosen skills to a file the person can send to someone else.
+ *
+ * The skills are read here rather than sent from the page, so a pack is always
+ * what is actually saved, not what a stale screen was showing. `packName` only
+ * labels the file and names it in the save dialog.
+ * @param {{ packName?: unknown, skillIds?: unknown }} [payload]
+ * @param {import('electron').IpcMainInvokeEvent} event
+ */
+async function handleSkillsExport(payload, event) {
+  const listed = await listSkills();
+  if (!listed.ok) return listed;
+
+  const wanted = Array.isArray(payload?.skillIds)
+    ? payload.skillIds.filter((id) => typeof id === 'string' && id !== '')
+    : [];
+  const chosen = wanted.length === 0 ? listed.data : listed.data.filter((skill) => wanted.includes(skill.id));
+  if (chosen.length === 0) {
+    return { ok: false, error: { code: 'SKILL_PACK_EMPTY', message: 'Choose at least one skill to share.' } };
+  }
+
+  const packName =
+    typeof payload?.packName === 'string' && payload.packName.trim() !== '' ? payload.packName.trim() : 'My skills';
+  const built = buildSkillPack(chosen, { packName });
+  if (!built.ok) return built;
+
+  try {
+    const owner = BrowserWindow.fromWebContents(event?.sender) ?? BrowserWindow.getFocusedWindow();
+    const options = {
+      title: 'Share skills',
+      defaultPath: path.join(app.getPath('documents'), packFileName(packName)),
+      filters: [{ name: 'Zuri skill pack', extensions: ['json'] }],
+    };
+    const picked = owner === null ? await dialog.showSaveDialog(options) : await dialog.showSaveDialog(owner, options);
+    if (picked.canceled || typeof picked.filePath !== 'string' || picked.filePath === '') {
+      return { ok: true, data: { cancelled: true } };
+    }
+    await writeFile(picked.filePath, built.data.text, 'utf8');
+    return { ok: true, data: { cancelled: false, path: picked.filePath, count: built.data.count } };
+  } catch (error) {
+    console.error('[zuri:skills] export', error);
+    return {
+      ok: false,
+      error: {
+        code: 'SKILL_PACK_WRITE_FAILED',
+        message: `The skills could not be saved: ${error?.message ?? 'unknown error'}`,
+      },
+    };
+  }
+}
+
+/**
+ * Read a pack and add the skills it holds, all switched off.
+ *
+ * Reading and writing are separate steps on purpose: the whole file is checked
+ * before a single skill is created, so a malformed pack cannot leave half of
+ * itself behind.
+ * @param {import('electron').IpcMainInvokeEvent} _event
+ */
+async function handleSkillsImport(_event) {
+  const owner = BrowserWindow.getFocusedWindow();
+  const options = {
+    title: 'Import skills',
+    properties: ['openFile'],
+    filters: [{ name: 'Zuri skill pack', extensions: ['json'] }],
+  };
+
+  let picked;
+  try {
+    picked = owner === null ? await dialog.showOpenDialog(options) : await dialog.showOpenDialog(owner, options);
+  } catch (error) {
+    console.error('[zuri:skills] import dialog', error);
+    return { ok: false, error: { code: 'SKILL_PACK_READ_FAILED', message: 'The file chooser could not be opened.' } };
+  }
+  if (picked.canceled || !Array.isArray(picked.filePaths) || picked.filePaths.length === 0) {
+    return { ok: true, data: { cancelled: true } };
+  }
+
+  let text;
+  try {
+    const bytes = await stat(picked.filePaths[0]);
+    // Checked before reading, so a huge file is refused rather than loaded.
+    if (bytes.size > SKILL_PACK_MAX_BYTES) {
+      return {
+        ok: false,
+        error: { code: 'SKILL_PACK_TOO_LARGE', message: 'That file is larger than 200 KB, so it is not a skill pack.' },
+      };
+    }
+    text = await readFile(picked.filePaths[0], 'utf8');
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'SKILL_PACK_READ_FAILED',
+        message: `That file could not be read: ${error?.message ?? 'unknown error'}`,
+      },
+    };
+  }
+
+  const parsed = parseSkillPack(text);
+  if (!parsed.ok) return parsed;
+
+  const listed = await listSkills();
+  if (!listed.ok) return listed;
+
+  const plan = planSkillImport(parsed.data.skills, listed.data);
+  let added = 0;
+  for (const skill of plan.fresh) {
+    const created = await createSkill({ name: skill.name, instructions: skill.instructions });
+    // One skill failing (the store filled up between the plan and the write) must
+    // not stop the rest: the counts below say exactly what happened.
+    if (created.ok) added += 1;
+  }
+
+  if (added > 0) announceState({ area: 'skills' });
+
+  return {
+    ok: true,
+    data: {
+      cancelled: false,
+      packName: parsed.data.name,
+      added,
+      duplicates: plan.duplicates + parsed.data.skipped,
+      overLimit: plan.overLimit,
+    },
+  };
 }
 
 /**

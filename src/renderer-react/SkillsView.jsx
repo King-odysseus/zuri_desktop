@@ -5,6 +5,8 @@ import { DeleteIcon, EditIcon } from './Icons.jsx';
 // Mirrors SKILL_MAX_ENABLED in src/main/store.js, which is the rule that is enforced;
 // this copy only lets the page explain the limit before a switch is refused.
 const MAX_ENABLED = 5;
+// Mirrors SKILL_MAX_COUNT in src/main/store.js; this copy only explains a skipped skill.
+const MAX_SKILLS = 20;
 
 const STARTER_IDEAS = [
   { name: 'Plain English', instructions: 'Write in short, plain sentences. Avoid jargon, and explain any technical word the first time it appears.' },
@@ -26,6 +28,11 @@ export default function SkillsView() {
   const [editingId, setEditingId] = useState('');
   // The form is hidden until someone adds or edits, so the page opens as a plain list.
   const [formOpen, setFormOpen] = useState(false);
+  // A null value means the first load: start with every saved skill selected.
+  const [selectedSkillIds, setSelectedSkillIds] = useState(null);
+  // The one-line result of sharing or importing, and whether a file dialog is open.
+  const [packNote, setPackNote] = useState('');
+  const [packBusy, setPackBusy] = useState(false);
 
   const zuriSkills = typeof window !== 'undefined' ? window.zuri?.skills : undefined;
 
@@ -37,7 +44,9 @@ export default function SkillsView() {
     }
     const result = await zuriSkills.list();
     if (result?.ok) {
-      setSkills(Array.isArray(result.data) ? result.data : []);
+      const nextSkills = Array.isArray(result.data) ? result.data : [];
+      setSkills(nextSkills);
+      setSelectedSkillIds((current) => (current === null ? nextSkills.map((skill) => skill.id) : current.filter((id) => nextSkills.some((skill) => skill.id === id))));
       setStatus('ready');
     } else {
       setStatus('error');
@@ -96,7 +105,59 @@ export default function SkillsView() {
     await reload();
   }
 
+  /**
+   * Write every saved skill to a file, including the ones switched off: a pack is
+   * a copy of the list, not just of what is currently in use.
+   */
+  async function shareSkills() {
+    if (!zuriSkills || packBusy) return;
+    setPackBusy(true);
+    setProblem('');
+    setPackNote('');
+    try {
+      const result = await zuriSkills.export({ packName: 'My skills', skillIds: selectedSkillIds ?? [] });
+      if (!result?.ok) {
+        setProblem(result?.error?.message ?? 'The skills could not be shared.');
+        return;
+      }
+      if (result.data?.cancelled === true) return;
+      setPackNote(`Shared ${result.data?.count ?? 0} skill${result.data?.count === 1 ? '' : 's'}.`);
+    } finally {
+      setPackBusy(false);
+    }
+  }
+
+  /**
+   * Add the skills from a file someone shared. Everything arrives switched off, so
+   * the instructions are read before any of them changes a reply.
+   */
+  async function importSkills() {
+    if (!zuriSkills || packBusy) return;
+    setPackBusy(true);
+    setProblem('');
+    setPackNote('');
+    try {
+      const result = await zuriSkills.import();
+      if (!result?.ok) {
+        setProblem(result?.error?.message ?? 'That file could not be imported.');
+        return;
+      }
+      if (result.data?.cancelled === true) return;
+      const added = Number(result.data?.added) || 0;
+      const skipped = Number(result.data?.duplicates) || 0;
+      const overLimit = Number(result.data?.overLimit) || 0;
+      const parts = [`${added} skill${added === 1 ? '' : 's'} added, all switched off.`];
+      if (skipped > 0) parts.push(`${skipped} already saved.`);
+      if (overLimit > 0) parts.push(`${overLimit} left out because only ${MAX_SKILLS} skills fit.`);
+      setPackNote(parts.join(' '));
+      await reload();
+    } finally {
+      setPackBusy(false);
+    }
+  }
+
   const enabledCount = skills.filter((skill) => skill.enabled).length;
+  const chosenCount = selectedSkillIds?.length ?? skills.length;
 
   return (
     <main className="flex h-full min-w-0 flex-1 flex-col bg-background text-foreground">
@@ -110,11 +171,27 @@ export default function SkillsView() {
               </p>
             </div>
             {!formOpen && (
-              <Button variant="primary" className="shrink-0" isDisabled={status !== 'ready'} onPress={() => { setProblem(''); setFormOpen(true); }}>
-                New skill
-              </Button>
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                {/* Both file actions are useless with nothing saved, so they wait for the list. */}
+                <Button
+                  variant="ghost"
+                  className="min-h-11"
+                  isDisabled={status !== 'ready' || chosenCount === 0 || packBusy}
+                  onPress={() => void shareSkills()}
+                >
+                  Share skills
+                </Button>
+                <Button variant="ghost" className="min-h-11" isDisabled={status !== 'ready' || packBusy} onPress={() => void importSkills()}>
+                  Import
+                </Button>
+                <Button variant="primary" className="min-h-11" isDisabled={status !== 'ready'} onPress={() => { setProblem(''); setFormOpen(true); }}>
+                  New skill
+                </Button>
+              </div>
             )}
           </header>
+
+          {packNote !== '' && <p role="status" className="text-sm text-muted">{packNote}</p>}
 
           {status === 'error' && <p role="alert" className="text-sm text-danger">Skills need the Zuri desktop app.</p>}
           {problem !== '' && <p role="alert" className="text-sm text-danger">{problem}</p>}
@@ -165,6 +242,17 @@ export default function SkillsView() {
                     <h3 className="font-medium">{skill.name}</h3>
                     <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted">{skill.instructions}</p>
                   </div>
+                  <Checkbox
+                    isSelected={(selectedSkillIds ?? []).includes(skill.id)}
+                    onChange={(checked) => setSelectedSkillIds((current) => {
+                      const selected = current ?? skills.map((entry) => entry.id);
+                      return checked ? [...new Set([...selected, skill.id])] : selected.filter((id) => id !== skill.id);
+                    })}
+                    className="min-h-11"
+                    aria-label={`${(selectedSkillIds ?? []).includes(skill.id) ? 'Remove' : 'Include'} ${skill.name} from shared pack`}
+                  >
+                    Share
+                  </Checkbox>
                   <Checkbox
                     isSelected={skill.enabled === true}
                     isDisabled={skill.enabled !== true && enabledCount >= MAX_ENABLED}

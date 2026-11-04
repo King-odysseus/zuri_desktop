@@ -398,6 +398,100 @@ check('MCP settings and stdio tools are validated and approval gated', async () 
   return 'settings, handshake, discovery, call and approval gate';
 });
 
+// A skill pack is a file one person can hand to another. Importing must never
+// switch instructions on by itself, and a file that is not a pack must be refused
+// by name rather than half-imported.
+check('a shared skill pack round-trips, refuses bad files and arrives switched off', async () => {
+  const packs = await import(pathToFileURL(path.join(root, 'src/main/skillPacks.js')).href);
+
+  const built = packs.buildSkillPack(
+    [
+      { name: 'Plain English', instructions: 'Short sentences.' },
+      { name: 'Formal emails', instructions: 'Polite and brief.' },
+    ],
+    { packName: 'Style: formal' },
+  );
+  if (!built.ok) throw new Error(built.error.message);
+
+  const written = JSON.parse(built.data.text);
+  if (written.format !== 'zuri-skill-pack' || written.version !== 1) throw new Error('the pack header is wrong');
+  if (written.skills.length !== 2) throw new Error('the pack lost a skill');
+  if ('enabled' in written.skills[0]) throw new Error('a pack must not carry the on/off switch');
+
+  const parsed = packs.parseSkillPack(built.data.text);
+  if (!parsed.ok) throw new Error(parsed.error.message);
+  if (parsed.data.skills[0].name !== 'Plain English') throw new Error('the round trip changed a skill name');
+
+  const refused = [
+    ['', 'SKILL_PACK_INVALID'],
+    ['not json at all', 'SKILL_PACK_INVALID'],
+    ['{"format":"something-else","version":1,"skills":[]}', 'SKILL_PACK_INVALID'],
+    ['{"format":"zuri-skill-pack","version":2,"skills":[]}', 'SKILL_PACK_VERSION'],
+    ['{"format":"zuri-skill-pack","version":1,"skills":[]}', 'SKILL_PACK_EMPTY'],
+    ['{"format":"zuri-skill-pack","version":1,"skills":[{"name":"","instructions":"x"}]}', 'SKILL_PACK_EMPTY'],
+  ];
+  for (const [text, code] of refused) {
+    const outcome = packs.parseSkillPack(text);
+    const got = outcome.ok ? 'success' : outcome.error.code;
+    if (got !== code) {
+      throw new Error(`${text.slice(0, 24) || 'an empty file'} gave ${got}, wanted ${code}`);
+    }
+  }
+
+  const noSkills = packs.buildSkillPack([{ name: '', instructions: '  ' }]);
+  if (noSkills.ok || noSkills.error.code !== 'SKILL_PACK_EMPTY') throw new Error('a list with no usable skill was exported');
+
+  // Two entries with one name would read as a duplicate bug in the list.
+  const duplicate = packs.parseSkillPack(
+    JSON.stringify({
+      format: 'zuri-skill-pack',
+      version: 1,
+      skills: [
+        { name: 'Same', instructions: 'a' },
+        { name: 'same', instructions: 'b' },
+      ],
+    }),
+  );
+  if (!duplicate.ok || duplicate.data.skills.length !== 1 || duplicate.data.skipped !== 1) {
+    throw new Error('a repeated name was not folded into one skill');
+  }
+
+  const fileName = packs.packFileName('Style: formal');
+  if (fileName !== 'Style-formal.zuri-skills.json') throw new Error(`unexpected file name ${fileName}`);
+
+  const plan = packs.planSkillImport(
+    [
+      { name: 'Kept', instructions: 'a' },
+      { name: 'kept', instructions: 'b' },
+      { name: 'Same', instructions: 'c' },
+    ],
+    [{ name: 'same' }],
+  );
+  if (plan.fresh.length !== 1 || plan.fresh[0].name !== 'Kept') throw new Error('the import plan kept the wrong skills');
+  // One repeat inside the pack plus the name already saved: both are skipped.
+  if (plan.duplicates !== 2) throw new Error('the import plan missed a duplicate');
+
+  // Through the store: what an import writes stays off until the person turns it on.
+  const store = await import(pathToFileURL(path.join(root, 'src/main/store.js')).href);
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'zuri-skill-pack-'));
+  const before = store.getStoreRoot();
+  try {
+    store.setStoreRoot(scratch);
+    const created = await store.createSkill({ name: 'Plain English', instructions: 'Short sentences.' });
+    if (!created.ok) throw new Error(created.error.message);
+    if (created.data.enabled !== false) throw new Error('an imported skill was switched on');
+    const listed = await store.listSkills();
+    const second = packs.planSkillImport(parsed.data.skills, listed.data);
+    if (second.fresh.length !== 1 || second.fresh[0].name !== 'Formal emails') {
+      throw new Error('a skill that is already saved would be imported a second time');
+    }
+  } finally {
+    store.setStoreRoot(before);
+  }
+
+  return 'round trip, six refusals, a folded duplicate and the switched-off default';
+});
+
 // First run is a sign-in, not a developer setup screen. The card has to offer the
 // Zuri account and must not ask for a provider key; a key belongs in Settings, for
 // the person who would rather pay a provider directly.
@@ -1094,6 +1188,19 @@ for (const [kind, content] of Object.entries(OFFICE_SAMPLES)) {
     const chart = await part(book, 'xl/charts/chart1.xml');
     if (!chart.includes('$A$2:$A$2')) throw new Error('the chart should cover only the real rows, not the blank ones');
     return 'input styling, accounting and thousands formats, data bars, blank rows with live formulas';
+  });
+
+  check('Excel can create a blank fill-in template when rows are omitted', async () => {
+    const book = await buildOfficeFile('xlsx', { sheets: [{
+      name: 'Expenses', blankRows: 3, totals: true,
+      columns: ['Item', { header: 'Qty', type: 'integer', role: 'input' }, { header: 'Amount', type: 'currency', formula: '=[@Qty]*10' }],
+      dropdowns: [{ column: 'Item', options: ['Travel', 'Supplies'] }],
+    }] });
+    const sheet = await part(book, 'xl/worksheets/sheet1.xml');
+    if ((sheet.match(/<row /g) ?? []).length < 5) throw new Error('the header, three blank rows and totals row were not created');
+    if (!sheet.includes('<f>Expenses_Table[[#This Row],[Qty]]*10</f>')) throw new Error('the calculated column was not prepared');
+    if (!sheet.includes('type="list"')) throw new Error('the drop-down was not prepared');
+    return 'columns-only template has spare rows, formulas, totals and a drop-down';
   });
 
   check('pictures are checked before they reach a file, and appear in Word and PowerPoint', async () => {

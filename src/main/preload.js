@@ -46,6 +46,9 @@ const CHANNELS = Object.freeze([
   'zuri:skills:create',
   'zuri:skills:update',
   'zuri:skills:delete',
+  // Sharing a set of skills as a file, and adding the skills a shared file holds.
+  'zuri:skills:export',
+  'zuri:skills:import',
   'zuri:settings:get',
   'zuri:settings:save',
   'zuri:onboarding:complete',

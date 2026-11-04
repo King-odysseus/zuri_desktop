@@ -1042,7 +1042,8 @@ export async function buildXlsx(content) {
     const rows = list(sheet?.rows, 'rows', LIMITS.sheetRows).map((row) => list(row, 'A row', LIMITS.tableColumns).map(excelValue));
     const realRowCount = rows.length;
     // Empty rows below the data keep the formulas, drop-downs and totals of a template ready for the next entry.
-    const blankRows = rows.length > 0 ? Math.min(Math.max(Math.trunc(Number(sheet?.blankRows)) || 0, 0), 200) : 0;
+    // A columns-only sheet is a valid blank template too, so do not require a starter row before reserving space.
+    const blankRows = columns.length > 0 ? Math.min(Math.max(Math.trunc(Number(sheet?.blankRows)) || 0, 0), 200) : 0;
     for (let blank = 0; blank < blankRows; blank += 1) rows.push(Array.from({ length: columns.length }, () => ''));
     // A calculated column fills every row that left its cell empty, so the model writes
     // the formula once and never has to count rows.
