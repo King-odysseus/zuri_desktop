@@ -4210,6 +4210,56 @@ a.download-card:hover {
   color: var(--danger);
 }
 
+/* What the enhancer suggests adding. The rewrite goes into the box above; these stay
+   outside it, because a detail the person has not confirmed is not their message yet.
+   Square corners, no border, no shadow, and the same hover as the other quiet rows. */
+.chat-suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 0 8px;
+}
+
+.chat-suggestions-title {
+  margin: 0 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chat-suggestion {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 8px 8px 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: left;
+  box-shadow: none;
+  cursor: pointer;
+}
+
+.chat-suggestion:hover {
+  background: var(--surface-tertiary);
+}
+
+.chat-suggestion svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.chat-suggestion:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+}
+
 .chat-alert-action {
   margin-left: 8px;
 }
@@ -6355,9 +6405,10 @@ h4,
   }
 }
 
-/* A quiet icon button whose mark is read as destructive: a filled danger button
-   would be the loudest thing on a page of plain rows, and its fill is nearly white
-   in the dark theme, which hides the white mark inside it. */
+/* Deleting is asked for in place, so the trigger is a quiet icon. HeroUI's filled
+   danger button is wrong here twice over: it would be the loudest thing on a page
+   of plain rows, and its fill is nearly white in the dark theme, which hides the
+   white mark sitting inside it. */
 .history-delete {
   color: var(--danger);
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from '../components/DataRow.jsx';
-import { Button, Input, Select } from '../components/ui.jsx';
+import { Button, Input, NumberField, Select } from '../components/ui.jsx';
 import { changeAdminUser, createAdminUser, fetchAdminStats, fetchAdminUsers } from '../lib/api.js';
 import { formatNaira, formatTokens } from '../lib/format.js';
 
@@ -214,7 +214,7 @@ export default function AdminPeople({ days, plans }) {
             </Select>
           </label>
           <label className="field"><span>Days active</span>
-            <Input type="number" min="1" max="366" value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} />
+            <NumberField aria-label="Days active" min="1" max="366" value={form.days} onChange={(event) => setForm({ ...form, days: event.target.value })} />
           </label>
         </div>
         <div className="card-actions">
@@ -244,8 +244,8 @@ export default function AdminPeople({ days, plans }) {
                 </Select>
               </label>
               <label className="field"><span>Days active</span>
-                <Input
-                  type="number"
+                <NumberField
+                  aria-label="Days active"
                   min="1"
                   max="366"
                   value={planEditor.days}

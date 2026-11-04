@@ -1,5 +1,5 @@
 import { formatNaira, formatTokens } from '../lib/format.js';
-import { Button, Checkbox, Input, Select } from '../components/ui.jsx';
+import { Button, Checkbox, Input, NumberField, Select } from '../components/ui.jsx';
 
 const SUPPLIERS = ['deepseek', 'moonshot', 'zai', 'openai', 'anthropic'];
 
@@ -22,18 +22,18 @@ function ModelForm({ draft, plans, busy, onEdit, onSave, onCancel, isExisting })
         <label className="field"><span>Supplier model name</span><Input value={draft.supplierModel} onChange={(event) => onEdit('supplierModel', event.target.value)} required /></label>
         <label className="field"><span>Billed as</span><Select value={draft.kind ?? 'text'} onChange={(event) => onEdit('kind', event.target.value)}><option value="text">Chat, by the token</option><option value="image">Pictures, by the image</option></Select></label>
         {draft.kind !== 'image' ? <>
-          <label className="field"><span>Input price, USD per 1M tokens</span><Input type="number" min="0" step="0.01" value={draft.inputUsdPerMillion} onChange={(event) => onEdit('inputUsdPerMillion', event.target.value)} /></label>
-          <label className="field"><span>Output price, USD per 1M tokens</span><Input type="number" min="0" step="0.01" value={draft.outputUsdPerMillion} onChange={(event) => onEdit('outputUsdPerMillion', event.target.value)} /></label>
+          <label className="field"><span>Input price, USD per 1M tokens</span><NumberField aria-label="Input price, USD per 1M tokens" min="0" step="0.01" value={draft.inputUsdPerMillion} onChange={(event) => onEdit('inputUsdPerMillion', event.target.value)} /></label>
+          <label className="field"><span>Output price, USD per 1M tokens</span><NumberField aria-label="Output price, USD per 1M tokens" min="0" step="0.01" value={draft.outputUsdPerMillion} onChange={(event) => onEdit('outputUsdPerMillion', event.target.value)} /></label>
         </> : <>
-          <label className="field"><span>Supplier price, USD per picture</span><Input type="number" min="0" step="0.001" value={draft.usdPerImage} onChange={(event) => onEdit('usdPerImage', event.target.value)} /></label>
-          <label className="field"><span>Allowance tokens per picture</span><Input type="number" min="1000" max="4000000" step="1000" value={draft.quotaTokensPerImage} onChange={(event) => onEdit('quotaTokensPerImage', event.target.value)} /></label>
+          <label className="field"><span>Supplier price, USD per picture</span><NumberField aria-label="Supplier price, USD per picture" min="0" step="0.001" value={draft.usdPerImage} onChange={(event) => onEdit('usdPerImage', event.target.value)} /></label>
+          <label className="field"><span>Allowance tokens per picture</span><NumberField aria-label="Allowance tokens per picture" min="1000" max="4000000" step="1000" value={draft.quotaTokensPerImage} onChange={(event) => onEdit('quotaTokensPerImage', event.target.value)} /></label>
           <label className="field"><span>Picture size label</span><Input value={draft.imageQuality ?? ''} maxLength={20} onChange={(event) => onEdit('imageQuality', event.target.value)} placeholder="standard" /></label>
         </>}
-        <label className="field"><span>Quota weight (prompts)</span><Input type="number" min="0.1" max="100" step="0.1" value={draft.quotaWeight} onChange={(event) => onEdit('quotaWeight', event.target.value)} /></label>
-        <label className="field"><span>Quota weight (replies, 0 = same as prompts)</span><Input type="number" min="0" max="100" step="0.1" value={draft.outputQuotaWeight ?? 0} onChange={(event) => onEdit('outputQuotaWeight', event.target.value)} /></label>
-        <label className="field"><span>Rate factor (0.05 to 1)</span><Input type="number" min="0.05" max="1" step="0.05" value={draft.rateFactor} onChange={(event) => onEdit('rateFactor', event.target.value)} /></label>
+        <label className="field"><span>Quota weight (prompts)</span><NumberField aria-label="Quota weight (prompts)" min="0.1" max="100" step="0.1" value={draft.quotaWeight} onChange={(event) => onEdit('quotaWeight', event.target.value)} /></label>
+        <label className="field"><span>Quota weight (replies, 0 = same as prompts)</span><NumberField aria-label="Quota weight (replies)" min="0" max="100" step="0.1" value={draft.outputQuotaWeight ?? 0} onChange={(event) => onEdit('outputQuotaWeight', event.target.value)} /></label>
+        <label className="field"><span>Rate factor (0.05 to 1)</span><NumberField aria-label="Rate factor" min="0.05" max="1" step="0.05" value={draft.rateFactor} onChange={(event) => onEdit('rateFactor', event.target.value)} /></label>
         <label className="field"><span>Lowest plan allowed</span><Select value={draft.minPlan} onChange={(event) => onEdit('minPlan', event.target.value)}>{plans.map((plan) => <option key={plan.code} value={plan.code}>{plan.name}</option>)}</Select></label>
-        <label className="field"><span>Order in the list</span><Input type="number" step="1" value={draft.sortOrder} onChange={(event) => onEdit('sortOrder', event.target.value)} /></label>
+        <label className="field"><span>Order in the list</span><NumberField aria-label="Order in the list" step="1" value={draft.sortOrder} onChange={(event) => onEdit('sortOrder', event.target.value)} /></label>
       </div>
       <Checkbox className="admin-check" checked={draft.isActive} onChange={(event) => onEdit('isActive', event.target.checked)}><span>Available to customers</span></Checkbox>
       <div className="card-actions"><Button type="submit" className="btn btn-primary" variant="primary" isDisabled={busy}>{busy ? 'Saving' : 'Save model'}</Button><Button type="button" className="btn btn-ghost" variant="ghost" onClick={onCancel}>Cancel</Button></div>

@@ -253,10 +253,18 @@ async function conversationRoute(request, response, url) {
   if (!id && request.method === 'GET') {
     // A project screen asks for one project's chats; without the filter the whole
     // history is listed, which is what the chat list draws. An empty value counts as
-    // no filter, the way an unset box on a form does.
+    // no filter, the way an unset box on a form does. The search box sends q, which
+    // the live server matches against the title and the messages, so it is matched
+    // here too rather than leaving every row in place.
     const wanted = (url.searchParams.get('projectId') ?? '').trim();
+    const query = (url.searchParams.get('q') ?? '').trim().toLowerCase();
+    const matchesQuery = (row) =>
+      query === ''
+      || String(row.title ?? '').toLowerCase().includes(query)
+      || row.messages.some((message) => String(message.content ?? '').toLowerCase().includes(query));
     const summary = [...conversations]
       .filter((row) => wanted === '' || row.projectId === wanted)
+      .filter(matchesQuery)
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .map(conversationSummary);
     json(response, { conversations: summary });
@@ -591,13 +599,18 @@ createServer(async (request, response) => {
   }
 
   // The prompt enhancer, so the button beside Send can be seen working with no provider
-  // key. This is a plain restatement, not a model reply: it exists to show the rewrite
-  // landing in the message box and the undo after it.
+  // key. It answers in the server's own shape: the message, then the lines the person
+  // could add to it. It never stands in for an answer to the message.
   if (url.pathname === '/api/prompts/enhance' && request.method === 'POST') {
     const sent = JSON.parse((await readBody(request)) || '{}');
     const words = String(sent.prompt ?? '').trim();
     return json(response, {
-      prompt: `Please help me with the following. Answer in three short paragraphs, with one example.\n\nWhat I need: ${words}\n\nAudience: [who it is for]\nBy when: [date]`,
+      prompt: words,
+      suggestions: [
+        'Audience: who this is for, for example a small business owner.',
+        'By when: the date you need it.',
+        'Say what the dashboard must show.',
+      ],
       original: words,
     });
   }
