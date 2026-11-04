@@ -179,7 +179,14 @@ let projects = [
 /** @param {object} row @returns {object} */
 function conversationSummary(row) {
   const { messages, ...rest } = row;
-  return { ...rest, messageCount: messages.length };
+  const last = messages.length > 0 ? messages[messages.length - 1] : null;
+  // The real server sends the last message clipped to 240 characters, so the sample
+  // rows are shaped the same way and the preview shows what a live list would.
+  return {
+    ...rest,
+    messageCount: messages.length,
+    preview: last ? String(last.content ?? '').slice(0, 240) : '',
+  };
 }
 
 /**

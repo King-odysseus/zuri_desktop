@@ -751,7 +751,7 @@ export const DEFAULT_CHAT_MODEL = 'zuri-flash';
  * @param {string} [projectId] Send one project's id to list only its chats.
  * @returns {Promise<Array<{ id: string, title: string, createdAt?: string, updatedAt?: string, projectId?: string | null }>>}
  */
-export async function fetchConversations(query = '', projectId = '') {
+export async function fetchConversations(query = '', projectId = '', includeArchived = false) {
   const trimmed = typeof query === 'string' ? query.trim().slice(0, 120) : '';
   const project = typeof projectId === 'string' ? projectId.trim() : '';
   // Both filters ride in one request: a project screen asks for that project's
@@ -760,6 +760,9 @@ export async function fetchConversations(query = '', projectId = '') {
   const filters = [];
   if (trimmed !== '') filters.push(`q=${encodeURIComponent(trimmed)}`);
   if (project !== '') filters.push(`projectId=${encodeURIComponent(project)}`);
+  // The history screen asks for the archived chats too; every other caller wants
+  // only the live list, which is what the server answers with by default.
+  if (includeArchived === true) filters.push('archived=1');
   const built = filters.join('&');
   const suffix = built === '' ? '' : `?${built}`;
   const data = await api(`/api/me/conversations${suffix}`);

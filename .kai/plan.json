@@ -2,45 +2,33 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Survey desktop, web and mobile component usage",
+      "text": "Read chat sidebar code and reproduce the three chat faults",
       "state": "done"
     },
     {
-      "text": "Install HeroUI 3 and learn its v3 API",
+      "text": "Restore chat previews/titles in the sidebar",
       "state": "done"
     },
     {
-      "text": "Wire HeroUI styles and theme tokens into both stylesheets",
+      "text": "Fix the doubled search field so it is one rounded box",
       "state": "done"
     },
     {
-      "text": "Rewrite web shared ui.jsx on HeroUI primitives",
+      "text": "Restore the Recents header and the chat history button (with a history screen)",
       "state": "done"
     },
     {
-      "text": "Rewrite desktop ui.jsx and SelectField on HeroUI",
+      "text": "Verify the chat sidebar and history screen at 390/768/1280/1920",
       "state": "done"
     },
     {
-      "text": "Convert web views and components to HeroUI",
-      "state": "done"
+      "text": "Run npm run test, commit and push",
+      "state": "active"
     },
     {
-      "text": "Convert desktop renderer controls to HeroUI",
-      "state": "done"
-    },
-    {
-      "text": "Remove Flowbite, update the two stale test assertions and the docs",
-      "state": "done"
-    },
-    {
-      "text": "Build desktop, web and mobile bundles",
-      "state": "done"
-    },
-    {
-      "text": "Run npm test and verify HeroUI on all three targets in the browser and the desktop window",
-      "state": "done"
+      "text": "Rebuild the Windows installer and deploy to Railway",
+      "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T09:51:33.677Z"
+  "updatedAt": "2026-11-04T11:22:48.879Z"
 }

@@ -2678,6 +2678,54 @@ check('the account control sits at the foot of the signed-in sidebar', () => {
   return 'the account control is the last row of the chat column and is pinned when folded';
 });
 
+check('a saved chat row keeps its name beside what was last said', () => {
+  const styles = read('web/src/styles.css');
+  const chat = read('web/src/views/ChatView.jsx');
+  // A HeroUI button is a fixed 40px box that centres what it holds. A row here stacks
+  // a name, a quote and a timestamp, so that box squeezed the name to nothing and only
+  // the timestamp was left on screen. The row is content-sized again.
+  const row = [...styles.matchAll(/\.chat-recent-open \{([^}]*)\}/g)].map((match) => match[1]);
+  if (row.length === 0) throw new Error('.chat-recent-open has no rule of its own any more');
+  const sized = row.find((body) => /height: auto;/.test(body) && /min-height: 44px;/.test(body));
+  if (!sized) throw new Error('the row is back inside a fixed height, which squashes the name');
+  const titles = [...styles.matchAll(/\.chat-recent-title \{([^}]*)\}/g)].map((match) => match[1]);
+  const clipped = titles.find((body) => /white-space: nowrap;/.test(body) && /text-overflow: ellipsis;/.test(body));
+  if (!clipped) {
+    throw new Error('the name is no longer one clipped line');
+  }
+  if (!chat.includes('chat-recent-snippet')) throw new Error('the list no longer shows what was last said in a chat');
+  if (!chat.includes('previewOf(conversation)')) throw new Error('the preview line is drawn from nothing');
+  return 'the name, the last message and the time all fit one content-sized row';
+});
+
+check('the chat search is one pill, not a field inside a field', () => {
+  const styles = read('web/src/styles.css');
+  const field = styles.match(/\.conversation-search \.input,\s*\n\.conversation-search input \{([^}]*)\}/);
+  if (!field) throw new Error('the search field has no rule of its own any more');
+  if (!/box-shadow: none;/.test(field[1])) throw new Error('the inner field draws its own raised edge again');
+  if (!/background: transparent;/.test(field[1])) throw new Error('the inner field paints a second box inside the pill');
+  if (!/border-radius: 0;/.test(field[1])) throw new Error('the inner field has its own corners again');
+  // Its own ring went with the rest of the skin, so the pill has to show focus instead.
+  if (!/\.conversation-search:focus-within \{/.test(styles)) throw new Error('the search field gives no sign of focus');
+  return 'the wrapper is the only box and it shows focus';
+});
+
+check('the saved-chat column names itself and opens the chat history', () => {
+  const chat = read('web/src/views/ChatView.jsx');
+  const app = read('web/src/App.jsx');
+  const history = read('web/src/views/HistoryView.jsx');
+  if (!chat.includes('chat-recents-head')) throw new Error('the list has no heading of its own');
+  if (!chat.includes('onOpenHistory')) throw new Error('the heading has no way through to the history');
+  if (!app.includes("'history'")) throw new Error('the history screen has no address of its own');
+  // The screen exists to hold what Recents does not: the archived chats, with the
+  // means to restore or delete them.
+  if (!history.includes('fetchConversations(') || !/true\s*\)/.test(history)) throw new Error('the history does not ask for the archived chats');
+  if (!history.includes('deleteConversation') || !history.includes('setConversationFlags')) {
+    throw new Error('the history cannot delete or restore a chat');
+  }
+  return 'the column carries a Recents heading, a history control and a screen behind it';
+});
+
 check('the chat takes the whole window and only the transcript scrolls', () => {
   const dashboard = read('web/src/views/Dashboard.jsx');
   const styles = read('web/src/styles.css');
@@ -2712,12 +2760,56 @@ check('the model beside Send is a menu anchored to its own chip', () => {
 check('conversation search is capped and encoded before it reaches the server', () => {
   const api = read('web/src/lib/api.js');
   const control = read('web/src/components/ConversationSearch.jsx');
-  if (!api.includes('fetchConversations(query = \'\')')) throw new Error('conversation fetch does not accept a search query');
+  if (!/export async function fetchConversations\(query = ''/.test(api)) throw new Error('conversation fetch does not accept a search query');
   if (!api.includes('slice(0, 120)')) throw new Error('conversation search has no length cap');
   if (!api.includes('encodeURIComponent(trimmed)')) throw new Error('conversation search is not URL encoded');
   if (!control.includes('aria-label="Search conversations"')) throw new Error('search control is not labelled');
   if (!control.includes('Clear conversation search')) throw new Error('search control has no clear action');
   return 'bounded, encoded server search with an accessible clearable control';
+});
+
+/*
+ * The sidebar lost three things when the chat moved onto HeroUI, and each one was
+ * invisible to the type checker: HeroUI's button carries a fixed height, so the
+ * column of name and time inside it shrank the name to zero and every row showed
+ * only its age; the input drew its own rounded focus ring inside the styled field,
+ * so the search looked like a box within a box; and the Recents heading with its
+ * history button was gone, leaving no way to reach a chat that had been archived.
+ * Each assertion below pins the thing that was missing, not the markup around it.
+ */
+check('a chat row keeps its name and its last words, and the search is one field', () => {
+  const css = read('web/src/styles.css');
+  const chat = read('web/src/views/ChatView.jsx');
+  const app = read('web/src/App.jsx');
+  const dashboard = read('web/src/views/Dashboard.jsx');
+
+  // A row must be free to grow past HeroUI's fixed button height, or the name is
+  // the part that gives way.
+  const rowHeight = /\.chat-recent-open\s*\{([^}]*)\}/g;
+  const heights = Array.from(css.matchAll(rowHeight), (match) => match[1]);
+  if (!heights.some((block) => /height:\s*auto/.test(block))) {
+    throw new Error('the chat row still takes HeroUI\'s fixed height, which collapses the name');
+  }
+
+  // The name and the quote are the two things a person reads; the row must draw both.
+  if (!chat.includes('className="chat-recent-title"')) throw new Error('the row has no name');
+  if (!chat.includes('function previewOf(')) throw new Error('the row has no quote of the last message');
+  if (!chat.includes('className="chat-recent-snippet"')) throw new Error('the quote is not drawn in the row');
+
+  // One rounded box: the field draws the box and the input inside it draws nothing.
+  const field = /\.conversation-search \.input,\s*\.conversation-search input\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+  if (!/box-shadow:\s*none/.test(field)) throw new Error('the search input draws its own box inside the field');
+  if (!/border-radius:\s*0/.test(field)) throw new Error('the search input keeps its own rounded corners inside the field');
+  if (!/\.conversation-search:focus-within/.test(css)) throw new Error('the search field has no focus ring of its own');
+
+  // Recents needs a heading and a way into the chats it no longer lists.
+  if (!chat.includes('chat-recents-head')) throw new Error('the Recents heading is missing');
+  if (!chat.includes('label="Chat history"')) throw new Error('the history button is missing from Recents');
+  if (!chat.includes('onOpenHistory')) throw new Error('the history button goes nowhere');
+  if (!/const VIEWS = \[[^\]]*'history'/.test(app)) throw new Error('the app has no history section to open');
+  if (!dashboard.includes('<HistoryView')) throw new Error('the history section is not drawn');
+
+  return 'name and quote on every row, one search field, Recents heading and a working history button';
 });
 
 check('web chat prompts can be edited and the latest reply regenerated', () => {

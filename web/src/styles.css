@@ -236,8 +236,10 @@
   --glass: #060421;
   --hairline: #181448;
   --strong: #2a2570;
-  --control-border: transparent;
-  --field-background: #0f0c33;
+  /* The field fill steps above the card on the navy page, as on the desktop app:
+     with the same fill the control reads as plain text. */
+  --control-border: #241f5e;
+  --field-background: #181448;
   --text: #ecebff;
   --muted: #b3b1de;
   --faint: #8381b5;
@@ -4525,7 +4527,9 @@ h4,
 
 .project-card {
   display: flex;
-  align-items: flex-start;
+  /* Centred rather than top aligned: the tile is taller than its two lines of
+     words, and pinning them to the top left a band of empty blue beneath them. */
+  align-items: center;
   gap: 12px;
   min-height: 92px;
   padding: 16px;
@@ -4630,6 +4634,33 @@ h4,
 
 .project-input {
   min-height: var(--control-height);
+}
+
+/*
+ * HeroUI's date, time and number controls draw their own box. They take the plain
+ * field's height and side padding here instead of carrying .project-input, whose
+ * padding would sit outside HeroUI's box and make the row taller than its
+ * neighbours. A day and a clock share one row until the column gets too narrow.
+ */
+.date-time-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 8px;
+  min-width: 0;
+}
+
+.date-time-field > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.date-input-group,
+.number-field-group {
+  min-height: var(--control-height);
+  border-radius: var(--radius-md);
+  background: var(--field-background);
+  padding: 0 12px;
 }
 
 .project-textarea {
@@ -5915,4 +5946,398 @@ h4,
 
 .message-body del {
   opacity: 0.7;
+}
+
+/*
+ * The saved-chat column after the move to HeroUI.
+ *
+ * A HeroUI button is a fixed height whatever it holds, with its own padding, and it
+ * centres what is inside it (`.button--md` is 40px tall with 10px of padding). A row
+ * here stacks a title over a timestamp, so that fixed box gave two lines 20px of
+ * room: the title, which clips rather than pushing the row taller, was squeezed to
+ * nothing and only the timestamp survived. The rows are content-sized again and read
+ * from the left, as ChatGPT's list does.
+ */
+.chat-recent-open {
+  height: auto;
+  min-height: 44px;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+/* One line with a real ellipsis. A flex container cannot ellipsize its own text,
+   because the words become an anonymous item that will not shrink, so the title was
+   cut off with no dots. A block clips and ellipsizes, and the pin rides inline. */
+.chat-recent-title {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.chat-recent-title svg {
+  display: inline-block;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+
+/* The timestamp keeps to one line too, so a narrow column never wraps it under the
+   title and makes the rows different heights. It shares the row's second line with
+   the quote of the last message, which takes whatever room is left. */
+.chat-recent-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* What was last said, in one line. The name is the row's heading; this is the
+   sentence under it that tells two chats about the same subject apart. */
+.chat-recent-snippet {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--nav-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+/* A chat nobody has written to yet has no quote, and an empty element still costs
+   the row a gap, so it takes no space at all. */
+.chat-recent-snippet:empty {
+  display: none;
+}
+
+.chat-recent-meta {
+  flex: 0 0 auto;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+/* The rename form takes the row's place, so it keeps the row's height instead of
+   collapsing to the height of its one field. */
+.chat-recent-form {
+  min-height: 44px;
+}
+
+/* One flat field in the row, as the rest of the column is: HeroUI's raised shadow
+   would be the only lifted edge in the panel. The suppression is scoped to the
+   resting state, because HeroUI draws its focus ring as a box-shadow too and an
+   unstyled field loses the one state a person needs to see. */
+.chat-recent-input:not(:focus) {
+  box-shadow: none;
+  -webkit-box-shadow: none;
+}
+
+/* The same ring the column's other fields draw, in product tokens, so the rename
+   field is not the one control in the panel with no visible focus. */
+.chat-recent-input:focus,
+.chat-recent-input:focus-visible {
+  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 3px var(--brand-blue-soft);
+  outline: 0;
+}
+
+/* The button in the project strip is a single quiet line, so it is content-sized:
+   without this HeroUI's 40px would make the strip taller than the two rules above. */
+.chat-project-leave {
+  height: auto;
+  min-height: 28px;
+}
+
+/* The label above the search field, with the way to the archived chats at its end,
+   in the same quiet uppercase the rest of the column's labels use. */
+.chat-recents-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  /* The label lines up with the row titles, which start 12px into the column. */
+  padding-left: 12px;
+}
+
+/* HeroUI's button is 40px tall, and 36px from 768px up, so both are under the 44px a
+   thumb needs. The header button has the room, so it takes both sides. */
+.chat-recents-head .button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+/* A row's two actions sit in the flow of a 260px column, so widths alone would cost
+   88px of it on every row for controls that only appear on hover. The height is free
+   because the row is already 44px; the width waits for a thumb. */
+.chat-recent-actions .button {
+  min-height: 44px;
+}
+
+@media (pointer: coarse), (max-width: 899px) {
+  .chat-recent-actions .button {
+    min-width: 44px;
+  }
+}
+
+.chat-recents-head-title {
+  margin: 0;
+  color: var(--nav-muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* A label sits close to what it names, so the field's own top margin would leave it
+   floating halfway to the nav above instead of describing the search under it. */
+.chat-recents-head + .conversation-search {
+  margin-top: 2px;
+}
+
+/* A folded column is a rail of icons, and the search and the list already leave it. */
+@media (min-width: 900px) {
+  .chat-recents.is-collapsed .chat-recents-head {
+    display: none;
+  }
+}
+
+/*
+ * The search field is one pill, not two boxes.
+ *
+ * HeroUI's Input brings its own fill, a 14px radius, a padding and a raised shadow,
+ * so inside this wrapper it drew a second box on top of the first. The wrapper is the
+ * field: the input carries only the text, and because its own ring goes with the
+ * rest of its skin, the focus ring is drawn on the wrapper instead.
+ */
+.conversation-search .input,
+.conversation-search input {
+  flex: 1 1 auto;
+  /* Fills the pill's own height, so the whole 40px is the field rather than a
+     strip of text in the middle of it that misses a thumb. */
+  align-self: stretch;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-box-shadow: none;
+  outline: 0;
+  color: var(--nav-foreground);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* The magnifier and the clear button keep their size while the field shrinks to the
+   column's width, so neither is squeezed out of the pill on a narrow window. */
+.conversation-search > svg,
+.conversation-search-clear {
+  flex: 0 0 auto;
+}
+
+/* WebKit draws its own clear mark inside a search field, which would be a second
+   control in the pill beside the real one the wrapper draws. */
+.conversation-search input::-webkit-search-cancel-button,
+.conversation-search input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.conversation-search:focus-within {
+  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 3px var(--brand-blue-soft);
+}
+
+/* The clear button draws at 28px inside a 40px pill, so its thumb area is widened to
+   44px with a transparent overlay instead of by growing the button, which would burst
+   the pill. */
+.conversation-search-clear {
+  position: relative;
+}
+
+.conversation-search-clear::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+/* ---------------------------------------------- Chat history screen */
+
+/* The whole history, archived chats included. It is a plain list rather than a
+   card per chat: the page is a place to scan and clear, so nothing here lifts
+   off the surface or draws a border around a single row. */
+.history-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.history-search {
+  display: flex;
+  flex: 1 1 260px;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-secondary);
+  color: var(--muted);
+}
+
+/* HeroUI's field keeps its own radius and focus outline; inside this strip the
+   strip is the field, so the input itself draws nothing. */
+.history-search .input,
+.history-search input {
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: none;
+}
+
+.history-search:focus-within {
+  box-shadow: inset 0 0 0 1px var(--brand-blue), 0 0 0 3px var(--brand-blue-soft);
+}
+
+/* Deleting is asked in place, in the same row, so a phone never gets a blocked
+   browser dialog and the words match the rest of the page. */
+.history-confirm {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.history-confirm-delete {
+  color: var(--danger);
+}
+
+.history-note {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 14px;
+}
+
+.history-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 8px;
+  border-radius: var(--radius-md);
+}
+
+.history-row:hover {
+  background: var(--surface-secondary);
+}
+
+.history-icon {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--surface-secondary);
+  color: var(--muted);
+}
+
+.history-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.history-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* The name and the quote are each one line: a history of a hundred chats is
+   scanned, not read, so every row keeps the same height. */
+.history-name,
+.history-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-preview {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.history-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--faint);
+}
+
+.history-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.history-empty {
+  margin-top: 18px;
+  padding: 24px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--surface-secondary);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* A phone keeps the actions on the row's own line, beside the words: a row of icon
+   buttons dropped under the text left a gap the height of a button between every
+   pair of chats. The speech mark beside each name gives its 28px back instead, so
+   the name still has room to be read past its first few words. */
+@media (max-width: 520px) {
+  .history-row {
+    padding: 8px 4px;
+  }
+
+  .history-icon {
+    display: none;
+  }
+
+  .history-actions .button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+/* A quiet icon button whose mark is read as destructive: a filled danger button
+   would be the loudest thing on a page of plain rows, and its fill is nearly white
+   in the dark theme, which hides the white mark inside it. */
+.history-delete {
+  color: var(--danger);
 }

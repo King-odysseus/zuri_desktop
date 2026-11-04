@@ -41,7 +41,7 @@ import {
   streamChat,
   uploadFile,
 } from '../lib/api.js';
-import { LogoMark } from '../components/Icons.jsx';
+import { HistoryIcon, LogoMark } from '../components/Icons.jsx';
 import { formatRelativeTime, greetingFor } from '../lib/format.js';
 import { clearChatDraft, readChatDraft, saveChatDraft } from '../lib/drafts.js';
 import { deleteFiles, listFiles, saveFiles } from '../lib/fileStore.js';
@@ -274,6 +274,19 @@ function stamp(conversation) {
   const value = conversation?.updatedAt ?? conversation?.createdAt ?? 0;
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? 0 : time;
+}
+
+/**
+ * One line of what was last said in a chat, for the row under its name.
+ *
+ * A name alone cannot tell two chats about the same subject apart, so the row quotes
+ * the last message. The server clips to 240 characters; newlines collapse here so a
+ * pasted table or a code block still reads as one line, and the row clips the rest.
+ */
+function previewOf(conversation) {
+  return String(conversation?.preview ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Newest first, whatever order the server answered in. */
@@ -664,6 +677,9 @@ function failureOf(error, fallback) {
  * Two panes: the account's conversations on the left, the open one on the right.
  * Below 900px only one pane is on screen at a time, because a 390px window has no
  * room for both, and the open chat carries a back button to the list.
+ *
+ * `onOpenHistory` is the screen that holds the chats this list no longer shows, so
+ * the header beside Recents can reach it; without one the control does nothing.
  */
 export default function ChatView({
   onSignIn,
@@ -676,6 +692,8 @@ export default function ChatView({
   projectId = '',
   projectName = '',
   onLeaveProject = null,
+  onOpenHistory = () => {},
+  historyVersion = 0,
 }) {
   const [conversations, setConversations] = useState([]);
   const [listStatus, setListStatus] = useState('loading');
@@ -789,7 +807,9 @@ export default function ChatView({
       void loadConversations(conversationQuery);
     }, conversationQuery.trim() === '' ? 0 : 220);
     return () => window.clearTimeout(timer);
-  }, [conversationQuery, loadConversations]);
+    // historyVersion moves when a chat is deleted or restored on the history screen,
+    // so the list is built again instead of keeping a row that no longer exists.
+  }, [conversationQuery, loadConversations, historyVersion]);
 
   useEffect(() => {
     saveChatDraft(draft);
@@ -1772,6 +1792,16 @@ export default function ChatView({
           </div>
         )}
 
+        {/* The list's own heading, with the way to the archived chats at its end.
+            The rows below are only the live ones, so the history needs a door. Inside
+            a project the same list holds that project's chats, so it is not Recents. */}
+        <div className="chat-recents-head">
+          <p className="chat-recents-head-title">{projectId === '' ? 'Recents' : 'Chats'}</p>
+          <IconButton label="Chat history" onClick={() => onOpenHistory()}>
+            <HistoryIcon size={16} aria-hidden="true" />
+          </IconButton>
+        </div>
+
         <ConversationSearch
           value={conversationQuery}
           onChange={setConversationQuery}
@@ -1831,7 +1861,10 @@ export default function ChatView({
                       {conversation.pinned && <PinIcon size={12} filled aria-hidden="true" />}
                       {conversation.title || 'New chat'}
                     </span>
-                    <span className="chat-recent-meta">{formatRelativeTime(stamp(conversation) || undefined)}</span>
+                    <span className="chat-recent-line">
+                      <span className="chat-recent-snippet">{previewOf(conversation)}</span>
+                      <span className="chat-recent-meta">{formatRelativeTime(stamp(conversation) || undefined)}</span>
+                    </span>
                   </Button>
                   <span className="chat-recent-actions">
                     {/*

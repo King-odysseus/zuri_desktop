@@ -128,6 +128,25 @@ function saveSidebarWidth(width) {
   }
 }
 
+/**
+ * The last thing said in a chat, flattened to one line for the row under its name.
+ *
+ * A name alone cannot tell two chats about the same subject apart, so the row quotes
+ * the last message. The web list gets the same quote from the server; here the thread
+ * already carries its messages, so it is read from the one in hand. A chat nobody has
+ * written to yet has no quote and the row stays one line.
+ * @param {object} thread
+ * @returns {string}
+ */
+function threadQuote(thread) {
+  const messages = Array.isArray(thread?.messages) ? thread.messages : [];
+  const last = messages.length > 0 ? messages[messages.length - 1] : null;
+  return String(last?.content ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
+}
+
 export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread, onEditProject = () => {}, activeThreadId, refreshKey, theme, onToggleTheme, collapsed = false, onToggleCollapsed = () => {} }) {
   const [threads, setThreads] = useState([]);
   const [projects, setProjects] = useState([]);
@@ -291,6 +310,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
 
   function renderThread(thread) {
     const label = thread.title || 'New chat';
+    const quote = threadQuote(thread);
     return (
       <div key={thread.id} className="group mb-1">
         <div className="flex items-center gap-1">
@@ -301,8 +321,13 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             className="min-w-0 flex-1 justify-start truncate rounded-lg px-2 py-2 text-left"
             onPress={() => onSelectThread(thread.id)}
           >
-            {thread.pinned === true && <PinIcon size={12} className="mr-1 shrink-0" aria-hidden="true" />}
-            <span className="zuri-thread-title" title={label}>{label}</span>
+            <span className="zuri-thread-row">
+              <span className="zuri-thread-line">
+                {thread.pinned === true && <PinIcon size={12} className="mr-1 shrink-0" aria-hidden="true" />}
+                <span className="zuri-thread-title" title={label}>{label}</span>
+              </span>
+              {quote !== '' && <span className="zuri-thread-quote" title={quote}>{quote}</span>}
+            </span>
           </Button>
           {/* Shown on hover or keyboard focus so the title keeps the room it needs. */}
           <div className="hidden shrink-0 items-center group-focus-within:flex group-hover:flex">

@@ -25,7 +25,7 @@ import {
 import { applyTheme, preferredTheme } from './lib/theme.js';
 import { registerNativePush } from './lib/push.js';
 
-const VIEWS = ['chat', 'projects', 'tasks', 'reminders', 'notifications', 'automations', 'images', 'settings', 'admin'];
+const VIEWS = ['chat', 'history', 'projects', 'tasks', 'reminders', 'notifications', 'automations', 'images', 'settings', 'admin'];
 // The old top-level account screens now live under Settings; their addresses still resolve.
 const SETTINGS_TABS = ['overview', 'usage', 'plans', 'billing', 'account'];
 const CHAT_PATH = '/chat';
@@ -298,7 +298,12 @@ export default function App() {
     // lands back on it; the rest stay in view state. replaceState rather than
     // pushState, because the single popstate handler only knows the public routes
     // and would not move between views.
-    window.history.replaceState({}, '', section === 'chat' ? CHAT_PATH : '/');
+    // Chat and history are the sections with an address, so a reload or a shared
+    // link lands back on them; the rest stay in view state. replaceState rather
+    // than pushState, because the single popstate handler only knows the public
+    // routes and would not move between views.
+    const address = section === 'chat' ? CHAT_PATH : section === 'history' ? '/history' : '/';
+    window.history.replaceState({}, '', address);
     window.scrollTo({ top: 0 });
   }, []);
 

@@ -3,10 +3,11 @@ import BottomBar, { BOTTOM_BAR_SPACE } from '../components/BottomBar.jsx';
 import Footer from '../components/Footer.jsx';
 import DownloadLink from '../components/DownloadLink.jsx';
 import { Button, IconButton } from '../components/ui.jsx';
-import { AutomationIcon, BellIcon, ChevronUpIcon, FolderIcon, ImageIcon, LockIcon, LogoMark, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SettingsIcon, ShieldIcon, SignOutIcon, SunIcon, TaskIcon } from '../components/Icons.jsx';
+import { AutomationIcon, BellIcon, ChevronUpIcon, DownloadIcon, FolderIcon, ImageIcon, LockIcon, LogoMark, MessageIcon, MoonIcon, PanelLeftCloseIcon, PanelLeftOpenIcon, SettingsIcon, ShieldIcon, SignOutIcon, SunIcon, TaskIcon } from '../components/Icons.jsx';
 import AdminView from './AdminView.jsx';
 import { initialsFor, planLabel } from '../lib/format.js';
 import ChatView from './ChatView.jsx';
+import HistoryView from './HistoryView.jsx';
 import OverviewView from './OverviewView.jsx';
 import UsageView from './UsageView.jsx';
 import PlansView from './PlansView.jsx';
@@ -108,7 +109,7 @@ function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut })
     setOpen(false);
     action();
   };
-  const row = 'flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-left text-sm hover:bg-black/5';
+  const row = 'flex min-h-11 w-full items-center justify-start gap-3 rounded-xl px-3 text-sm [&>svg]:text-[var(--muted)] hover:bg-surface-secondary';
 
   return (
     <div className="sidebar-account relative mt-auto" ref={wrapRef}>
@@ -117,7 +118,7 @@ function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut })
           ref={menuRef}
           role="menu"
           aria-label="Account"
-          className="fixed z-[80] w-60 rounded-2xl bg-white p-1.5 text-ink shadow-[0_10px_32px_rgba(13,27,58,0.18)]"
+          className="fixed z-[80] w-60 rounded-2xl bg-surface p-1.5 text-body shadow-[0_10px_32px_rgba(13,27,58,0.18)]"
           style={{ left: position.left, bottom: position.bottom }}
         >
           {isAdmin && !inAdmin && (
@@ -131,7 +132,10 @@ function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut })
             <span>Settings</span>
           </Button>
           <div role="none" onClick={() => setOpen(false)}>
-            <DownloadLink className="flex min-h-11 w-full items-center gap-3 rounded-xl px-3 text-sm hover:bg-black/5" />
+            <DownloadLink
+              className="flex min-h-11 w-full items-center justify-start gap-3 rounded-xl px-3 text-sm [&>svg]:text-[var(--muted)] hover:bg-surface-secondary"
+              icon={<DownloadIcon />}
+            />
           </div>
           <Button type="button" variant="ghost" role="menuitem" className={row} onClick={() => choose(onSignOut)}>
             <SignOutIcon />
@@ -272,6 +276,9 @@ export default function Dashboard({ account, plans, view, settingsTab, busy, top
   // Chat shown inside a project keeps that project here rather than in the URL, so
   // the ordinary Chat entry stays the plain history and needs no extra route.
   const [chatProject, setChatProject] = useState(null);
+  // Bumped when a chat is deleted or restored on the history screen, so the Recents
+  // column is built again instead of showing a row that no longer exists.
+  const [chatsVersion, setChatsVersion] = useState(0);
   const toggleCollapsed = () => {
     setNavCollapsed((current) => {
       const next = !current;
@@ -366,6 +373,16 @@ export default function Dashboard({ account, plans, view, settingsTab, busy, top
               projectId={chatProject?.id ?? ''}
               projectName={chatProject?.name ?? ''}
               onLeaveProject={() => setChatProject(null)}
+              onOpenHistory={() => onViewChange('history')}
+              historyVersion={chatsVersion}
+            />
+          )}
+          {view === 'history' && (
+            <HistoryView
+              onBackToChat={() => onViewChange('chat')}
+              // A chat deleted or restored here changes the Recents column, so the
+              // shell is told and refetches rather than leaving a stale row behind.
+              onChanged={() => setChatsVersion((current) => current + 1)}
             />
           )}
           {view === 'projects' && (

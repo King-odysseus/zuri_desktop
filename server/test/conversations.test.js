@@ -52,6 +52,7 @@ const conversationRow = {
   created_at: CREATED_AT,
   updated_at: UPDATED_AT,
   message_count: '2',
+  preview: 'I need the passport form before Friday',
 };
 
 // ---------------------------------------------------------------------------
@@ -71,12 +72,19 @@ assert.deepEqual(listed, [{
   model: 'zuri-flash',
   origin: 'web',
   messageCount: 2,
+  // The last thing said travels with the row, so a list can show what a chat is
+  // about and not only its name.
+  preview: 'I need the passport form before Friday',
   pinned: false,
   archived: false,
   projectId: null,
   createdAt: CREATED_AT,
   updatedAt: UPDATED_AT,
 }]);
+// The quote under each name is the last message, clipped in the database so a long
+// reply is not carried whole for every row of the list.
+assert.match(listing.queries[0].text, /LEFT\(lm\.content, 240\)/);
+assert.match(listing.queries[0].text, /ORDER BY lm\.created_at DESC, lm\.id DESC LIMIT 1/);
 console.log('PASS conversations are listed for their owner only');
 
 const searched = recordingPool([{ match: 'FROM conversations c', reply: { rows: [conversationRow], rowCount: 1 } }]);
@@ -243,6 +251,9 @@ function createMemoryRepository() {
     model: row.model,
     origin: row.origin,
     messageCount: row.messages.length,
+    // The last thing said, clipped to the same 240 characters the SQL subquery
+    // takes, so a list row reads the same here as it does against Postgres.
+    preview: row.messages.length ? String(row.messages[row.messages.length - 1].content).slice(0, 240) : '',
     pinned: row.pinned === true,
     archived: row.archived === true,
     createdAt: row.createdAt,
@@ -380,7 +391,7 @@ assert.equal((await unconfigured(new Request('https://cloud.example.com/api/me/c
 const createdResponse = await call('POST', '/api/me/conversations', { token: tokenA, body: {} });
 assert.equal(createdResponse.status, 200);
 const newConversation = (await createdResponse.json()).data.conversation;
-assert.deepEqual(Object.keys(newConversation).sort(), ['archived', 'createdAt', 'id', 'messageCount', 'model', 'origin', 'pinned', 'title', 'updatedAt']);
+assert.deepEqual(Object.keys(newConversation).sort(), ['archived', 'createdAt', 'id', 'messageCount', 'model', 'origin', 'pinned', 'preview', 'title', 'updatedAt']);
 assert.equal(newConversation.title, 'New chat');
 assert.equal(newConversation.model, 'zuri-flash');
 assert.equal(newConversation.origin, 'web');

@@ -130,7 +130,8 @@ function isUuid(value) {
 // The message count travels with each conversation row, so the list is one query
 // rather than one query per thread.
 const CONVERSATION_COLUMNS =
-  'SELECT c.id, c.title, c.model, c.origin, c.pinned, c.archived, c.project_id, c.created_at, c.updated_at, COUNT(m.id)::INT AS message_count ' +
+  'SELECT c.id, c.title, c.model, c.origin, c.pinned, c.archived, c.project_id, c.created_at, c.updated_at, COUNT(m.id)::INT AS message_count, ' +
+  '(SELECT LEFT(lm.content, 240) FROM conversation_messages lm WHERE lm.conversation_id = c.id ORDER BY lm.created_at DESC, lm.id DESC LIMIT 1) AS preview ' +
   'FROM conversations c LEFT JOIN conversation_messages m ON m.conversation_id = c.id ';
 
 /** @param {object} row @returns {object} */
@@ -141,6 +142,9 @@ function publicConversation(row) {
     model: row.model,
     origin: row.origin,
     messageCount: Number(row.message_count ?? 0),
+    // The last message, so a thread can be recognised by what was said in it and
+    // not only by its name. Empty for a chat nobody has written to yet.
+    preview: typeof row.preview === 'string' ? row.preview : '',
     pinned: row.pinned === true,
     archived: row.archived === true,
     // null means the chat was never filed under a project, which is where every
