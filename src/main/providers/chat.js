@@ -1822,7 +1822,9 @@ export async function sendChatMessage(threadId, options = {}) {
     // run here, on this computer, because that is where the workspace is; the
     // server only ever forwards the definitions and returns the request.
     const allowedForAccount = agentAllowedTools(settings, options.agentId);
+    const disabledTools = new Set(Array.isArray(settings?.disabledTools) ? settings.disabledTools : []);
     const offeredForAccount = toolsForMode(mode, options.webSearch)
+      .filter((tool) => !disabledTools.has(tool.name))
       .filter((tool) => allowedForAccount === null || allowedForAccount.includes(tool.name));
 
     // The wire conversation grows as rounds go by: an assistant turn that asked

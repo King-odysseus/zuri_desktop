@@ -27,6 +27,7 @@ import {
   MoonIcon,
   OverlayIcon,
   PinIcon,
+  GridIcon,
   SunIcon,
   SyncIcon,
   TaskIcon,
@@ -45,6 +46,7 @@ export const NAV_ITEMS = [
   { key: 'chats', label: 'Chats', Icon: ChatIcon },
   { key: 'agents', label: 'Agents', Icon: AgentIcon },
   { key: 'skills', label: 'Skills', Icon: SkillsIcon },
+  { key: 'plugins', label: 'Plugins', Icon: GridIcon },
   { key: 'tasks', label: 'Tasks', Icon: TaskIcon },
   { key: 'reminders', label: 'Reminders', Icon: BellIcon },
   { key: 'automations', label: 'Automations', Icon: AutomationIcon },
@@ -87,7 +89,7 @@ function AccountMenuRow({ Icon, label, hint, onPress }) {
 // A short, calm list: the everyday destinations stay on screen and the rest fold under
 // More, so Recents keeps most of the height. Settings lives in the account menu.
 const PRIMARY_KEYS = ['tasks', 'reminders', 'automations', 'files'];
-const MORE_KEYS = ['agents', 'skills', 'images', 'features', 'cloud'];
+const MORE_KEYS = ['agents', 'skills', 'plugins', 'images', 'features', 'cloud'];
 const PRIMARY_ITEMS = NAV_ITEMS.filter(({ key }) => PRIMARY_KEYS.includes(key));
 const MORE_ITEMS = NAV_ITEMS.filter(({ key }) => MORE_KEYS.includes(key));
 

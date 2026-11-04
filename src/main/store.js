@@ -51,6 +51,9 @@ export const DEFAULT_DATA = Object.freeze({
     model: 'gpt-4o',
     allowedApps: Object.freeze([]),
     allowedUrls: Object.freeze([]),
+    // Built-in tools are on unless the person switches one off in Plugins. An
+    // exclusion list keeps older settings files fully backwards compatible.
+    disabledTools: Object.freeze([]),
     // The floating quick-ask window is opt-in: it sits above every other application,
     // so it opens at launch only after the person switches it on in Settings.
     overlayEnabled: false,
@@ -318,12 +321,17 @@ export async function saveSettings(patch, options = {}) {
   if (Object.hasOwn(patch, 'customInstructions') && typeof patch.customInstructions !== 'string') {
     return failure('SETTINGS_INVALID_ANSWER_STYLE', 'customInstructions must be text');
   }
+  if (Object.hasOwn(patch, 'disabledTools') && (!Array.isArray(patch.disabledTools) || patch.disabledTools.some((tool) => typeof tool !== 'string'))) {
+    return failure('SETTINGS_INVALID_PLUGINS', 'disabledTools must be a list of tool names');
+  }
 
   // Standing instructions come from a text box and ride in every request, so the
   // stored copy is trimmed and capped here rather than trusted as sent.
-  const clean = Object.hasOwn(patch, 'customInstructions')
-    ? { ...patch, customInstructions: patch.customInstructions.trim().slice(0, CUSTOM_INSTRUCTIONS_MAX_LENGTH) }
-    : patch;
+  const clean = {
+    ...patch,
+    ...(Object.hasOwn(patch, 'customInstructions') ? { customInstructions: patch.customInstructions.trim().slice(0, CUSTOM_INSTRUCTIONS_MAX_LENGTH) } : {}),
+    ...(Object.hasOwn(patch, 'disabledTools') ? { disabledTools: [...new Set(patch.disabledTools.map((tool) => tool.trim()).filter(Boolean))].slice(0, 100) } : {}),
+  };
 
   return withSettingsLock(async () => {
     const read = await readStore('settings', options);

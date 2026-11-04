@@ -2,21 +2,21 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Inspect the previously failing self-test assertions and current worktree",
+      "text": "Read project specifications and inspect existing tool, skill, settings, and navigation code",
       "state": "done"
     },
     {
-      "text": "Confirm the drawer, Flowbite shell, and admin-route fixes without changing unrelated work",
+      "text": "Add a persisted Plugins model and safe enable or disable controls for built-in tools and skills",
       "state": "done"
     },
     {
-      "text": "Run the full npm test gate and review the result",
+      "text": "Add the Plugins view and navigation entry with phone and desktop layouts",
       "state": "done"
     },
     {
-      "text": "Summarize verification and any remaining blockers: web build passes; browser visual check unavailable",
+      "text": "Run npm test and focused checks, then review the diff for security and scope",
       "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T01:20:00.000Z"
+  "updatedAt": "2026-11-04T01:40:00.000Z"
 }

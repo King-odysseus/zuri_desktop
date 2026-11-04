@@ -17,6 +17,7 @@ import SignInView from './SignInView.jsx';
 import NewProjectView from './NewProjectView.jsx';
 import SkillsView from './SkillsView.jsx';
 import AgeGateView from './AgeGateView.jsx';
+import PluginsView from './PluginsView.jsx';
 // The shell and every destination are now served by the React renderer.
 export default function App() {
   const isOverlay = new URLSearchParams(window.location.search).has('overlay');
@@ -193,6 +194,7 @@ export default function App() {
       {route === 'chats' && <ChatPanel key={chatSessionKey} initialThreadId={activeThreadId} onChatUpdated={refreshChats} onNavigate={setRoute} onNewChat={startNewChat} sidebarCollapsed={sidebarCollapsed} onToggleSidebar={() => setSidebarCollapsed((value) => !value)} />}
       {route === 'new-project' && <NewProjectView key={editingProject?.id ?? 'new'} project={editingProject} onCreated={() => { setEditingProject(null); refreshChats(); setRoute('chats'); }} />}
       {route === 'skills' && <SkillsView />}
+      {route === 'plugins' && <PluginsView onNavigate={setRoute} />}
       {route === 'agents' && <AgentsView />}
       {route === 'automations' && <AutomationsView />}
       {route === 'files' && <FilesView />}
