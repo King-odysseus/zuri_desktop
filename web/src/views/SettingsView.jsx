@@ -37,7 +37,7 @@ export default function SettingsView({ tab, onTabChange, panels, theme, onToggle
             variant="ghost"
             key={item.id}
             type="button"
-            className={`nav-item${current === item.id ? ' is-active' : ''} shrink-0`}
+            className={`nav-item w-full justify-start${current === item.id ? ' is-active' : ''} shrink-0`}
             aria-current={current === item.id ? 'page' : undefined}
             onClick={() => onTabChange(item.id)}
           >

@@ -1324,7 +1324,7 @@ a:hover {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 2px 4px 2px 2px;
+  padding: 2px 4px 2px 10px;
 }
 
 .sidebar-brand .brand-name {
@@ -6590,4 +6590,165 @@ h4,
    for the whole app, so no existing or future field can bring the handle back. */
 textarea {
   resize: none !important;
+}
+
+/* ------------------------------------------------------------------- one rail
+ * The signed-in panel is one grid in every view. The rail is 16px of padding, the
+ * first column (rail + 10px) holds every icon and every row that has no icon, and
+ * the second (rail + 42px beyond that) holds every label that follows an icon.
+ *
+ * Before this the chat column had 14px of side padding while every other page had
+ * 16px, so opening Chat shifted the whole navigation sideways, and the brand name,
+ * the nav labels, the search text and the chat titles each sat on a column of their
+ * own. These are the last word on those numbers, so a later section cannot drift
+ * them again.
+ */
+.sidebar-brand {
+  gap: 6px;
+}
+
+.chat-recents-head,
+.chat-recents-foot {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* The row is a 2px pill around an 8px inset, which puts its title on the same
+   column as the icons above it rather than 2px to the right of them. */
+.chat-recent-open {
+  padding: 9px 8px;
+}
+
+/* The typed words line up with the labels of the destinations, not 2px short. */
+.conversation-search {
+  gap: 10px;
+}
+
+@media (min-width: 900px) {
+  /* The chat column and the docked sidebar are the same panel, so they take the
+     same padding. Without this the navigation moved 2px sideways on every switch
+     between Chat and any other page. */
+  .chat-recents {
+    padding: 24px 16px;
+  }
+}
+
+/* A project tile is a grid cell, not a label: it takes its whole column and reads
+   from the left, so a row of projects shares one left edge and one right edge
+   instead of each tile being as wide as its own name. */
+.project-card {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+/* ------------------------------------------------------------------ one menu
+ * A phone reaches the drawer through one floating icon, and it is the same icon in
+ * the same place on every page. The chat drew it flat and the other pages drew it
+ * as a shadowed white circle, so the one control that is always on screen changed
+ * appearance when the person moved between Chat and anywhere else. It is flat
+ * everywhere now, and 44px, which is the smallest a thumb can hit reliably.
+ */
+@media (max-width: 899px) {
+  .nav-fab,
+  .chat-back {
+    width: 44px;
+    height: 44px;
+  }
+
+  .nav-fab {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .nav-fab:hover {
+    background: var(--nav-hover);
+  }
+
+  /* The bottom tab bar is gone, so the 4rem the chat reserved for it was empty
+     space under the composer. Only the home bar's own inset is still needed. */
+  .app-main.is-chat {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* A phone has one gutter, 16px, the same as the page padding the content below the
+ * top of the screen already uses. The chat and the drawer were the two places that
+ * used 14px and 20px, so a thumb moving between them met three different margins:
+ * the menu icon, the composer and the drawer's first row each started somewhere
+ * else. Everything on a narrow screen now starts on that one line. */
+@media (max-width: 899px) {
+  .sidebar,
+  .chat-recents {
+    padding-inline: 16px;
+  }
+
+  .chat-transcript,
+  .chat-composer-wrap {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+/* The account row's avatar is the widest mark in the panel, and it sat 2px left of
+   the icons above it because its row has its own inset. It joins their column. */
+.sidebar-account > .button {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+/* The two floating icons belong to the conversation's column, not to the window.
+ * They were pinned to the edges of the whole thread area, so on a wide screen the
+ * new-chat icon sat hundreds of pixels to the right of the last message and the
+ * menu icon equally far to the left of it. The row now takes the transcript's own
+ * width and padding, so both icons sit on the column the messages and the composer
+ * already use. */
+.chat-floats {
+  max-width: 896px;
+  margin-inline: auto;
+  padding: 0 16px;
+}
+
+@media (min-width: 900px) {
+  .chat-floats {
+    padding: 0 20px;
+  }
+}
+
+/* The nav gap widens by 2px on a phone so the rows breathe, which moved the label
+ * column to 54. The brand name and the search text were still built from the
+ * desktop gaps, so on a narrow screen they sat 2px left of every nav label. They
+ * take the same 2px so the panel keeps one label column at every width. */
+@media (max-width: 899px) {
+  .sidebar-brand {
+    gap: 8px;
+  }
+
+  .conversation-search {
+    gap: 12px;
+  }
+}
+
+/* The public bar and the page under it are one column. The bar sized itself from the
+ * shell's own 1440px container while every public section is 1200px wide with its
+ * own side padding, so at 1280 the logo sat 32px left of the headline and the last
+ * action 32px right of the copy. The bar now takes the sections' container and the
+ * sections' padding at each width, which puts the brand over the headline, and the
+ * actions over the right-hand edge of the same column. */
+.topbar-inner {
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+@media (min-width: 640px) {
+  .topbar-inner {
+    padding-inline: 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .topbar-inner {
+    padding-inline: 40px;
+  }
 }

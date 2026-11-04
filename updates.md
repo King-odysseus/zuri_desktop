@@ -1,3 +1,20 @@
+## 2026-11-04 - Windows (every UI measures from one rail)
+
+- The signed-in panel was two slightly different panels: the chat column carried 14px of side padding and every other page 16px, so the whole navigation jumped 2px sideways whenever Chat opened. One 16px rail now, at every width.
+- Text down the sidebar sat on five different left edges (brand name, nav labels, RECENTS, chat titles, footer note). Two columns now: 26 for icons and rows without one, 52 for labels that follow an icon, held at 390 and 1280.
+- A project tile took the width of its own name, so a row shared neither a left nor a right edge and left a dead strip beside it. Tiles fill their grid cell on phone and desktop.
+- The five Settings tabs were each as wide as their word inside a 210px column. They take the column's width, so all five start and end on the same edges.
+- A phone chat reserved 64px at the bottom for the tab bar that no longer exists, so the composer floated above the edge. The composer sits 16px from the sides with 20px below it.
+- The two floating chat icons (menu, new chat) were pinned to the whole thread area, so on a wide screen they sat hundreds of pixels outside the column the messages and composer use. They take the transcript's own width and padding, and the phone menu icon is one flat 44px control on every page.
+- The public top bar sized itself from the 1440px shell while every public section is 1200px with its own side padding, so at 1280 the logo sat 32px left of the headline. The bar takes the sections' container and their padding at each width.
+- The desktop model picker squashed its rows into its capped height, so each explanation drew over the next model name. A row keeps its own height and the list scrolls instead, capped at 70% of the window with a 4px gap, so it stays inside a short screen.
+- The desktop account row was 4px tighter and less round than every other row in the panel. It takes the 12px inset and the pill corner, so its avatar sits on the icon column.
+- Bumped to 0.2.12.
+- Checked: npm run test passes every stage (both builds, selftest, server tests, Electron smoke, first run, both demos, chat sync), none failing. The web pages were measured in a browser at 390, 1280 and 1920: every card, form and list starts on the line of its page heading, and no grid cell keeps a shrunken child.
+- Key files: web/src/styles.css, web/src/views/SettingsView.jsx, src/renderer-react/app.css.
+- Other OS action: npm run web:build, then npm run cloud:deploy. The desktop needs the rebuilt installer.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (desktop matches the web, navy logo, no console errors)
 
 - The web text fields no longer pass isDisabled and isReadOnly to the page as unknown attributes, which logged two console errors. They go on as the native disabled and readonly attributes. The date, time and select fields carry an aria-label.
