@@ -14,7 +14,7 @@
       "state": "done"
     },
     {
-      "text": "Summarize verification and any remaining blockers",
+      "text": "Summarize verification and any remaining blockers: web build passes; browser visual check unavailable",
       "state": "done"
     }
   ],
