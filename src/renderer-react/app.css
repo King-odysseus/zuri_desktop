@@ -831,6 +831,52 @@ button,
   gap: 4px;
 }
 
+/* The list is cut off at the foot of its cap, and nothing on its face said it went
+   on: the app hides every scrollbar (see the reset near the top of this file), which
+   is right for a page and wrong for a floating menu, where the cut edge is the only
+   thing in sight. These three popups are the one surface that draws a bar again.
+   It is thin and in the muted tone, so it reads as a rail beside the rows rather
+   than the 15px Windows strip that reset was aimed at, and it costs the rows 8px
+   of width only while the menu actually overflows. */
+.zuri-composer-menu {
+  /* `auto`, not `thin`: Chromium swaps to its own thin bar, arrows and all, as soon
+     as `scrollbar-width` names a thickness, and then ignores the rounded 8px thumb
+     drawn further down. Left at its initial value it keeps the thumb. */
+  scrollbar-width: auto !important; /* outranks the `*` reset, which is one class lighter */
+}
+
+/* Firefox has no ::-webkit-scrollbar, so the `auto` above would hand it the native
+   15px bar with arrow buttons: the very strip the reset was written to remove. It is
+   the one engine that needs a thickness named instead. */
+@supports not selector(::-webkit-scrollbar) {
+  .zuri-composer-menu {
+    scrollbar-width: thin !important;
+    scrollbar-color: color-mix(in oklab, var(--foreground) 26%, transparent) transparent;
+  }
+}
+
+/* Chromium takes `scrollbar-width` over the pseudo-elements, but the Electron build
+   this ships on is pinned behind that: the bar is restored in both spellings, or the
+   `display: none` in the reset would keep it invisible there. */
+.zuri-composer-menu::-webkit-scrollbar {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.zuri-composer-menu::-webkit-scrollbar-track,
+.zuri-composer-menu::-webkit-scrollbar-corner {
+  display: block !important;
+  background: transparent;
+}
+
+.zuri-composer-menu::-webkit-scrollbar-thumb {
+  display: block !important;
+  width: 8px !important;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 26%, transparent);
+}
+
 /* The mode picker is wider than the chip it opens from: each mode carries a one-line
    explanation, so it needs room to wrap rather than a row of dots. */
 .zuri-mode-menu {

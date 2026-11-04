@@ -3934,11 +3934,80 @@ a.download-card:hover {
   left: 0;
   z-index: 20;
   width: 16rem;
+  /* The add menu and the model list gained a picture section each, so on a short
+     window they grew taller than the room above the composer and left the top of the
+     list past the edge of the screen, where nothing could reach it. Capped to the
+     same share of the window the desktop menu uses, and scrolling inside it. */
+  max-height: min(60dvh, 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 0;
   border-radius: var(--radius-xl);
   background: var(--surface);
   box-shadow: var(--shadow-glass);
+}
+
+/*
+ * A menu that scrolls has to say so.
+ *
+ * The app paints no scrollbar anywhere (see the reset at the top of this file), which
+ * is right for a page and wrong for a floating menu: the list ends in a row cut
+ * through the middle at the foot of its cap, and nothing on its face said there was
+ * more below it. These are the only surfaces that turn the bar back on. It is 8px,
+ * rounded and in the muted tone, so it reads as a rail beside the rows rather than
+ * the 15px Windows strip the reset was aimed at, and a menu whose rows fit draws
+ * nothing at all.
+ */
+.chat-menu,
+.chat-model-menu,
+.chat-row-menu-projects {
+  /* `auto`, not `thin`: Chromium swaps to its own thin bar, arrows and all, as soon
+     as `scrollbar-width` names a thickness, and then ignores the rounded 8px thumb
+     drawn further down. Left at its initial value it keeps the thumb. */
+  scrollbar-width: auto !important; /* outranks the `*` reset, which is one class lighter */
+}
+
+/* Firefox has no ::-webkit-scrollbar, so the `auto` above would hand it the native
+   15px bar with arrow buttons: the very strip the reset was written to remove. It is
+   the one engine that needs a thickness named instead. */
+@supports not selector(::-webkit-scrollbar) {
+  .chat-menu,
+  .chat-model-menu,
+  .chat-row-menu-projects {
+    scrollbar-width: thin !important;
+    scrollbar-color: color-mix(in oklab, var(--text) 24%, transparent) transparent;
+  }
+}
+
+/* Chromium honours `scrollbar-width` over the pseudo-elements, but browsers already
+   out there are behind that: the bar is restored in both spellings, or the
+   `display: none` in the reset would keep it invisible in them. */
+.chat-menu::-webkit-scrollbar,
+.chat-model-menu::-webkit-scrollbar,
+.chat-row-menu-projects::-webkit-scrollbar {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.chat-menu::-webkit-scrollbar-track,
+.chat-model-menu::-webkit-scrollbar-track,
+.chat-row-menu-projects::-webkit-scrollbar-track,
+.chat-menu::-webkit-scrollbar-corner,
+.chat-model-menu::-webkit-scrollbar-corner,
+.chat-row-menu-projects::-webkit-scrollbar-corner {
+  display: block !important;
+  background: transparent;
+}
+
+.chat-menu::-webkit-scrollbar-thumb,
+.chat-model-menu::-webkit-scrollbar-thumb,
+.chat-row-menu-projects::-webkit-scrollbar-thumb {
+  display: block !important;
+  width: 8px !important;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--text) 24%, transparent);
 }
 
 .chat-menu-row,
@@ -4195,6 +4264,11 @@ a.download-card:hover {
   bottom: calc(100% + 8px);
   z-index: 20;
   min-width: 180px;
+  /* Same cap as the add menu: a long list of models and picture models scrolls
+     inside the panel instead of running off the top of a short window. */
+  max-height: min(60dvh, 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 4px;
   border: 0;
   border-radius: var(--radius-xl);

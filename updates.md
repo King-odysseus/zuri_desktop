@@ -1,3 +1,14 @@
+## 2026-11-04 - Windows (a menu that scrolls says so)
+
+- Both apps hide every scrollbar on purpose, which is right for a page and wrong for a floating menu: the model picker ends in a row cut through the middle at the foot of its height cap, and nothing on its face said there was more below it. The composer pop-ups (the model list, the + menu and the desktop mode picker) and the web project menu now draw a thin 8px rounded bar in the muted tone, only while their rows actually overflow. Everywhere else the no-scrollbar design is unchanged.
+- The bar is restored in both spellings. Chromium swaps to its own thin bar, arrows and all, as soon as `scrollbar-width` names a thickness and then ignores the rounded thumb, so the rule leaves it at `auto` and draws the thumb itself; Firefox has no `::-webkit-scrollbar`, so a `@supports not selector(::-webkit-scrollbar)` block names a thin bar with the same colour for it alone.
+- The web model list and the web + menu had no height cap at all, so on a short screen they grew past the top of the window and their first row sat where nothing could reach it. Both are capped to `min(60dvh, 22rem)`, the same share of the window the desktop menu uses, and scroll inside the cap.
+- Checked in a browser at 390 wide: the model menu at a 430px window showed the bar with all of it on screen; the + menu at a 300px window showed the bar and stopped 72px above the bottom edge, where before it hung off the top; at a taller window the + menu fit, so no bar appeared. The desktop pop-up was driven through the built renderer stylesheet in a browser. The chat thread, the chat list and the page itself still draw no bar and claim no width.
+- Bumped to 0.2.13.
+- Key files: web/src/styles.css, src/renderer-react/app.css.
+- Other OS action: npm run web:build, then npm run cloud:deploy. The desktop needs the rebuilt installer.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (every UI measures from one rail)
 
 - The signed-in panel was two slightly different panels: the chat column carried 14px of side padding and every other page 16px, so the whole navigation jumped 2px sideways whenever Chat opened. One 16px rail now, at every width.
