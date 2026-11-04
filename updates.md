@@ -1550,3 +1550,12 @@
 - Other OS action: run `npm test` before packaging or deploying. No new dependency was added.
 - Done on: Windows
 
+## 2026-11-04 - Windows (Office starter prompts use the live file)
+
+- Added a browser-safe intelligence layer for the Office pane. After the pane reads the current workbook, document or deck, its starter prompts now reflect the facts it found: formulas, tables and sheets in Excel; selection, paragraph count and headings in Word; selection, slide count and empty slides in PowerPoint.
+- The intelligence layer is deterministic and read-only. It does not change the existing reviewed-operation flow, and the full context still goes to the model when the person sends a message.
+- Added self-test coverage for all three Office hosts and served the new pane asset through the local HTTPS add-in server.
+- Key files: src/addin/intelligence.js, src/addin/taskpane.js, src/addin/taskpane.html, src/main/addin.js, scripts/selftest.js.
+- Other OS action: none beyond the usual test/build workflow. Rebuild the desktop installer before distributing the change.
+- Done on: Windows
+

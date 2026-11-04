@@ -837,6 +837,44 @@ check('the Office pane can improve a prompt in Excel, Word and PowerPoint alike'
   return 'Improve, undo and suggestions, the same in Excel, Word and PowerPoint';
 });
 
+check('the Office pane turns live file context into smart starter prompts', async () => {
+  const page = read('src/addin/taskpane.html');
+  const script = read('src/addin/taskpane.js');
+  const server = read('src/main/addin.js');
+  const intelligence = read('src/addin/intelligence.js');
+  if (!page.includes('intelligence.js')) throw new Error('the pane does not load its intelligence layer');
+  if (!script.includes('paintSmartSuggestions(context)')) throw new Error('the pane never refreshes context-aware suggestions');
+  if (!server.includes("'/intelligence.js'")) throw new Error('the add-in server does not serve the intelligence layer');
+
+  const vm = await import('node:vm');
+  const sandbox = { module: { exports: {} } };
+  vm.createContext(sandbox);
+  vm.runInContext(intelligence, sandbox);
+  const smart = sandbox.module.exports;
+  const excel = smart.getSmartSuggestions('Excel', [
+    'Workbook sheets: Budget, Summary.',
+    'Existing formulas:',
+    'Excel tables on this sheet: BudgetTable A1:F30.',
+    '',
+    'Selected cells (B2:C4):',
+    'Revenue',
+  ].join('\\n'));
+  if (!excel.some((item) => /formulas/i.test(item)) || !excel.some((item) => /totals across/i.test(item))) {
+    throw new Error('Excel suggestions do not use formulas and workbook structure');
+  }
+
+  const word = smart.getSmartSuggestions('Word', 'The document has 14 paragraphs.\\n[Heading 1] Summary\\n\\nSelected text:\\nA short paragraph.');
+  if (!word.some((item) => /selected text/i.test(item)) || !word.some((item) => /outline/i.test(item))) {
+    throw new Error('Word suggestions do not use selection and document length');
+  }
+
+  const powerpoint = smart.getSmartSuggestions('PowerPoint', 'The deck has 6 slides.\\nSlide 2: (no text)\\nSelected text:\\nA title');
+  if (!powerpoint.some((item) => /slide titles/i.test(item)) || !powerpoint.some((item) => /no readable text/i.test(item))) {
+    throw new Error('PowerPoint suggestions do not use slide structure');
+  }
+  return 'Excel, Word and PowerPoint starter prompts are based on the current file';
+});
+
 check('the Office pane shows thinking before the first streamed token', () => {
   const script = read('src/addin/taskpane.js');
   const css = read('src/addin/taskpane.css');
@@ -1140,7 +1178,7 @@ check('the installer carries the Office pane', () => {
   if (!packageJson.build?.files?.includes('src/addin/**/*')) {
     throw new Error('electron-builder does not package src/addin');
   }
-  for (const name of ['taskpane.html', 'taskpane.js', 'taskpane.css', 'ops.js']) {
+  for (const name of ['taskpane.html', 'taskpane.js', 'taskpane.css', 'ops.js', 'intelligence.js']) {
     if (!exists('src/addin/' + name)) throw new Error('src/addin/' + name + ' is missing');
   }
   return 'src/addin is packaged';

@@ -27,6 +27,7 @@ const STATIC_FILES = Object.freeze({
   '/taskpane.js': { file: 'taskpane.js', type: 'text/javascript; charset=utf-8' },
   '/taskpane.css': { file: 'taskpane.css', type: 'text/css; charset=utf-8' },
   '/ops.js': { file: 'ops.js', type: 'text/javascript; charset=utf-8' },
+  '/intelligence.js': { file: 'intelligence.js', type: 'text/javascript; charset=utf-8' },
 });
 
 /** Where the certificate, secret and manifest live, under Zuri's own data folder. */

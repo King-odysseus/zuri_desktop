@@ -14,6 +14,7 @@
   'use strict';
 
   var ZuriOps = window.ZuriOps;
+  var ZuriIntelligence = window.ZuriIntelligence;
   var token = document.querySelector('meta[name="zuri-token"]').content;
 
   var pane = {
@@ -1589,6 +1590,7 @@
       .then(function (context) {
         state.context = context;
         pane.contextText.textContent = context.label;
+        paintSmartSuggestions(context);
         setStatus('');
         startStream(context.text);
       })
@@ -1862,7 +1864,12 @@
       return;
     }
 
-    copy.suggestions.forEach(function (suggestion) {
+    paintSuggestionButtons(copy.suggestions);
+  }
+
+  /** Draw prompts that reflect what the current file actually contains. */
+  function paintSuggestionButtons(suggestions) {
+    suggestions.forEach(function (suggestion) {
       var button = el('button', 'suggestion', suggestion);
       button.type = 'button';
       button.addEventListener('click', function () {
@@ -1873,6 +1880,14 @@
       });
       pane.suggestions.appendChild(button);
     });
+  }
+
+  function paintSmartSuggestions(context) {
+    if (!ZuriIntelligence || typeof ZuriIntelligence.getSmartSuggestions !== 'function') return;
+    var suggestions = ZuriIntelligence.getSmartSuggestions(state.host, context.text);
+    if (suggestions.length === 0 || state.messages.length > 0) return;
+    pane.suggestions.textContent = '';
+    paintSuggestionButtons(suggestions);
   }
 
   function renderThread() {
@@ -2023,6 +2038,7 @@
       .then(function (context) {
         state.context = context;
         pane.contextText.textContent = context.label;
+        paintSmartSuggestions(context);
         setStatus('');
       })
       .catch(function (error) {
