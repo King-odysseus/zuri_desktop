@@ -1,3 +1,16 @@
+## 2026-11-04 - Windows (a saved chat shows its name again, and chat history has a door)
+
+- In the browser, and on a phone through the same build, every saved chat in the sidebar showed only a time. The HeroUI migration had put each row's whole label inside HeroUI's Button, which is a fixed 40px box that centres what it holds; the row stacks a name, the last message and a time, so the name was squeezed to nothing while the timestamp, which does not clip, survived. The row is content-sized again with a 44px tap target, the name on one clipped line above the message and the time beside it. The desktop sidebar never lost its names and is unchanged.
+- Each row now carries the words of the last message: the conversations summary in server/src/db.js returns a bounded preview of the newest message, so a chat can be recognised without opening it.
+- The chat search was two boxes: the pill drawn by `.conversation-search` and a second HeroUI field inside it with its own corners, padding and shadow. The input now draws nothing and the pill is the only box, and the focus ring moved to the pill so the field still shows focus.
+- The saved-chat column has a heading again, Recents on the chat and Chats inside a project, with a Chat history button at its end.
+- New web screen at /history lists every chat including archived ones, with search, restore, delete one and delete all. Closing it refreshes the chat list without remounting the open chat.
+- Checked: npm run test passes, 303 checks, none failing, and the three new selftest checks fail if the row is put back inside a fixed height, if the inner search field draws its own box, or if the heading and the way into the history are removed. Looked at in a browser at 390, 1280 and 1920 wide.
+- Key files: web/src/views/ChatView.jsx, web/src/components/ConversationSearch.jsx, web/src/views/HistoryView.jsx, web/src/views/Dashboard.jsx, web/src/App.jsx, web/src/lib/api.js, web/src/styles.css, server/src/db.js, scripts/selftest.js.
+- Other OS action: npm run web:build, then npm run cloud:deploy so Railway serves the new bundle. The desktop app needs no rebuild for this.
+- Done on: Windows
+
+
 ## 2026-11-04 - Windows (HeroUI is the only component library on desktop, web and mobile)
 
 - Flowbite React is gone. Both surfaces now render HeroUI v3 (`@heroui/react` + `@heroui/styles`), and the shared `ui.jsx` of each surface is the only way a page reaches a control: Button, IconButton, Input, Textarea, Select, Checkbox, Radio, Chip, Card, UsageBar and Alert are all HeroUI underneath. `flowbite-react` is removed from the dependencies and from both stylesheets.

@@ -79,6 +79,9 @@
   --success-foreground: #ffffff;
   --warning-foreground: #ffffff;
   --overlay-foreground: var(--text);
+  /* A calendar, menu or dialog floats on the page's own shadow, not the
+     library's neutral grey with its one-pixel inset line. */
+  --overlay-shadow: var(--shadow-glass);
 }
 
 /*
@@ -132,6 +135,8 @@
   --surface-tertiary: #e6edfa;
   --raised: #d3def5;
   --glass: #ffffff;
+  /* A floating layer stays white in daylight, so it lifts off a soft card. */
+  --overlay: #ffffff;
   /* Dividers are the second fill step so they stay quiet on white. */
   --hairline: #e6edfa;
   --strong: #d3def5;
@@ -234,6 +239,8 @@
   --surface-tertiary: #181448;
   --raised: #221d5c;
   --glass: #060421;
+  /* On navy a floating layer steps above the card it covers. */
+  --overlay: #181448;
   --hairline: #181448;
   --strong: #2a2570;
   /* The field fill steps above the card on the navy page, as on the desktop app:
@@ -4650,17 +4657,28 @@ h4,
   min-width: 0;
 }
 
+/*
+ * Each half keeps its own natural width, so the calendar button and the AM/PM
+ * segment are never squeezed out; a column too narrow for both stacks them.
+ */
 .date-time-field > * {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: max-content;
 }
 
-.date-input-group,
-.number-field-group {
+/* HeroUI's own group class names differ per control, so the slot attribute is the
+   stable hook. The number group keeps its buttons flush, so it takes no padding. */
+[data-slot='date-input-group'] {
   min-height: var(--control-height);
   border-radius: var(--radius-md);
   background: var(--field-background);
   padding: 0 12px;
+}
+
+[data-slot='number-field-group'] {
+  min-height: var(--control-height);
+  border-radius: var(--radius-md);
+  background: var(--field-background);
 }
 
 .project-textarea {
@@ -5589,8 +5607,10 @@ h4,
 
 @media (min-width: 720px) {
   .task-form-grid {
-    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr);
-    align-items: end;
+    /* The middle column holds a day and a clock side by side, so it needs more
+       room than the third; a wrapped pair would leave the labels out of step. */
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.4fr) minmax(0, 1fr);
+    align-items: start;
   }
 }
 

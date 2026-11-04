@@ -2,33 +2,33 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Read chat sidebar code and reproduce the three chat faults",
+      "text": "Left-align the account popup rows and make the popup readable in the dark theme",
       "state": "done"
     },
     {
-      "text": "Restore chat previews/titles in the sidebar",
-      "state": "done"
-    },
-    {
-      "text": "Fix the doubled search field so it is one rounded box",
-      "state": "done"
-    },
-    {
-      "text": "Restore the Recents header and the chat history button (with a history screen)",
-      "state": "done"
-    },
-    {
-      "text": "Verify the chat sidebar and history screen at 390/768/1280/1920",
-      "state": "done"
-    },
-    {
-      "text": "Run npm run test, commit and push",
+      "text": "Check the uncommitted stylesheet work and pick up where the other run stopped",
       "state": "active"
     },
     {
-      "text": "Rebuild the Windows installer and deploy to Railway",
+      "text": "Run the full test suite and rebuild both bundles",
+      "state": "pending"
+    },
+    {
+      "text": "Look over the changed screens at 390/768/1280/1920",
+      "state": "pending"
+    },
+    {
+      "text": "Commit and push",
+      "state": "pending"
+    },
+    {
+      "text": "Build the Windows installer",
+      "state": "pending"
+    },
+    {
+      "text": "Deploy the cloud server to Railway and confirm it is live",
       "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T11:22:48.879Z"
+  "updatedAt": "2026-11-04T11:31:56.599Z"
 }
