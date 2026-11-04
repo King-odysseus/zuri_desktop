@@ -4230,6 +4230,7 @@ a.download-card:hover {
 .chat-suggestion {
   display: flex;
   align-items: flex-start;
+  justify-content: flex-start;
   gap: 6px;
   width: 100%;
   padding: 8px 8px 8px 6px;

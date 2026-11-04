@@ -11,20 +11,20 @@
     },
     {
       "text": "Rebuild the web bundle and check the toggle in a browser at 1280px and 390px",
-      "state": "active"
+      "state": "done"
     },
     {
       "text": "Check the chat sidebar for the outstanding faults (search field, previews, Recents header, padding)",
-      "state": "pending"
+      "state": "done"
     },
     {
       "text": "Run npm run test, commit and push",
-      "state": "pending"
+      "state": "active"
     },
     {
       "text": "Rebuild the Windows installer and deploy to Railway",
       "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T11:45:59.869Z"
+  "updatedAt": "2026-11-04T11:50:31.690Z"
 }
