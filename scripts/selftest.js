@@ -163,6 +163,47 @@ check('dates, times and numbers are HeroUI fields, never the browser picker', ()
   return `${sources.length} files use the shared fields`;
 });
 
+check('the prompt enhancer rewrites the message as well as offering additions', () => {
+  // Both halves are the point of the button: better wording in the box, and the
+  // details the message left open. A surface that drew only the list looked like the
+  // button did nothing, which is what a person reported.
+  const web = read('web/src/views/ChatView.jsx');
+  const desktop = read('src/renderer-react/ChatPanel.jsx');
+  for (const [name, source, setter] of [
+    ['web', web, 'setDraft(text)'],
+    ['desktop', desktop, 'setDraft(improved)'],
+  ]) {
+    if (!source.includes(setter)) throw new Error(`the ${name} composer never takes the rewritten prompt`);
+    if (!source.includes('setEnhanceSuggestions(')) throw new Error(`the ${name} composer never shows the additions`);
+    if (!source.includes('Add to your prompt')) throw new Error(`the ${name} composer has no heading for the additions`);
+  }
+  return 'both surfaces put the rewrite in the box and the additions beside it';
+});
+
+check('the prompt enhancer reply is read as a rewrite and a list, never as an answer', () => {
+  return import(pathToFileURL(path.join(root, 'server', 'src', 'prompts.js')).href).then(({ readEnhancerReply }) => {
+    const reply = readEnhancerReply([
+      'PROMPT:',
+      'Write a five slide proposal for a small business owner.',
+      'SUGGESTIONS:',
+      '- By when: the date you need it.',
+      '- Tone: plain and direct.',
+    ].join('\n'));
+    if (reply.shaped !== true) throw new Error('a reply in the asked shape is not recognised');
+    if (reply.prompt !== 'Write a five slide proposal for a small business owner.') {
+      throw new Error('the rewrite was not read out of the first block');
+    }
+    if (reply.suggestions.length !== 2) throw new Error('the additions were not read out of the second block');
+    // Prose before the blocks is what a model writes when it answers instead, and it
+    // must never be glued onto the message the person sends.
+    const chatty = readEnhancerReply('Sure, here is a better prompt.\nPROMPT:\nRewrite this.\nSUGGESTIONS:');
+    if (chatty.prompt !== 'Rewrite this.') throw new Error('the opening line leaked into the rewritten prompt');
+    const unshaped = readEnhancerReply('Here is a proposal for your business.');
+    if (unshaped.shaped !== false || unshaped.prompt !== '') throw new Error('an answer was read as a rewritten prompt');
+    return 'the rewrite and the additions are read apart, and an answer is refused';
+  });
+});
+
 check('the sidebar refreshes after chat history changes', () => {
   const source = read('src/renderer-react/Sidebar.jsx');
   for (const required of ["window.zuri?.state?.onChanged?.", "change?.area === 'chats'", 'stopListening?.()']) {
@@ -189,14 +230,29 @@ check('the sidebar can be dragged to a width that is kept, and long titles end i
   }
   // HeroUI's Button draws its children directly, with no label wrapper span the
   // way Flowbite had, so the title span itself must be allowed to shrink inside
-  // the button, or a long title widens the row instead of clipping.
-  if (!sidebar.includes('className="min-w-0 flex-1 justify-start truncate rounded-lg px-2 py-2 text-left"')) {
+  // the button, or a long title widens the row instead of clipping. The class list
+  // also carries the highlight's roundness, so it is read as a set of requirements
+  // rather than as one frozen string.
+  const threadButton = /className="([^"]*)"[^>]*onPress=\{\(\) => onSelectThread\(thread\.id\)\}/.exec(sidebar)?.[1] ?? '';
+  if (!threadButton.includes('min-w-0') || !threadButton.includes('flex-1')) {
     throw new Error('the thread button cannot shrink, so a long title would widen the row');
+  }
+  if (!threadButton.includes('rounded-full')) {
+    throw new Error('the selected chat no longer takes a pill around the row');
   }
   if (!sidebar.includes('className="zuri-thread-title"')) {
     throw new Error('the thread title lost its clipping class');
   }
-  return 'resizable between its limits, width remembered, titles clipped with an ellipsis';
+  // The row quotes the last message and says when the chat was touched. The name
+  // alone could not tell two chats about the same subject apart.
+  for (const required of ['zuri-thread-quote', 'zuri-thread-when', 'threadWhen(']) {
+    if (!sidebar.includes(required)) throw new Error(`the saved-chat row is missing ${required}`);
+  }
+  const when = /\.zuri-thread-when\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+  for (const declaration of ['flex: none', 'white-space: nowrap']) {
+    if (!when.includes(declaration)) throw new Error(`the time rule lacks ${declaration}`);
+  }
+  return 'resizable between its limits, width remembered, titles clipped, last words and time on the row';
 });
 
 check('saved chats can be renamed without losing the continue action', () => {

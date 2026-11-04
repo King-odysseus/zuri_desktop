@@ -61,6 +61,29 @@ export const NAV_ITEMS = [
 export const QUICK_ASK_HINT =
   typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform ?? '') ? 'Cmd Alt Space' : 'Ctrl Alt Space';
 
+/**
+ * How long ago the chat was last touched, in words short enough for a row. A week
+ * old is measured in weeks, and past a month the plain date says more than
+ * "5 weeks ago" does.
+ */
+function threadWhen(thread) {
+  const stamp = Date.parse(thread?.updatedAt ?? thread?.createdAt ?? '');
+  if (Number.isNaN(stamp)) return '';
+  const minutes = Math.floor((Date.now() - stamp) / 60_000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 28) {
+    const weeks = Math.floor(days / 7);
+    return weeks === 1 ? '1 week ago' : `${weeks} weeks ago`;
+  }
+  return new Date(stamp).toLocaleDateString();
+}
+
 /** The round initial shown until Zuri has a picture for the person. */
 function initialFor(name, email) {
   const source = String(name || email || 'Z').trim();
@@ -311,6 +334,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
   function renderThread(thread) {
     const label = thread.title || 'New chat';
     const quote = threadQuote(thread);
+    const when = threadWhen(thread);
     return (
       <div key={thread.id} className="group mb-1">
         <div className="flex items-center gap-1">
@@ -318,7 +342,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             type="button"
             variant={thread.id === activeThreadId ? 'secondary' : 'ghost'}
             fullWidth
-            className="min-w-0 flex-1 justify-start truncate rounded-lg px-2 py-2 text-left"
+            className="min-w-0 flex-1 justify-start rounded-full px-3 py-2 text-left"
             onPress={() => onSelectThread(thread.id)}
           >
             <span className="zuri-thread-row">
@@ -326,7 +350,12 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
                 {thread.pinned === true && <PinIcon size={12} className="mr-1 shrink-0" aria-hidden="true" />}
                 <span className="zuri-thread-title" title={label}>{label}</span>
               </span>
-              {quote !== '' && <span className="zuri-thread-quote" title={quote}>{quote}</span>}
+              {(quote !== '' || when !== '') && (
+                <span className="zuri-thread-line zuri-thread-meta">
+                  {quote !== '' && <span className="zuri-thread-quote" title={quote}>{quote}</span>}
+                  {when !== '' && <span className="zuri-thread-when">{when}</span>}
+                </span>
+              )}
             </span>
           </Button>
           {/* Shown on hover or keyboard focus so the title keeps the room it needs. */}
@@ -377,7 +406,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
                 type="button"
                 variant="ghost"
                 role="menuitem"
-                className="min-h-11 justify-start rounded-lg px-2 text-left"
+                className="min-h-11 justify-start rounded-full px-3 text-left"
                 isDisabled={thread.projectId === project.id}
                 onPress={() => void moveThread(thread.id, project.id)}
               >
@@ -407,7 +436,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
         type="button"
         variant={current === key ? 'secondary' : 'ghost'}
         fullWidth
-        className="min-h-11 justify-start gap-2 rounded-xl px-3 font-normal"
+        className="min-h-11 justify-start gap-2 rounded-full px-3 font-normal"
         aria-current={current === key ? 'page' : undefined}
         onPress={() => onNavigate(key)}
       >
@@ -508,7 +537,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           <Button
             variant="ghost"
             fullWidth
-            className="zuri-new-chat min-h-11 justify-start gap-2 rounded-xl px-3 font-normal"
+            className="zuri-new-chat min-h-11 justify-start gap-2 rounded-full px-3 font-normal"
             onPress={onNewChat}
           >
             <EditIcon size={16} />
@@ -523,7 +552,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
             type="button"
             variant="ghost"
             fullWidth
-            className="min-h-11 justify-start gap-2 rounded-xl px-3 font-normal text-muted"
+            className="min-h-11 justify-start gap-2 rounded-full px-3 font-normal text-muted"
             aria-expanded={moreOpen}
             onPress={() => setMoreOpen((open) => !open)}
           >
@@ -560,7 +589,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
                     type="button"
                     variant="ghost"
                     fullWidth
-                    className="min-h-11 min-w-0 flex-1 justify-start gap-2 truncate rounded-lg px-2 text-left"
+                    className="min-h-11 min-w-0 flex-1 justify-start gap-2 truncate rounded-full px-3 text-left"
                     aria-expanded={isOpen}
                     onPress={() => toggleProject(project.id)}
                   >

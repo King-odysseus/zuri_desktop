@@ -603,14 +603,28 @@ createServer(async (request, response) => {
   // could add to it. It never stands in for an answer to the message.
   if (url.pathname === '/api/prompts/enhance' && request.method === 'POST') {
     const sent = JSON.parse((await readBody(request)) || '{}');
-    const words = String(sent.prompt ?? '').trim();
+    const words = String(sent.prompt ?? '').trim().replace(/\s+/g, ' ');
+    // The real enhancer is a model call. The preview stands in for it with the two
+    // things a person can see it do: word the message better, and name what it left
+    // open. Echoing the message back, as this used to, made a working button look
+    // broken, because the composer then showed the same words it started with.
+    const tightened = words
+      .replace(/^(?:please\s+|(?:can|could|would)\s+you\s+(?:please\s+)?|i\s+(?:want|need)\s+you\s+to\s+|help\s+me\s+)/i, '')
+      .replace(/^([a-z])/, (letter) => letter.toUpperCase());
+    const lower = words.toLowerCase();
+    const suggestions = [];
+    if (!/\b(for|audience|aimed at|readers?|users?|customers?)\b/.test(lower)) {
+      suggestions.push('Audience: who this is for, for example a small business owner.');
+    }
+    if (!/\b(by|before|deadline|due|today|tomorrow|this week|next week|monday|tuesday|wednesday|thursday|friday)\b/.test(lower)) {
+      suggestions.push('By when: the date you need it.');
+    }
+    if (!/\b(slides?|pages?|words?|paragraphs?|short|brief|detailed|long)\b/.test(lower)) {
+      suggestions.push('How long: the number of slides, pages or words you want.');
+    }
     return json(response, {
-      prompt: words,
-      suggestions: [
-        'Audience: who this is for, for example a small business owner.',
-        'By when: the date you need it.',
-        'Say what the dashboard must show.',
-      ],
+      prompt: tightened === '' ? words : tightened,
+      suggestions: suggestions.slice(0, 3),
       original: words,
     });
   }

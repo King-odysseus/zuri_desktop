@@ -442,6 +442,19 @@ button,
   min-width: 0;
 }
 
+/* A HeroUI button is a fixed 40px box that centres what it holds. With two lines in
+   it, that box squeezed the name and left both lines sitting on its lower edge. The
+   row is content-sized with even padding, so the words sit in the middle of the
+   highlight, and the highlight itself is a pill rather than a rounded box. */
+.zuri-sidebar-panel button:has(.zuri-thread-row) {
+  height: auto;
+  min-height: 44px;
+  align-items: center;
+  padding-top: 7px;
+  padding-bottom: 7px;
+  border-radius: 9999px;
+}
+
 .zuri-thread-line {
   display: flex;
   align-items: center;
@@ -450,6 +463,7 @@ button,
 
 .zuri-thread-quote {
   display: block;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--nav-muted);
@@ -457,6 +471,22 @@ button,
   font-weight: 400;
   line-height: 1.35;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The quote keeps its room and the time keeps its own, so a long quote clips rather
+   than pushing the time off the row. The web list words the two the same way. */
+.zuri-thread-meta {
+  gap: 6px;
+}
+
+.zuri-thread-when {
+  flex: none;
+  margin-left: auto;
+  color: var(--nav-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
   white-space: nowrap;
 }
 

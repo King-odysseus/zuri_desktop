@@ -2,29 +2,41 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Find the avatar + text row shown in the screenshot",
+      "text": "View screenshots and reproduce the three sidebar faults",
       "state": "done"
     },
     {
-      "text": "Pin the avatar to the left on mobile; also fix the folded 76px rail where the avatar hung outside the panel",
+      "text": "Fix chat row titles/previews, single search pill, Recents header + history door",
       "state": "done"
     },
     {
-      "text": "Give status badges recognisable colours (active green, deactivated red) across web, desktop and phone",
+      "text": "Verify in browser and run the full suite",
       "state": "done"
     },
     {
-      "text": "Verify the badges and the avatar in a browser at 390 and 1280 wide",
+      "text": "Audit desktop, web and mobile for the same UI features",
       "state": "done"
     },
     {
-      "text": "Run the full test suite (307 checks, no failures)",
+      "text": "Make the prompt enhancer rewrite the prompt as well as list additions, on both surfaces",
       "state": "done"
     },
     {
-      "text": "Rebuild the Windows installer and deploy to Railway (installer 0.2.6 built, live site serving the new colours)",
-      "state": "done"
+      "text": "Make the nav active/hover highlight fully rounded with padding off the bottom edge",
+      "state": "active"
+    },
+    {
+      "text": "Rebuild bundles, run npm run test, commit and push",
+      "state": "pending"
+    },
+    {
+      "text": "Rebuild and install the Windows installer",
+      "state": "pending"
+    },
+    {
+      "text": "Deploy the web UI to Railway and verify the live site",
+      "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T12:33:22.694Z"
+  "updatedAt": "2026-11-04T13:05:51.836Z"
 }
