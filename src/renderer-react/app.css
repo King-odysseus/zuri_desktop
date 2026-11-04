@@ -1529,6 +1529,12 @@ html:has(.zuri-overlay-root) #root {
   color: var(--foreground);
 }
 
+/* Keep the account control anchored to the foot even when a short conversation
+   list or a narrow window leaves spare room in the navigation column. */
+.zuri-sidebar-panel > .relative.mt-auto {
+  margin-top: auto;
+}
+
 .zuri-account-trigger:hover,
 .zuri-account-trigger[aria-expanded='true'] {
   background: var(--selected);

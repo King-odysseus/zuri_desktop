@@ -617,7 +617,7 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
           {looseThreads.map(renderThread)}
         </div>
 
-        <div className="relative border-t border-border px-3 py-3" ref={menuRef}>
+        <div className="relative mt-auto border-t border-border px-3 py-3" ref={menuRef}>
           {menuOpen && (
             <div role="menu" aria-label="Your account" className="zuri-account-menu">
               <div className="zuri-account-head">

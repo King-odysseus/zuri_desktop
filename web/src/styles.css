@@ -1689,6 +1689,12 @@ body:has(.app) .app {
   color: var(--nav-foreground);
 }
 
+/* The account control is the final navigation action on every viewport, including
+   the phone drawer where the panel itself is fixed to the screen. */
+.sidebar-account {
+  margin-top: auto;
+}
+
 .avatar {
   display: grid;
   place-items: center;
