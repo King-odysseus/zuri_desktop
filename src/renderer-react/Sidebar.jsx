@@ -338,11 +338,18 @@ export default function Sidebar({ current, onNavigate, onNewChat, onSelectThread
     return (
       <div key={thread.id} className="group mb-1">
         <div className="flex items-center gap-1">
+          {/*
+            * The open chat is marked by its name, not by a fill behind the row: the
+            * filled pill read as a filter chip and sat awkwardly against the action
+            * buttons beside it. `is-open` carries that to app.css, and aria-current
+            * says the same thing to a screen reader.
+            */}
           <Button
             type="button"
-            variant={thread.id === activeThreadId ? 'secondary' : 'ghost'}
+            variant="ghost"
             fullWidth
-            className="zuri-thread-open min-w-0 flex-1 justify-start rounded-full px-3 py-2 text-left"
+            className={`zuri-thread-open min-w-0 flex-1 justify-start rounded-full px-3 py-2 text-left${thread.id === activeThreadId ? ' is-open' : ''}`}
+            aria-current={thread.id === activeThreadId ? 'true' : undefined}
             onPress={() => onSelectThread(thread.id)}
           >
             <span className="zuri-thread-row">

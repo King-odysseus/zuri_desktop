@@ -464,6 +464,15 @@ button,
   border-radius: 9999px;
 }
 
+/* The open chat keeps no fill behind it. The soft blue block made one row read as a
+   filter chip dropped into the list, so the name alone carries the state: blue ink
+   and a heavier weight. Hover still fills the row, so pointing at a chat is obvious
+   without leaving a highlight behind once the pointer moves on. */
+.zuri-sidebar-panel .zuri-thread-open.is-open .zuri-thread-title {
+  color: var(--selected-foreground);
+  font-weight: 600;
+}
+
 .zuri-thread-line {
   display: flex;
   align-items: center;
