@@ -1126,7 +1126,17 @@ check('Word and PowerPoint add-in edits use portable, single-argument Office bat
   if (font.color !== '#123456' || font.size !== 30 || font.bold !== true) {
     throw new Error('PowerPoint title fallback did not style the available title placeholder');
   }
-  return 'Word styles and replacements, plus PowerPoint title fallback, survive Office batch validation';
+  for (const required of [
+    'parentTableOrNullObject',
+    'getSelectedSlides',
+    'getSelectedShapes',
+    'Selected table:',
+    'Selected shape:',
+    'selectedShapeRequested',
+  ]) {
+    if (!source.includes(required)) throw new Error(`selection-aware Office editing is missing ${required}`);
+  }
+  return 'Word styles and replacements, plus selection-aware PowerPoint edits, survive Office batch validation';
 });
 
 check('Excel context gives multi-tab plans the workbook map they need', () => {

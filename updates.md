@@ -1,3 +1,13 @@
+## 2026-11-04 - Windows (Office edits now follow selected slides, shapes and tables)
+
+- The Office pane used selected text as its only selection signal. Selecting a PowerPoint shape, slide, or table can have no text, so the model could not identify the target and the read could fall back to the generic file error. Word table selections had the same blind spot because only selection text was loaded.
+- PowerPoint context now reads selected slide and shape collections when PowerPointApi 1.5 is available, including shape name, type and text. PowerPoint writes can target the live selected shape with the selected, selection or current shape alias, while older Office builds keep the existing text-only path.
+- Word context now reports the containing table, its dimensions and bounded cell contents through parentTableOrNullObject when WordApi 1.3 is available. Optional PowerPoint metadata failures fall back to the existing selected-text context instead of blanking the read.
+- Added self-test coverage for the selection-aware readers and target path. `node scripts/selftest.js` passes.
+- Key files: src/addin/taskpane.js, src/addin/intelligence.js, scripts/selftest.js.
+- Other OS action: none beyond the usual. The add-in ships inside the desktop app, so rebuild the installer before testing in Office.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (the Office pane says it is working, and can improve a prompt)
 
 - The Office pane drew an empty reply row while a request was in flight, so there was no sign of thinking, streaming or connection. The row was meant to read "Thinking...", but the check it used never fired: an empty reply splits into one blank text segment rather than no segments, so counting segments painted nothing. The row is now judged by what it actually drew.

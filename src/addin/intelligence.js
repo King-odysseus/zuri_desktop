@@ -23,7 +23,7 @@
   }
 
   function hasSelection(context) {
-    return /(?:Selected cells|Selected text):\s*\n?\s*(?!\(nothing selected\)|$)/i.test(String(context || ''));
+    return /(?:Selected cells|Selected text|Selected shape|Selected slide):\s*\n?\s*(?!\(nothing selected\)|$)/i.test(String(context || ''));
   }
 
   function hasSeveralSheets(context) {

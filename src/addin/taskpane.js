@@ -473,6 +473,19 @@
       paragraphs.load('items/text,items/style');
       var selection = context.document.getSelection();
       selection.load('text');
+      var selectedTable = null;
+      var selectedTableRange = null;
+      // Selection text is empty for a cursor inside a table, and selecting the
+      // table itself does not tell the model which cells it can safely change.
+      // Word 1.3 exposes the containing table without throwing outside one.
+      if (supported('WordApi', '1.3') && selection.parentTableOrNullObject) {
+        selectedTable = selection.parentTableOrNullObject;
+        selectedTable.load('rowCount,columnCount');
+        if (typeof selectedTable.getRange === 'function') {
+          selectedTableRange = selectedTable.getRange();
+          selectedTableRange.load('text');
+        }
+      }
       var properties = context.document.properties;
       properties.load('title');
 
@@ -507,6 +520,17 @@
 
         var selected = (selection.text || '').trim();
         if (selected !== '') lines.push('', 'Selected text:', truncate(selected, 4000));
+        if (selectedTable && selectedTable.isNullObject !== true) {
+          lines.push('', 'Selected table: ' + selectedTable.rowCount + ' rows by ' + selectedTable.columnCount + ' columns.');
+          if (selectedTableRange && Array.isArray(selectedTableRange.text)) {
+            var tableRows = selectedTableRange.text.map(function (row) {
+              return (Array.isArray(row) ? row : [row]).map(function (cell) {
+                return String(cell === undefined || cell === null ? '' : cell).replace(/\t/g, ' ').replace(/\r?\n/g, ' / ');
+              }).join('\t');
+            });
+            lines.push('Selected table contents:', truncate(tableRows.join('\n'), 4000));
+          }
+        }
 
         return { label: 'Word ' + (title || 'document') + ' ' + paragraphs.items.length + ' paragraphs', text: lines.join('\n') };
       });
@@ -527,9 +551,36 @@
       }
       return PowerPoint.run(function (context) {
         var slides = context.presentation.slides;
-        slides.load('items');
+        slides.load('items/id');
+        var selectedSlides = null;
+        var selectedShapes = null;
+        // Text coercion is intentionally retained for older Office builds, but it
+        // is empty for a selected picture, table, or shape with no text. These
+        // collections identify the actual object under the person's selection.
+        if (supported('PowerPointApi', '1.5') && typeof context.presentation.getSelectedSlides === 'function') {
+          selectedSlides = context.presentation.getSelectedSlides();
+          selectedSlides.load('items/id');
+        }
+        if (supported('PowerPointApi', '1.5') && typeof context.presentation.getSelectedShapes === 'function') {
+          selectedShapes = context.presentation.getSelectedShapes();
+          selectedShapes.load('items/id,items/name,items/type,items/textFrame/hasText');
+        }
         return context.sync().then(function () {
           var lines = ['The deck has ' + slides.items.length + ' slides. Slide numbers start at 1.'];
+          var selectedSlideNumbers = [];
+          if (selectedSlides && Array.isArray(selectedSlides.items)) {
+            selectedSlides.items.forEach(function (selectedSlide) {
+              for (var selectedIndex = 0; selectedIndex < slides.items.length; selectedIndex += 1) {
+                if (slides.items[selectedIndex].id === selectedSlide.id) {
+                  selectedSlideNumbers.push(selectedIndex + 1);
+                  break;
+                }
+              }
+            });
+          }
+          if (selectedSlideNumbers.length > 0) {
+            lines.push('Selected slide' + (selectedSlideNumbers.length === 1 ? '' : 's') + ': ' + selectedSlideNumbers.join(', ') + '.');
+          }
           var shown = Math.min(slides.items.length, 20);
           var shapeLists = [];
           for (var s = 0; s < shown; s += 1) {
@@ -549,7 +600,26 @@
                 }
               }
             }
+            var selectedShapeText = [];
+            if (selectedShapes && Array.isArray(selectedShapes.items)) {
+              selectedShapes.items.forEach(function (shape) {
+                if (shape.textFrame && shape.textFrame.hasText && shape.textFrame.textRange) {
+                  shape.textFrame.textRange.load('text');
+                }
+              });
+            }
             return context.sync().then(function () {
+              if (selectedShapes && Array.isArray(selectedShapes.items)) {
+                selectedShapes.items.forEach(function (shape) {
+                  var shapeLine = 'Selected shape: ' + (shape.name || '(unnamed)') + ' (type ' + (shape.type || 'unknown') + ')';
+                  if (selectedSlideNumbers.length > 0) shapeLine += ' on slide ' + selectedSlideNumbers[0];
+                  if (shape.textFrame && shape.textFrame.hasText && shape.textFrame.textRange) {
+                    var shapeText = String(shape.textFrame.textRange.text || '').replace(/\s+/g, ' ').trim();
+                    if (shapeText !== '') shapeLine += ': ' + truncate(shapeText, 2000);
+                  }
+                  selectedShapeText.push(shapeLine);
+                });
+              }
               var bySlide = {};
               withText.forEach(function (entry) {
                 var value = String(entry.shape.textFrame.textRange.text || '').replace(/\s+/g, ' ').trim();
@@ -562,11 +632,16 @@
                 lines.push('Slide ' + (index + 1) + ': ' + (texts.length === 0 ? '(no text)' : texts.join(' | ')));
               }
               if (slides.items.length > shown) lines.push('...the rest of the deck was left out.');
+              if (selectedShapeText.length > 0) lines.push('', selectedShapeText.join('\n'));
               if (selectedText.trim() !== '') lines.push('', 'Selected text:', truncate(selectedText, 2000));
               return { label: 'PowerPoint ' + slides.items.length + ' slides', text: lines.join('\n') };
             });
           });
         });
+      }).catch(function () {
+        // A missing optional PowerPoint requirement set must not turn a useful
+        // selected-text answer into the pane's generic "file could not be read".
+        return basic;
       });
     });
   }
@@ -1398,6 +1473,11 @@
       return PowerPoint.run(function (context) {
         var slides = context.presentation.slides;
         var byIndex = {};
+        var selectedShapes = null;
+        if (supported('PowerPointApi', '1.5') && typeof context.presentation.getSelectedShapes === 'function') {
+          selectedShapes = context.presentation.getSelectedShapes();
+          selectedShapes.load('items/name,items/id');
+        }
 
         function slideAt(number) {
           if (byIndex[number]) return byIndex[number];
@@ -1419,6 +1499,10 @@
         });
 
         return context.sync().then(function () {
+          var selectedShape = selectedShapes && Array.isArray(selectedShapes.items) ? selectedShapes.items[0] : null;
+          function selectedShapeRequested(name) {
+            return /^(selection|selected(?:\s+(?:shape|item))?|current(?:\s+(?:shape|item))?)$/i.test(String(name || '').trim());
+          }
           rest.forEach(function (operation) {
           if (operation.op === 'addSlide') {
             var slide = slides.add();
@@ -1437,8 +1521,10 @@
           if (operation.op === 'setShapeText') {
             var shapes = shapeCollections[operation.slide || 1] || target.shapes;
             var match = null;
+            if (selectedShape && selectedShapeRequested(operation.shape)) match = selectedShape;
             for (var s = 0; s < shapes.items.length; s += 1) {
               var shape = shapes.items[s];
+              if (match !== null) break;
               if (operation.shape === '' || shape.name === operation.shape || (match === null && shape.name.toLowerCase().indexOf(operation.shape.toLowerCase()) !== -1)) {
                 match = shape;
                 if (operation.shape !== '' && shape.name === operation.shape) break;
@@ -1456,7 +1542,7 @@
           }
           if (operation.op === 'styleShape') {
             var styleShapes = shapeCollections[operation.slide || 1] || target.shapes;
-            var styleTarget = null;
+            var styleTarget = selectedShape && selectedShapeRequested(operation.shape) ? selectedShape : null;
             for (var t = 0; t < styleShapes.items.length; t += 1) {
               var candidate = styleShapes.items[t];
               if (candidate.name === operation.shape) { styleTarget = candidate; break; }

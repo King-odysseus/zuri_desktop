@@ -2,49 +2,41 @@
   "schemaVersion": 1,
   "items": [
     {
-      "text": "Find the composer in the screenshot and why its controls cannot be selected",
+      "text": "Re-check the original brief's items against the current code: chat previews, single search box, Recents header with history button, enhancer rewriting plus suggestions",
       "state": "done"
     },
     {
-      "text": "Confirm whether the composer controls are dead, on web and desktop",
+      "text": "Verify the web UI shows chat previews, one search box, Recents header and history button",
       "state": "done"
     },
     {
-      "text": "Remove the stray lines (hairline round the desktop composer, divider above the account block) so both surfaces match the web",
+      "text": "Verify the desktop UI shows the same, and fix the suggestion pills to match the web",
       "state": "done"
     },
     {
-      "text": "Rebuild the desktop bundle and verify both lines are gone and nothing else moved",
+      "text": "Verify the enhancer rewrites the draft and also lists suggestions on both surfaces",
       "state": "done"
     },
     {
-      "text": "Run npm run test",
+      "text": "Run npm run test: all 196 checks pass",
       "state": "done"
     },
     {
-      "text": "Commit and push the fix",
+      "text": "Commit the parity fix",
       "state": "done"
     },
     {
-      "text": "Get confirmation to build and deploy",
+      "text": "Rebuild and install the Windows installer, deleting the previous build",
       "state": "done"
-    },
-    {
-      "text": "Delete the previous installer and rebuild the Windows installer",
-      "state": "active"
-    },
-    {
-      "text": "Install the new build and confirm its version",
-      "state": "pending"
     },
     {
       "text": "Deploy the web build to Railway and verify the live site",
-      "state": "pending"
+      "state": "done"
     },
     {
-      "text": "Close the review servers and report",
-      "state": "pending"
+      "text": "Push and report",
+      "state": "done"
     }
   ],
-  "updatedAt": "2026-11-04T15:16:29.852Z"
+  "updatedAt": "2026-11-04T15:40:13.125Z"
 }
