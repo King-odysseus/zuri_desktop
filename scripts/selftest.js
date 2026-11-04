@@ -1154,6 +1154,9 @@ check('Excel context gives multi-tab plans the workbook map they need', () => {
     'getUsedRangeOrNullObject(true)',
     'every non-empty sheet',
     'exact sheet name before the !',
+    'Selected Excel table:',
+    'excelRangeContains',
+    'optional probe',
   ]) {
     if (!reader.includes(required)) throw new Error(`the workbook reader is missing ${required}`);
   }

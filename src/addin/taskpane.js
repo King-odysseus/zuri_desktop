@@ -249,8 +249,15 @@
     return Excel.run(function (context) {
       var activeSheet = context.workbook.worksheets.getActiveWorksheet();
       activeSheet.load('name');
-      var selection = context.workbook.getSelectedRange();
-      selection.load(['address', 'text']);
+      var selection = null;
+      try {
+        // A chart or other non-cell selection can make this optional probe unavailable
+        // on older Excel builds. The workbook context remains useful without it.
+        selection = context.workbook.getSelectedRange();
+        selection.load(['address', 'text']);
+      } catch (error) {
+        selection = null;
+      }
       var sheets = context.workbook.worksheets.load('items/name');
       // Named ranges need ExcelApi 1.4; an older Excel simply reports none.
       var workbookNames = supported('ExcelApi', '1.4') ? context.workbook.names.load('items/name,items/formula') : null;
@@ -348,11 +355,26 @@
             });
 
             if (shownSheets === 0) lines.push('All workbook sheets are empty.');
-            var selected = selection.address.split('!').pop();
-            var selectedText = (selection.text || []).map(function (row) {
+            var selectedAddress = selection && typeof selection.address === 'string' ? selection.address : '';
+            var selected = selectedAddress === '' ? '' : selectedAddress.split('!').pop();
+            var selectedText = selection && Array.isArray(selection.text) ? selection.text.map(function (row) {
               return (Array.isArray(row) ? row : [row]).join('\\t');
-            }).join('\\n').trim();
-            if (selectedText !== '') lines.push('', 'Selected cells (' + selected + '):', truncate(selectedText, 2000));
+            }).join('\\n').trim() : '';
+            if (selected !== '') {
+              var selectedTable = null;
+              sheetReads.some(function (entry) {
+                return (entry.tableRanges || []).some(function (table) {
+                  if (!excelRangeContains(table.range.address, selectedAddress)) return false;
+                  selectedTable = { name: table.name, address: table.range.address };
+                  return true;
+                });
+              });
+              if (selectedTable !== null) {
+                lines.push('', 'Selected Excel table: "' + selectedTable.name + '" (' + selectedTable.address.split('!').pop() + ').');
+              }
+              lines.push('', 'Selected cells (' + selected + '):');
+              if (selectedText !== '') lines.push(truncate(selectedText, 2000));
+            }
             return { label: state.host + ' workbook, ' + sheets.items.length + ' sheets', text: lines.join('\\n') };
           });
         });
@@ -463,6 +485,26 @@
       value = Math.floor((value - 1) / 26);
     }
     return name;
+  }
+
+  /** Parse an Excel A1 address into sheet and numeric bounds for table matching. */
+  function excelAddressBounds(address) {
+    var parts = String(address || '').split('!');
+    var sheet = parts.length > 1 ? parts.slice(0, -1).join('!').replace(/^'|'$/g, '').replace(/''/g, "'").toLowerCase() : '';
+    var cells = (parts[parts.length - 1] || '').replace(/\$/g, '').toUpperCase().split(':');
+    var first = /^([A-Z]{1,3})(\d+)$/.exec(cells[0]);
+    var last = /^([A-Z]{1,3})(\d+)$/.exec(cells[cells.length - 1]);
+    if (!first || !last) return null;
+    return { sheet: sheet, startColumn: columnNumber(first[1]), startRow: Number(first[2]), endColumn: columnNumber(last[1]), endRow: Number(last[2]) };
+  }
+
+  /** True when selected cells fall within a table range on the same worksheet. */
+  function excelRangeContains(outerAddress, innerAddress) {
+    var outer = excelAddressBounds(outerAddress);
+    var inner = excelAddressBounds(innerAddress);
+    return outer !== null && inner !== null && outer.sheet === inner.sheet
+      && inner.startColumn >= outer.startColumn && inner.endColumn <= outer.endColumn
+      && inner.startRow >= outer.startRow && inner.endRow <= outer.endRow;
   }
 
   /** The document as a numbered outline, which is what "make this a report" needs. */

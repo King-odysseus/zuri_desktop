@@ -1,3 +1,12 @@
+## 2026-11-04 - Windows (Excel selections identify cells and tables)
+
+- Excel context now treats selection as optional, so selecting a chart or other non-cell object does not discard the workbook-wide read on older Office builds.
+- Selected Excel cells are always named when an address is available, including blank selections, and selections inside a table identify the table name and range so the model can target the right object.
+- Added self-test assertions for the guarded probe, selected table context and A1 containment helper.
+- Key files: src/addin/taskpane.js, scripts/selftest.js.
+- Other OS action: none beyond the usual rebuild; the add-in ships inside the desktop app.
+- Done on: Windows
+
 ## 2026-11-04 - Windows (selection reads fall back across Office builds)
 
 - The first selection-aware build still left some real Office sessions without a target. Word can expose a whole-table selection as a plain range, and PowerPoint can throw while asking for selected text when the selection is a shape or slide.
