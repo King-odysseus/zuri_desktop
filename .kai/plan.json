@@ -6,13 +6,21 @@
       "state": "done"
     },
     {
-      "text": "Build and deploy the web UI",
+      "text": "Confirm the local web build is current with the latest source",
       "state": "done"
     },
     {
-      "text": "Verify deployment and report result",
+      "text": "Deploy the web UI if the live site is behind (no deploy needed: live already matches)",
       "state": "done"
+    },
+    {
+      "text": "Verify the live site and run the project checks",
+      "state": "done"
+    },
+    {
+      "text": "Commit the web build output and push",
+      "state": "active"
     }
   ],
-  "updatedAt": "2026-11-04T02:04:09.216Z"
+  "updatedAt": "2026-11-04T02:04:45.112Z"
 }
