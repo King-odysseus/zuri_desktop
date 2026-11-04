@@ -19,16 +19,32 @@
     },
     {
       "text": "Run npm run test",
-      "state": "active"
+      "state": "done"
     },
     {
       "text": "Commit and push the fix",
+      "state": "done"
+    },
+    {
+      "text": "Get confirmation to build and deploy",
+      "state": "done"
+    },
+    {
+      "text": "Delete the previous installer and rebuild the Windows installer",
+      "state": "active"
+    },
+    {
+      "text": "Install the new build and confirm its version",
       "state": "pending"
     },
     {
-      "text": "Show the running UI and wait for confirmation before the installer and the Railway deploy",
+      "text": "Deploy the web build to Railway and verify the live site",
+      "state": "pending"
+    },
+    {
+      "text": "Close the review servers and report",
       "state": "pending"
     }
   ],
-  "updatedAt": "2026-11-04T15:13:38.081Z"
+  "updatedAt": "2026-11-04T15:16:29.852Z"
 }
