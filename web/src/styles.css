@@ -1264,11 +1264,12 @@ a:hover {
     gap: 8px;
   }
 
-  /* Everything that is words goes: the name, the account, the labels, the signed-in
-     line, the download link and the conversation list. The icons and the brand mark
-     stay, which is what the rail is for. */
+  /* Everything that is words goes: the brand name, the account name and plan, the
+     labels, the signed-in line, the download link and the conversation list. The
+     icons, the brand mark and the avatar stay, which is what the rail is for. */
   :is(.sidebar, .chat-recents).is-collapsed .brand-name,
-  :is(.sidebar, .chat-recents).is-collapsed .account-card > span:not(.avatar),
+  :is(.sidebar, .chat-recents).is-collapsed .sidebar-account .account-copy,
+  :is(.sidebar, .chat-recents).is-collapsed .sidebar-account .account-chevron,
   :is(.sidebar, .chat-recents).is-collapsed .nav-item span,
   :is(.sidebar, .chat-recents).is-collapsed .sidebar-note,
   :is(.sidebar, .chat-recents).is-collapsed .sidebar-download,
@@ -1288,11 +1289,22 @@ a:hover {
     padding: 0;
   }
 
-  /* The account tile is the one thing a rail cannot show: its two lines are the
-     whole point of it, and a lone initials circle reads as a button. The desktop
-     app leaves it out of its rail for the same reason. */
-  :is(.sidebar, .chat-recents).is-collapsed .account-card {
-    display: none;
+  /* A 76px rail cannot hold the name, the plan and the chevron: they overflowed
+     the panel and pushed the avatar halfway out of it. The avatar stays, centred
+     with the icons above, so the account is still one click away. */
+  :is(.sidebar, .chat-recents).is-collapsed .sidebar-account {
+    display: flex;
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  /* The rail's own content width, so the avatar lines up with the icons above
+     whatever the button's own padding and gap would have added. */
+  :is(.sidebar, .chat-recents).is-collapsed .sidebar-account > button {
+    width: 56px;
+    justify-content: center;
+    gap: 0;
+    padding: 0;
   }
 
   :is(.sidebar, .chat-recents).is-collapsed .sidebar-brand-actions {
@@ -1744,19 +1756,6 @@ body:has(.app) .app {
   background: var(--info-soft);
   border-color: var(--info-line);
   color: var(--info);
-}
-
-/* The account sits on the panel as a plain row: avatar, name, address. No card,
-   no fill, no rule. */
-.account-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border: 0;
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--nav-foreground);
 }
 
 /* The account control is the final navigation action on every viewport, including

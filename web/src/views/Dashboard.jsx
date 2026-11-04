@@ -143,21 +143,28 @@ function AccountMenu({ user, name, planText, inAdmin, onViewChange, onSignOut })
           </Button>
         </div>
       )}
+      {/* Below 900px the panel is the whole screen, and a folded panel leaves this
+          row holding only the avatar. A HeroUI button centres what it holds, which
+          floated that one avatar in the middle of the row while every other row
+          started at the left edge. The wide rail still centres it, where the icons
+          above the account are centred too. */}
       <Button
         variant="ghost"
         ref={toggleRef}
         type="button"
-        className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-2 text-left hover:bg-black/5"
+        className="flex min-h-14 w-full items-center gap-3 rounded-2xl px-2 text-left hover:bg-black/5 max-[900px]:justify-start"
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
       >
         <span className="avatar">{initialsFor(user.displayName, user.email)}</span>
-        <span className="min-w-0 flex-1 [.is-collapsed_&]:hidden">
+        {/* The folded rail (900px and wider) keeps the avatar alone and hides these
+            two by name; the phone drawer is always full width and keeps them. */}
+        <span className="account-copy min-w-0 flex-1">
           <span className="account-name block truncate">{name}</span>
           <span className="account-email block truncate">{planText}</span>
         </span>
-        <ChevronUpIcon className="[.is-collapsed_&]:hidden" />
+        <ChevronUpIcon className="account-chevron" />
       </Button>
     </div>
   );
