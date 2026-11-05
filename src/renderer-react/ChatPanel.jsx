@@ -1356,7 +1356,7 @@ export default function ChatPanel({ initialThreadId = '', onChatUpdated, onNavig
   // into a band across the window with a long empty run between the plus and the
   // message, so it no longer grows with the window. The floating overlay keeps its
   // own width because it is a small card.
-  const contentWidth = compact ? 'max-w-4xl' : 'max-w-3xl';
+  const contentWidth = compact ? 'max-w-4xl' : 'max-w-[52rem]';
 
   return (
     <main className={`relative flex h-full min-w-0 flex-1 flex-col bg-background text-foreground ${compact ? 'zuri-overlay-panel' : ''}`}>
