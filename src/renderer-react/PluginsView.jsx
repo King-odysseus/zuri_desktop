@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Checkbox, Input, Textarea } from './ui.jsx';
+import { Button, Checkbox, Input, Switch, Textarea } from './ui.jsx';
 import { GridIcon, LockIcon, SkillsIcon } from './Icons.jsx';
 
 const PREVIEW_TOOLS = [
@@ -7,7 +7,7 @@ const PREVIEW_TOOLS = [
   { name: 'createReminder', label: 'Set a reminder', description: 'Notify you at a time you choose.' },
   { name: 'webSearch', label: 'Search the web', description: 'Find current information online.' },
   { name: 'readFile', label: 'Read files', description: 'Read text and Office documents in your workspace.' },
-  { name: 'createDocument', label: 'Create documents', description: 'Build Word, Excel or PowerPoint files.' },
+  { name: 'createDocument', label: 'Create documents', description: 'Build Word, Excel, PowerPoint or PDF files.' },
   { name: 'summarizeDocument', label: 'Summarise documents', description: 'Turn a long document into a useful summary.' },
   { name: 'writeFile', label: 'Save files', description: 'Save text or Markdown in your workspace.' },
   { name: 'editDocument', label: 'Edit documents', description: 'Create an edited copy of an Office file.' },
@@ -162,9 +162,7 @@ export default function PluginsView({ onNavigate = () => {} }) {
                       <h3 className="font-medium">{tool.label || tool.name}</h3>
                       <p className="mt-1 text-sm text-muted">{tool.description || 'A Zuri tool.'}</p>
                     </div>
-                    <Checkbox isSelected={enabled} onChange={(checked) => void toggleTool(tool.name, checked)} className="min-h-11" aria-label={`${enabled ? 'Turn off' : 'Turn on'} ${tool.label || tool.name}`}>
-                      {enabled ? 'On' : 'Off'}
-                    </Checkbox>
+                    <Switch isSelected={enabled} onChange={(checked) => void toggleTool(tool.name, checked)} aria-label={`${enabled ? 'Turn off' : 'Turn on'} ${tool.label || tool.name}`} />
                   </li>
                 );
               })}
@@ -197,7 +195,7 @@ export default function PluginsView({ onNavigate = () => {} }) {
               {servers.length > 0 && <ul className="flex flex-col divide-y divide-border rounded-xl border border-border">
                 {servers.map((server) => <li key={server.id} className="flex flex-wrap items-center gap-3 px-3 py-3">
                   <div className="min-w-0 flex-1"><h3 className="font-medium">{server.name}</h3><p className="truncate text-xs text-muted">{server.command} {server.args?.join(' ')}</p></div>
-                  <Checkbox isSelected={server.enabled === true} onChange={(checked) => void toggleServer(server, checked)} aria-label={`${server.enabled ? 'Disable' : 'Enable'} ${server.name}`}>{server.enabled ? 'On' : 'Off'}</Checkbox>
+                  <Switch isSelected={server.enabled === true} onChange={(checked) => void toggleServer(server, checked)} aria-label={`${server.enabled ? 'Disable' : 'Enable'} ${server.name}`} />
                   <Button size="sm" variant="secondary" isDisabled={serverBusy} onPress={() => void testServer(server)}>Test</Button>
                   <Button size="sm" variant="ghost" onPress={() => void removeServer(server.id)}>Remove</Button>
                 </li>)}

@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeTheme,
 import { existsSync, unlinkSync } from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { copyFile, mkdir, readdir, readFile, stat, unlink, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, readFile, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 import { APPROVAL_TIMEOUT_MS, CHAT_STREAM_CHANNEL, chatForAddin, runPrompt, sendChatMessage, summarizeText } from './providers/chat.js';
@@ -69,7 +69,7 @@ import {
   updateSkill,
   updateTask,
 } from './store.js';
-import { cancelToolStep, ensureWorkspace, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, resolveWorkspacePath, runTool, toolCatalogue } from './tools/index.js';
+import { cancelToolStep, ensureWorkspace, getWorkspaceRoot, listWorkspaceFiles, registerChosenFile, resolveWorkspaceFile, resolveWorkspacePath, runTool, toolCatalogue } from './tools/index.js';
 import { publicMcpServer, testMcpServer } from './mcp/client.js';
 import { SKILL_PACK_MAX_BYTES, buildSkillPack, packFileName, parseSkillPack, planSkillImport } from './skillPacks.js';
 
@@ -386,6 +386,8 @@ const HANDLERS = new Map([
   ['zuri:files:open', handleFilesOpen],
   ['zuri:files:reveal', handleFilesReveal],
   ['zuri:files:saveAs', handleFilesSaveAs],
+  ['zuri:files:delete', handleFilesDelete],
+  ['zuri:files:clear', handleFilesClear],
   ['zuri:files:choose', handleFilesChoose],
   ['zuri:files:save-pasted', handleFilesSavePasted],
   ['zuri:files:summarize', handleFilesSummarize],
@@ -1726,6 +1728,35 @@ async function handleFilesSaveAs(payload, event) {
   } catch (error) {
     if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:files] saveAs', error);
     return filesFailure(error, 'FILES_SAVE_FAILED');
+  }
+}
+
+async function handleFilesDelete(payload) {
+  try {
+    const target = await resolveWorkspaceFile(payload?.path);
+    await unlink(target);
+    announceState({ area: 'files', path: target });
+    return { ok: true, data: { path: target } };
+  } catch (error) {
+    if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:files] delete', error);
+    return filesFailure(error, 'FILES_DELETE_FAILED');
+  }
+}
+
+async function handleFilesClear() {
+  try {
+    const listed = await listWorkspaceFiles();
+    for (const file of listed.files) {
+      const target = await resolveWorkspaceFile(file.path);
+      await rm(target, { force: true });
+    }
+    await rm(path.join(getWorkspaceRoot(), 'images'), { recursive: true, force: true });
+    await rm(path.join(getWorkspaceRoot(), 'documents'), { recursive: true, force: true });
+    announceState({ area: 'files' });
+    return { ok: true, data: { count: listed.files.length } };
+  } catch (error) {
+    if (!String(error?.code ?? '').startsWith('TOOL_')) console.error('[zuri:files] clear', error);
+    return filesFailure(error, 'FILES_CLEAR_FAILED');
   }
 }
 

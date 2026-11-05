@@ -53,6 +53,13 @@ if (pool) {
   }
 }
 const repository = pool ? createRepository(pool, { pushDelivery }) : null;
+if (repository && typeof repository.deleteExpiredStoredFiles === 'function') {
+  const removeExpiredFiles = () => repository.deleteExpiredStoredFiles()
+    .then((count) => { if (count > 0) console.log(`[zuri-cloud] removed ${count} expired attachment(s)`); })
+    .catch((error) => console.error('[zuri-cloud] attachment cleanup failed:', error?.message ?? error));
+  void removeExpiredFiles();
+  setInterval(removeExpiredFiles, 60 * 60 * 1000);
+}
 // Password accounts need no Google client, so the auth service exists whenever
 // there is a database; Google sign-in is simply unavailable without a client id.
 const auth = repository

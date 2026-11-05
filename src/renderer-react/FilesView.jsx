@@ -49,6 +49,7 @@ export default function FilesView() {
   const [summaryPath, setSummaryPath] = useState('');
   const [instruction, setInstruction] = useState('');
   const [workspacePath, setWorkspacePath] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
 
   async function reload() {
     if (typeof api?.files?.list !== 'function') {
@@ -101,6 +102,29 @@ export default function FilesView() {
     await act('.', 'reveal');
   }
 
+  async function removeFile(filePath) {
+    if (typeof api?.files?.delete !== 'function') return;
+    setBusyPath(filePath);
+    const result = await api.files.delete({ path: filePath });
+    setBusyPath('');
+    setMessage(result?.ok ? `Deleted ${filePath}.` : result?.error?.message ?? `Could not delete ${filePath}.`);
+    if (result?.ok) await reload();
+  }
+
+  async function clearFiles() {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      return;
+    }
+    if (typeof api?.files?.clear !== 'function') return;
+    setBusyPath('__clear__');
+    const result = await api.files.clear({});
+    setBusyPath('');
+    setConfirmClear(false);
+    setMessage(result?.ok ? 'Workspace files deleted.' : result?.error?.message ?? 'Workspace files could not be deleted.');
+    if (result?.ok) await reload();
+  }
+
   async function chooseSummary() {
     if (typeof api?.files?.choose !== 'function' || typeof api?.files?.summarize !== 'function') return;
     const picked = await api.files.choose({ purpose: 'summarize' });
@@ -147,7 +171,7 @@ export default function FilesView() {
           <section>
             <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-sm font-medium text-muted">Files</h2>
-              {status === 'ready' && <span className="text-sm text-muted">{countLine}</span>}
+              {status === 'ready' && <div className="flex items-center gap-3"><span className="text-sm text-muted">{countLine}</span>{files.length > 0 && <Button size="sm" variant="ghost" onPress={() => void clearFiles()} isDisabled={busyPath !== ''}>{confirmClear ? 'Confirm clear all' : 'Clear all'}</Button>}</div>}
             </div>
 
             {status === 'loading' && <p className="text-sm text-muted">Reading the workspace folder...</p>}
@@ -173,6 +197,7 @@ export default function FilesView() {
                     <div className="col-span-2 flex items-center justify-end gap-2 md:col-span-1">
                       <Button size="sm" variant="ghost" onPress={() => void act(file.path, 'open')} isDisabled={busyPath !== ''}>Open</Button>
                       <Button size="sm" variant="ghost" onPress={() => void act(file.path, 'reveal')} isDisabled={busyPath !== ''}>Reveal</Button>
+                      <Button size="sm" variant="ghost" onPress={() => void removeFile(file.path)} isDisabled={busyPath !== ''}>Delete</Button>
                     </div>
                   </li>
                 ))}

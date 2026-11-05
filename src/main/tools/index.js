@@ -47,7 +47,7 @@ const SEARCH_LIMIT_MAX = 20;
 const APP_NAME_LIMIT = 120;
 const USER_AGENT = 'Zuri/0.1 (desktop assistant)';
 
-const DOCUMENT_EXTENSIONS = new Set(['.docx', '.xlsx', '.pptx']);
+const DOCUMENT_EXTENSIONS = new Set(['.docx', '.xlsx', '.pptx', '.pdf']);
 const HTML_EXTENSIONS = new Set(['.html', '.htm']);
 const WEB_PROTOCOLS = new Set(['http:', 'https:']);
 
@@ -610,7 +610,7 @@ const DOCUMENTS_DIR_NAME = 'documents';
  */
 function documentBaseName(raw) {
   const leaf = String(raw ?? '').split(/[\\/]/).pop() ?? '';
-  const stem = leaf.replace(/\.(docx|xlsx|pptx)$/i, '');
+  const stem = leaf.replace(/\.(docx|xlsx|pptx|pdf)$/i, '');
   const cleaned = stem.replace(/[<>:"|?*\x00-\x1f]/g, '-').replace(/\s+/g, ' ').replace(/^[.\s]+|[.\s]+$/g, '');
   return cleaned.slice(0, 80) || 'document';
 }
@@ -687,9 +687,10 @@ async function createDocumentTool(args, context) {
     powerpoint: 'pptx',
     presentation: 'pptx',
     slides: 'pptx',
+    pdf: 'pdf',
   }[requestedKind] ?? requestedKind;
   if (!OFFICE_KINDS.includes(kind)) {
-    throw new ToolError('TOOL_INVALID_ARGUMENT', 'createDocument needs `kind` to be docx, xlsx or pptx.');
+    throw new ToolError('TOOL_INVALID_ARGUMENT', 'createDocument needs `kind` to be docx, xlsx, pptx or pdf.');
   }
 
   // Some providers hand nested arguments back as a JSON string rather than an object.
@@ -1081,7 +1082,7 @@ export const TOOLS = Object.freeze([
   Object.freeze({
     name: 'createDocument',
     label: 'Create a Word, Excel or PowerPoint file',
-    description: 'Build a new .docx, .xlsx or .pptx file in the workspace from structured content, for the person to open and edit.',
+    description: 'Build a new .docx, .xlsx, .pptx or .pdf file in the workspace from structured content, for the person to open and edit.',
     requiresConfirmation: false,
     handler: createDocumentTool,
   }),

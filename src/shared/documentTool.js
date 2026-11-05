@@ -1,5 +1,5 @@
 /**
- * documentTool.js - the one definition of the "create a Word, Excel or PowerPoint
+ * documentTool.js - the one definition of the "create a Word, Excel, PowerPoint or PDF
  * file" tool the model is offered.
  *
  * The desktop chat and the browser chat both hand this to the model, so the
@@ -11,7 +11,7 @@
 export const DOCUMENT_TOOL = Object.freeze({
   name: 'createDocument',
   description:
-    'Create a downloadable Word (docx), Excel (xlsx) or PowerPoint (pptx) file when the person asks for a document, spreadsheet, deck or slides. ' +
+    'Create a downloadable Word (docx), Excel (xlsx), PowerPoint (pptx) or PDF file when the person asks for a document, spreadsheet, deck, slides or PDF. ' +
     'Write the full content into the call; never ask them to copy text into Office themselves. After it succeeds, tell them the file is ready in one short sentence. ' +
     'Quality bar: plan the structure first, write finished prose rather than placeholders, and use the richer options below. ' +
     'Word: open with a short summary, use headings and tables for comparisons, and **bold** or *italic* inside text for emphasis. ' +
@@ -24,7 +24,7 @@ export const DOCUMENT_TOOL = Object.freeze({
   parameters: {
     type: 'object',
     properties: {
-      kind: { type: 'string', enum: ['docx', 'xlsx', 'pptx'], description: 'docx = Word, xlsx = Excel, pptx = PowerPoint.' },
+      kind: { type: 'string', enum: ['docx', 'xlsx', 'pptx', 'pdf'], description: 'docx = Word, xlsx = Excel, pptx = PowerPoint, pdf = PDF.' },
       fileName: { type: 'string', description: 'Short file name without extension.' },
       content: {
         type: 'object',

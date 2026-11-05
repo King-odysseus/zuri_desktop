@@ -63,6 +63,7 @@ const DOCUMENT_MIME_TYPES = Object.freeze({
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  pdf: 'application/pdf',
 });
 const SEARCH_QUERY_MIN_LENGTH = 2;
 const SEARCH_QUERY_MAX_LENGTH = 400;
@@ -1441,9 +1442,10 @@ export function createApp(dependencies = {}) {
           powerpoint: 'pptx',
           presentation: 'pptx',
           slides: 'pptx',
+          pdf: 'pdf',
         }[requestedKind] ?? requestedKind;
         if (!Object.hasOwn(DOCUMENT_MIME_TYPES, kind)) {
-          return response(400, { ok: false, error: { code: 'INVALID_KIND', message: 'Choose docx, xlsx or pptx.' } });
+          return response(400, { ok: false, error: { code: 'INVALID_KIND', message: 'Choose docx, xlsx, pptx or pdf.' } });
         }
         // Some suppliers hand nested arguments back as a JSON string.
         let content = body.content ?? body.document ?? body.body;
@@ -1479,7 +1481,7 @@ export function createApp(dependencies = {}) {
           if (bytes.length > MAX_DOCUMENT_BYTES) {
             return response(413, { ok: false, error: { code: 'DOCUMENT_TOO_LARGE', message: 'That file came out too large. Make it shorter.' } });
           }
-          const stem = String(body.fileName ?? '').split(/[\\/]/).pop().replace(/\.(docx|xlsx|pptx)$/i, '').replace(/[<>:"|?*\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/^[.\s]+|[.\s]+$/g, '').slice(0, 80);
+          const stem = String(body.fileName ?? '').split(/[\\/]/).pop().replace(/\.(docx|xlsx|pptx|pdf)$/i, '').replace(/[<>:"|?*\u0000-\u001f]/g, '-').replace(/\s+/g, ' ').replace(/^[.\s]+|[.\s]+$/g, '').slice(0, 80);
           return response(200, {
             ok: true,
             data: {
@@ -2414,6 +2416,7 @@ export function createApp(dependencies = {}) {
       const session = await dependencies.auth.authenticate(bearerToken(request));
       if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to attach a file.' } }, { 'www-authenticate': 'Bearer' });
       if (dependencies.repository?.createStoredFile === undefined) return response(503, { ok: false, error: { code: 'FILES_NOT_CONFIGURED', message: 'File storage is not configured yet.' } });
+      await dependencies.repository.deleteExpiredStoredFiles?.();
 
       let body;
       try {
@@ -2500,6 +2503,7 @@ export function createApp(dependencies = {}) {
       const session = await dependencies.auth.authenticate(presented);
       if (!session) return response(401, { ok: false, error: { code: 'AUTH_REQUIRED', message: 'Sign in to see that file.' } }, { 'www-authenticate': 'Bearer' });
       if (dependencies.repository?.findStoredFile === undefined) return response(503, { ok: false, error: { code: 'FILES_NOT_CONFIGURED', message: 'File storage is not configured yet.' } });
+      await dependencies.repository.deleteExpiredStoredFiles?.();
 
       try {
         const file = await dependencies.repository.findStoredFile({ userId: session.user.id, id: segments[0] });

@@ -55,9 +55,17 @@ for (const [kind, content, mime] of [
   assert.ok(data.mime.includes(mime), 'the MIME type matches the kind');
   const bytes = Buffer.from(data.base64, 'base64');
   assert.equal(bytes.length, data.bytes);
-  assert.equal(bytes.subarray(0, 2).toString(), 'PK', `${kind} is a ZIP package`);
+  if (kind === 'pdf') assert.equal(bytes.subarray(0, 5).toString(), '%PDF-', 'pdf has a valid header');
+  else assert.equal(bytes.subarray(0, 2).toString(), 'PK', `${kind} is a ZIP package`);
   assert.ok(Array.isArray(data.warnings));
 }
+
+const pdfApp = createApp({ auth, repository: {}, now: fixedNow, officeBuilder: { build: buildOfficeFile, review: reviewOfficeContent } });
+const pdfResponse = await post({ kind: 'pdf', fileName: 'plan.pdf', content: { title: 'Plan', sections: [{ heading: 'Intro', paragraphs: ['Hello world'] }] } }, TOKEN, pdfApp);
+assert.equal(pdfResponse.status, 200, 'pdf is built');
+const pdfData = (await pdfResponse.json()).data;
+assert.equal(pdfData.mime, 'application/pdf');
+assert.equal(Buffer.from(pdfData.base64, 'base64').subarray(0, 5).toString(), '%PDF-');
 
 // Content as a JSON string is accepted, as some suppliers send it.
 assert.equal((await post({ kind: 'pptx', content: JSON.stringify(DECK) })).status, 200);

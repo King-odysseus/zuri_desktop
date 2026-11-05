@@ -91,6 +91,8 @@ const CHANNELS = Object.freeze([
   'zuri:files:open',
   'zuri:files:reveal',
   'zuri:files:saveAs',
+  'zuri:files:delete',
+  'zuri:files:clear',
   'zuri:files:choose',
   // A picture pasted into the composer exists only as clipboard bytes, so main
   // writes it into the workspace before the message can attach it by path.

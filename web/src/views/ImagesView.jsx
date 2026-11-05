@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button, InlineAlert, Input, Select, Textarea } from '../components/ui.jsx';
 import { api } from '../lib/api.js';
-import { blobFromBase64, deletePicture, listPictures, savePicture } from '../lib/imageStore.js';
+import { blobFromBase64, clearPictures, deletePicture, listPictures, savePicture } from '../lib/imageStore.js';
 import { DeleteIcon, DownloadIcon, EnhanceIcon, ImageIcon, RegenerateIcon } from '../components/Icons.jsx';
 
 const SHAPES = [['square', 'Square'], ['portrait', 'Portrait'], ['landscape', 'Landscape']];
@@ -39,6 +39,7 @@ export default function ImagesView() {
   const [query, setQuery] = useState('');
   const [openId, setOpenId] = useState('');
   const [confirmId, setConfirmId] = useState('');
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const reload = useCallback(async () => {
     try {
@@ -117,13 +118,25 @@ export default function ImagesView() {
     await reload();
   }
 
+  async function clearAll() {
+    if (!confirmClear) {
+      setConfirmClear(true);
+      return;
+    }
+    await clearPictures();
+    setConfirmClear(false);
+    setOpenId('');
+    await reload();
+  }
+
   return (
     <section className="view image-view">
       <div className="view-head">
         <div>
           <h1>Images</h1>
-          <p>Describe a picture and Zuri draws it. Pictures are kept on this device only, never on our servers.</p>
+          <p>Describe a picture and Zuri draws it. Pictures are kept on this device only and removed after one week unless you save them.</p>
         </div>
+        {pictures.length > 0 && <Button variant="ghost" onPress={() => void clearAll()}>{confirmClear ? 'Confirm clear all' : 'Clear all'}</Button>}
       </div>
 
       {/*

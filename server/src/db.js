@@ -2119,6 +2119,10 @@ export function createRepository(pool, options = {}) {
       );
       return publicStoredFile(result.rows[0]);
     },
+    async deleteExpiredStoredFiles() {
+      const result = await pool.query("DELETE FROM stored_files WHERE created_at < NOW() - INTERVAL '7 days'");
+      return result.rowCount ?? 0;
+    },
     /**
      * One stored picture, bytes included, only when the caller owns it.
      *

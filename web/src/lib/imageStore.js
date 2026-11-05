@@ -8,6 +8,7 @@
 
 const DATABASE = 'zuri-images';
 const STORE = 'pictures';
+export const IMAGE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 function open() {
   return new Promise((resolve, reject) => {
@@ -50,6 +51,7 @@ export function blobFromBase64(base64, mime) {
  * @returns {Promise<{ id: string }>}
  */
 export async function savePicture(picture) {
+  await purgeExpiredPictures();
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   await run('readwrite', (store) => store.put({ ...picture, id, createdAt: new Date().toISOString() }));
   return { id };
@@ -57,6 +59,7 @@ export async function savePicture(picture) {
 
 /** @returns {Promise<Array<{ id: string, blob: Blob, prompt: string, usedPrompt: string, model: string, shape: string, createdAt: string }>>} newest first */
 export async function listPictures() {
+  await purgeExpiredPictures();
   const all = (await run('readonly', (store) => store.getAll())) ?? [];
   return all.sort((left, right) => (left.createdAt < right.createdAt ? 1 : -1));
 }
@@ -64,4 +67,16 @@ export async function listPictures() {
 /** @param {string} id */
 export async function deletePicture(id) {
   await run('readwrite', (store) => store.delete(id));
+}
+
+export async function clearPictures() {
+  await run('readwrite', (store) => store.clear());
+}
+
+async function purgeExpiredPictures() {
+  const cutoff = Date.now() - IMAGE_RETENTION_MS;
+  const all = (await run('readonly', (store) => store.getAll())) ?? [];
+  const expired = all.filter((picture) => Date.parse(picture?.createdAt ?? '') < cutoff).map((picture) => picture.id);
+  if (expired.length === 0) return;
+  await run('readwrite', (store) => expired.forEach((id) => store.delete(id)));
 }

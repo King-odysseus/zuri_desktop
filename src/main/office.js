@@ -39,7 +39,7 @@ import { createRequire } from 'node:module';
 // pptxgenjs's ES entry imports jszip in a way plain Node rejects; its CommonJS entry loads everywhere.
 const PptxGenJS = createRequire(import.meta.url)('pptxgenjs');
 
-export const OFFICE_KINDS = Object.freeze(['docx', 'xlsx', 'pptx']);
+export const OFFICE_KINDS = Object.freeze(['docx', 'xlsx', 'pptx', 'pdf']);
 
 /** Hard caps so a runaway model reply cannot build a huge file or hang the app. */
 const LIMITS = Object.freeze({
@@ -1591,15 +1591,102 @@ export function reviewOfficeContent(kind, content) {
   return warnings;
 }
 
-const BUILDERS = Object.freeze({ docx: buildDocx, xlsx: buildXlsx, pptx: buildPptx });
+const BUILDERS = Object.freeze({ docx: buildDocx, xlsx: buildXlsx, pptx: buildPptx, pdf: buildPdf });
+
+function pdfText(value) {
+  return String(value ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ')
+    .replace(/[^\x20-\x7E]/g, '?')
+    .replace(/[\\()]/g, (character) => `\\${character}`);
+}
+
+function pdfLines(content) {
+  const lines = [];
+  const add = (value, indent = 0) => {
+    const words = String(value ?? '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    if (words.length === 0) return;
+    let line = ' '.repeat(indent);
+    for (const word of words) {
+      if (line.trim() !== '' && line.length + word.length + 1 > 92) {
+        lines.push(line.trimEnd());
+        line = ' '.repeat(indent);
+      }
+      line += `${line.trim() === '' ? '' : ' '}${word}`;
+    }
+    if (line.trim() !== '') lines.push(line.trimEnd());
+  };
+  add(content?.title || 'Document');
+  if (content?.subtitle) add(content.subtitle);
+  for (const section of Array.isArray(content?.sections) ? content.sections : []) {
+    if (section?.heading) { lines.push(''); add(section.heading); }
+    for (const paragraph of Array.isArray(section?.paragraphs) ? section.paragraphs : []) add(paragraph);
+    for (const bullet of Array.isArray(section?.bullets) ? section.bullets : []) add(`- ${typeof bullet === 'object' ? bullet.text : bullet}`, 2);
+    for (const numbered of Array.isArray(section?.numbered) ? section.numbered : []) add(`1. ${numbered}`, 2);
+    if (section?.quote) add(`"${section.quote}"`, 2);
+    if (section?.callout) add(section.callout, 2);
+    const rows = section?.table?.rows;
+    if (Array.isArray(rows)) for (const row of rows) add(Array.isArray(row) ? row.join(' | ') : row, 2);
+  }
+  if (Array.isArray(content?.blocks)) {
+    for (const block of content.blocks) {
+      if (block?.type === 'pageBreak') { lines.push('\f'); continue; }
+      if (block?.type === 'heading') add(block.text);
+      else if (block?.type === 'bullets') for (const item of block.items ?? []) add(`- ${item}`, 2);
+      else if (block?.type === 'table') for (const row of block.rows ?? []) add(Array.isArray(row) ? row.join(' | ') : row, 2);
+      else add(block?.text);
+    }
+  }
+  return lines.length > 0 ? lines : ['Document'];
+}
+
+function buildPdf(content) {
+  const lines = pdfLines(content);
+  const pages = [];
+  let page = [];
+  for (const line of lines) {
+    if (line === '\f' || page.length >= 46) { pages.push(page); page = []; }
+    if (line !== '\f') page.push(line);
+  }
+  if (page.length > 0 || pages.length === 0) pages.push(page);
+
+  const objects = [];
+  const addObject = (value) => { objects.push(value); return objects.length; };
+  const font = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
+  const pageIds = [];
+  for (const pageLines of pages) {
+    const commands = ['BT', '/F1 12 Tf', '50 742 Td', '16 TL'];
+    pageLines.forEach((line, index) => {
+      if (index > 0) commands.push('T*');
+      commands.push(`(${pdfText(line)}) Tj`);
+    });
+    commands.push('ET');
+    const stream = commands.join('\n');
+    const contentId = addObject(`<< /Length ${Buffer.byteLength(stream, 'ascii')} >>\nstream\n${stream}\nendstream`);
+    pageIds.push(addObject(`<< /Type /Page /Parent PAGES /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${font} 0 R >> >> /Contents ${contentId} 0 R >>`));
+  }
+  const pagesId = addObject(`<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageIds.length} >>`);
+  const catalogId = addObject(`<< /Type /Catalog /Pages ${pagesId} 0 R >>`);
+  const body = ['%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'];
+  const offsets = [0];
+  for (let index = 0; index < objects.length; index += 1) {
+    const object = objects[index].replace('PAGES', `${pagesId} 0 R`);
+    offsets.push(Buffer.byteLength(body.join(''), 'binary'));
+    body.push(`${index + 1} 0 obj\n${object}\nendobj\n`);
+  }
+  const xrefOffset = Buffer.byteLength(body.join(''), 'binary');
+  body.push(`xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`);
+  for (let index = 1; index < offsets.length; index += 1) body.push(`${String(offsets[index]).padStart(10, '0')} 00000 n \n`);
+  body.push(`trailer\n<< /Size ${objects.length + 1} /Root ${catalogId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
+  return Buffer.from(body.join(''), 'binary');
+}
 
 /**
- * @param {'docx' | 'xlsx' | 'pptx'} kind
+ * @param {'docx' | 'xlsx' | 'pptx' | 'pdf'} kind
  * @param {object} content
  * @returns {Promise<Buffer>}
  */
 export function buildOfficeFile(kind, content) {
   const builder = BUILDERS[kind];
-  if (!builder) throw new OfficeError(`"${kind}" is not a supported file type. Use docx, xlsx or pptx.`);
+  if (!builder) throw new OfficeError(`"${kind}" is not a supported file type. Use docx, xlsx, pptx or pdf.`);
   return builder(content ?? {});
 }

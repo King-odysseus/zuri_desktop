@@ -1596,3 +1596,12 @@
 - Other OS action: none beyond the usual test/build workflow. Rebuild the desktop installer before distributing the change.
 - Done on: Windows
 
+## 2026-11-05 - Windows (PDF output and local file retention controls)
+
+- Added PDF as a shared document tool kind for web and desktop, with a bounded text layout and application/pdf responses.
+- Plugin tool and connector settings now use switches. Browser image libraries purge pictures older than one week and offer delete-one and clear-all controls. Desktop workspace files now offer guarded delete-one and clear-all controls and desktop-generated images remain local.
+- Cloud fallback chat uploads are deleted after seven days when the file route is used.
+- Key files: src/main/office.js, src/shared/documentTool.js, server/src/app.js, server/src/db.js, src/main/tools/index.js, src/main/main.js, src/renderer-react/PluginsView.jsx, src/renderer-react/FilesView.jsx, web/src/lib/imageStore.js, web/src/views/ImagesView.jsx.
+- Other OS action: run npm run react:build, npm run web:build and npm run server:test after syncing.
+- Done on: Windows
+
